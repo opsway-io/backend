@@ -1,0 +1,35 @@
+version: '3.1'
+
+services:
+  database:
+    image: mysql:8.0.23
+    environment:
+      MYSQL_DATABASE: 'books'
+      MYSQL_USER: 'books'
+      MYSQL_PASSWORD: 'secret'
+      MYSQL_RANDOM_ROOT_PASSWORD: 'true'
+    ports:
+      - 3306:3306
+
+  rabbitmq:
+    image: rabbitmq:management-alpine
+    restart: unless-stopped
+    ports: 
+      - 15672:15672
+      - 5672:5672
+    environment:
+      - RABBITMQ_DEFAULT_USER=guest
+      - RABBITMQ_DEFAULT_PASS=guest
+
+  redis:
+    image: redis
+    restart: unless-stopped
+    ports:
+      - 6379:6379
+
+  nats:
+    image: nats-streaming:0.21.2-alpine3.13
+    restart: unless-stopped
+    ports:
+      - 8222:8222
+      - 4222:4222
