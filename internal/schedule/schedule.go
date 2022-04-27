@@ -16,8 +16,6 @@ type Schedule interface {
 	Remove(ctx context.Context, id string) (err error)
 	Run(ctx context.Context, id string) (err error)
 	Consume(ctx context.Context, f ConsumerFunc) (err error)
-	Enable(ctx context.Context) (err error)
-	Disable(ctx context.Context) (err error)
 }
 
 type RedisSchedule struct {
@@ -45,13 +43,5 @@ func (rs *RedisSchedule) Run(ctx context.Context, id string) (err error) {
 }
 
 func (rs *RedisSchedule) Consume(ctx context.Context, f ConsumerFunc) (err error) {
-	return errors.New("not implemented")
-}
-
-func (rs *RedisSchedule) Enable(ctx context.Context) (err error) {
-	return errors.New("not implemented")
-}
-
-func (rs *RedisSchedule) Disable(ctx context.Context) (err error) {
 	return errors.New("not implemented")
 }
