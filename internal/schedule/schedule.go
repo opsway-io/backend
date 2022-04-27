@@ -11,13 +11,13 @@ import (
 type ConsumerFunc func(id string, data interface{})
 
 type Schedule interface {
-	Add(cron *cron.Schedule, data interface{}) (id string, err error)
-	Set(id string, data interface{}) (err error)
-	Remove(id string) (err error)
-	Run(id string) (err error)
+	Add(ctx context.Context, cron *cron.Schedule, data interface{}) (id string, err error)
+	Set(ctx context.Context, id string, data interface{}) (err error)
+	Remove(ctx context.Context, id string) (err error)
+	Run(ctx context.Context, id string) (err error)
 	Consume(ctx context.Context, f ConsumerFunc) (err error)
-	Enable() (err error)
-	Disable() (err error)
+	Enable(ctx context.Context) (err error)
+	Disable(ctx context.Context) (err error)
 }
 
 type RedisSchedule struct {
@@ -28,19 +28,19 @@ func New(client *redis.Client) Schedule {
 	return &RedisSchedule{client: client}
 }
 
-func (rs *RedisSchedule) Add(cron *cron.Schedule, data interface{}) (id string, err error) {
+func (rs *RedisSchedule) Add(ctx context.Context, cron *cron.Schedule, data interface{}) (id string, err error) {
 	return "", errors.New("not implemented")
 }
 
-func (rs *RedisSchedule) Set(id string, data interface{}) (err error) {
+func (rs *RedisSchedule) Set(ctx context.Context, id string, data interface{}) (err error) {
 	return errors.New("not implemented")
 }
 
-func (rs *RedisSchedule) Remove(id string) (err error) {
+func (rs *RedisSchedule) Remove(ctx context.Context, id string) (err error) {
 	return errors.New("not implemented")
 }
 
-func (rs *RedisSchedule) Run(id string) (err error) {
+func (rs *RedisSchedule) Run(ctx context.Context, id string) (err error) {
 	return errors.New("not implemented")
 }
 
@@ -48,10 +48,10 @@ func (rs *RedisSchedule) Consume(ctx context.Context, f ConsumerFunc) (err error
 	return errors.New("not implemented")
 }
 
-func (rs *RedisSchedule) Enable() (err error) {
+func (rs *RedisSchedule) Enable(ctx context.Context) (err error) {
 	return errors.New("not implemented")
 }
 
-func (rs *RedisSchedule) Disable() (err error) {
+func (rs *RedisSchedule) Disable(ctx context.Context) (err error) {
 	return errors.New("not implemented")
 }
