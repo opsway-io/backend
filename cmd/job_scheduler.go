@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"math/rand"
 	"strings"
-	"time"
 
 	"github.com/go-redis/redis"
 	"github.com/sirupsen/logrus"
@@ -53,14 +52,10 @@ func runScheduler(cmd *cobra.Command, args []string) {
 		}
 	}
 
-	for {
+	setIdCmd := fmt.Sprintf("redis.call('%s', '%s', '%s', '%s', '%s')", rc.XGroupSetID(subject, consumersGroup, "0").Args()...)
 
-		time.Sleep(time.Second * 2)
-
-		logrus.Info("resetting group")
-		if err := rc.XGroupSetID(subject, consumersGroup, "0").Err(); err != nil {
-			logrus.WithError(err).Fatal(err)
-		}
+	if err := rc.Do("KEYDB.CRON", "test-10-seconds", "REPEAT", 10000, setIdCmd).Err(); err != nil {
+		logrus.WithError(err).Fatal(err)
 	}
 }
 
