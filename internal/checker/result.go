@@ -9,8 +9,7 @@ type Result struct {
 }
 
 type Response struct {
-	StatusCode    int
-	ContentLength int64
+	StatusCode int
 }
 
 type Timing struct {
