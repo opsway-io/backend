@@ -1,7 +1,7 @@
 package main
 
 import (
-	"monitor/internal/influxdb"
+	"github.com/opsway-io/backend/internal/influxdb"
 
 	"github.com/sirupsen/logrus"
 )
@@ -19,7 +19,7 @@ func main() {
 		logrus.Fatal(err)
 	}
 
-	repo, err = influxdb.NewRepository(client, "test", "test")
+	_, err = influxdb.NewRepository(client, "test", "test")
 	if err != nil {
 		logrus.Fatal(err)
 	}
