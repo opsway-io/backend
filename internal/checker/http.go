@@ -33,10 +33,6 @@ func APICheck(method, url string, headers map[string]string, body io.Reader, tim
 
 	req.Header.Set("User-Agent", UserAgent)
 
-	if body != nil {
-		req.Body = ioutil.NopCloser(body)
-	}
-
 	var result httpstat.Result
 	ctx := httpstat.WithHTTPStat(req.Context(), &result)
 	req = req.WithContext(ctx)
@@ -50,8 +46,7 @@ func APICheck(method, url string, headers map[string]string, body io.Reader, tim
 		return nil, errors.Wrap(err, "failed to send request")
 	}
 
-	_, err = ioutil.ReadAll(io.LimitReader(resp.Body, BodySizeLimit))
-	if err != nil {
+	if _, err := io.Copy(ioutil.Discard, resp.Body); err != nil {
 		return nil, errors.Wrap(err, "failed to read response body")
 	}
 	resp.Body.Close()
@@ -59,8 +54,7 @@ func APICheck(method, url string, headers map[string]string, body io.Reader, tim
 
 	meta := &Result{
 		Response: Response{
-			StatusCode:    resp.StatusCode,
-			ContentLength: resp.ContentLength,
+			StatusCode: resp.StatusCode,
 		},
 		Timing: Timing{
 			Phases: TimingPhases{
