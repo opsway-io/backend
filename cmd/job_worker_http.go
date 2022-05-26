@@ -5,14 +5,17 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/fatih/structs"
 	"github.com/opsway-io/backend/internal/checker"
-	"github.com/opsway-io/backend/pkg/utils"
+	"github.com/opsway-io/backend/internal/influxdb"
 
 	"github.com/go-redis/redis"
 	"github.com/rs/xid"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 )
+
+var repo *influxdb.RepositoryImpl
 
 // serveCmd represents the serve command.
 var httpProbeCmd = &cobra.Command{
@@ -22,6 +25,16 @@ var httpProbeCmd = &cobra.Command{
 
 func init() { //nolint:gochecknoinits
 	rootCmd.AddCommand(httpProbeCmd)
+
+	client, err := influxdb.NewConnection()
+	if err != nil {
+		logrus.Fatal(err)
+	}
+
+	repo, err = influxdb.NewRepository(client, "opsway", "test")
+	if err != nil {
+		logrus.Fatal(err)
+	}
 }
 
 func httpProbe(cmd *cobra.Command, args []string) {
@@ -54,16 +67,19 @@ func httpProbe(cmd *cobra.Command, args []string) {
 		}
 
 		for i := 0; i < len(entries[0].Messages); i++ {
-			err := handle(rc, entries[0].Messages[i])
+			result, err := handle(rc, entries[0].Messages[i])
 			if err != nil {
 				logrus.WithError(err).Fatal(err)
 			}
+
+			m := structs.Map(result)
+			repo.Write(m)
 			c++
 		}
 	}
 }
 
-func handle(rc *redis.Client, msg redis.XMessage) error {
+func handle(rc *redis.Client, msg redis.XMessage) (*checker.Result, error) {
 	messageID := msg.ID
 
 	res, err := checker.APICheck(http.MethodGet, "https://tranberg.tk", nil, nil, time.Second*5)
@@ -71,7 +87,5 @@ func handle(rc *redis.Client, msg redis.XMessage) error {
 		logrus.WithError(err).Error("HTTP probe failed")
 	}
 
-	utils.Print(res)
-
-	return rc.XAck(subject, consumersGroup, messageID).Err()
+	return res, rc.XAck(subject, consumersGroup, messageID).Err()
 }

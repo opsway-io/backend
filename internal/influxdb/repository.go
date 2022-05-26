@@ -3,6 +3,7 @@ package influxdb
 import (
 	"context"
 	"fmt"
+	"time"
 
 	influxdb2 "github.com/influxdata/influxdb-client-go/v2"
 	"github.com/influxdata/influxdb-client-go/v2/api"
@@ -20,8 +21,10 @@ func NewRepository(db influxdb2.Client, org string, bucket string) (*RepositoryI
 	}, nil
 }
 
-func (r *RepositoryImpl) Write(data string) {
-	r.writeClient.WriteRecord(data)
+func (r *RepositoryImpl) Write(data map[string]interface{}) {
+	p := influxdb2.NewPoint("test", map[string]string{"tag": "value"}, data, time.Now())
+
+	r.writeClient.WritePoint(p)
 
 	r.writeClient.Flush()
 }

@@ -3,6 +3,7 @@ module github.com/opsway-io/backend
 go 1.18
 
 require (
+	github.com/fatih/structs v1.1.0
 	github.com/go-redis/redis v6.15.9+incompatible
 	github.com/go-redis/redis/v8 v8.11.5
 	github.com/influxdata/influxdb-client-go/v2 v2.9.0
