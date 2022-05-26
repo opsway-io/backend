@@ -10,6 +10,7 @@ import (
 	"github.com/opsway-io/backend/internal/influxdb"
 
 	"github.com/go-redis/redis"
+	"github.com/jeremywohl/flatten"
 	"github.com/rs/xid"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
@@ -31,7 +32,7 @@ func init() { //nolint:gochecknoinits
 		logrus.Fatal(err)
 	}
 
-	repo, err = influxdb.NewRepository(client, "opsway", "test")
+	repo, err = influxdb.NewRepository(client, "opsway", "http")
 	if err != nil {
 		logrus.Fatal(err)
 	}
@@ -73,6 +74,11 @@ func httpProbe(cmd *cobra.Command, args []string) {
 			}
 
 			m := structs.Map(result)
+			m, err = flatten.Flatten(m, "", flatten.DotStyle)
+			if err != nil {
+				logrus.WithError(err).Fatal(err)
+			}
+
 			repo.Write(m)
 			c++
 		}

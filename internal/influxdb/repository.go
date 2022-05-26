@@ -22,7 +22,7 @@ func NewRepository(db influxdb2.Client, org string, bucket string) (*RepositoryI
 }
 
 func (r *RepositoryImpl) Write(data map[string]interface{}) {
-	p := influxdb2.NewPoint("test", map[string]string{"tag": "value"}, data, time.Now())
+	p := influxdb2.NewPoint("test", map[string]string{"tag": "apiCheck"}, data, time.Now())
 
 	r.writeClient.WritePoint(p)
 

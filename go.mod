@@ -7,6 +7,7 @@ require (
 	github.com/go-redis/redis v6.15.9+incompatible
 	github.com/go-redis/redis/v8 v8.11.5
 	github.com/influxdata/influxdb-client-go/v2 v2.9.0
+	github.com/jeremywohl/flatten v1.0.1
 	github.com/joho/godotenv v1.4.0
 	github.com/kelseyhightower/envconfig v1.4.0
 	github.com/opsway-io/go-httpstat v1.0.0
