@@ -5,8 +5,8 @@ import (
 	"net/http"
 	"time"
 
-	"monitor/internal/checker"
-	"monitor/pkg/utils"
+	"github.com/opsway-io/backend/internal/checker"
+	"github.com/opsway-io/backend/pkg/utils"
 
 	"github.com/go-redis/redis"
 	"github.com/rs/xid"

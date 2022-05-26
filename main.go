@@ -1,6 +1,6 @@
 package main
 
-import "monitor/cmd"
+import "github.com/opsway-io/backend/cmd"
 
 const (
 	subject        = "tickets"

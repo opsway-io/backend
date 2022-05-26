@@ -9,9 +9,9 @@ import (
 
 	"github.com/pkg/errors"
 
-	xtls "monitor/pkg/tls"
+	xtls "github.com/opsway-io/backend/pkg/tls"
 
-	"github.com/tcnksm/go-httpstat"
+	"github.com/opsway-io/go-httpstat"
 )
 
 const (
@@ -55,14 +55,11 @@ func APICheck(method, url string, headers map[string]string, body io.Reader, tim
 		return nil, errors.Wrap(err, "failed to read response body")
 	}
 	resp.Body.Close()
-	endTime := time.Now()
-
-	result.End(endTime)
+	result.End(time.Now())
 
 	meta := &Result{
 		Response: Response{
-			StatusCode: resp.StatusCode,
-			// Body:          respBody,
+			StatusCode:    resp.StatusCode,
 			ContentLength: resp.ContentLength,
 		},
 		Timing: Timing{
@@ -70,12 +67,12 @@ func APICheck(method, url string, headers map[string]string, body io.Reader, tim
 			TCPConnection:    result.TCPConnection,
 			TLSHandshake:     result.TLSHandshake,
 			ServerProcessing: result.ServerProcessing,
-			// ContentTransfer:  result.ContentTransfer(endTime),
-			NameLookup:    result.NameLookup,
-			Connect:       result.Connect,
-			PreTransfer:   result.Pretransfer,
-			StartTransfer: result.StartTransfer,
-			// Total:            result.Total(endTime),
+			ContentTransfer:  result.ContentTransfer,
+			NameLookup:       result.NameLookup,
+			Connect:          result.Connect,
+			PreTransfer:      result.Pretransfer,
+			StartTransfer:    result.StartTransfer,
+			Total:            result.Total,
 		},
 	}
 

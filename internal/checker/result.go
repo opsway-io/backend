@@ -10,7 +10,6 @@ type Result struct {
 
 type Response struct {
 	StatusCode    int
-	Body          []byte
 	ContentLength int64
 }
 
