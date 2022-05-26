@@ -1,0 +1,1382 @@
+[
+    {
+        "id": "0b120014-0f55-4bb1-ab16-432ff39af325",
+        "check": {
+            "id": "0b120014-0f55-4bb1-ab16-432ff39af325",
+            "name": "Bank App",
+            "checkType": "API",
+            "frequency": 5,
+            "frequencyOffset": 9,
+            "activated": true,
+            "muted": false,
+            "tags": [
+                "website"
+            ],
+            "created_at": "2021-05-02T16:57:03.850Z",
+            "isSample": false,
+            "groupId": null,
+            "groupOrder": null,
+            "status": {
+                "hasFailures": false,
+                "isDegraded": false,
+                "sslDaysRemaining": 65,
+                "updated_at": "2022-05-26T11:55:50.204Z",
+                "created_at": "2021-05-02T16:57:04.565Z",
+                "lastFailedResultId": "a707ca48-d0b2-4230-b5ca-8c44b35f407d",
+                "lastFailingCheckRunTimestamp": "2021-10-13T08:40:52.456Z"
+            }
+        },
+        "results": [
+            {
+                "id": "31390320-2141-4d2f-af57-fd42e715ea78",
+                "checkId": "0b120014-0f55-4bb1-ab16-432ff39af325",
+                "responseTime": 479,
+                "hasFailures": false,
+                "isDegraded": false,
+                "overMaxResponseTime": false,
+                "runLocation": "eu-west-3",
+                "startedAt": "2022-05-26T11:55:49Z"
+            },
+            {
+                "id": "b84e2217-f678-463b-b524-2cf4b7e9ad4c",
+                "checkId": "0b120014-0f55-4bb1-ab16-432ff39af325",
+                "responseTime": 102,
+                "hasFailures": false,
+                "isDegraded": false,
+                "overMaxResponseTime": false,
+                "runLocation": "eu-central-1",
+                "startedAt": "2022-05-26T11:50:49Z"
+            },
+            {
+                "id": "9f115d7c-31b6-4c9b-a283-20838ea93c6b",
+                "checkId": "0b120014-0f55-4bb1-ab16-432ff39af325",
+                "responseTime": 46,
+                "hasFailures": false,
+                "isDegraded": false,
+                "overMaxResponseTime": false,
+                "runLocation": "eu-west-3",
+                "startedAt": "2022-05-26T11:45:49Z"
+            },
+            {
+                "id": "c562a9c3-e7f5-472d-92cf-96bbdd878688",
+                "checkId": "0b120014-0f55-4bb1-ab16-432ff39af325",
+                "responseTime": 68,
+                "hasFailures": false,
+                "isDegraded": false,
+                "overMaxResponseTime": false,
+                "runLocation": "eu-central-1",
+                "startedAt": "2022-05-26T11:40:50Z"
+            },
+            {
+                "id": "bb055b65-47ae-4714-84d0-4323adb84eee",
+                "checkId": "0b120014-0f55-4bb1-ab16-432ff39af325",
+                "responseTime": 49,
+                "hasFailures": false,
+                "isDegraded": false,
+                "overMaxResponseTime": false,
+                "runLocation": "eu-west-3",
+                "startedAt": "2022-05-26T11:35:49Z"
+            },
+            {
+                "id": "6109fef5-5248-4a96-a2dd-b91f2a0f2832",
+                "checkId": "0b120014-0f55-4bb1-ab16-432ff39af325",
+                "responseTime": 67,
+                "hasFailures": false,
+                "isDegraded": false,
+                "overMaxResponseTime": false,
+                "runLocation": "eu-central-1",
+                "startedAt": "2022-05-26T11:30:49Z"
+            },
+            {
+                "id": "fe5e8feb-b42a-4480-8b4b-b47db6efa0ca",
+                "checkId": "0b120014-0f55-4bb1-ab16-432ff39af325",
+                "responseTime": 60,
+                "hasFailures": false,
+                "isDegraded": false,
+                "overMaxResponseTime": false,
+                "runLocation": "eu-west-3",
+                "startedAt": "2022-05-26T11:25:50Z"
+            },
+            {
+                "id": "72671ff1-4ff0-4c64-abae-311becca955d",
+                "checkId": "0b120014-0f55-4bb1-ab16-432ff39af325",
+                "responseTime": 89,
+                "hasFailures": false,
+                "isDegraded": false,
+                "overMaxResponseTime": false,
+                "runLocation": "eu-central-1",
+                "startedAt": "2022-05-26T11:20:49Z"
+            },
+            {
+                "id": "919ba71d-10ca-4829-abbb-48052d1f29fa",
+                "checkId": "0b120014-0f55-4bb1-ab16-432ff39af325",
+                "responseTime": 45,
+                "hasFailures": false,
+                "isDegraded": false,
+                "overMaxResponseTime": false,
+                "runLocation": "eu-west-3",
+                "startedAt": "2022-05-26T11:15:49Z"
+            },
+            {
+                "id": "67ccc560-131f-4539-8da2-3c4f3a53983b",
+                "checkId": "0b120014-0f55-4bb1-ab16-432ff39af325",
+                "responseTime": 65,
+                "hasFailures": false,
+                "isDegraded": false,
+                "overMaxResponseTime": false,
+                "runLocation": "eu-central-1",
+                "startedAt": "2022-05-26T11:10:49Z"
+            },
+            {
+                "id": "d30f3f9c-fc10-402a-a8d1-d58ccea79e08",
+                "checkId": "0b120014-0f55-4bb1-ab16-432ff39af325",
+                "responseTime": 47,
+                "hasFailures": false,
+                "isDegraded": false,
+                "overMaxResponseTime": false,
+                "runLocation": "eu-west-3",
+                "startedAt": "2022-05-26T11:05:49Z"
+            },
+            {
+                "id": "db1925f8-dadd-4c6b-9e88-4e1db59d56d1",
+                "checkId": "0b120014-0f55-4bb1-ab16-432ff39af325",
+                "responseTime": 155,
+                "hasFailures": false,
+                "isDegraded": false,
+                "overMaxResponseTime": false,
+                "runLocation": "eu-central-1",
+                "startedAt": "2022-05-26T11:00:49Z"
+            },
+            {
+                "id": "4a35edf9-81a0-4c94-80b2-a96b9ff9686f",
+                "checkId": "0b120014-0f55-4bb1-ab16-432ff39af325",
+                "responseTime": 147,
+                "hasFailures": false,
+                "isDegraded": false,
+                "overMaxResponseTime": false,
+                "runLocation": "eu-west-3",
+                "startedAt": "2022-05-26T10:55:49Z"
+            },
+            {
+                "id": "cdb586ba-c424-4b07-8739-33ce9d04bfc5",
+                "checkId": "0b120014-0f55-4bb1-ab16-432ff39af325",
+                "responseTime": 67,
+                "hasFailures": false,
+                "isDegraded": false,
+                "overMaxResponseTime": false,
+                "runLocation": "eu-central-1",
+                "startedAt": "2022-05-26T10:50:49Z"
+            },
+            {
+                "id": "9b4ac76d-6afd-4ebe-95fd-6d9819e7e6cd",
+                "checkId": "0b120014-0f55-4bb1-ab16-432ff39af325",
+                "responseTime": 149,
+                "hasFailures": false,
+                "isDegraded": false,
+                "overMaxResponseTime": false,
+                "runLocation": "eu-west-3",
+                "startedAt": "2022-05-26T10:45:49Z"
+            },
+            {
+                "id": "bb620cd6-0c0b-4c3f-b3b6-82e22813070f",
+                "checkId": "0b120014-0f55-4bb1-ab16-432ff39af325",
+                "responseTime": 54,
+                "hasFailures": false,
+                "isDegraded": false,
+                "overMaxResponseTime": false,
+                "runLocation": "eu-central-1",
+                "startedAt": "2022-05-26T10:40:49Z"
+            },
+            {
+                "id": "625abd3c-e146-40c3-ac7b-1c2107db058f",
+                "checkId": "0b120014-0f55-4bb1-ab16-432ff39af325",
+                "responseTime": 46,
+                "hasFailures": false,
+                "isDegraded": false,
+                "overMaxResponseTime": false,
+                "runLocation": "eu-west-3",
+                "startedAt": "2022-05-26T10:35:49Z"
+            },
+            {
+                "id": "fa961158-db70-4f2d-af27-f743fca5cd31",
+                "checkId": "0b120014-0f55-4bb1-ab16-432ff39af325",
+                "responseTime": 71,
+                "hasFailures": false,
+                "isDegraded": false,
+                "overMaxResponseTime": false,
+                "runLocation": "eu-central-1",
+                "startedAt": "2022-05-26T10:30:49Z"
+            },
+            {
+                "id": "5c5d26a4-a62a-4126-ab1a-baac216b2186",
+                "checkId": "0b120014-0f55-4bb1-ab16-432ff39af325",
+                "responseTime": 47,
+                "hasFailures": false,
+                "isDegraded": false,
+                "overMaxResponseTime": false,
+                "runLocation": "eu-west-3",
+                "startedAt": "2022-05-26T10:25:49Z"
+            },
+            {
+                "id": "536928e0-3ea3-4a7b-b2d2-92be927ab212",
+                "checkId": "0b120014-0f55-4bb1-ab16-432ff39af325",
+                "responseTime": 168,
+                "hasFailures": false,
+                "isDegraded": false,
+                "overMaxResponseTime": false,
+                "runLocation": "eu-central-1",
+                "startedAt": "2022-05-26T10:20:49Z"
+            },
+            {
+                "id": "abfee931-ce68-452c-8364-7530c595201e",
+                "checkId": "0b120014-0f55-4bb1-ab16-432ff39af325",
+                "responseTime": 159,
+                "hasFailures": false,
+                "isDegraded": false,
+                "overMaxResponseTime": false,
+                "runLocation": "eu-west-3",
+                "startedAt": "2022-05-26T10:15:49Z"
+            },
+            {
+                "id": "4c317678-2091-4167-82b8-677ca1e0ee59",
+                "checkId": "0b120014-0f55-4bb1-ab16-432ff39af325",
+                "responseTime": 106,
+                "hasFailures": false,
+                "isDegraded": false,
+                "overMaxResponseTime": false,
+                "runLocation": "eu-central-1",
+                "startedAt": "2022-05-26T10:10:49Z"
+            },
+            {
+                "id": "888460a6-4f62-4924-b7f1-436918a77992",
+                "checkId": "0b120014-0f55-4bb1-ab16-432ff39af325",
+                "responseTime": 54,
+                "hasFailures": false,
+                "isDegraded": false,
+                "overMaxResponseTime": false,
+                "runLocation": "eu-west-3",
+                "startedAt": "2022-05-26T10:05:49Z"
+            },
+            {
+                "id": "38d77fed-2cdb-4302-b2d2-e7b32573b190",
+                "checkId": "0b120014-0f55-4bb1-ab16-432ff39af325",
+                "responseTime": 67,
+                "hasFailures": false,
+                "isDegraded": false,
+                "overMaxResponseTime": false,
+                "runLocation": "eu-central-1",
+                "startedAt": "2022-05-26T10:00:49Z"
+            }
+        ],
+        "stats": {
+            "1dSuccessRatio": 100,
+            "7dSuccessRatio": 100,
+            "avg": 80.35,
+            "p95": 172.64999999999998
+        }
+    },
+    {
+        "id": "141fe07f-eba6-438b-9ca0-891b7c185508",
+        "check": {
+            "id": "141fe07f-eba6-438b-9ca0-891b7c185508",
+            "name": "Union API",
+            "checkType": "API",
+            "frequency": 5,
+            "frequencyOffset": 22,
+            "activated": true,
+            "muted": false,
+            "tags": [
+                "api"
+            ],
+            "created_at": "2021-05-02T16:56:18.163Z",
+            "isSample": false,
+            "groupId": null,
+            "groupOrder": null,
+            "status": {
+                "hasFailures": false,
+                "isDegraded": false,
+                "sslDaysRemaining": 65,
+                "updated_at": "2022-05-26T11:57:07.888Z",
+                "created_at": "2021-05-02T16:56:19.048Z",
+                "lastFailedResultId": "0b0c149c-0ece-40cf-8ec5-c412c2039699",
+                "lastFailingCheckRunTimestamp": "2022-03-04T07:02:18.535Z"
+            }
+        },
+        "results": [
+            {
+                "id": "84851d1f-7fb6-46ae-8869-cc3c2ff3b1ab",
+                "checkId": "141fe07f-eba6-438b-9ca0-891b7c185508",
+                "responseTime": 68,
+                "hasFailures": false,
+                "isDegraded": false,
+                "overMaxResponseTime": false,
+                "runLocation": "eu-central-1",
+                "startedAt": "2022-05-26T11:57:07Z"
+            },
+            {
+                "id": "c2bb3169-3700-4da2-af20-c51e97b4c07d",
+                "checkId": "141fe07f-eba6-438b-9ca0-891b7c185508",
+                "responseTime": 152,
+                "hasFailures": false,
+                "isDegraded": false,
+                "overMaxResponseTime": false,
+                "runLocation": "eu-west-3",
+                "startedAt": "2022-05-26T11:52:07Z"
+            },
+            {
+                "id": "bb8cc73c-6c1a-454e-b1d8-9700e64a9d9e",
+                "checkId": "141fe07f-eba6-438b-9ca0-891b7c185508",
+                "responseTime": 75,
+                "hasFailures": false,
+                "isDegraded": false,
+                "overMaxResponseTime": false,
+                "runLocation": "eu-central-1",
+                "startedAt": "2022-05-26T11:47:08Z"
+            },
+            {
+                "id": "139cbe7d-0884-4e1c-8b48-337bf14d22bd",
+                "checkId": "141fe07f-eba6-438b-9ca0-891b7c185508",
+                "responseTime": 46,
+                "hasFailures": false,
+                "isDegraded": false,
+                "overMaxResponseTime": false,
+                "runLocation": "eu-west-3",
+                "startedAt": "2022-05-26T11:42:07Z"
+            },
+            {
+                "id": "0648a1c1-c3c5-408f-8d1f-0aa10fa887d1",
+                "checkId": "141fe07f-eba6-438b-9ca0-891b7c185508",
+                "responseTime": 66,
+                "hasFailures": false,
+                "isDegraded": false,
+                "overMaxResponseTime": false,
+                "runLocation": "eu-central-1",
+                "startedAt": "2022-05-26T11:37:08Z"
+            },
+            {
+                "id": "847141a1-4767-4cc0-85e0-90d80815eeac",
+                "checkId": "141fe07f-eba6-438b-9ca0-891b7c185508",
+                "responseTime": 50,
+                "hasFailures": false,
+                "isDegraded": false,
+                "overMaxResponseTime": false,
+                "runLocation": "eu-west-3",
+                "startedAt": "2022-05-26T11:32:08Z"
+            },
+            {
+                "id": "f9510d72-8e55-466f-833f-320237ce5493",
+                "checkId": "141fe07f-eba6-438b-9ca0-891b7c185508",
+                "responseTime": 63,
+                "hasFailures": false,
+                "isDegraded": false,
+                "overMaxResponseTime": false,
+                "runLocation": "eu-central-1",
+                "startedAt": "2022-05-26T11:27:08Z"
+            },
+            {
+                "id": "4a8f78e5-bf60-48d3-a7cf-37b02c3f1b79",
+                "checkId": "141fe07f-eba6-438b-9ca0-891b7c185508",
+                "responseTime": 41,
+                "hasFailures": false,
+                "isDegraded": false,
+                "overMaxResponseTime": false,
+                "runLocation": "eu-west-3",
+                "startedAt": "2022-05-26T11:22:07Z"
+            },
+            {
+                "id": "53eeb066-3243-4419-8512-23fb7af3a26c",
+                "checkId": "141fe07f-eba6-438b-9ca0-891b7c185508",
+                "responseTime": 69,
+                "hasFailures": false,
+                "isDegraded": false,
+                "overMaxResponseTime": false,
+                "runLocation": "eu-central-1",
+                "startedAt": "2022-05-26T11:17:08Z"
+            },
+            {
+                "id": "cbcee442-c35d-43c2-8d79-72df351bc0b5",
+                "checkId": "141fe07f-eba6-438b-9ca0-891b7c185508",
+                "responseTime": 164,
+                "hasFailures": false,
+                "isDegraded": false,
+                "overMaxResponseTime": false,
+                "runLocation": "eu-west-3",
+                "startedAt": "2022-05-26T11:12:07Z"
+            },
+            {
+                "id": "bc9d89c6-30f2-45ce-8d46-ebb38198a0e9",
+                "checkId": "141fe07f-eba6-438b-9ca0-891b7c185508",
+                "responseTime": 70,
+                "hasFailures": false,
+                "isDegraded": false,
+                "overMaxResponseTime": false,
+                "runLocation": "eu-central-1",
+                "startedAt": "2022-05-26T11:07:07Z"
+            },
+            {
+                "id": "aed79af5-c9e2-4978-9437-9076081a5ddb",
+                "checkId": "141fe07f-eba6-438b-9ca0-891b7c185508",
+                "responseTime": 49,
+                "hasFailures": false,
+                "isDegraded": false,
+                "overMaxResponseTime": false,
+                "runLocation": "eu-west-3",
+                "startedAt": "2022-05-26T11:02:07Z"
+            },
+            {
+                "id": "3f487f28-ebd5-43f5-aead-c25da19b969a",
+                "checkId": "141fe07f-eba6-438b-9ca0-891b7c185508",
+                "responseTime": 70,
+                "hasFailures": false,
+                "isDegraded": false,
+                "overMaxResponseTime": false,
+                "runLocation": "eu-central-1",
+                "startedAt": "2022-05-26T10:57:07Z"
+            },
+            {
+                "id": "53041736-09cc-49a8-add1-260dd672b7a5",
+                "checkId": "141fe07f-eba6-438b-9ca0-891b7c185508",
+                "responseTime": 50,
+                "hasFailures": false,
+                "isDegraded": false,
+                "overMaxResponseTime": false,
+                "runLocation": "eu-west-3",
+                "startedAt": "2022-05-26T10:52:07Z"
+            },
+            {
+                "id": "ef8e8b7c-5866-4ed5-882d-22ed98c8d977",
+                "checkId": "141fe07f-eba6-438b-9ca0-891b7c185508",
+                "responseTime": 62,
+                "hasFailures": false,
+                "isDegraded": false,
+                "overMaxResponseTime": false,
+                "runLocation": "eu-central-1",
+                "startedAt": "2022-05-26T10:47:08Z"
+            },
+            {
+                "id": "2e60bc6c-4b79-4acd-87af-1473a8beb924",
+                "checkId": "141fe07f-eba6-438b-9ca0-891b7c185508",
+                "responseTime": 571,
+                "hasFailures": false,
+                "isDegraded": false,
+                "overMaxResponseTime": false,
+                "runLocation": "eu-west-3",
+                "startedAt": "2022-05-26T10:42:07Z"
+            },
+            {
+                "id": "4418b197-b95e-438f-8e61-b8cc58d6efa9",
+                "checkId": "141fe07f-eba6-438b-9ca0-891b7c185508",
+                "responseTime": 67,
+                "hasFailures": false,
+                "isDegraded": false,
+                "overMaxResponseTime": false,
+                "runLocation": "eu-central-1",
+                "startedAt": "2022-05-26T10:37:08Z"
+            },
+            {
+                "id": "8824598d-c9a0-49f2-9edf-c373cfb32d1e",
+                "checkId": "141fe07f-eba6-438b-9ca0-891b7c185508",
+                "responseTime": 153,
+                "hasFailures": false,
+                "isDegraded": false,
+                "overMaxResponseTime": false,
+                "runLocation": "eu-west-3",
+                "startedAt": "2022-05-26T10:32:07Z"
+            },
+            {
+                "id": "356c637d-1e03-4d6f-a54b-ec8542d188bf",
+                "checkId": "141fe07f-eba6-438b-9ca0-891b7c185508",
+                "responseTime": 67,
+                "hasFailures": false,
+                "isDegraded": false,
+                "overMaxResponseTime": false,
+                "runLocation": "eu-central-1",
+                "startedAt": "2022-05-26T10:27:07Z"
+            },
+            {
+                "id": "34f19ced-40aa-4ca7-abf5-952136fce35e",
+                "checkId": "141fe07f-eba6-438b-9ca0-891b7c185508",
+                "responseTime": 40,
+                "hasFailures": false,
+                "isDegraded": false,
+                "overMaxResponseTime": false,
+                "runLocation": "eu-west-3",
+                "startedAt": "2022-05-26T10:22:07Z"
+            },
+            {
+                "id": "6a8dd682-90f8-42d5-bd61-933e4de45bb4",
+                "checkId": "141fe07f-eba6-438b-9ca0-891b7c185508",
+                "responseTime": 76,
+                "hasFailures": false,
+                "isDegraded": false,
+                "overMaxResponseTime": false,
+                "runLocation": "eu-central-1",
+                "startedAt": "2022-05-26T10:17:07Z"
+            },
+            {
+                "id": "27573f2f-28be-49fd-a9c3-1a95973c2378",
+                "checkId": "141fe07f-eba6-438b-9ca0-891b7c185508",
+                "responseTime": 43,
+                "hasFailures": false,
+                "isDegraded": false,
+                "overMaxResponseTime": false,
+                "runLocation": "eu-west-3",
+                "startedAt": "2022-05-26T10:12:07Z"
+            },
+            {
+                "id": "7a686b00-e57b-4b06-bfee-3fc77ea94d06",
+                "checkId": "141fe07f-eba6-438b-9ca0-891b7c185508",
+                "responseTime": 57,
+                "hasFailures": false,
+                "isDegraded": false,
+                "overMaxResponseTime": false,
+                "runLocation": "eu-central-1",
+                "startedAt": "2022-05-26T10:07:07Z"
+            },
+            {
+                "id": "81559da9-ac8c-4348-ac4b-061c59374e96",
+                "checkId": "141fe07f-eba6-438b-9ca0-891b7c185508",
+                "responseTime": 53,
+                "hasFailures": false,
+                "isDegraded": false,
+                "overMaxResponseTime": false,
+                "runLocation": "eu-west-3",
+                "startedAt": "2022-05-26T10:02:07Z"
+            }
+        ],
+        "stats": {
+            "1dSuccessRatio": 100,
+            "7dSuccessRatio": 100,
+            "avg": 81.78,
+            "p95": 167
+        }
+    },
+    {
+        "id": "41c8b073-8ce9-4907-91f3-c02964a6f414",
+        "check": {
+            "id": "41c8b073-8ce9-4907-91f3-c02964a6f414",
+            "name": "Website",
+            "checkType": "API",
+            "frequency": 5,
+            "frequencyOffset": 24,
+            "activated": true,
+            "muted": false,
+            "tags": [
+                "website"
+            ],
+            "created_at": "2021-05-02T16:39:58.068Z",
+            "isSample": false,
+            "groupId": null,
+            "groupOrder": null,
+            "status": {
+                "hasFailures": false,
+                "isDegraded": false,
+                "sslDaysRemaining": 139,
+                "updated_at": "2022-05-26T11:57:20.111Z",
+                "created_at": "2021-05-02T16:39:59.154Z",
+                "lastFailedResultId": "5f0e7829-071d-4cc1-9e22-376bc90d7865",
+                "lastFailingCheckRunTimestamp": "2022-03-04T07:02:31.597Z"
+            }
+        },
+        "results": [
+            {
+                "id": "aae94fc4-68b7-40fc-bc61-27126e6658ea",
+                "checkId": "41c8b073-8ce9-4907-91f3-c02964a6f414",
+                "responseTime": 79,
+                "hasFailures": false,
+                "isDegraded": false,
+                "overMaxResponseTime": false,
+                "runLocation": "eu-west-3",
+                "startedAt": "2022-05-26T11:57:19Z"
+            },
+            {
+                "id": "70089cf3-4447-49a0-8c2f-16f5ec01e0fd",
+                "checkId": "41c8b073-8ce9-4907-91f3-c02964a6f414",
+                "responseTime": 123,
+                "hasFailures": false,
+                "isDegraded": false,
+                "overMaxResponseTime": false,
+                "runLocation": "eu-central-1",
+                "startedAt": "2022-05-26T11:52:19Z"
+            },
+            {
+                "id": "bd7a0535-e557-4ec1-afd8-e0b881787b21",
+                "checkId": "41c8b073-8ce9-4907-91f3-c02964a6f414",
+                "responseTime": 59,
+                "hasFailures": false,
+                "isDegraded": false,
+                "overMaxResponseTime": false,
+                "runLocation": "eu-west-3",
+                "startedAt": "2022-05-26T11:47:19Z"
+            },
+            {
+                "id": "293fe21f-2f8e-4abf-9041-804fcc6d1d0b",
+                "checkId": "41c8b073-8ce9-4907-91f3-c02964a6f414",
+                "responseTime": 142,
+                "hasFailures": false,
+                "isDegraded": false,
+                "overMaxResponseTime": false,
+                "runLocation": "eu-central-1",
+                "startedAt": "2022-05-26T11:42:19Z"
+            },
+            {
+                "id": "affc2fee-ed39-4185-9b14-6f4c542a3743",
+                "checkId": "41c8b073-8ce9-4907-91f3-c02964a6f414",
+                "responseTime": 72,
+                "hasFailures": false,
+                "isDegraded": false,
+                "overMaxResponseTime": false,
+                "runLocation": "eu-west-3",
+                "startedAt": "2022-05-26T11:37:20Z"
+            },
+            {
+                "id": "0349db20-c1ca-4235-b4c6-ae8c0b59cf63",
+                "checkId": "41c8b073-8ce9-4907-91f3-c02964a6f414",
+                "responseTime": 173,
+                "hasFailures": false,
+                "isDegraded": false,
+                "overMaxResponseTime": false,
+                "runLocation": "eu-central-1",
+                "startedAt": "2022-05-26T11:32:20Z"
+            },
+            {
+                "id": "db782e3b-fc68-4f56-97cd-5a4cb6f66458",
+                "checkId": "41c8b073-8ce9-4907-91f3-c02964a6f414",
+                "responseTime": 130,
+                "hasFailures": false,
+                "isDegraded": false,
+                "overMaxResponseTime": false,
+                "runLocation": "eu-west-3",
+                "startedAt": "2022-05-26T11:27:20Z"
+            },
+            {
+                "id": "40087d6d-939e-479b-a227-839fabf72364",
+                "checkId": "41c8b073-8ce9-4907-91f3-c02964a6f414",
+                "responseTime": 106,
+                "hasFailures": false,
+                "isDegraded": false,
+                "overMaxResponseTime": false,
+                "runLocation": "eu-central-1",
+                "startedAt": "2022-05-26T11:22:20Z"
+            },
+            {
+                "id": "a7560cb5-f329-4990-a679-09319b1ca575",
+                "checkId": "41c8b073-8ce9-4907-91f3-c02964a6f414",
+                "responseTime": 134,
+                "hasFailures": false,
+                "isDegraded": false,
+                "overMaxResponseTime": false,
+                "runLocation": "eu-west-3",
+                "startedAt": "2022-05-26T11:17:19Z"
+            },
+            {
+                "id": "130652a1-deae-48d9-b3e0-7d8f69607e34",
+                "checkId": "41c8b073-8ce9-4907-91f3-c02964a6f414",
+                "responseTime": 101,
+                "hasFailures": false,
+                "isDegraded": false,
+                "overMaxResponseTime": false,
+                "runLocation": "eu-central-1",
+                "startedAt": "2022-05-26T11:12:20Z"
+            },
+            {
+                "id": "616819cf-2ea8-4193-9132-8f737cea751b",
+                "checkId": "41c8b073-8ce9-4907-91f3-c02964a6f414",
+                "responseTime": 85,
+                "hasFailures": false,
+                "isDegraded": false,
+                "overMaxResponseTime": false,
+                "runLocation": "eu-west-3",
+                "startedAt": "2022-05-26T11:07:19Z"
+            },
+            {
+                "id": "04dc7cf9-4c8d-4f5a-b5b0-663f6f6a05d2",
+                "checkId": "41c8b073-8ce9-4907-91f3-c02964a6f414",
+                "responseTime": 117,
+                "hasFailures": false,
+                "isDegraded": false,
+                "overMaxResponseTime": false,
+                "runLocation": "eu-central-1",
+                "startedAt": "2022-05-26T11:02:20Z"
+            },
+            {
+                "id": "ea36740e-7878-4ecc-91d8-65170186c642",
+                "checkId": "41c8b073-8ce9-4907-91f3-c02964a6f414",
+                "responseTime": 105,
+                "hasFailures": false,
+                "isDegraded": false,
+                "overMaxResponseTime": false,
+                "runLocation": "eu-west-3",
+                "startedAt": "2022-05-26T10:57:19Z"
+            },
+            {
+                "id": "8af28318-d54b-4f46-84b8-0f3b753333a2",
+                "checkId": "41c8b073-8ce9-4907-91f3-c02964a6f414",
+                "responseTime": 134,
+                "hasFailures": false,
+                "isDegraded": false,
+                "overMaxResponseTime": false,
+                "runLocation": "eu-central-1",
+                "startedAt": "2022-05-26T10:52:19Z"
+            },
+            {
+                "id": "ddfda1f1-30d1-41eb-abdb-32c472ad209e",
+                "checkId": "41c8b073-8ce9-4907-91f3-c02964a6f414",
+                "responseTime": 104,
+                "hasFailures": false,
+                "isDegraded": false,
+                "overMaxResponseTime": false,
+                "runLocation": "eu-west-3",
+                "startedAt": "2022-05-26T10:47:19Z"
+            },
+            {
+                "id": "a7aaf152-82c1-475d-9dba-3c8862792936",
+                "checkId": "41c8b073-8ce9-4907-91f3-c02964a6f414",
+                "responseTime": 167,
+                "hasFailures": false,
+                "isDegraded": false,
+                "overMaxResponseTime": false,
+                "runLocation": "eu-central-1",
+                "startedAt": "2022-05-26T10:42:20Z"
+            },
+            {
+                "id": "2b2db79a-a130-4adf-b722-03bb84d412d3",
+                "checkId": "41c8b073-8ce9-4907-91f3-c02964a6f414",
+                "responseTime": 156,
+                "hasFailures": false,
+                "isDegraded": false,
+                "overMaxResponseTime": false,
+                "runLocation": "eu-west-3",
+                "startedAt": "2022-05-26T10:37:19Z"
+            },
+            {
+                "id": "fc516835-7808-42ff-8ca1-6298202d311a",
+                "checkId": "41c8b073-8ce9-4907-91f3-c02964a6f414",
+                "responseTime": 238,
+                "hasFailures": false,
+                "isDegraded": false,
+                "overMaxResponseTime": false,
+                "runLocation": "eu-central-1",
+                "startedAt": "2022-05-26T10:32:19Z"
+            },
+            {
+                "id": "8934c04c-7df9-474b-9e07-0caa7b5703fa",
+                "checkId": "41c8b073-8ce9-4907-91f3-c02964a6f414",
+                "responseTime": 73,
+                "hasFailures": false,
+                "isDegraded": false,
+                "overMaxResponseTime": false,
+                "runLocation": "eu-west-3",
+                "startedAt": "2022-05-26T10:27:19Z"
+            },
+            {
+                "id": "70b0fd99-d5ac-49f6-8593-df7a868d75e2",
+                "checkId": "41c8b073-8ce9-4907-91f3-c02964a6f414",
+                "responseTime": 311,
+                "hasFailures": false,
+                "isDegraded": false,
+                "overMaxResponseTime": false,
+                "runLocation": "eu-central-1",
+                "startedAt": "2022-05-26T10:22:19Z"
+            },
+            {
+                "id": "2d961ce6-d0e9-4e6f-8fe5-b2f36526f543",
+                "checkId": "41c8b073-8ce9-4907-91f3-c02964a6f414",
+                "responseTime": 107,
+                "hasFailures": false,
+                "isDegraded": false,
+                "overMaxResponseTime": false,
+                "runLocation": "eu-west-3",
+                "startedAt": "2022-05-26T10:17:19Z"
+            },
+            {
+                "id": "414f4f51-a8ac-4d77-aa38-142bbf61a10d",
+                "checkId": "41c8b073-8ce9-4907-91f3-c02964a6f414",
+                "responseTime": 109,
+                "hasFailures": false,
+                "isDegraded": false,
+                "overMaxResponseTime": false,
+                "runLocation": "eu-central-1",
+                "startedAt": "2022-05-26T10:12:20Z"
+            },
+            {
+                "id": "67683756-a23e-48d6-939f-342882622a50",
+                "checkId": "41c8b073-8ce9-4907-91f3-c02964a6f414",
+                "responseTime": 82,
+                "hasFailures": false,
+                "isDegraded": false,
+                "overMaxResponseTime": false,
+                "runLocation": "eu-west-3",
+                "startedAt": "2022-05-26T10:07:19Z"
+            },
+            {
+                "id": "4fc07ab3-e586-4da0-9320-7bd713f8e42e",
+                "checkId": "41c8b073-8ce9-4907-91f3-c02964a6f414",
+                "responseTime": 126,
+                "hasFailures": false,
+                "isDegraded": false,
+                "overMaxResponseTime": false,
+                "runLocation": "eu-central-1",
+                "startedAt": "2022-05-26T10:02:19Z"
+            }
+        ],
+        "stats": {
+            "1dSuccessRatio": 100,
+            "7dSuccessRatio": 100,
+            "avg": 103.3,
+            "p95": 174.94999999999993
+        }
+    },
+    {
+        "id": "a07cffad-2409-4e9e-9eea-f1fc6b61eff0",
+        "check": {
+            "id": "a07cffad-2409-4e9e-9eea-f1fc6b61eff0",
+            "name": "Bank API",
+            "checkType": "API",
+            "frequency": 5,
+            "frequencyOffset": 22,
+            "activated": true,
+            "muted": false,
+            "tags": [
+                "api"
+            ],
+            "created_at": "2021-05-02T16:58:16.950Z",
+            "isSample": false,
+            "groupId": null,
+            "groupOrder": null,
+            "status": {
+                "hasFailures": false,
+                "isDegraded": false,
+                "sslDaysRemaining": 65,
+                "updated_at": "2022-05-26T11:57:07.883Z",
+                "created_at": "2021-05-02T16:58:17.958Z",
+                "lastFailedResultId": "f804da26-4f59-4172-bae1-244d9e818e31",
+                "lastFailingCheckRunTimestamp": "2022-03-04T07:02:18.827Z"
+            }
+        },
+        "results": [
+            {
+                "id": "8f5d63da-4682-452e-a319-c5ea9e6a9442",
+                "checkId": "a07cffad-2409-4e9e-9eea-f1fc6b61eff0",
+                "responseTime": 59,
+                "hasFailures": false,
+                "isDegraded": false,
+                "overMaxResponseTime": false,
+                "runLocation": "eu-central-1",
+                "startedAt": "2022-05-26T11:57:07Z"
+            },
+            {
+                "id": "4b337eec-838e-4c20-abfd-d2c136274c05",
+                "checkId": "a07cffad-2409-4e9e-9eea-f1fc6b61eff0",
+                "responseTime": 42,
+                "hasFailures": false,
+                "isDegraded": false,
+                "overMaxResponseTime": false,
+                "runLocation": "eu-west-3",
+                "startedAt": "2022-05-26T11:52:07Z"
+            },
+            {
+                "id": "b400151f-cc55-45d6-88b5-8d38e40c03eb",
+                "checkId": "a07cffad-2409-4e9e-9eea-f1fc6b61eff0",
+                "responseTime": 188,
+                "hasFailures": false,
+                "isDegraded": false,
+                "overMaxResponseTime": false,
+                "runLocation": "eu-central-1",
+                "startedAt": "2022-05-26T11:47:08Z"
+            },
+            {
+                "id": "5eaad223-eae0-4425-9f16-226088cc032a",
+                "checkId": "a07cffad-2409-4e9e-9eea-f1fc6b61eff0",
+                "responseTime": 49,
+                "hasFailures": false,
+                "isDegraded": false,
+                "overMaxResponseTime": false,
+                "runLocation": "eu-west-3",
+                "startedAt": "2022-05-26T11:42:07Z"
+            },
+            {
+                "id": "98205592-6957-47e0-8471-5224d30ee267",
+                "checkId": "a07cffad-2409-4e9e-9eea-f1fc6b61eff0",
+                "responseTime": 56,
+                "hasFailures": false,
+                "isDegraded": false,
+                "overMaxResponseTime": false,
+                "runLocation": "eu-central-1",
+                "startedAt": "2022-05-26T11:37:08Z"
+            },
+            {
+                "id": "fefc084a-2550-4884-8e2c-503cb6ab72f6",
+                "checkId": "a07cffad-2409-4e9e-9eea-f1fc6b61eff0",
+                "responseTime": 49,
+                "hasFailures": false,
+                "isDegraded": false,
+                "overMaxResponseTime": false,
+                "runLocation": "eu-west-3",
+                "startedAt": "2022-05-26T11:32:08Z"
+            },
+            {
+                "id": "06ea55e8-c0b6-4c21-ae12-c1583da2f369",
+                "checkId": "a07cffad-2409-4e9e-9eea-f1fc6b61eff0",
+                "responseTime": 170,
+                "hasFailures": false,
+                "isDegraded": false,
+                "overMaxResponseTime": false,
+                "runLocation": "eu-central-1",
+                "startedAt": "2022-05-26T11:27:08Z"
+            },
+            {
+                "id": "aa86d13f-e40b-47cc-9f90-07a5cadeb4ac",
+                "checkId": "a07cffad-2409-4e9e-9eea-f1fc6b61eff0",
+                "responseTime": 67,
+                "hasFailures": false,
+                "isDegraded": false,
+                "overMaxResponseTime": false,
+                "runLocation": "eu-west-3",
+                "startedAt": "2022-05-26T11:22:07Z"
+            },
+            {
+                "id": "a8a204a4-e949-486d-a8aa-6250cb5e633d",
+                "checkId": "a07cffad-2409-4e9e-9eea-f1fc6b61eff0",
+                "responseTime": 50,
+                "hasFailures": false,
+                "isDegraded": false,
+                "overMaxResponseTime": false,
+                "runLocation": "eu-central-1",
+                "startedAt": "2022-05-26T11:17:08Z"
+            },
+            {
+                "id": "33dd6bb2-a04e-495a-8a34-b59e617783f5",
+                "checkId": "a07cffad-2409-4e9e-9eea-f1fc6b61eff0",
+                "responseTime": 70,
+                "hasFailures": false,
+                "isDegraded": false,
+                "overMaxResponseTime": false,
+                "runLocation": "eu-west-3",
+                "startedAt": "2022-05-26T11:12:07Z"
+            },
+            {
+                "id": "51b342ab-446b-4955-aefc-d77575a61cf9",
+                "checkId": "a07cffad-2409-4e9e-9eea-f1fc6b61eff0",
+                "responseTime": 55,
+                "hasFailures": false,
+                "isDegraded": false,
+                "overMaxResponseTime": false,
+                "runLocation": "eu-central-1",
+                "startedAt": "2022-05-26T11:07:07Z"
+            },
+            {
+                "id": "86f97e02-ad31-476e-a6b2-f683125c0a5c",
+                "checkId": "a07cffad-2409-4e9e-9eea-f1fc6b61eff0",
+                "responseTime": 54,
+                "hasFailures": false,
+                "isDegraded": false,
+                "overMaxResponseTime": false,
+                "runLocation": "eu-west-3",
+                "startedAt": "2022-05-26T11:02:07Z"
+            },
+            {
+                "id": "499d81ec-2420-46ec-8984-a1f1e3df9d18",
+                "checkId": "a07cffad-2409-4e9e-9eea-f1fc6b61eff0",
+                "responseTime": 76,
+                "hasFailures": false,
+                "isDegraded": false,
+                "overMaxResponseTime": false,
+                "runLocation": "eu-central-1",
+                "startedAt": "2022-05-26T10:57:07Z"
+            },
+            {
+                "id": "1b183482-c3a2-403c-9469-ddf8dbdc3206",
+                "checkId": "a07cffad-2409-4e9e-9eea-f1fc6b61eff0",
+                "responseTime": 171,
+                "hasFailures": false,
+                "isDegraded": false,
+                "overMaxResponseTime": false,
+                "runLocation": "eu-west-3",
+                "startedAt": "2022-05-26T10:52:07Z"
+            },
+            {
+                "id": "13c92f70-2ba5-4bf8-acb4-8fcad359161c",
+                "checkId": "a07cffad-2409-4e9e-9eea-f1fc6b61eff0",
+                "responseTime": 68,
+                "hasFailures": false,
+                "isDegraded": false,
+                "overMaxResponseTime": false,
+                "runLocation": "eu-central-1",
+                "startedAt": "2022-05-26T10:47:08Z"
+            },
+            {
+                "id": "1cf8b745-ccb1-4b81-8ddb-ae817a2c3b1f",
+                "checkId": "a07cffad-2409-4e9e-9eea-f1fc6b61eff0",
+                "responseTime": 151,
+                "hasFailures": false,
+                "isDegraded": false,
+                "overMaxResponseTime": false,
+                "runLocation": "eu-west-3",
+                "startedAt": "2022-05-26T10:42:07Z"
+            },
+            {
+                "id": "89628bfc-9a74-4782-ac52-87bce0e3453c",
+                "checkId": "a07cffad-2409-4e9e-9eea-f1fc6b61eff0",
+                "responseTime": 127,
+                "hasFailures": false,
+                "isDegraded": false,
+                "overMaxResponseTime": false,
+                "runLocation": "eu-central-1",
+                "startedAt": "2022-05-26T10:37:08Z"
+            },
+            {
+                "id": "66c3f34a-2d17-4455-bea0-ea557b2ed5e1",
+                "checkId": "a07cffad-2409-4e9e-9eea-f1fc6b61eff0",
+                "responseTime": 41,
+                "hasFailures": false,
+                "isDegraded": false,
+                "overMaxResponseTime": false,
+                "runLocation": "eu-west-3",
+                "startedAt": "2022-05-26T10:32:07Z"
+            },
+            {
+                "id": "b12db072-6855-4f42-aa54-21cf81020a1b",
+                "checkId": "a07cffad-2409-4e9e-9eea-f1fc6b61eff0",
+                "responseTime": 71,
+                "hasFailures": false,
+                "isDegraded": false,
+                "overMaxResponseTime": false,
+                "runLocation": "eu-central-1",
+                "startedAt": "2022-05-26T10:27:07Z"
+            },
+            {
+                "id": "5dcec176-27d5-4aee-83ee-c15586a96754",
+                "checkId": "a07cffad-2409-4e9e-9eea-f1fc6b61eff0",
+                "responseTime": 46,
+                "hasFailures": false,
+                "isDegraded": false,
+                "overMaxResponseTime": false,
+                "runLocation": "eu-west-3",
+                "startedAt": "2022-05-26T10:22:08Z"
+            },
+            {
+                "id": "1c68e3cd-d11c-46e7-929f-6fdea2641f85",
+                "checkId": "a07cffad-2409-4e9e-9eea-f1fc6b61eff0",
+                "responseTime": 76,
+                "hasFailures": false,
+                "isDegraded": false,
+                "overMaxResponseTime": false,
+                "runLocation": "eu-central-1",
+                "startedAt": "2022-05-26T10:17:07Z"
+            },
+            {
+                "id": "56b16aa0-a3e1-4350-9d33-e6713632667b",
+                "checkId": "a07cffad-2409-4e9e-9eea-f1fc6b61eff0",
+                "responseTime": 58,
+                "hasFailures": false,
+                "isDegraded": false,
+                "overMaxResponseTime": false,
+                "runLocation": "eu-west-3",
+                "startedAt": "2022-05-26T10:12:07Z"
+            },
+            {
+                "id": "40dab311-ad4e-4045-ae97-0e48f903be8f",
+                "checkId": "a07cffad-2409-4e9e-9eea-f1fc6b61eff0",
+                "responseTime": 131,
+                "hasFailures": false,
+                "isDegraded": false,
+                "overMaxResponseTime": false,
+                "runLocation": "eu-central-1",
+                "startedAt": "2022-05-26T10:07:07Z"
+            },
+            {
+                "id": "9c204e11-a8f5-4094-9f8e-e6c904de5aae",
+                "checkId": "a07cffad-2409-4e9e-9eea-f1fc6b61eff0",
+                "responseTime": 43,
+                "hasFailures": false,
+                "isDegraded": false,
+                "overMaxResponseTime": false,
+                "runLocation": "eu-west-3",
+                "startedAt": "2022-05-26T10:02:07Z"
+            }
+        ],
+        "stats": {
+            "1dSuccessRatio": 100,
+            "7dSuccessRatio": 100,
+            "avg": 81.92,
+            "p95": 175.54999999999984
+        }
+    },
+    {
+        "id": "e0a2e7e3-3728-4500-b042-eb1e8ee91657",
+        "check": {
+            "id": "e0a2e7e3-3728-4500-b042-eb1e8ee91657",
+            "name": "Union App",
+            "checkType": "API",
+            "frequency": 5,
+            "frequencyOffset": 9,
+            "activated": true,
+            "muted": false,
+            "tags": [
+                "website"
+            ],
+            "created_at": "2021-05-02T16:42:30.252Z",
+            "isSample": false,
+            "groupId": null,
+            "groupOrder": null,
+            "status": {
+                "hasFailures": false,
+                "isDegraded": false,
+                "sslDaysRemaining": 65,
+                "updated_at": "2022-05-26T11:55:49.647Z",
+                "created_at": "2021-05-02T16:42:31.213Z",
+                "lastFailedResultId": "81f241e6-e7f5-4394-9584-bad1ea9635d4",
+                "lastFailingCheckRunTimestamp": "2022-03-04T07:01:07.832Z"
+            }
+        },
+        "results": [
+            {
+                "id": "11a8ed85-b9a5-4a75-a83a-451daa3ed2b5",
+                "checkId": "e0a2e7e3-3728-4500-b042-eb1e8ee91657",
+                "responseTime": 73,
+                "hasFailures": false,
+                "isDegraded": false,
+                "overMaxResponseTime": false,
+                "runLocation": "eu-central-1",
+                "startedAt": "2022-05-26T11:55:49Z"
+            },
+            {
+                "id": "998e8bac-ab56-4696-869e-e1a10fe02163",
+                "checkId": "e0a2e7e3-3728-4500-b042-eb1e8ee91657",
+                "responseTime": 152,
+                "hasFailures": false,
+                "isDegraded": false,
+                "overMaxResponseTime": false,
+                "runLocation": "eu-west-3",
+                "startedAt": "2022-05-26T11:50:49Z"
+            },
+            {
+                "id": "82af2ca3-b1f1-4205-bc58-e47a8b462044",
+                "checkId": "e0a2e7e3-3728-4500-b042-eb1e8ee91657",
+                "responseTime": 60,
+                "hasFailures": false,
+                "isDegraded": false,
+                "overMaxResponseTime": false,
+                "runLocation": "eu-central-1",
+                "startedAt": "2022-05-26T11:45:49Z"
+            },
+            {
+                "id": "fc453c97-eef4-4db2-bf2b-722355d13830",
+                "checkId": "e0a2e7e3-3728-4500-b042-eb1e8ee91657",
+                "responseTime": 49,
+                "hasFailures": false,
+                "isDegraded": false,
+                "overMaxResponseTime": false,
+                "runLocation": "eu-west-3",
+                "startedAt": "2022-05-26T11:40:49Z"
+            },
+            {
+                "id": "dead7a06-36e0-424c-8f39-e0739eec615f",
+                "checkId": "e0a2e7e3-3728-4500-b042-eb1e8ee91657",
+                "responseTime": 61,
+                "hasFailures": false,
+                "isDegraded": false,
+                "overMaxResponseTime": false,
+                "runLocation": "eu-central-1",
+                "startedAt": "2022-05-26T11:35:49Z"
+            },
+            {
+                "id": "ffac0870-3a6c-496d-91e0-b9c4e5bb5cca",
+                "checkId": "e0a2e7e3-3728-4500-b042-eb1e8ee91657",
+                "responseTime": 146,
+                "hasFailures": false,
+                "isDegraded": false,
+                "overMaxResponseTime": false,
+                "runLocation": "eu-west-3",
+                "startedAt": "2022-05-26T11:30:49Z"
+            },
+            {
+                "id": "3e80fc7d-4e02-443d-af38-a57867e13383",
+                "checkId": "e0a2e7e3-3728-4500-b042-eb1e8ee91657",
+                "responseTime": 54,
+                "hasFailures": false,
+                "isDegraded": false,
+                "overMaxResponseTime": false,
+                "runLocation": "eu-central-1",
+                "startedAt": "2022-05-26T11:25:49Z"
+            },
+            {
+                "id": "6c59a121-89fc-41a3-9bde-a8997ea60287",
+                "checkId": "e0a2e7e3-3728-4500-b042-eb1e8ee91657",
+                "responseTime": 150,
+                "hasFailures": false,
+                "isDegraded": false,
+                "overMaxResponseTime": false,
+                "runLocation": "eu-west-3",
+                "startedAt": "2022-05-26T11:20:49Z"
+            },
+            {
+                "id": "bee9705e-cd53-467f-bbf4-95c9497e3b8e",
+                "checkId": "e0a2e7e3-3728-4500-b042-eb1e8ee91657",
+                "responseTime": 59,
+                "hasFailures": false,
+                "isDegraded": false,
+                "overMaxResponseTime": false,
+                "runLocation": "eu-central-1",
+                "startedAt": "2022-05-26T11:15:49Z"
+            },
+            {
+                "id": "bd697f1c-41af-433a-9c63-e154ae446852",
+                "checkId": "e0a2e7e3-3728-4500-b042-eb1e8ee91657",
+                "responseTime": 45,
+                "hasFailures": false,
+                "isDegraded": false,
+                "overMaxResponseTime": false,
+                "runLocation": "eu-west-3",
+                "startedAt": "2022-05-26T11:10:49Z"
+            },
+            {
+                "id": "93035a36-c7c2-40da-ad54-c334e4a95bcf",
+                "checkId": "e0a2e7e3-3728-4500-b042-eb1e8ee91657",
+                "responseTime": 57,
+                "hasFailures": false,
+                "isDegraded": false,
+                "overMaxResponseTime": false,
+                "runLocation": "eu-central-1",
+                "startedAt": "2022-05-26T11:05:49Z"
+            },
+            {
+                "id": "05a9f9ca-88e1-4fc7-98ec-f31d0383f254",
+                "checkId": "e0a2e7e3-3728-4500-b042-eb1e8ee91657",
+                "responseTime": 55,
+                "hasFailures": false,
+                "isDegraded": false,
+                "overMaxResponseTime": false,
+                "runLocation": "eu-west-3",
+                "startedAt": "2022-05-26T11:00:49Z"
+            },
+            {
+                "id": "84be8b43-5991-4755-b504-1d4aaee8ca80",
+                "checkId": "e0a2e7e3-3728-4500-b042-eb1e8ee91657",
+                "responseTime": 78,
+                "hasFailures": false,
+                "isDegraded": false,
+                "overMaxResponseTime": false,
+                "runLocation": "eu-central-1",
+                "startedAt": "2022-05-26T10:55:49Z"
+            },
+            {
+                "id": "eb685089-fb6f-4b24-8e65-411d051cb1d2",
+                "checkId": "e0a2e7e3-3728-4500-b042-eb1e8ee91657",
+                "responseTime": 51,
+                "hasFailures": false,
+                "isDegraded": false,
+                "overMaxResponseTime": false,
+                "runLocation": "eu-west-3",
+                "startedAt": "2022-05-26T10:50:49Z"
+            },
+            {
+                "id": "bed255df-cfc0-4bf9-95ac-152e69ec0b07",
+                "checkId": "e0a2e7e3-3728-4500-b042-eb1e8ee91657",
+                "responseTime": 74,
+                "hasFailures": false,
+                "isDegraded": false,
+                "overMaxResponseTime": false,
+                "runLocation": "eu-central-1",
+                "startedAt": "2022-05-26T10:45:49Z"
+            },
+            {
+                "id": "84ba8e82-a96a-4fdd-95f2-b48a31cbc080",
+                "checkId": "e0a2e7e3-3728-4500-b042-eb1e8ee91657",
+                "responseTime": 81,
+                "hasFailures": false,
+                "isDegraded": false,
+                "overMaxResponseTime": false,
+                "runLocation": "eu-west-3",
+                "startedAt": "2022-05-26T10:40:49Z"
+            },
+            {
+                "id": "0787f6fe-7eee-4ace-9a61-4df93eae621b",
+                "checkId": "e0a2e7e3-3728-4500-b042-eb1e8ee91657",
+                "responseTime": 78,
+                "hasFailures": false,
+                "isDegraded": false,
+                "overMaxResponseTime": false,
+                "runLocation": "eu-central-1",
+                "startedAt": "2022-05-26T10:35:49Z"
+            },
+            {
+                "id": "3de486b8-9c39-4b0e-8902-267ca86f5cc3",
+                "checkId": "e0a2e7e3-3728-4500-b042-eb1e8ee91657",
+                "responseTime": 44,
+                "hasFailures": false,
+                "isDegraded": false,
+                "overMaxResponseTime": false,
+                "runLocation": "eu-west-3",
+                "startedAt": "2022-05-26T10:30:49Z"
+            },
+            {
+                "id": "43eb3acb-68a3-4e24-964b-5648e8352772",
+                "checkId": "e0a2e7e3-3728-4500-b042-eb1e8ee91657",
+                "responseTime": 66,
+                "hasFailures": false,
+                "isDegraded": false,
+                "overMaxResponseTime": false,
+                "runLocation": "eu-central-1",
+                "startedAt": "2022-05-26T10:25:49Z"
+            },
+            {
+                "id": "2aecd76f-0b7c-4a11-90ab-d8437c48281f",
+                "checkId": "e0a2e7e3-3728-4500-b042-eb1e8ee91657",
+                "responseTime": 147,
+                "hasFailures": false,
+                "isDegraded": false,
+                "overMaxResponseTime": false,
+                "runLocation": "eu-west-3",
+                "startedAt": "2022-05-26T10:20:49Z"
+            },
+            {
+                "id": "f925d85a-9eb0-491c-a834-14403a7f06b2",
+                "checkId": "e0a2e7e3-3728-4500-b042-eb1e8ee91657",
+                "responseTime": 65,
+                "hasFailures": false,
+                "isDegraded": false,
+                "overMaxResponseTime": false,
+                "runLocation": "eu-central-1",
+                "startedAt": "2022-05-26T10:15:49Z"
+            },
+            {
+                "id": "10d5d7fe-e48f-4576-a399-387f3e93ec09",
+                "checkId": "e0a2e7e3-3728-4500-b042-eb1e8ee91657",
+                "responseTime": 46,
+                "hasFailures": false,
+                "isDegraded": false,
+                "overMaxResponseTime": false,
+                "runLocation": "eu-west-3",
+                "startedAt": "2022-05-26T10:10:49Z"
+            },
+            {
+                "id": "64e2157b-f150-437a-a4d3-ab57516287c2",
+                "checkId": "e0a2e7e3-3728-4500-b042-eb1e8ee91657",
+                "responseTime": 82,
+                "hasFailures": false,
+                "isDegraded": false,
+                "overMaxResponseTime": false,
+                "runLocation": "eu-central-1",
+                "startedAt": "2022-05-26T10:05:49Z"
+            },
+            {
+                "id": "c5a4972f-3da0-4c55-81e9-7a48c93ab1bd",
+                "checkId": "e0a2e7e3-3728-4500-b042-eb1e8ee91657",
+                "responseTime": 49,
+                "hasFailures": false,
+                "isDegraded": false,
+                "overMaxResponseTime": false,
+                "runLocation": "eu-west-3",
+                "startedAt": "2022-05-26T10:00:49Z"
+            }
+        ],
+        "stats": {
+            "1dSuccessRatio": 100,
+            "7dSuccessRatio": 100,
+            "avg": 83.52,
+            "p95": 170.64999999999998
+        }
+    }
+]

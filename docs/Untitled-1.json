@@ -1,0 +1,168 @@
+{
+    "checks": [
+        {
+            "id": "a07cffad-2409-4e9e-9eea-f1fc6b61eff0",
+            "name": "Bank API",
+            "checkType": "API",
+            "frequency": 5,
+            "frequencyOffset": 22,
+            "activated": true,
+            "muted": false,
+            "tags": [
+                "api"
+            ],
+            "created_at": "2021-05-02T16:58:16.950Z",
+            "isSample": false,
+            "groupId": null,
+            "groupOrder": null,
+            "status": {
+                "hasFailures": false,
+                "isDegraded": false,
+                "sslDaysRemaining": 65,
+                "updated_at": "2022-05-26T11:57:07.883Z",
+                "created_at": "2021-05-02T16:58:17.958Z",
+                "lastFailedResultId": "f804da26-4f59-4172-bae1-244d9e818e31",
+                "lastFailingCheckRunTimestamp": "2022-03-04T07:02:18.827Z"
+            },
+            "group": null,
+            "request": {
+                "url": "https://bank-api.unioo.io/health"
+            },
+            "triggers": [],
+            "deploymentTriggers": []
+        },
+        {
+            "id": "0b120014-0f55-4bb1-ab16-432ff39af325",
+            "name": "Bank App",
+            "checkType": "API",
+            "frequency": 5,
+            "frequencyOffset": 9,
+            "activated": true,
+            "muted": false,
+            "tags": [
+                "website"
+            ],
+            "created_at": "2021-05-02T16:57:03.850Z",
+            "isSample": false,
+            "groupId": null,
+            "groupOrder": null,
+            "status": {
+                "hasFailures": false,
+                "isDegraded": false,
+                "sslDaysRemaining": 65,
+                "updated_at": "2022-05-26T11:55:50.204Z",
+                "created_at": "2021-05-02T16:57:04.565Z",
+                "lastFailedResultId": "a707ca48-d0b2-4230-b5ca-8c44b35f407d",
+                "lastFailingCheckRunTimestamp": "2021-10-13T08:40:52.456Z"
+            },
+            "group": null,
+            "request": {
+                "url": "https://bank.unioo.io"
+            },
+            "triggers": [],
+            "deploymentTriggers": []
+        },
+        {
+            "id": "141fe07f-eba6-438b-9ca0-891b7c185508",
+            "name": "Union API",
+            "checkType": "API",
+            "frequency": 5,
+            "frequencyOffset": 22,
+            "activated": true,
+            "muted": false,
+            "tags": [
+                "api"
+            ],
+            "created_at": "2021-05-02T16:56:18.163Z",
+            "isSample": false,
+            "groupId": null,
+            "groupOrder": null,
+            "status": {
+                "hasFailures": false,
+                "isDegraded": false,
+                "sslDaysRemaining": 65,
+                "updated_at": "2022-05-26T11:57:07.888Z",
+                "created_at": "2021-05-02T16:56:19.048Z",
+                "lastFailedResultId": "0b0c149c-0ece-40cf-8ec5-c412c2039699",
+                "lastFailingCheckRunTimestamp": "2022-03-04T07:02:18.535Z"
+            },
+            "group": null,
+            "request": {
+                "url": "https://api.unioo.io/health"
+            },
+            "triggers": [],
+            "deploymentTriggers": []
+        },
+        {
+            "id": "e0a2e7e3-3728-4500-b042-eb1e8ee91657",
+            "name": "Union App",
+            "checkType": "API",
+            "frequency": 5,
+            "frequencyOffset": 9,
+            "activated": true,
+            "muted": false,
+            "tags": [
+                "website"
+            ],
+            "created_at": "2021-05-02T16:42:30.252Z",
+            "isSample": false,
+            "groupId": null,
+            "groupOrder": null,
+            "status": {
+                "hasFailures": false,
+                "isDegraded": false,
+                "sslDaysRemaining": 65,
+                "updated_at": "2022-05-26T11:55:49.647Z",
+                "created_at": "2021-05-02T16:42:31.213Z",
+                "lastFailedResultId": "81f241e6-e7f5-4394-9584-bad1ea9635d4",
+                "lastFailingCheckRunTimestamp": "2022-03-04T07:01:07.832Z"
+            },
+            "group": null,
+            "request": {
+                "url": "https://app.unioo.io"
+            },
+            "triggers": [],
+            "deploymentTriggers": []
+        },
+        {
+            "id": "41c8b073-8ce9-4907-91f3-c02964a6f414",
+            "name": "Website",
+            "checkType": "API",
+            "frequency": 5,
+            "frequencyOffset": 24,
+            "activated": true,
+            "muted": false,
+            "tags": [
+                "website"
+            ],
+            "created_at": "2021-05-02T16:39:58.068Z",
+            "isSample": false,
+            "groupId": null,
+            "groupOrder": null,
+            "status": {
+                "hasFailures": false,
+                "isDegraded": false,
+                "sslDaysRemaining": 139,
+                "updated_at": "2022-05-26T11:57:20.111Z",
+                "created_at": "2021-05-02T16:39:59.154Z",
+                "lastFailedResultId": "5f0e7829-071d-4cc1-9e22-376bc90d7865",
+                "lastFailingCheckRunTimestamp": "2022-03-04T07:02:31.597Z"
+            },
+            "group": null,
+            "request": {
+                "url": "http://unioo.io"
+            },
+            "triggers": [],
+            "deploymentTriggers": []
+        }
+    ],
+    "summary": {
+        "total": 5,
+        "totalPassing": 5,
+        "totalFailing": 0,
+        "totalDegraded": 0,
+        "totalDeactivated": 0,
+        "totalFailed24h": 5
+    },
+    "emptyGroups": []
+}
