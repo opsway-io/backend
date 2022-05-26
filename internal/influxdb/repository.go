@@ -9,6 +9,11 @@ import (
 	"github.com/influxdata/influxdb-client-go/v2/api"
 )
 
+type Repository interface {
+	Write(data map[string]interface{})
+	Read(bucket string) (string, error)
+}
+
 type RepositoryImpl struct {
 	writeClient api.WriteAPI
 	readClient  api.QueryAPI

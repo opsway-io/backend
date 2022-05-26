@@ -8,8 +8,6 @@ import (
 
 // Config contains environment configurable variables
 type Config struct {
-	// User     string `required:"true"`
-	// Password string `required:"true"`
 	Host  string `required:"true"`
 	Port  uint32 `required:"true"`
 	Token string `required:"true"`
