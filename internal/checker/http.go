@@ -1,12 +1,17 @@
 package checker
 
 import (
+	"crypto/tls"
 	"io"
 	"io/ioutil"
 	"net/http"
 	"time"
 
 	"github.com/pkg/errors"
+
+	xtls "monitor/pkg/tls"
+
+	"github.com/tcnksm/go-httpstat"
 )
 
 const (
@@ -14,13 +19,7 @@ const (
 	UserAgent     = "opsway 1.0.0"
 )
 
-type APICheckStatus struct {
-	StatusCode   int
-	ResponseTime int64
-	Body         []byte
-}
-
-func APICheck(method, url string, headers map[string]string, body io.Reader, timeout time.Duration) (*APICheckStatus, error) {
+func APICheck(method, url string, headers map[string]string, body io.Reader, timeout time.Duration) (*Result, error) {
 	req, err := http.NewRequest(method, url, body)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to create request")
@@ -38,27 +37,71 @@ func APICheck(method, url string, headers map[string]string, body io.Reader, tim
 		req.Body = ioutil.NopCloser(body)
 	}
 
+	var result httpstat.Result
+	ctx := httpstat.WithHTTPStat(req.Context(), &result)
+	req = req.WithContext(ctx)
+
 	client := &http.Client{
 		Timeout: timeout,
 	}
 
-	start := time.Now()
 	resp, err := client.Do(req)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to send request")
 	}
 
-	end := time.Now()
-
-	respBody, err := ioutil.ReadAll(io.LimitReader(resp.Body, BodySizeLimit))
+	_, err = ioutil.ReadAll(io.LimitReader(resp.Body, BodySizeLimit))
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to read response body")
 	}
 	resp.Body.Close()
+	endTime := time.Now()
 
-	return &APICheckStatus{
-		StatusCode:   resp.StatusCode,
-		ResponseTime: end.Sub(start).Milliseconds(),
-		Body:         respBody,
-	}, nil
+	result.End(endTime)
+
+	meta := &Result{
+		Response: Response{
+			StatusCode: resp.StatusCode,
+			// Body:          respBody,
+			ContentLength: resp.ContentLength,
+		},
+		Timing: Timing{
+			DNSLookup:        result.DNSLookup,
+			TCPConnection:    result.TCPConnection,
+			TLSHandshake:     result.TLSHandshake,
+			ServerProcessing: result.ServerProcessing,
+			// ContentTransfer:  result.ContentTransfer(endTime),
+			NameLookup:    result.NameLookup,
+			Connect:       result.Connect,
+			PreTransfer:   result.Pretransfer,
+			StartTransfer: result.StartTransfer,
+			// Total:            result.Total(endTime),
+		},
+	}
+
+	if resp.TLS != nil {
+		meta.SSL = &SSL{
+			Version: xtls.VersionName(resp.TLS.Version),
+			Cipher:  tls.CipherSuiteName(resp.TLS.CipherSuite),
+		}
+
+		if resp.TLS.PeerCertificates != nil && len(resp.TLS.PeerCertificates) > 0 {
+			cert := resp.TLS.PeerCertificates[0]
+
+			meta.SSL.Certificate = Certificate{
+				Issuer: CertificateIssuer{
+					CommonName:   cert.Issuer.CommonName,
+					Organization: cert.Issuer.Organization,
+					Country:      cert.Issuer.Country,
+				},
+				Subject: CertificateSubject{
+					CommonName: cert.Subject.CommonName,
+				},
+				NotBefore: cert.NotBefore,
+				NotAfter:  cert.NotAfter,
+			}
+		}
+	}
+
+	return meta, nil
 }
