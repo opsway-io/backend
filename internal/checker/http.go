@@ -63,16 +63,20 @@ func APICheck(method, url string, headers map[string]string, body io.Reader, tim
 			ContentLength: resp.ContentLength,
 		},
 		Timing: Timing{
-			DNSLookup:        result.DNSLookup,
-			TCPConnection:    result.TCPConnection,
-			TLSHandshake:     result.TLSHandshake,
-			ServerProcessing: result.ServerProcessing,
-			ContentTransfer:  result.ContentTransfer,
-			NameLookup:       result.NameLookup,
-			Connect:          result.Connect,
-			PreTransfer:      result.Pretransfer,
-			StartTransfer:    result.StartTransfer,
-			Total:            result.Total,
+			Phases: TimingPhases{
+				DNSLookup:        result.DNSLookup,
+				TCPConnection:    result.TCPConnection,
+				TLSHandshake:     result.TLSHandshake,
+				ServerProcessing: result.ServerProcessing,
+				ContentTransfer:  result.ContentTransfer,
+			},
+			Timeline: TimingTimeline{
+				NameLookup:    result.NameLookup,
+				Connect:       result.Connect,
+				PreTransfer:   result.Pretransfer,
+				StartTransfer: result.StartTransfer,
+				Total:         result.Total,
+			},
 		},
 	}
 
