@@ -3,7 +3,9 @@ package cmd
 import (
 	"fmt"
 	"math/rand"
+	"strconv"
 	"strings"
+	"time"
 
 	"github.com/go-redis/redis"
 	"github.com/sirupsen/logrus"
@@ -20,9 +22,11 @@ func init() { //nolint:gochecknoinits
 	rootCmd.AddCommand(jobSchedulerCmd)
 }
 
-const (
-	subject        = "tickets"
-	consumersGroup = "tickets-consumer-group"
+var (
+	interval       = time.Second * 10
+	cronName       = "cron-" + strconv.Itoa(int(interval.Seconds()))
+	subject        = "stream-" + strconv.Itoa(int(interval.Seconds()))
+	consumersGroup = "consumer-group-" + strconv.Itoa(int(interval.Seconds()))
 )
 
 func runScheduler(cmd *cobra.Command, args []string) {
@@ -54,7 +58,7 @@ func runScheduler(cmd *cobra.Command, args []string) {
 
 	setIdCmd := fmt.Sprintf("redis.call('%s', '%s', '%s', '%s', '%s')", rc.XGroupSetID(subject, consumersGroup, "0").Args()...)
 
-	if err := rc.Do("KEYDB.CRON", "test-10-seconds", "REPEAT", 10000, setIdCmd).Err(); err != nil {
+	if err := rc.Do("KEYDB.CRON", cronName, "REPEAT", interval.Milliseconds(), setIdCmd).Err(); err != nil {
 		logrus.WithError(err).Fatal(err)
 	}
 }
@@ -62,7 +66,7 @@ func runScheduler(cmd *cobra.Command, args []string) {
 func publishTicketReceivedEvent(client *redis.Client) error {
 	logrus.Info("Publishing event to Redis")
 	err := client.XAdd(&redis.XAddArgs{
-		Stream:       "tickets",
+		Stream:       subject,
 		MaxLen:       0,
 		MaxLenApprox: 0,
 		ID:           "",
