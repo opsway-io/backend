@@ -1,4 +1,4 @@
-package checker
+package http
 
 import "time"
 

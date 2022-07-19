@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+    <meta http-equiv="Pragma" content="no-cache" />
+    <meta http-equiv="Expires" content="0" />
+
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/swagger-ui/3.45.1/swagger-ui.min.css" integrity="sha512-aEbfSpriGJ1mxZoWXLSwbJ8GSMLVNXBmHidn2cAGFHfJCFKSuqZEVzJy3ULeFRvvBIo7AHQbhkPIJ6sKW00GWQ==" crossorigin="anonymous" />
+
+    <title>Opsway API</title>
+  </head>
+  <body>
+    <div id="openapi">
+      <script src="https://cdnjs.cloudflare.com/ajax/libs/swagger-ui/3.45.1/swagger-ui-bundle.js" integrity="sha512-bEDewjT/ufwN2J2lPn+3dUcuWJOr2CrxSx31L4V72Ovux/GvoLTgCC/rkdmw6H84aTWfOhXe4uMCrp0E4y+OVw==" crossorigin="anonymous"></script>
+    <script>
+      window.onload = function () {
+        const ui = SwaggerUIBundle({
+          url: "v1.yaml",
+          dom_id: "#openapi"
+        });
+      }
+    </script>
+  </body>
+</html>

@@ -1,7 +1,8 @@
-package tls
+package http
 
 import btls "crypto/tls"
 
+//nolint:gochecknoglobals
 var versions = map[uint16]string{
 	btls.VersionSSL30: "SSL",
 	btls.VersionTLS10: "TLS 1.0",
@@ -10,6 +11,6 @@ var versions = map[uint16]string{
 	btls.VersionTLS13: "TLS 1.3",
 }
 
-func VersionName(version uint16) string {
+func TLSVersionName(version uint16) string {
 	return versions[version]
 }

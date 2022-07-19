@@ -1,0 +1,410 @@
+openapi: "3.0.0"
+
+info:
+  title: Opsway API
+  version: 1.0.0
+
+servers:
+  - url: https://api.opsway.io/v1
+  - url: "{scheme}://{host}"
+    description: Custom
+    variables:
+      scheme:
+        default: "http"
+        enum:
+          - "http"
+          - "https"
+      host:
+        default: "localhost:8080"
+
+components:
+  schemas:
+    Organization:
+      type: object
+      properties:
+        name:
+          type: string
+        logo:
+          type: string
+          readOnly: true
+        createdAt:
+          type: string
+          format: date-time
+          readOnly: true
+        updatedAt:
+          type: string
+          format: date-time
+          readOnly: true
+    User:
+      type: object
+      properties:
+        id:
+          type: string
+          readOnly: true
+        name: 
+          type: string
+        email:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+          readOnly: true
+        updatedAt:
+          type: string
+          format: date-time
+          readOnly: true
+    Monitor:
+      type: object
+      properties:
+        id:
+          type: string
+          readOnly: true
+        name:
+          type: string
+        description:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+          readOnly: true
+        updatedAt:
+          type: string
+          format: date-time
+          readOnly: true
+
+paths:
+  # Authentication
+  /authentication/login:
+    post:
+      tags:
+        - Authentication
+      summary: Login
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                email:
+                  type: string
+                password:
+                  type: string
+      responses:
+        200:
+          description: Login
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  token:
+                    type: string
+                    readOnly: true
+                  user:
+                    $ref: '#/components/schemas/User'
+                    readOnly: true
+        401:
+          description: Unauthorized
+  /authentication/refresh:
+    post:
+      tags:
+        - Authentication
+      summary: Refresh token
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                token:
+                  type: string
+      responses:
+        200:
+          description: Refresh token
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  token:
+                    type: string
+                    readOnly: true
+        401:
+          description: Unauthorized
+
+  # Organizations
+  /organizations/{organizationId}:
+    get:
+      tags:
+        - Organization
+      summary: Get organization
+      parameters:
+        - name: organizationId
+          in: path
+          required: true
+          schema:
+            type: number
+      responses:
+        200:
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Organization'
+        404:
+          description: Not found
+        401:
+          description: Unauthorized
+    patch:
+      tags:
+        - Organization
+      summary: Update organization
+      parameters:
+        - name: organizationId
+          in: path
+          required: true
+          schema:
+            type: number
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Organization'
+      responses:
+        200:
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Organization'
+        400:
+          description: Bad request
+        404:
+          description: Not found
+        401:
+          description: Unauthorized
+
+  # Users
+  /organizations/{organizationId}/users:
+    get:
+      tags:
+        - Users
+      summary: Get organization users
+      parameters:
+        - name: organizationId
+          in: path
+          required: true
+          schema:
+            type: number
+      responses:
+        200:
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/User'
+        404:
+          description: Not found
+        401:
+          description: Unauthorized
+  /organizations/{organizationId}/users/{userId}:
+    get:
+      tags:
+        - Users
+      summary: Get organization user
+      parameters:
+        - name: organizationId
+          in: path
+          required: true
+          schema:
+            type: number
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: number
+      responses:
+        200:
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        404:
+          description: Not found
+        401:
+          description: Unauthorized
+    patch:
+      tags:
+        - Users
+      summary: Update organization user
+      parameters:
+        - name: organizationId
+          in: path
+          required: true
+          schema:
+            type: number
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: number
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/User'
+      responses:
+        200:
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        400:
+          description: Bad request
+        404:
+          description: Not found
+        401:
+          description: Unauthorized
+
+  # Monitors
+  /organizations/{organizationId}/monitors:
+    get:
+      tags:
+        - Monitors
+      summary: Get organization monitors
+      responses:
+        200:
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Monitor'
+        404:
+          description: Not found
+        401:
+          description: Unauthorized
+  /organizations/{organizationId}/monitors/{monitorId}:
+    get:
+      tags:
+        - Monitors
+      summary: Get organization monitor
+      parameters:
+        - name: organizationId
+          in: path
+          required: true
+          schema:
+            type: number
+        - name: monitorId
+          in: path
+          required: true
+          schema:
+            type: number
+      responses:
+        200:
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Monitor'
+        404:
+          description: Not found
+        401:
+          description: Unauthorized
+    post:
+      tags:
+        - Monitors
+      summary: Create organization monitor
+      parameters:
+        - name: organizationId
+          in: path
+          required: true
+          schema:
+            type: number
+        - name: monitorId
+          in: path
+          required: true
+          schema:
+            type: number
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Monitor'
+      responses:
+        201:
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Monitor'
+        400:
+          description: Bad request
+        401: 
+          description: Unauthorized
+        404:
+          description: Not found
+    patch:
+      tags:
+        - Monitors
+      summary: Update organization monitor
+      parameters:
+        - name: organizationId
+          in: path
+          required: true
+          schema:
+            type: number
+        - name: monitorId
+          in: path
+          required: true
+          schema:
+            type: number
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Monitor'
+      responses:
+        200:
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Monitor'
+        400:
+          description: Bad request
+        404:
+          description: Not found
+        401:
+          description: Unauthorized
+    delete:
+      tags:
+        - Monitors
+      summary: Delete organization monitor
+      parameters:
+        - name: organizationId
+          in: path
+          required: true
+          schema:
+            type: number
+        - name: monitorId
+          in: path
+          required: true
+          schema:
+            type: number
+      responses:
+        200:
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Monitor'
+        404:
+          description: Not found
+        401:
+          description: Unauthorized

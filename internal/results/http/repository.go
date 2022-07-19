@@ -1,4 +1,4 @@
-package influxdb
+package result
 
 import (
 	"context"
@@ -35,7 +35,6 @@ func (r *RepositoryImpl) Write(data map[string]interface{}) {
 }
 
 func (r *RepositoryImpl) Read(bucket string) (string, error) {
-
 	query := fmt.Sprintf(`from(bucket:"%s"))`, bucket)
 
 	result, err := r.readClient.Query(context.Background(), query)

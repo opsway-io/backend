@@ -1,26 +1,23 @@
-package checker
+package http
 
 import (
 	"crypto/tls"
 	"io"
 	"io/ioutil"
-	"net/http"
+	xhttp "net/http"
 	"time"
 
 	"github.com/pkg/errors"
-
-	xtls "github.com/opsway-io/backend/pkg/tls"
 
 	"github.com/opsway-io/go-httpstat"
 )
 
 const (
-	BodySizeLimit = 2048
-	UserAgent     = "opsway 1.0.0"
+	UserAgent = "opsway 1.0.0"
 )
 
-func APICheck(method, url string, headers map[string]string, body io.Reader, timeout time.Duration) (*Result, error) {
-	req, err := http.NewRequest(method, url, body)
+func Probe(method, url string, headers map[string]string, body io.Reader, timeout time.Duration) (*Result, error) {
+	req, err := xhttp.NewRequest(method, url, body)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to create request")
 	}
@@ -37,7 +34,7 @@ func APICheck(method, url string, headers map[string]string, body io.Reader, tim
 	ctx := httpstat.WithHTTPStat(req.Context(), &result)
 	req = req.WithContext(ctx)
 
-	client := &http.Client{
+	client := &xhttp.Client{
 		Timeout: timeout,
 	}
 
@@ -76,7 +73,7 @@ func APICheck(method, url string, headers map[string]string, body io.Reader, tim
 
 	if resp.TLS != nil {
 		meta.SSL = &SSL{
-			Version: xtls.VersionName(resp.TLS.Version),
+			Version: TLSVersionName(resp.TLS.Version),
 			Cipher:  tls.CipherSuiteName(resp.TLS.CipherSuite),
 		}
 
