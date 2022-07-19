@@ -1,29 +1,17 @@
 version: '3.1'
 
-services:
-  # database:
-  #   image: mysql:8.0.23
-  #   environment:
-  #     MYSQL_DATABASE: 'books'
-  #     MYSQL_USER: 'books'
-  #     MYSQL_PASSWORD: 'secret'
-  #     MYSQL_RANDOM_ROOT_PASSWORD: 'true'
-  #   ports:
-  #     - 3306:3306
 
-  rabbitmq:
-    image: rabbitmq:management-alpine
+services:
+  postgres:
+    image: postgres:14.4-alpine
     restart: unless-stopped
-    ports: 
-      - 15672:15672
-      - 5672:5672
     environment:
-      - RABBITMQ_DEFAULT_USER=guest
-      - RABBITMQ_DEFAULT_PASS=guest
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: admin
 
   keydb:
-    image: eqalpha/keydb:x86_64_v6.2.2
-    command: keydb-server /etc/keydb/redis.conf --server-threads 2
+    image: eqalpha/keydb:alpine_x86_64_v6.3.1
+    command: keydb-server /etc/keydb/keydb.conf --server-threads 2
     ports:
       - 6379:6379
     restart: unless-stopped
@@ -43,3 +31,20 @@ services:
       - 8086:8086
     volumes:
       - /tmp/influxdb2:/var/lib/influxdb2:rw
+
+  # api:
+  #   build: .
+  #   ports:
+  #     - 8000:8000
+  #   restart: unless-stopped
+  #   depends_on:
+  #     - keydb
+  #     - database
+
+  prober:
+    build: .
+    command: sub
+    restart: unless-stopped
+    depends_on:
+      - keydb
+      - database

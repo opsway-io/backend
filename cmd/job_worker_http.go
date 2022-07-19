@@ -88,7 +88,7 @@ func httpProbe(cmd *cobra.Command, args []string) {
 func handle(rc *redis.Client, msg redis.XMessage) (*checker.Result, error) {
 	messageID := msg.ID
 
-	res, err := checker.APICheck(http.MethodGet, "https://tranberg.tk", nil, nil, time.Second*5)
+	res, err := checker.APICheck(http.MethodGet, "https://opsway.io", nil, nil, time.Second*5)
 	if err != nil {
 		logrus.WithError(err).Error("HTTP probe failed")
 	}

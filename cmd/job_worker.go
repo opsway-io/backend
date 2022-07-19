@@ -21,7 +21,7 @@ func init() { //nolint:gochecknoinits
 
 func serve(cmd *cobra.Command, args []string) {
 	rc := redis.NewClient(&redis.Options{
-		Addr: fmt.Sprintf("%s:%s", "127.0.0.1", "6379"),
+		Addr: fmt.Sprintf("%s:%s", "keydb", "6379"),
 	})
 	_, err := rc.Ping().Result()
 	if err != nil {
