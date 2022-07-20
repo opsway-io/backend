@@ -51,7 +51,5 @@ type CertificateSubject struct {
 }
 
 type CertificateIssuer struct {
-	CommonName   string
-	Organization []string
-	Country      []string
+	Organization string
 }

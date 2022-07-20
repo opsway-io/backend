@@ -5,6 +5,7 @@ import (
 	"io"
 	"io/ioutil"
 	xhttp "net/http"
+	"strings"
 	"time"
 
 	"github.com/pkg/errors"
@@ -82,9 +83,7 @@ func Probe(method, url string, headers map[string]string, body io.Reader, timeou
 
 			meta.SSL.Certificate = Certificate{
 				Issuer: CertificateIssuer{
-					CommonName:   cert.Issuer.CommonName,
-					Organization: cert.Issuer.Organization,
-					Country:      cert.Issuer.Country,
+					Organization: strings.Join(cert.Issuer.Organization, ""),
 				},
 				Subject: CertificateSubject{
 					CommonName: cert.Subject.CommonName,
