@@ -7,6 +7,8 @@ services:
     environment:
       POSTGRES_USER: admin
       POSTGRES_PASSWORD: admin
+    volumes:
+      - ./data/postgres:/var/lib/posgresql/data
     ports:
       - 5432:5432
 
@@ -14,6 +16,8 @@ services:
     image: eqalpha/keydb:alpine_x86_64_v6.3.1
     restart: unless-stopped
     command: keydb-server /etc/keydb/keydb.conf --server-threads 2
+    volumes:
+      - ./data/redis:/data
     ports:
       - 6379:6379
 
