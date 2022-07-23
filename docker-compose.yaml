@@ -22,6 +22,8 @@ services:
     restart: unless-stopped
     ports:
       - 8086:8086
+    volumes:
+      - ./data/influx:/var/lib/influxdb2:rw
 
   # api:
   #   build: .
