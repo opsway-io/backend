@@ -5,11 +5,13 @@ import (
 	"github.com/opsway-io/backend/internal/jwt"
 	"github.com/opsway-io/backend/internal/rest/v1/authentication"
 	"github.com/opsway-io/backend/internal/user"
-	"go.uber.org/zap"
+	"github.com/sirupsen/logrus"
 )
 
-func Register(e *echo.Group, logger *zap.Logger, userService user.Service, jwtService jwt.Service) {
+func Register(e *echo.Group, logger *logrus.Logger, userService user.Service, jwtService jwt.Service) {
+	l := logger.WithFields(logrus.Fields{})
+
 	g := e.Group("/v1")
 
-	authentication.Register(g, logger, userService, jwtService)
+	authentication.Register(g, l, userService, jwtService)
 }

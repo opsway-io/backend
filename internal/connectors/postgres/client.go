@@ -3,6 +3,7 @@ package postgres
 import (
 	"context"
 
+	"github.com/opsway-io/backend/internal/user"
 	"github.com/pkg/errors"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
@@ -35,6 +36,8 @@ func NewClient(ctx context.Context, conf Config) (*gorm.DB, error) {
 	if err = sqlDB.PingContext(ctx); err != nil {
 		return nil, errors.Wrap(err, "failed to ping database")
 	}
+
+	db.AutoMigrate(user.User{})
 
 	return db, nil
 }

@@ -7,6 +7,7 @@ services:
     environment:
       POSTGRES_USER: admin
       POSTGRES_PASSWORD: admin
+      POSTGRES_DB: opsway
     volumes:
       - ./data/postgres:/var/lib/posgresql/data
     ports:
@@ -29,14 +30,17 @@ services:
     volumes:
       - ./data/influx:/var/lib/influxdb2:rw
 
-  # api:
-  #   build: .
-  #   restart: unless-stopped
-  #   ports:
-  #     - 8000:8000
-  #   depends_on:
-  #     - postgres
-  #     - keydb
+  api:
+    build: .
+    command: api
+    restart: unless-stopped
+    ports:
+      - 8080:8080
+    volumes:
+      - ./config.compose.yaml:/app/config.yaml:r
+    depends_on:
+      - postgres
+      - keydb
 
   # prober:
   #   build: .

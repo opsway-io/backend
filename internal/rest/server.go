@@ -11,7 +11,7 @@ import (
 	"github.com/opsway-io/backend/internal/rest/validator"
 	"github.com/opsway-io/backend/internal/user"
 	"github.com/pkg/errors"
-	"go.uber.org/zap"
+	"github.com/sirupsen/logrus"
 )
 
 type Config struct {
@@ -24,7 +24,7 @@ type Server struct {
 	config Config
 }
 
-func NewServer(conf Config, logger *zap.Logger, userService user.Service, jwtService jwt.Service) (*Server, error) {
+func NewServer(conf Config, logger *logrus.Logger, userService user.Service, jwtService jwt.Service) (*Server, error) {
 	e := echo.New()
 
 	e.HideBanner = true

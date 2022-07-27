@@ -5,7 +5,7 @@ import (
 	"github.com/opsway-io/backend/internal/jwt"
 	w "github.com/opsway-io/backend/internal/rest/wrappers"
 	"github.com/opsway-io/backend/internal/user"
-	"go.uber.org/zap"
+	"github.com/sirupsen/logrus"
 )
 
 type Handlers struct {
@@ -13,7 +13,7 @@ type Handlers struct {
 	JWTService  jwt.Service
 }
 
-func Register(e *echo.Group, logger *zap.Logger, userService user.Service, jwtService jwt.Service) {
+func Register(e *echo.Group, logger *logrus.Entry, userService user.Service, jwtService jwt.Service) {
 	h := &Handlers{
 		UserService: userService,
 		JWTService:  jwtService,

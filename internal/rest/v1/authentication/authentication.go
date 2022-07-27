@@ -5,7 +5,7 @@ import (
 
 	"github.com/labstack/echo/v4"
 	"github.com/opsway-io/backend/internal/user"
-	"go.uber.org/zap"
+	"github.com/sirupsen/logrus"
 )
 
 type User struct {
@@ -28,30 +28,28 @@ type LoginResponse struct {
 	User         User   `json:"user"`
 }
 
-func (h *Handlers) PostLogin(ctx echo.Context, l *zap.Logger) error {
+func (h *Handlers) PostLogin(ctx echo.Context, l *logrus.Entry) error {
 	var req LoginRequest
 	if err := ctx.Bind(&req); err != nil {
-		l.Debug("failed to bind request", zap.Error(err))
+		l.WithError(err).Debug("failed to bind request")
 
 		return echo.ErrInternalServerError
 	}
 
 	if err := ctx.Validate(&req); err != nil {
-		l.Debug("request failed validation", zap.Error(err))
+		l.WithError(err).Debug("request failed validation")
 
 		return echo.ErrBadRequest
 	}
 
 	user, err := h.UserService.GetUserByEmail(ctx.Request().Context(), req.Email)
 	if err != nil {
-		l.Debug("failed to get user", zap.Error(err))
+		l.WithError(err).Debug("failed to get user")
 
 		return echo.ErrUnauthorized
 	}
 
-	l = l.With(
-		zap.Int("user_id", user.ID),
-	)
+	l = l.WithField("user_id", user.ID)
 
 	if ok := user.CheckPassword(req.Password); !ok {
 		l.Debug("password invalid")
@@ -61,7 +59,7 @@ func (h *Handlers) PostLogin(ctx echo.Context, l *zap.Logger) error {
 
 	token, refresh, err := h.JWTService.Generate(user)
 	if err != nil {
-		l.Debug("failed to generate token for user", zap.Error(err))
+		l.WithError(err).Debug("failed to generate token for user")
 
 		return echo.ErrInternalServerError
 	}
@@ -84,23 +82,23 @@ type RefreshResponse struct {
 	RefreshToken string `json:"refreshToken"`
 }
 
-func (h *Handlers) PostRefresh(ctx echo.Context, l *zap.Logger) error {
+func (h *Handlers) PostRefresh(ctx echo.Context, l *logrus.Entry) error {
 	var req RefreshRequest
 	if err := ctx.Bind(&req); err != nil {
-		l.Debug("failed to bind request", zap.Error(err))
+		l.WithError(err).Debug("failed to bind request")
 
 		return echo.ErrInternalServerError
 	}
 
 	if err := ctx.Validate(&req); err != nil {
-		l.Debug("request failed validation", zap.Error(err))
+		l.WithError(err).Debug("request failed validation")
 
 		return echo.ErrBadRequest
 	}
 
 	token, refresh, err := h.JWTService.Refresh(req.RefreshToken)
 	if err != nil {
-		l.Debug("failed to renew token", zap.Error(err))
+		l.WithError(err).Debug("failed to renew token")
 
 		return echo.ErrUnauthorized
 	}

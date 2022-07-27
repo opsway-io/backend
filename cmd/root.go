@@ -4,6 +4,8 @@ import (
 	"github.com/opsway-io/backend/internal/connectors/influxdb"
 	"github.com/opsway-io/backend/internal/connectors/keydb"
 	"github.com/opsway-io/backend/internal/connectors/postgres"
+	"github.com/opsway-io/backend/internal/jwt"
+	"github.com/opsway-io/backend/internal/rest"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -16,6 +18,8 @@ type Config struct {
 	Postgres postgres.Config `mapstructure:"postgres"`
 	KeyDB    keydb.Config    `mapstructure:"keydb"`
 	InfluxDB influxdb.Config `mapstructure:"influxdb"`
+	REST     rest.Config     `mapstructure:"rest"`
+	JWT      jwt.Config      `mapstructure:"jwt"`
 }
 
 type LogConfig struct {
