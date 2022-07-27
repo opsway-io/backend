@@ -34,12 +34,24 @@ func runAPI(cmd *cobra.Command, args []string) {
 		"port": conf.REST.Port,
 	}).Info("Starting REST server")
 
-	db, err := postgres.NewClient(context.Background(), conf.Postgres)
+	ctx := context.Background()
+
+	db, err := postgres.NewClient(ctx, conf.Postgres)
 	if err != nil {
 		l.WithError(err).Fatal("Failed to create Postgres client")
 	}
 
 	userService := user.NewService(db)
+
+	// TODO: Remove
+	u := &user.User{
+		Name:        "Douglas Adams",
+		DisplayName: "Ford Prefect",
+		Email:       "admin@opsway.io",
+	}
+	u.SetPassword("pass")
+	userService.CreateUser(ctx, u)
+	// TODO: Remove
 
 	jwtService := jwt.NewService(conf.JWT)
 
