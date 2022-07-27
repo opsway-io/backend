@@ -11,7 +11,7 @@ type User struct {
 	ID           int
 	Name         string `gorm:"not null"`
 	DisplayName  string
-	Email        string `gorm:"uniqueIndex,not null"`
+	Email        string `gorm:"uniqueIndex:idx_email"`
 	PasswordHash string
 	CreatedAt    time.Time
 	UpdatedAt    time.Time
