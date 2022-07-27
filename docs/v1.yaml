@@ -15,11 +15,11 @@ servers:
           - "http"
           - "https"
       host:
-        default: "localhost:8080"
+        default: "localhost:8080/v1"
 
 components:
   schemas:
-    Organization:
+    Team:
       type: object
       properties:
         name:
@@ -132,14 +132,14 @@ paths:
         401:
           description: Unauthorized
 
-  # Organizations
-  /organizations/{organizationId}:
+  # Teams
+  /teams/{teamId}:
     get:
       tags:
-        - Organization
-      summary: Get organization
+        - Team
+      summary: Get team
       parameters:
-        - name: organizationId
+        - name: teamId
           in: path
           required: true
           schema:
@@ -150,17 +150,17 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Organization'
+                $ref: '#/components/schemas/Team'
         404:
           description: Not found
         401:
           description: Unauthorized
     patch:
       tags:
-        - Organization
-      summary: Update organization
+        - Team
+      summary: Update team
       parameters:
-        - name: organizationId
+        - name: teamId
           in: path
           required: true
           schema:
@@ -169,14 +169,14 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/Organization'
+              $ref: '#/components/schemas/Team'
       responses:
         200:
           description: OK
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Organization'
+                $ref: '#/components/schemas/Team'
         400:
           description: Bad request
         404:
@@ -185,13 +185,13 @@ paths:
           description: Unauthorized
 
   # Users
-  /organizations/{organizationId}/users:
+  /teams/{teamId}/users:
     get:
       tags:
         - Users
-      summary: Get organization users
+      summary: Get team users
       parameters:
-        - name: organizationId
+        - name: teamId
           in: path
           required: true
           schema:
@@ -209,13 +209,13 @@ paths:
           description: Not found
         401:
           description: Unauthorized
-  /organizations/{organizationId}/users/{userId}:
+  /teams/{teamId}/users/{userId}:
     get:
       tags:
         - Users
-      summary: Get organization user
+      summary: Get team user
       parameters:
-        - name: organizationId
+        - name: teamId
           in: path
           required: true
           schema:
@@ -239,9 +239,9 @@ paths:
     patch:
       tags:
         - Users
-      summary: Update organization user
+      summary: Update team user
       parameters:
-        - name: organizationId
+        - name: teamId
           in: path
           required: true
           schema:
@@ -271,11 +271,11 @@ paths:
           description: Unauthorized
 
   # Monitors
-  /organizations/{organizationId}/monitors:
+  /teams/{teamId}/monitors:
     get:
       tags:
         - Monitors
-      summary: Get organization monitors
+      summary: Get team monitors
       responses:
         200:
           description: OK
@@ -289,13 +289,13 @@ paths:
           description: Not found
         401:
           description: Unauthorized
-  /organizations/{organizationId}/monitors/{monitorId}:
+  /teams/{teamId}/monitors/{monitorId}:
     get:
       tags:
         - Monitors
-      summary: Get organization monitor
+      summary: Get team monitor
       parameters:
-        - name: organizationId
+        - name: teamId
           in: path
           required: true
           schema:
@@ -319,9 +319,9 @@ paths:
     post:
       tags:
         - Monitors
-      summary: Create organization monitor
+      summary: Create team monitor
       parameters:
-        - name: organizationId
+        - name: teamId
           in: path
           required: true
           schema:
@@ -352,9 +352,9 @@ paths:
     patch:
       tags:
         - Monitors
-      summary: Update organization monitor
+      summary: Update team monitor
       parameters:
-        - name: organizationId
+        - name: teamId
           in: path
           required: true
           schema:
@@ -385,9 +385,9 @@ paths:
     delete:
       tags:
         - Monitors
-      summary: Delete organization monitor
+      summary: Delete team monitor
       parameters:
-        - name: organizationId
+        - name: teamId
           in: path
           required: true
           schema:
