@@ -26,16 +26,21 @@ func NewRepository(db influxdb2.Client, org string, bucket string) (*RepositoryI
 	}, nil
 }
 
-func (r *RepositoryImpl) Write(data map[string]interface{}) {
-	p := influxdb2.NewPoint("test", map[string]string{"tag": "apiCheck"}, data, time.Now())
+func (r *RepositoryImpl) Write(monitorID string, orgID string, data map[string]interface{}) {
+	p := influxdb2.NewPoint("http-probe", map[string]string{"monitorID": monitorID, "orgID": orgID}, data, time.Now())
 
 	r.writeClient.WritePoint(p)
 
 	r.writeClient.Flush()
 }
 
-func (r *RepositoryImpl) Read(bucket string) (string, error) {
-	query := fmt.Sprintf(`from(bucket:"%s"))`, bucket)
+func (r *RepositoryImpl) Read(bucket string, measurement string, tag0 string, tag1 string) (string, error) {
+	query := fmt.Sprintf(
+		`from (bucket: %s) 
+		|> range(start: -1h) 
+		|> filter(fn: (r) => r._measurement == %s and r.tag == %s and r._tag == %s )`,
+		bucket, measurement, tag0, tag1,
+	)
 
 	result, err := r.readClient.Query(context.Background(), query)
 	if err != nil {
