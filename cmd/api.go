@@ -5,6 +5,7 @@ import (
 
 	"github.com/opsway-io/backend/internal/connectors/postgres"
 	"github.com/opsway-io/backend/internal/jwt"
+	"github.com/opsway-io/backend/internal/monitor"
 	"github.com/opsway-io/backend/internal/rest"
 	"github.com/opsway-io/backend/internal/user"
 	"github.com/sirupsen/logrus"
@@ -40,6 +41,12 @@ func runAPI(cmd *cobra.Command, args []string) {
 	if err != nil {
 		l.WithError(err).Fatal("Failed to create Postgres client")
 	}
+
+	db.AutoMigrate(
+		user.User{},
+		monitor.Monitor{},
+		monitor.Settings{},
+	)
 
 	userService := user.NewService(db)
 
