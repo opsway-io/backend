@@ -16,7 +16,13 @@ type Handlers struct {
 	MonitorService monitor.Service
 }
 
-func Register(e *echo.Group, logger *logrus.Entry, userService user.Service, jwtService jwt.Service, monitorService monitor.Service) {
+func Register(
+	e *echo.Group,
+	logger *logrus.Entry,
+	userService user.Service,
+	jwtService jwt.Service,
+	monitorService monitor.Service,
+) {
 	h := &Handlers{
 		UserService:    userService,
 		JWTService:     jwtService,
