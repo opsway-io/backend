@@ -8,8 +8,8 @@ import (
 	"github.com/labstack/echo/v4/middleware"
 	"github.com/opsway-io/backend/internal/jwt"
 	"github.com/opsway-io/backend/internal/monitor"
+	"github.com/opsway-io/backend/internal/rest/controllers"
 	"github.com/opsway-io/backend/internal/rest/helpers"
-	v1 "github.com/opsway-io/backend/internal/rest/v1"
 	"github.com/opsway-io/backend/internal/user"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -45,7 +45,7 @@ func NewServer(conf Config, logger *logrus.Logger, userService user.Service, jwt
 
 	root := e.Group("/v1")
 
-	v1.Register(
+	controllers.Register(
 		root,
 		logger.WithField("module", "rest"),
 		userService,

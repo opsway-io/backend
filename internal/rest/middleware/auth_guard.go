@@ -47,7 +47,6 @@ func AuthGuard(logger *logrus.Entry, jwtService jwt.Service) echo.MiddlewareFunc
 			}
 
 			c.Set("jwt_claims", claims)
-			c.Set("jwt_token", token)
 
 			return next(c)
 		}
