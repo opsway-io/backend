@@ -6,7 +6,8 @@ import (
 
 type Claims struct {
 	jwt.StandardClaims
-	Email string `json:"email"`
+	Email  string `json:"email"`
+	TeamID int    `json:"teamId"`
 }
 
 type RefreshClaims struct {

@@ -3,6 +3,7 @@ module github.com/opsway-io/backend
 go 1.18
 
 require (
+	github.com/creasty/defaults v1.6.0
 	github.com/fatih/structs v1.1.0
 	github.com/go-playground/validator v9.31.0+incompatible
 	github.com/go-redis/redis v6.15.9+incompatible

@@ -16,11 +16,11 @@ type Service interface {
 }
 
 type Config struct {
-	Secret           []byte        `default:"secret"`
-	ExpiresIn        time.Duration `default:"1h"`
-	RefreshExpiresIn time.Duration `default:"30d"`
-	Issuer           string        `default:"opsway.io"`
-	Audience         string        `default:"opsway.io"`
+	Secret           string        `mapstructure:"secret"`
+	ExpiresIn        time.Duration `mapstructure:"expires_in"`
+	RefreshExpiresIn time.Duration `mapstructure:"refresh_expires_in"`
+	Issuer           string        `mapstructure:"issuer"`
+	Audience         string        `mapstructure:"audience"`
 }
 
 type ServiceImpl struct {
@@ -44,7 +44,8 @@ func (s *ServiceImpl) Generate(user *user.User) (string, string, error) {
 			Subject:   fmt.Sprintf("%d", user.ID),
 			Audience:  s.Config.Audience,
 		},
-		Email: user.Email,
+		Email:  user.Email,
+		TeamID: 42, // TODO: get team id from user
 	}
 
 	tokenString, err := s.signClaims(tokenClaims)
@@ -74,7 +75,7 @@ func (s *ServiceImpl) Generate(user *user.User) (string, string, error) {
 func (s *ServiceImpl) Verify(tokenString string) (bool, *Claims, error) {
 	claims := &Claims{}
 	token, err := jwt.ParseWithClaims(tokenString, claims, func(token *jwt.Token) (interface{}, error) {
-		return s.Config.Secret, nil
+		return []byte(s.Config.Secret), nil
 	})
 	if err != nil {
 		return false, nil, errors.Wrap(err, "failed to parse token")
@@ -94,5 +95,5 @@ func (s *ServiceImpl) Refresh(token string) (string, string, error) {
 func (s *ServiceImpl) signClaims(claims jwt.Claims) (string, error) {
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 
-	return token.SignedString(s.Config.Secret)
+	return token.SignedString([]byte(s.Config.Secret))
 }

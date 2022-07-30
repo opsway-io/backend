@@ -9,6 +9,7 @@ import (
 
 type Monitor struct {
 	ID         int
+	TeamID     int            `gorm:"not null,index"`
 	Name       string         `gorm:"not null"`
 	Tags       pq.StringArray `gorm:"type:text[]"`
 	SettingsID int
