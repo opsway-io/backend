@@ -41,18 +41,13 @@ services:
   #   depends_on:
   #     - postgres
   #     - keydb
+  #     - influxdb
+  
 
   # prober:
   #   build: .
   #   restart: unless-stopped
   #   command: prober
-  #   depends_on:
-  #     - keydb
-
-  # consumer:
-  #   build: .
-  #   restart: unless-stopped
-  #   command: consumer
   #   depends_on:
   #     - keydb
   #     - influxdb
