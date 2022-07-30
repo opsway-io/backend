@@ -8,8 +8,8 @@ import (
 	"github.com/labstack/echo/v4/middleware"
 	"github.com/opsway-io/backend/internal/jwt"
 	"github.com/opsway-io/backend/internal/monitor"
+	"github.com/opsway-io/backend/internal/rest/helpers"
 	v1 "github.com/opsway-io/backend/internal/rest/v1"
-	"github.com/opsway-io/backend/internal/rest/validator"
 	"github.com/opsway-io/backend/internal/user"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -30,7 +30,7 @@ func NewServer(conf Config, logger *logrus.Logger, userService user.Service, jwt
 
 	e.HideBanner = true
 	e.HidePort = true
-	e.Validator = validator.New()
+	e.Validator = helpers.NewValidator()
 
 	e.Use(
 		middleware.Recover(),

@@ -1,12 +1,12 @@
 package v1
 
 import (
-	"errors"
 	"net/http"
 
-	"github.com/creasty/defaults"
 	"github.com/labstack/echo/v4"
 	"github.com/opsway-io/backend/internal/monitor"
+	"github.com/opsway-io/backend/internal/rest/helpers"
+	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
 
@@ -21,21 +21,9 @@ type GetMonitorsResponse struct {
 }
 
 func (h *Handlers) GetMonitors(ctx echo.Context, l *logrus.Entry) error {
-	var req GetMonitorsRequest
-	if err := ctx.Bind(&req); err != nil {
-		l.WithError(err).Debug("failed to bind request")
-
-		return echo.ErrBadRequest
-	}
-
-	if err := ctx.Validate(&req); err != nil {
-		l.WithError(err).Debug("request failed validation")
-
-		return echo.ErrBadRequest
-	}
-
-	if err := defaults.Set(&req); err != nil {
-		l.WithError(err).Debug("failed to set defaults")
+	req, err := helpers.Bind[GetMonitorsRequest](ctx)
+	if err != nil {
+		l.WithError(err).Debug("failed to bind GetMonitorsRequest")
 
 		return echo.ErrInternalServerError
 	}
@@ -62,17 +50,11 @@ type GetMonitorRequest struct {
 }
 
 func (h *Handlers) GetMonitor(ctx echo.Context, l *logrus.Entry) error {
-	var req GetMonitorRequest
-	if err := ctx.Bind(&req); err != nil {
-		l.WithError(err).Debug("failed to bind request")
+	req, err := helpers.Bind[GetMonitorRequest](ctx)
+	if err != nil {
+		l.WithError(err).Debug("failed to bind GetMonitorRequest")
 
-		return echo.ErrBadRequest
-	}
-
-	if err := ctx.Validate(&req); err != nil {
-		l.WithError(err).Debug("request failed validation")
-
-		return echo.ErrBadRequest
+		return echo.ErrInternalServerError
 	}
 
 	m, err := h.MonitorService.GetByTeamIDAndID(ctx.Request().Context(), req.TeamID, req.MonitorID)

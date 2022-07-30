@@ -1,4 +1,4 @@
-package validator
+package helpers
 
 import (
 	"github.com/go-playground/validator"
@@ -9,7 +9,7 @@ type Validator struct {
 	validator *validator.Validate
 }
 
-func New() *Validator {
+func NewValidator() *Validator {
 	v := validator.New()
 
 	return &Validator{

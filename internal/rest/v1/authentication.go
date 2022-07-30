@@ -4,6 +4,7 @@ import (
 	"net/http"
 
 	"github.com/labstack/echo/v4"
+	"github.com/opsway-io/backend/internal/rest/helpers"
 	"github.com/opsway-io/backend/internal/user"
 	"github.com/sirupsen/logrus"
 )
@@ -17,29 +18,23 @@ type User struct {
 	UpdatedAt   int64  `json:"updatedAt"`
 }
 
-type LoginRequest struct {
+type PostLoginRequest struct {
 	Email    string `json:"email" validate:"required,email"`
 	Password string `json:"password" validate:"required"`
 }
 
-type LoginResponse struct {
+type PostLoginResponse struct {
 	Token        string `json:"token"`
 	RefreshToken string `json:"refreshToken"`
 	User         User   `json:"user"`
 }
 
 func (h *Handlers) PostLogin(ctx echo.Context, l *logrus.Entry) error {
-	var req LoginRequest
-	if err := ctx.Bind(&req); err != nil {
-		l.WithError(err).Debug("failed to bind request")
+	req, err := helpers.Bind[PostLoginRequest](ctx)
+	if err != nil {
+		l.WithError(err).Debug("failed to bind PostLoginRequest")
 
 		return echo.ErrInternalServerError
-	}
-
-	if err := ctx.Validate(&req); err != nil {
-		l.WithError(err).Debug("request failed validation")
-
-		return echo.ErrBadRequest
 	}
 
 	user, err := h.UserService.GetUserByEmail(ctx.Request().Context(), req.Email)
@@ -66,34 +61,28 @@ func (h *Handlers) PostLogin(ctx echo.Context, l *logrus.Entry) error {
 
 	l.Info("user authenticated")
 
-	return ctx.JSON(http.StatusOK, LoginResponse{
+	return ctx.JSON(http.StatusOK, PostLoginResponse{
 		Token:        token,
 		RefreshToken: refresh,
 		User:         userToResponse(user),
 	})
 }
 
-type RefreshRequest struct {
+type PostRefreshRequest struct {
 	RefreshToken string `json:"refreshToken" validate:"required"`
 }
 
-type RefreshResponse struct {
+type PostRefreshResponse struct {
 	Token        string `json:"token"`
 	RefreshToken string `json:"refreshToken"`
 }
 
 func (h *Handlers) PostRefresh(ctx echo.Context, l *logrus.Entry) error {
-	var req RefreshRequest
-	if err := ctx.Bind(&req); err != nil {
-		l.WithError(err).Debug("failed to bind request")
+	req, err := helpers.Bind[PostRefreshRequest](ctx)
+	if err != nil {
+		l.WithError(err).Debug("failed to bind PostLoginRequest")
 
 		return echo.ErrInternalServerError
-	}
-
-	if err := ctx.Validate(&req); err != nil {
-		l.WithError(err).Debug("request failed validation")
-
-		return echo.ErrBadRequest
 	}
 
 	token, refresh, err := h.JWTService.Refresh(req.RefreshToken)
@@ -105,7 +94,7 @@ func (h *Handlers) PostRefresh(ctx echo.Context, l *logrus.Entry) error {
 
 	l.Info("token refreshed")
 
-	return ctx.JSON(http.StatusOK, RefreshResponse{
+	return ctx.JSON(http.StatusOK, PostRefreshResponse{
 		Token:        token,
 		RefreshToken: refresh,
 	})
