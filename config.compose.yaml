@@ -8,3 +8,10 @@ rest:
 postgres:
   dsn: "host=postgres user=admin password=admin dbname=opsway port=5432 sslmode=disable"
   debug: true
+
+jwt:
+  secret: "secret"
+  audience: "https://opsway.io"
+  issuer: "opsway.io"
+  expires_in: 24h
+  refresh_expires_in: 720h 
