@@ -34,7 +34,7 @@ func (h *Handlers) PostLogin(ctx echo.Context, l *logrus.Entry) error {
 	if err != nil {
 		l.WithError(err).Debug("failed to bind PostLoginRequest")
 
-		return echo.ErrInternalServerError
+		return echo.ErrBadRequest
 	}
 
 	user, err := h.UserService.GetUserByEmail(ctx.Request().Context(), req.Email)
@@ -82,7 +82,7 @@ func (h *Handlers) PostRefresh(ctx echo.Context, l *logrus.Entry) error {
 	if err != nil {
 		l.WithError(err).Debug("failed to bind PostLoginRequest")
 
-		return echo.ErrInternalServerError
+		return echo.ErrBadRequest
 	}
 
 	token, refresh, err := h.JWTService.Refresh(req.RefreshToken)

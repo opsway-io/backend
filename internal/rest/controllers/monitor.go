@@ -25,7 +25,7 @@ func (h *Handlers) GetMonitors(ctx echo.Context, l *logrus.Entry) error {
 	if err != nil {
 		l.WithError(err).Debug("failed to bind GetMonitorsRequest")
 
-		return echo.ErrInternalServerError
+		return echo.ErrBadRequest
 	}
 
 	monitors, err := h.MonitorService.GetByTeamID(ctx.Request().Context(), req.TeamID, req.Offset, req.Limit)
@@ -54,7 +54,7 @@ func (h *Handlers) GetMonitor(ctx echo.Context, l *logrus.Entry) error {
 	if err != nil {
 		l.WithError(err).Debug("failed to bind GetMonitorRequest")
 
-		return echo.ErrInternalServerError
+		return echo.ErrBadRequest
 	}
 
 	m, err := h.MonitorService.GetByTeamIDAndID(ctx.Request().Context(), req.TeamID, req.MonitorID)
