@@ -35,4 +35,4 @@ jobs:
           context: .
           push: true
           tags: |
-            ${{ env.IMAGE }}:${{ steps.prep.outputs.BUILD_ID }}
+            naueramant/opsway-backend:${{ steps.prep.outputs.BUILD_ID }}
