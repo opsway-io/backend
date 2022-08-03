@@ -8,10 +8,10 @@ import (
 	"github.com/opsway-io/backend/internal/connectors/keydb"
 	httpProbe "github.com/opsway-io/backend/internal/probes/http"
 	result "github.com/opsway-io/backend/internal/results"
+	scheduler "github.com/opsway-io/backend/internal/schedule"
 
 	influxClient "github.com/opsway-io/backend/internal/connectors/influxdb"
 
-	"github.com/go-redis/redis"
 	"github.com/rs/xid"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
@@ -39,10 +39,12 @@ func runProber(cmd *cobra.Command, args []string) {
 	ctx := context.Background()
 
 	l.WithField("addr", conf.KeyDB.Addr).Info("connecting to keydb")
-	client, err := keydb.NewClient(ctx, conf.KeyDB)
+	redisClient, err := keydb.NewClient(ctx, conf.KeyDB)
 	if err != nil {
 		panic(err)
 	}
+
+	redisScheduler := scheduler.New(redisClient)
 
 	influxc, err := influxClient.NewClient(ctx, influxClient.Config{ServerURL: "http://localhost:8086", Token: "Raz0dd73B0aprtu-GKaaHHgobLcbAzZD1K3fbLLG7HVHw1zRWN2ljFbh0bd-2_4oxjyii3SLt6t01Ev3kdd8QA=="})
 	if err != nil {
@@ -54,46 +56,30 @@ func runProber(cmd *cobra.Command, args []string) {
 		panic(err)
 	}
 
-	consume(client, resultService)
+	consume(ctx, redisScheduler, resultService)
 }
 
-func consume(rc *redis.Client, rs result.Service) {
+func consume(ctx context.Context, scheduler scheduler.Schedule, rs result.Service) {
 	uniqueID := xid.New().String()
 
-	readGroupArgs := redis.XReadGroupArgs{
-		Group:    "TODO",
-		Consumer: uniqueID,
-		Streams:  []string{"TODO", ">"},
-		Count:    1,
-		Block:    -1,
-		NoAck:    false,
-	}
-
 	for {
-		entries, err := rc.XReadGroup(&readGroupArgs).Result()
+		entries, err := scheduler.Consume(ctx, uniqueID)
 		if err != nil {
 			logrus.WithError(err).Fatal("failed to get stream result")
 		}
 
 		for i := 0; i < len(entries[0].Messages); i++ {
-			result, err := handleMessage(rc, entries[0].Messages[i])
+			res, err := httpProbe.Probe(http.MethodGet, "https://opsway.io", nil, nil, time.Second*5)
 			if err != nil {
 				logrus.WithError(err).Fatal(err)
 			}
 
-			rs.WriteResult("https://opsway.io", "opsway", result)
+			err = rc.XAck("TODO", "TODO", entries[0].Messages[i].ID).Err()
+			if err != nil {
+				logrus.WithError(err).Fatal(err)
+			}
+
+			rs.WriteResult("https://opsway.io", "opsway", res)
 		}
 	}
-}
-
-func handleMessage(rc *redis.Client, msg redis.XMessage) (*httpProbe.Result, error) {
-	messageID := msg.ID
-
-	// TODO: use real values
-	res, err := httpProbe.Probe(http.MethodGet, "https://opsway.io", nil, nil, time.Second*5)
-	if err != nil {
-		return nil, err
-	}
-
-	return res, rc.XAck("TODO", "TODO", messageID).Err()
 }

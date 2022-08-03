@@ -2,7 +2,6 @@ package scheduler
 
 import (
 	"context"
-	"errors"
 	"strconv"
 	"time"
 
@@ -10,17 +9,12 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-type Event struct {
-	id   string
-	data interface{}
-}
-
 type Schedule interface {
 	Add(ctx context.Context, interval time.Duration, data map[string]interface{}) (id string, err error)
 	Set(ctx context.Context, id string, data interface{}) (err error)
 	Remove(ctx context.Context, id string) (err error)
 	Run(ctx context.Context, id string) (err error)
-	Consume(ctx context.Context) (events <-chan *Event, err error)
+	Consume(ctx context.Context, id string) (msgs []redis.XStream, err error)
 }
 
 type RedisSchedule struct {
@@ -58,6 +52,20 @@ func (rs *RedisSchedule) Run(ctx context.Context, id string) (err error) {
 	return rs.client.XGroupSetID("stream-", "consumer-group-", "0").Err()
 }
 
-func (rs *RedisSchedule) Consume(ctx context.Context) (events <-chan *Event, err error) {
-	return nil, errors.New("not implemented")
+func (rs *RedisSchedule) Consume(ctx context.Context, id string) (msgs []redis.XStream, err error) {
+	readGroupArgs := redis.XReadGroupArgs{
+		Group:    "TODO",
+		Consumer: id,
+		Streams:  []string{"TODO", ">"},
+		Count:    1,
+		Block:    -1,
+		NoAck:    false,
+	}
+
+	entries, err := rs.client.XReadGroup(&readGroupArgs).Result()
+	if err != nil {
+		logrus.WithError(err).Fatal("failed to get stream result")
+	}
+
+	return entries, nil
 }
