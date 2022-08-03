@@ -9,6 +9,9 @@ import (
 	"github.com/jeremywohl/flatten"
 	"github.com/opsway-io/backend/internal/connectors/keydb"
 	httpProbe "github.com/opsway-io/backend/internal/probes/http"
+	influxRepo "github.com/opsway-io/backend/internal/results/http"
+
+	influxClient "github.com/opsway-io/backend/internal/connectors/influxdb"
 
 	"github.com/go-redis/redis"
 	"github.com/rs/xid"
@@ -43,10 +46,20 @@ func runProber(cmd *cobra.Command, args []string) {
 		panic(err)
 	}
 
-	consume(client)
+	influxc, err := influxClient.NewClient(ctx, influxClient.Config{ServerURL: "http://localhost:8086", Token: "Raz0dd73B0aprtu-GKaaHHgobLcbAzZD1K3fbLLG7HVHw1zRWN2ljFbh0bd-2_4oxjyii3SLt6t01Ev3kdd8QA=="})
+	if err != nil {
+		panic(err)
+	}
+
+	influxr, err := influxRepo.NewRepository(influxc, "123", "123")
+	if err != nil {
+		panic(err)
+	}
+
+	consume(client, influxr)
 }
 
-func consume(rc *redis.Client) {
+func consume(rc *redis.Client, ir *influxRepo.Repository) {
 	uniqueID := xid.New().String()
 
 	readGroupArgs := redis.XReadGroupArgs{
@@ -93,6 +106,8 @@ func writeResult(res *httpProbe.Result) {
 	if err != nil {
 		logrus.WithError(err).Fatal(err)
 	}
+
+	influxRepo.Repository.Write()
 
 	// TODO: Write it somewhere
 }

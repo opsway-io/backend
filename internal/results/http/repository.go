@@ -1,4 +1,4 @@
-package result
+package repository
 
 import (
 	"context"
@@ -10,8 +10,8 @@ import (
 )
 
 type Repository interface {
-	Write(data map[string]interface{})
-	Read(bucket string) (string, error)
+	Write(monitorID string, orgID string, data map[string]interface{})
+	Read(bucket string, measurement string, tag0 string, tag1 string) (string, error)
 }
 
 type RepositoryImpl struct {
