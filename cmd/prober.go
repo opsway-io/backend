@@ -5,11 +5,9 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/fatih/structs"
-	"github.com/jeremywohl/flatten"
 	"github.com/opsway-io/backend/internal/connectors/keydb"
 	httpProbe "github.com/opsway-io/backend/internal/probes/http"
-	influxRepo "github.com/opsway-io/backend/internal/results/http"
+	result "github.com/opsway-io/backend/internal/results"
 
 	influxClient "github.com/opsway-io/backend/internal/connectors/influxdb"
 
@@ -51,15 +49,15 @@ func runProber(cmd *cobra.Command, args []string) {
 		panic(err)
 	}
 
-	influxr, err := influxRepo.NewRepository(influxc, "123", "123")
+	resultService, err := result.NewService(influxc, "123", "123")
 	if err != nil {
 		panic(err)
 	}
 
-	consume(client, influxr)
+	consume(client, resultService)
 }
 
-func consume(rc *redis.Client, ir *influxRepo.Repository) {
+func consume(rc *redis.Client, rs result.Service) {
 	uniqueID := xid.New().String()
 
 	readGroupArgs := redis.XReadGroupArgs{
@@ -83,7 +81,7 @@ func consume(rc *redis.Client, ir *influxRepo.Repository) {
 				logrus.WithError(err).Fatal(err)
 			}
 
-			writeResult(result)
+			rs.WriteResult("https://opsway.io", "opsway", result)
 		}
 	}
 }
@@ -98,16 +96,4 @@ func handleMessage(rc *redis.Client, msg redis.XMessage) (*httpProbe.Result, err
 	}
 
 	return res, rc.XAck("TODO", "TODO", messageID).Err()
-}
-
-func writeResult(res *httpProbe.Result) {
-	m := structs.Map(res)
-	m, err := flatten.Flatten(m, "", flatten.DotStyle)
-	if err != nil {
-		logrus.WithError(err).Fatal(err)
-	}
-
-	influxRepo.Repository.Write()
-
-	// TODO: Write it somewhere
 }
