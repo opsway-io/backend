@@ -15,3 +15,12 @@ jwt:
   issuer: "opsway.io"
   expires_in: 24h
   refresh_expires_in: 720h 
+
+influxdb:
+  host: influxdb
+  port: 8086
+  token: c2b67Z10xdccn0oWmN1d4SsBdCaU7RCDuesd0R8iSR-9pHSGfbvkTjlFCN3HONydaLjjmL82bS-sQQl2s1z6uw==
+
+redis:
+  host: keydb
+  port: 6379
