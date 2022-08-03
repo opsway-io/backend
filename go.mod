@@ -3,6 +3,7 @@ module github.com/opsway-io/backend
 go 1.18
 
 require (
+	github.com/creasty/defaults v1.6.0
 	github.com/fatih/structs v1.1.0
 	github.com/go-playground/validator v9.31.0+incompatible
 	github.com/go-redis/redis v6.15.9+incompatible
@@ -10,6 +11,7 @@ require (
 	github.com/influxdata/influxdb-client-go/v2 v2.9.1
 	github.com/jeremywohl/flatten v1.0.1
 	github.com/labstack/echo/v4 v4.7.2
+	github.com/lib/pq v1.10.2
 	github.com/opsway-io/go-httpstat v1.0.0
 	github.com/pkg/errors v0.9.1
 	github.com/rs/xid v1.4.0

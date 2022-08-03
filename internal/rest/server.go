@@ -7,8 +7,9 @@ import (
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
 	"github.com/opsway-io/backend/internal/jwt"
-	v1 "github.com/opsway-io/backend/internal/rest/v1"
-	"github.com/opsway-io/backend/internal/rest/validator"
+	"github.com/opsway-io/backend/internal/monitor"
+	"github.com/opsway-io/backend/internal/rest/controllers"
+	"github.com/opsway-io/backend/internal/rest/helpers"
 	"github.com/opsway-io/backend/internal/user"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -24,12 +25,12 @@ type Server struct {
 	config Config
 }
 
-func NewServer(conf Config, logger *logrus.Logger, userService user.Service, jwtService jwt.Service) (*Server, error) {
+func NewServer(conf Config, logger *logrus.Logger, userService user.Service, jwtService jwt.Service, monitorService monitor.Service) (*Server, error) {
 	e := echo.New()
 
 	e.HideBanner = true
 	e.HidePort = true
-	e.Validator = validator.New()
+	e.Validator = helpers.NewValidator()
 
 	e.Use(
 		middleware.Recover(),
@@ -42,13 +43,14 @@ func NewServer(conf Config, logger *logrus.Logger, userService user.Service, jwt
 		}),
 	)
 
-	root := e.Group("")
+	root := e.Group("/v1")
 
-	v1.Register(
+	controllers.Register(
 		root,
-		logger,
+		logger.WithField("module", "rest"),
 		userService,
 		jwtService,
+		monitorService,
 	)
 
 	return &Server{

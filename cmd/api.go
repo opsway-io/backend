@@ -5,6 +5,7 @@ import (
 
 	"github.com/opsway-io/backend/internal/connectors/postgres"
 	"github.com/opsway-io/backend/internal/jwt"
+	"github.com/opsway-io/backend/internal/monitor"
 	"github.com/opsway-io/backend/internal/rest"
 	"github.com/opsway-io/backend/internal/user"
 	"github.com/sirupsen/logrus"
@@ -41,6 +42,12 @@ func runAPI(cmd *cobra.Command, args []string) {
 		l.WithError(err).Fatal("Failed to create Postgres client")
 	}
 
+	db.AutoMigrate(
+		user.User{},
+		monitor.Monitor{},
+		monitor.Settings{},
+	)
+
 	userService := user.NewService(db)
 
 	// TODO: Remove
@@ -55,7 +62,9 @@ func runAPI(cmd *cobra.Command, args []string) {
 
 	jwtService := jwt.NewService(conf.JWT)
 
-	srv, err := rest.NewServer(conf.REST, l, userService, jwtService)
+	monitorService := monitor.NewService(db)
+
+	srv, err := rest.NewServer(conf.REST, l, userService, jwtService, monitorService)
 	if err != nil {
 		l.WithError(err).Fatal("Failed to create REST server")
 	}
