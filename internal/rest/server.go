@@ -43,7 +43,7 @@ func NewServer(conf Config, logger *logrus.Logger, userService user.Service, jwt
 		}),
 	)
 
-	root := e.Group("/v1")
+	root := e.Group("/api/v1")
 
 	controllers.Register(
 		root,
