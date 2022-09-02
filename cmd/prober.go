@@ -74,7 +74,7 @@ func consume(ctx context.Context, scheduler scheduler.Schedule, rs result.Servic
 				logrus.WithError(err).Fatal(err)
 			}
 
-			err = rc.XAck("TODO", "TODO", entries[0].Messages[i].ID).Err()
+			err = scheduler.Ack(ctx, "TODO", "TODO", entries[0].Messages[i].ID)
 			if err != nil {
 				logrus.WithError(err).Fatal(err)
 			}

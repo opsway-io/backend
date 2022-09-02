@@ -10,6 +10,7 @@ import (
 )
 
 type Schedule interface {
+	Ack(ctx context.Context, streamId string, groupId string, id string) (err error)
 	Add(ctx context.Context, interval time.Duration, data map[string]interface{}) (id string, err error)
 	Set(ctx context.Context, id string, data interface{}) (err error)
 	Remove(ctx context.Context, id string) (err error)
@@ -37,6 +38,10 @@ func (rs *RedisSchedule) Add(ctx context.Context, interval time.Duration, data m
 	})
 
 	return cmd.Result()
+}
+
+func (rs *RedisSchedule) Ack(ctx context.Context, streamId string, groupId string, id string) (err error) {
+	return rs.client.XAck(streamId, groupId, id).Err()
 }
 
 func (rs *RedisSchedule) Set(ctx context.Context, id string, data interface{}) (err error) {
