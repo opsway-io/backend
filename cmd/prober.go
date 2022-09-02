@@ -51,19 +51,19 @@ func runProber(cmd *cobra.Command, args []string) {
 		panic(err)
 	}
 
-	resultService, err := result.NewService(influxc, "123", "123")
+	resultService, err := result.NewService(influxc, "123", "test")
 	if err != nil {
 		panic(err)
 	}
 
-	consume(ctx, redisScheduler, resultService)
+	consume(ctx, redisScheduler, resultService, "stream-360")
 }
 
-func consume(ctx context.Context, scheduler scheduler.Schedule, rs result.Service) {
+func consume(ctx context.Context, scheduler scheduler.Schedule, rs result.Service, streamID string) {
 	uniqueID := xid.New().String()
 
 	for {
-		entries, err := scheduler.Consume(ctx, uniqueID)
+		entries, err := scheduler.Consume(ctx, streamID, "tickets-consumer-group", uniqueID)
 		if err != nil {
 			logrus.WithError(err).Fatal("failed to get stream result")
 		}

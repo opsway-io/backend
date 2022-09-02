@@ -15,7 +15,7 @@ type Schedule interface {
 	Set(ctx context.Context, id string, data interface{}) (err error)
 	Remove(ctx context.Context, id string) (err error)
 	Run(ctx context.Context, id string) (err error)
-	Consume(ctx context.Context, id string) (msgs []redis.XStream, err error)
+	Consume(ctx context.Context, streamId string, groupId string, id string) (msgs []redis.XStream, err error)
 }
 
 type RedisSchedule struct {
@@ -57,11 +57,11 @@ func (rs *RedisSchedule) Run(ctx context.Context, id string) (err error) {
 	return rs.client.XGroupSetID("stream", "tickets-consumer-group", "0").Err()
 }
 
-func (rs *RedisSchedule) Consume(ctx context.Context, id string) (msgs []redis.XStream, err error) {
+func (rs *RedisSchedule) Consume(ctx context.Context, streamId string, groupId string, id string) (msgs []redis.XStream, err error) {
 	readGroupArgs := redis.XReadGroupArgs{
-		Group:    "TODO",
+		Group:    groupId,
 		Consumer: id,
-		Streams:  []string{"TODO", ">"},
+		Streams:  []string{streamId, ">"},
 		Count:    1,
 		Block:    -1,
 		NoAck:    false,
