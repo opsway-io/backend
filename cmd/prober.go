@@ -74,7 +74,7 @@ func consume(ctx context.Context, scheduler scheduler.Schedule, rs result.Servic
 				logrus.WithError(err).Fatal(err)
 			}
 
-			err = scheduler.Ack(ctx, entries[0].Stream, "consumer-group", entries[0].Messages[i].ID)
+			err = scheduler.Ack(ctx, entries[0].Stream, "tickets-consumer-group", entries[0].Messages[i].ID)
 			if err != nil {
 				logrus.WithError(err).Fatal(err)
 			}
