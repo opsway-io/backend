@@ -54,7 +54,7 @@ func (rs *RedisSchedule) Remove(ctx context.Context, id string) (err error) {
 
 func (rs *RedisSchedule) Run(ctx context.Context, id string) (err error) {
 	rs.client.XRead(&redis.XReadArgs{})
-	return rs.client.XGroupSetID("stream-", "consumer-group-", "0").Err()
+	return rs.client.XGroupSetID("stream-", "consumer-group", "0").Err()
 }
 
 func (rs *RedisSchedule) Consume(ctx context.Context, id string) (msgs []redis.XStream, err error) {
