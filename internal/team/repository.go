@@ -4,10 +4,14 @@ import (
 	"context"
 	"errors"
 
+	"github.com/opsway-io/backend/internal/connectors/postgres"
 	"gorm.io/gorm"
 )
 
-var ErrNotFound = errors.New("team not found")
+var (
+	ErrNotFound          = errors.New("team not found")
+	ErrNameAlreadyExists = errors.New("team name already exists")
+)
 
 type Repository interface {
 	GetByID(ctx context.Context, id int) (*Team, error)
@@ -37,7 +41,15 @@ func (s *RepositoryImpl) GetByID(ctx context.Context, id int) (*Team, error) {
 }
 
 func (s *RepositoryImpl) Create(ctx context.Context, team *Team) error {
-	return s.db.WithContext(ctx).Create(team).Error
+	if err := s.db.WithContext(ctx).Create(team).Error; err != nil {
+		if errors.As(err, &postgres.ErrDuplicateEntry) {
+			return ErrNameAlreadyExists
+		}
+
+		return err
+	}
+
+	return nil
 }
 
 func (s *RepositoryImpl) Update(ctx context.Context, team *Team) error {
