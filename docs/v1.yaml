@@ -5,7 +5,7 @@ info:
   version: 1.0.0
 
 servers:
-  - url: https://api.opsway.io/v1
+  - url: https://opsway.io/api/v1
   - url: "{scheme}://{host}"
     description: Custom
     variables:
@@ -16,6 +16,16 @@ servers:
           - "https"
       host:
         default: "localhost:8080/v1"
+    
+tags:
+  - name: Authentication
+    description: Authentication
+  - name: Account
+    description: Management of your account
+  - name: Team
+    description: Everything related to your team
+  - name: Monitors
+    description: Monitor management
 
 components:
   schemas:
@@ -42,6 +52,26 @@ components:
           type: string
           readOnly: true
         name: 
+          type: string
+        email:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+          readOnly: true
+        updatedAt:
+          type: string
+          format: date-time
+          readOnly: true
+    Account:
+      type: object
+      properties:
+        id:
+          type: string
+          readOnly: true
+        name:
+          type: string
+        displayName:
           type: string
         email:
           type: string
@@ -105,30 +135,55 @@ paths:
                     readOnly: true
         401:
           description: Unauthorized
-  /authentication/refresh:
-    post:
+  # Account
+  /account/{accountId}:
+    get:
       tags:
-        - Authentication
-      summary: Refresh token
+        - Account
+      summary: Get account
+      parameters:
+        - name: accountId
+          in: path
+          required: true
+          schema:
+            type: number
+      responses:
+        200:
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Account'
+        404:
+          description: Not found
+        401:
+          description: Unauthorized
+    patch:
+      tags:
+        - Account
+      summary: Update account
+      parameters:
+        - name: accountId
+          in: path
+          required: true
+          schema:
+            type: number
       requestBody:
         content:
           application/json:
             schema:
-              type: object
-              properties:
-                token:
-                  type: string
+              $ref: '#/components/schemas/Account'
       responses:
         200:
-          description: Refresh token
+          description: OK
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  token:
-                    type: string
-                    readOnly: true
+                $ref: '#/components/schemas/Account'
+        400:
+          description: Bad request
+        404:
+          description: Not found
         401:
           description: Unauthorized
 
@@ -188,7 +243,7 @@ paths:
   /teams/{teamId}/users:
     get:
       tags:
-        - Users
+        - Team
       summary: Get team users
       parameters:
         - name: teamId
@@ -212,7 +267,7 @@ paths:
   /teams/{teamId}/users/{userId}:
     get:
       tags:
-        - Users
+        - Team
       summary: Get team user
       parameters:
         - name: teamId
@@ -232,39 +287,6 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/User'
-        404:
-          description: Not found
-        401:
-          description: Unauthorized
-    patch:
-      tags:
-        - Users
-      summary: Update team user
-      parameters:
-        - name: teamId
-          in: path
-          required: true
-          schema:
-            type: number
-        - name: userId
-          in: path
-          required: true
-          schema:
-            type: number
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/User'
-      responses:
-        200:
-          description: OK
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/User'
-        400:
-          description: Bad request
         404:
           description: Not found
         401:
