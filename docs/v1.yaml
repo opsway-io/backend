@@ -16,22 +16,21 @@ servers:
           - "https"
       host:
         default: "localhost:8080/v1"
-    
-tags:
-  - name: Authentication
-    description: Authentication
-  - name: Account
-    description: Management of your account
-  - name: Team
-    description: Everything related to your team
-  - name: Monitors
-    description: Monitor management
 
 components:
+  securitySchemes:
+    JWT:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
   schemas:
     Team:
       type: object
       properties:
+        id:
+          type: integer
+          readOnly: true
         name:
           type: string
         logo:
@@ -49,9 +48,9 @@ components:
       type: object
       properties:
         id:
-          type: string
+          type: integer
           readOnly: true
-        name: 
+        name:
           type: string
         email:
           type: string
@@ -67,7 +66,7 @@ components:
       type: object
       properties:
         id:
-          type: string
+          type: integer
           readOnly: true
         name:
           type: string
@@ -84,7 +83,7 @@ components:
           format: date-time
           readOnly: true
     Monitor:
-      type: object
+      type: integer
       properties:
         id:
           type: string
@@ -131,150 +130,19 @@ paths:
                     type: string
                     readOnly: true
                   user:
-                    $ref: '#/components/schemas/User'
+                    $ref: "#/components/schemas/User"
                     readOnly: true
         401:
           description: Unauthorized
-  # Account
-  /account/{accountId}:
+  # User
+  /users/{userId}:
     get:
       tags:
-        - Account
-      summary: Get account
+        - Users
+      summary: Get user
+      security:
+        - JWT: []
       parameters:
-        - name: accountId
-          in: path
-          required: true
-          schema:
-            type: number
-      responses:
-        200:
-          description: OK
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Account'
-        404:
-          description: Not found
-        401:
-          description: Unauthorized
-    patch:
-      tags:
-        - Account
-      summary: Update account
-      parameters:
-        - name: accountId
-          in: path
-          required: true
-          schema:
-            type: number
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/Account'
-      responses:
-        200:
-          description: OK
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Account'
-        400:
-          description: Bad request
-        404:
-          description: Not found
-        401:
-          description: Unauthorized
-
-  # Teams
-  /teams/{teamId}:
-    get:
-      tags:
-        - Team
-      summary: Get team
-      parameters:
-        - name: teamId
-          in: path
-          required: true
-          schema:
-            type: number
-      responses:
-        200:
-          description: OK
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Team'
-        404:
-          description: Not found
-        401:
-          description: Unauthorized
-    patch:
-      tags:
-        - Team
-      summary: Update team
-      parameters:
-        - name: teamId
-          in: path
-          required: true
-          schema:
-            type: number
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/Team'
-      responses:
-        200:
-          description: OK
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Team'
-        400:
-          description: Bad request
-        404:
-          description: Not found
-        401:
-          description: Unauthorized
-
-  # Users
-  /teams/{teamId}/users:
-    get:
-      tags:
-        - Team
-      summary: Get team users
-      parameters:
-        - name: teamId
-          in: path
-          required: true
-          schema:
-            type: number
-      responses:
-        200:
-          description: OK
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/User'
-        404:
-          description: Not found
-        401:
-          description: Unauthorized
-  /teams/{teamId}/users/{userId}:
-    get:
-      tags:
-        - Team
-      summary: Get team user
-      parameters:
-        - name: teamId
-          in: path
-          required: true
-          schema:
-            type: number
         - name: userId
           in: path
           required: true
@@ -286,7 +154,121 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/User'
+                $ref: "#/components/schemas/User"
+        404:
+          description: Not found
+        401:
+          description: Unauthorized
+    put:
+      tags:
+        - Users
+      summary: Update user
+      security:
+        - JWT: []
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: number
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/User"
+      responses:
+        200:
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+        400:
+          description: Bad request
+        404:
+          description: Not found
+        401:
+          description: Unauthorized
+
+  # Teams
+  /teams/{teamId}:
+    get:
+      tags:
+        - Teams
+      summary: Get team
+      security:
+        - JWT: []
+      parameters:
+        - name: teamId
+          in: path
+          required: true
+          schema:
+            type: number
+      responses:
+        200:
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Team"
+        404:
+          description: Not found
+        401:
+          description: Unauthorized
+    put:
+      tags:
+        - Teams
+      summary: Update team
+      security:
+        - JWT: []
+      parameters:
+        - name: teamId
+          in: path
+          required: true
+          schema:
+            type: number
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/Team"
+      responses:
+        200:
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Team"
+        400:
+          description: Bad request
+        404:
+          description: Not found
+        401:
+          description: Unauthorized
+
+  # Users
+  /teams/{teamId}/users:
+    get:
+      tags:
+        - Teams
+      summary: Get team users
+      security:
+        - JWT: []
+      parameters:
+        - name: teamId
+          in: path
+          required: true
+          schema:
+            type: number
+      responses:
+        200:
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/User"
         404:
           description: Not found
         401:
@@ -298,6 +280,8 @@ paths:
       tags:
         - Monitors
       summary: Get team monitors
+      security:
+        - JWT: []
       responses:
         200:
           description: OK
@@ -306,7 +290,7 @@ paths:
               schema:
                 type: array
                 items:
-                  $ref: '#/components/schemas/Monitor'
+                  $ref: "#/components/schemas/Monitor"
         404:
           description: Not found
         401:
@@ -316,6 +300,8 @@ paths:
       tags:
         - Monitors
       summary: Get team monitor
+      security:
+        - JWT: []
       parameters:
         - name: teamId
           in: path
@@ -333,7 +319,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Monitor'
+                $ref: "#/components/schemas/Monitor"
         404:
           description: Not found
         401:
@@ -342,6 +328,8 @@ paths:
       tags:
         - Monitors
       summary: Create team monitor
+      security:
+        - JWT: []
       parameters:
         - name: teamId
           in: path
@@ -357,24 +345,26 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/Monitor'
+              $ref: "#/components/schemas/Monitor"
       responses:
         201:
           description: Created
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Monitor'
+                $ref: "#/components/schemas/Monitor"
         400:
           description: Bad request
-        401: 
+        401:
           description: Unauthorized
         404:
           description: Not found
-    patch:
+    put:
       tags:
         - Monitors
       summary: Update team monitor
+      security:
+        - JWT: []
       parameters:
         - name: teamId
           in: path
@@ -390,14 +380,14 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/Monitor'
+              $ref: "#/components/schemas/Monitor"
       responses:
         200:
           description: OK
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Monitor'
+                $ref: "#/components/schemas/Monitor"
         400:
           description: Bad request
         404:
@@ -408,6 +398,8 @@ paths:
       tags:
         - Monitors
       summary: Delete team monitor
+      security:
+        - JWT: []
       parameters:
         - name: teamId
           in: path
@@ -425,7 +417,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Monitor'
+                $ref: "#/components/schemas/Monitor"
         404:
           description: Not found
         401:

@@ -5,7 +5,9 @@ import (
 
 	"github.com/labstack/echo/v4"
 	"github.com/opsway-io/backend/internal/monitor"
+	"github.com/opsway-io/backend/internal/rest/handlers"
 	"github.com/opsway-io/backend/internal/rest/helpers"
+	"github.com/opsway-io/backend/internal/rest/models"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
@@ -17,10 +19,10 @@ type GetMonitorsRequest struct {
 }
 
 type GetMonitorsResponse struct {
-	Monitors []monitor.Monitor `json:"monitors"`
+	Monitors []models.Monitor `json:"monitors"`
 }
 
-func (h *Handlers) GetMonitors(ctx echo.Context, l *logrus.Entry) error {
+func (h *Handlers) GetMonitors(ctx handlers.AuthenticatedContext, l *logrus.Entry) error {
 	req, err := helpers.Bind[GetMonitorsRequest](ctx)
 	if err != nil {
 		l.WithError(err).Debug("failed to bind GetMonitorsRequest")
@@ -40,7 +42,7 @@ func (h *Handlers) GetMonitors(ctx echo.Context, l *logrus.Entry) error {
 	}
 
 	return ctx.JSON(http.StatusOK, GetMonitorsResponse{
-		Monitors: monitors,
+		Monitors: models.MonitorsToResponse(monitors),
 	})
 }
 
@@ -49,7 +51,11 @@ type GetMonitorRequest struct {
 	MonitorID int `param:"monitor_id" validate:"required,numeric"`
 }
 
-func (h *Handlers) GetMonitor(ctx echo.Context, l *logrus.Entry) error {
+type GetMonitorResponse struct {
+	models.Monitor
+}
+
+func (h *Handlers) GetMonitor(ctx handlers.AuthenticatedContext, l *logrus.Entry) error {
 	req, err := helpers.Bind[GetMonitorRequest](ctx)
 	if err != nil {
 		l.WithError(err).Debug("failed to bind GetMonitorRequest")
@@ -68,5 +74,5 @@ func (h *Handlers) GetMonitor(ctx echo.Context, l *logrus.Entry) error {
 		return echo.ErrInternalServerError
 	}
 
-	return ctx.JSON(http.StatusOK, m)
+	return ctx.JSON(http.StatusOK, models.MonitorToResponse(*m))
 }

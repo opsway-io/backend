@@ -6,7 +6,7 @@ import (
 
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
-	"github.com/opsway-io/backend/internal/jwt"
+	"github.com/opsway-io/backend/internal/authentication"
 	"github.com/opsway-io/backend/internal/monitor"
 	"github.com/opsway-io/backend/internal/rest/controllers"
 	"github.com/opsway-io/backend/internal/rest/helpers"
@@ -25,7 +25,7 @@ type Server struct {
 	config Config
 }
 
-func NewServer(conf Config, logger *logrus.Logger, userService user.Service, jwtService jwt.Service, monitorService monitor.Service) (*Server, error) {
+func NewServer(conf Config, logger *logrus.Logger, userService user.Service, jwtService authentication.Service, monitorService monitor.Service) (*Server, error) {
 	e := echo.New()
 
 	e.HideBanner = true
@@ -34,6 +34,7 @@ func NewServer(conf Config, logger *logrus.Logger, userService user.Service, jwt
 
 	e.Use(
 		middleware.Recover(),
+		middleware.Logger(),
 		middleware.CORSWithConfig(middleware.CORSConfig{
 			AllowOrigins: []string{"*"},
 		}),

@@ -3,8 +3,8 @@ package cmd
 import (
 	"context"
 
+	"github.com/opsway-io/backend/internal/authentication"
 	"github.com/opsway-io/backend/internal/connectors/postgres"
-	"github.com/opsway-io/backend/internal/jwt"
 	"github.com/opsway-io/backend/internal/monitor"
 	"github.com/opsway-io/backend/internal/rest"
 	"github.com/opsway-io/backend/internal/user"
@@ -48,7 +48,8 @@ func runAPI(cmd *cobra.Command, args []string) {
 		monitor.Settings{},
 	)
 
-	userService := user.NewService(db)
+	userRepository := user.NewRepository(db)
+	userService := user.NewService(userRepository)
 
 	// TODO: Remove
 	u := &user.User{
@@ -60,7 +61,7 @@ func runAPI(cmd *cobra.Command, args []string) {
 	userService.CreateUser(ctx, u)
 	// TODO: Remove
 
-	jwtService := jwt.NewService(conf.JWT)
+	jwtService := authentication.NewService(conf.Authentication)
 
 	monitorService := monitor.NewService(db)
 

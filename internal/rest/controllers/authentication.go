@@ -5,18 +5,9 @@ import (
 
 	"github.com/labstack/echo/v4"
 	"github.com/opsway-io/backend/internal/rest/helpers"
-	"github.com/opsway-io/backend/internal/user"
+	"github.com/opsway-io/backend/internal/rest/models"
 	"github.com/sirupsen/logrus"
 )
-
-type User struct {
-	ID          int    `json:"id"`
-	Name        string `json:"name"`
-	DisplayName string `json:"displayName"`
-	Email       string `json:"email"`
-	CreatedAt   int64  `json:"createdAt"`
-	UpdatedAt   int64  `json:"updatedAt"`
-}
 
 type PostLoginRequest struct {
 	Email    string `json:"email" validate:"required,email"`
@@ -24,9 +15,9 @@ type PostLoginRequest struct {
 }
 
 type PostLoginResponse struct {
-	Token        string `json:"token"`
-	RefreshToken string `json:"refreshToken"`
-	User         User   `json:"user"`
+	Token        string      `json:"token"`
+	RefreshToken string      `json:"refreshToken"`
+	User         models.User `json:"user"`
 }
 
 func (h *Handlers) PostLogin(ctx echo.Context, l *logrus.Entry) error {
@@ -52,7 +43,7 @@ func (h *Handlers) PostLogin(ctx echo.Context, l *logrus.Entry) error {
 		return echo.ErrUnauthorized
 	}
 
-	token, refresh, err := h.JWTService.Generate(user)
+	token, err := h.JWTService.Generate(user)
 	if err != nil {
 		l.WithError(err).Debug("failed to generate token for user")
 
@@ -62,51 +53,7 @@ func (h *Handlers) PostLogin(ctx echo.Context, l *logrus.Entry) error {
 	l.Info("user authenticated")
 
 	return ctx.JSON(http.StatusOK, PostLoginResponse{
-		Token:        token,
-		RefreshToken: refresh,
-		User:         userToResponse(user),
+		Token: token,
+		User:  models.UserToResponse(*user),
 	})
-}
-
-type PostRefreshRequest struct {
-	RefreshToken string `json:"refreshToken" validate:"required"`
-}
-
-type PostRefreshResponse struct {
-	Token        string `json:"token"`
-	RefreshToken string `json:"refreshToken"`
-}
-
-func (h *Handlers) PostRefresh(ctx echo.Context, l *logrus.Entry) error {
-	req, err := helpers.Bind[PostRefreshRequest](ctx)
-	if err != nil {
-		l.WithError(err).Debug("failed to bind PostLoginRequest")
-
-		return echo.ErrBadRequest
-	}
-
-	token, refresh, err := h.JWTService.Refresh(req.RefreshToken)
-	if err != nil {
-		l.WithError(err).Debug("failed to renew token")
-
-		return echo.ErrUnauthorized
-	}
-
-	l.Info("token refreshed")
-
-	return ctx.JSON(http.StatusOK, PostRefreshResponse{
-		Token:        token,
-		RefreshToken: refresh,
-	})
-}
-
-func userToResponse(user *user.User) User {
-	return User{
-		ID:          user.ID,
-		Name:        user.Name,
-		DisplayName: user.DisplayName,
-		Email:       user.Email,
-		CreatedAt:   user.CreatedAt.Unix(),
-		UpdatedAt:   user.UpdatedAt.Unix(),
-	}
 }

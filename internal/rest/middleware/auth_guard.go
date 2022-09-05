@@ -4,11 +4,11 @@ import (
 	"strings"
 
 	"github.com/labstack/echo/v4"
-	"github.com/opsway-io/backend/internal/jwt"
+	"github.com/opsway-io/backend/internal/authentication"
 	"github.com/sirupsen/logrus"
 )
 
-func AuthGuard(logger *logrus.Entry, jwtService jwt.Service) echo.MiddlewareFunc {
+func AuthGuard(logger *logrus.Entry, jwtService authentication.Service) echo.MiddlewareFunc {
 	l := logger.WithField("middleware", "auth_guard")
 
 	return func(next echo.HandlerFunc) echo.HandlerFunc {

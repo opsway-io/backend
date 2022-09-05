@@ -2,7 +2,6 @@ package handlers
 
 import (
 	"github.com/labstack/echo/v4"
-	"github.com/opsway-io/backend/internal/jwt"
 	"github.com/sirupsen/logrus"
 )
 
@@ -12,9 +11,4 @@ func StandardHandler(handler StandardHandlerFunc, logger *logrus.Entry) echo.Han
 	return func(ctx echo.Context) error {
 		return handler(ctx, logger)
 	}
-}
-
-type AuthenticatedContext struct {
-	echo.Context
-	Claims jwt.Claims
 }
