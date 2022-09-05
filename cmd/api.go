@@ -62,7 +62,7 @@ func runAPI(cmd *cobra.Command, args []string) {
 
 	// TODO: Remove
 	t := team.Team{
-		Name: "Test",
+		Name: "opsway",
 	}
 	teamService.Create(ctx, &t)
 

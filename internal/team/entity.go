@@ -4,6 +4,8 @@ import (
 	"errors"
 	"regexp"
 	"time"
+
+	"gorm.io/gorm"
 )
 
 var (
@@ -35,7 +37,7 @@ type Team struct {
 	UpdatedAt   time.Time
 }
 
-func (t Team) BeforeCreate() (err error) {
+func (t *Team) BeforeCreate(tx *gorm.DB) (err error) {
 	if ok := checkNameFormat(t.Name); !ok {
 		return ErrIllegalNameFormat
 	}
@@ -43,7 +45,7 @@ func (t Team) BeforeCreate() (err error) {
 	return nil
 }
 
-func (t Team) BeforeUpdate() (err error) {
+func (t *Team) BeforeUpdate(tx *gorm.DB) (err error) {
 	if ok := checkNameFormat(t.Name); !ok {
 		return ErrIllegalNameFormat
 	}
