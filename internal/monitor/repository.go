@@ -13,8 +13,8 @@ type Repository interface {
 	Create(ctx context.Context, monitor *Monitor) error
 	Update(ctx context.Context, monitor *Monitor) error
 	Delete(ctx context.Context, id int) error
-	GetByTeamID(ctx context.Context, teamID int, offset int, limit int) ([]Monitor, error)
-	GetByTeamIDAndID(ctx context.Context, teamID, id int) (*Monitor, error)
+	GetByTeamID(ctx context.Context, teamID int, offset int, limit int) (*[]Monitor, error)
+	GetByIDAndTeamID(ctx context.Context, teamID, id int) (*Monitor, error)
 }
 
 type RepositoryImpl struct {
@@ -32,12 +32,15 @@ func (r *RepositoryImpl) Create(ctx context.Context, m *Monitor) error {
 }
 
 func (r *RepositoryImpl) Update(ctx context.Context, m *Monitor) error {
-	err := r.db.WithContext(ctx).Updates(m).Error
-	if errors.Is(err, gorm.ErrRecordNotFound) {
+	result := r.db.WithContext(ctx).Updates(m)
+	if result.Error != nil {
+		return result.Error
+	}
+	if result.RowsAffected == 0 {
 		return ErrNotFound
 	}
 
-	return err
+	return nil
 }
 
 func (r *RepositoryImpl) Delete(ctx context.Context, id int) error {
@@ -49,23 +52,23 @@ func (r *RepositoryImpl) Delete(ctx context.Context, id int) error {
 	return err
 }
 
-func (r *RepositoryImpl) GetByTeamID(ctx context.Context, teamID int, offset int, limit int) ([]Monitor, error) {
+func (r *RepositoryImpl) GetByTeamID(ctx context.Context, teamID int, offset int, limit int) (*[]Monitor, error) {
 	var monitors []Monitor
 	err := r.db.WithContext(ctx).Offset(offset).Limit(limit).Where(Monitor{
 		TeamID: teamID,
 	}).Find(&monitors).Error
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return []Monitor{}, nil
+			return nil, nil
 		}
 
 		return nil, err
 	}
 
-	return monitors, err
+	return &monitors, err
 }
 
-func (r *RepositoryImpl) GetByTeamIDAndID(ctx context.Context, teamID, id int) (*Monitor, error) {
+func (r *RepositoryImpl) GetByIDAndTeamID(ctx context.Context, id, teamID int) (*Monitor, error) {
 	var monitor Monitor
 	err := r.db.WithContext(ctx).Where(Monitor{
 		ID:     id,

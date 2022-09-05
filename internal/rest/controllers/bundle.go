@@ -6,27 +6,31 @@ import (
 	"github.com/opsway-io/backend/internal/monitor"
 	hs "github.com/opsway-io/backend/internal/rest/handlers"
 	"github.com/opsway-io/backend/internal/rest/middleware"
+	"github.com/opsway-io/backend/internal/team"
 	"github.com/opsway-io/backend/internal/user"
 	"github.com/sirupsen/logrus"
 )
 
 type Handlers struct {
-	UserService    user.Service
-	JWTService     authentication.Service
-	MonitorService monitor.Service
+	AuthenticationService authentication.Service
+	UserService           user.Service
+	TeamService           team.Service
+	MonitorService        monitor.Service
 }
 
 func Register(
 	e *echo.Group,
 	logger *logrus.Entry,
+	authenticationService authentication.Service,
 	userService user.Service,
-	jwtService authentication.Service,
+	teamService team.Service,
 	monitorService monitor.Service,
 ) {
 	h := &Handlers{
-		UserService:    userService,
-		JWTService:     jwtService,
-		MonitorService: monitorService,
+		AuthenticationService: authenticationService,
+		UserService:           userService,
+		TeamService:           teamService,
+		MonitorService:        monitorService,
 	}
 
 	// Authentication
@@ -39,7 +43,7 @@ func Register(
 
 	usersGroup := e.Group(
 		"/users/:userId",
-		middleware.AuthGuard(logger, jwtService),
+		middleware.AuthGuard(logger, authenticationService),
 	)
 
 	usersGroup.GET("", hs.AuthenticatedHandler(h.GetUser, logger))
@@ -49,7 +53,7 @@ func Register(
 
 	teamsGroup := e.Group(
 		"/teams/:teamId",
-		middleware.AuthGuard(logger, jwtService),
+		middleware.AuthGuard(logger, authenticationService),
 		middleware.TeamGuard(logger),
 	)
 
@@ -61,7 +65,7 @@ func Register(
 
 	monitorsGroup := e.Group(
 		"/teams/:team_id/monitors",
-		middleware.AuthGuard(logger, jwtService),
+		middleware.AuthGuard(logger, authenticationService),
 		middleware.TeamGuard(logger),
 	)
 

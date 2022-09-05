@@ -5,10 +5,11 @@ import (
 )
 
 type Service interface {
-	GetUser(ctx context.Context, id int64) (*User, error)
-	GetUserByEmail(ctx context.Context, email string) (*User, error)
-	CreateUser(ctx context.Context, user *User) error
-	UpdateUser(ctx context.Context, user *User) error
+	GetByID(ctx context.Context, id int) (*User, error)
+	GetByEmail(ctx context.Context, email string) (*User, error)
+	GetByTeamID(ctx context.Context, teamID int) (*[]User, error)
+	Create(ctx context.Context, user *User) error
+	Update(ctx context.Context, user *User) error
 }
 
 type ServiceImpl struct {
@@ -21,18 +22,22 @@ func NewService(repository Repository) Service {
 	}
 }
 
-func (s *ServiceImpl) GetUser(ctx context.Context, id int64) (*User, error) {
-	return s.repository.GetUser(ctx, id)
+func (s *ServiceImpl) GetByID(ctx context.Context, id int) (*User, error) {
+	return s.repository.GetByID(ctx, id)
 }
 
-func (s *ServiceImpl) GetUserByEmail(ctx context.Context, email string) (*User, error) {
-	return s.repository.GetUserByEmail(ctx, email)
+func (s *ServiceImpl) GetByEmail(ctx context.Context, email string) (*User, error) {
+	return s.repository.GetByEmail(ctx, email)
 }
 
-func (s *ServiceImpl) CreateUser(ctx context.Context, user *User) error {
-	return s.repository.CreateUser(ctx, user)
+func (s *ServiceImpl) GetByTeamID(ctx context.Context, teamID int) (*[]User, error) {
+	return s.repository.GetUsersByTeamID(ctx, teamID)
 }
 
-func (s *ServiceImpl) UpdateUser(ctx context.Context, user *User) error {
-	return s.repository.UpdateUser(ctx, user)
+func (s *ServiceImpl) Create(ctx context.Context, user *User) error {
+	return s.repository.Create(ctx, user)
+}
+
+func (s *ServiceImpl) Update(ctx context.Context, user *User) error {
+	return s.repository.Update(ctx, user)
 }

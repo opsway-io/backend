@@ -10,6 +10,7 @@ import (
 	"github.com/opsway-io/backend/internal/monitor"
 	"github.com/opsway-io/backend/internal/rest/controllers"
 	"github.com/opsway-io/backend/internal/rest/helpers"
+	"github.com/opsway-io/backend/internal/team"
 	"github.com/opsway-io/backend/internal/user"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -25,7 +26,14 @@ type Server struct {
 	config Config
 }
 
-func NewServer(conf Config, logger *logrus.Logger, userService user.Service, jwtService authentication.Service, monitorService monitor.Service) (*Server, error) {
+func NewServer(
+	conf Config,
+	logger *logrus.Logger,
+	authenticationService authentication.Service,
+	userService user.Service,
+	teamService team.Service,
+	monitorService monitor.Service,
+) (*Server, error) {
 	e := echo.New()
 
 	e.HideBanner = true
@@ -49,8 +57,9 @@ func NewServer(conf Config, logger *logrus.Logger, userService user.Service, jwt
 	controllers.Register(
 		root,
 		logger.WithField("module", "rest"),
+		authenticationService,
 		userService,
-		jwtService,
+		teamService,
 		monitorService,
 	)
 

@@ -3,6 +3,7 @@ package user
 import (
 	"time"
 
+	"github.com/opsway-io/backend/internal/team"
 	"github.com/pkg/errors"
 	"golang.org/x/crypto/bcrypt"
 )
@@ -13,6 +14,8 @@ type User struct {
 	DisplayName  string
 	Email        string `gorm:"uniqueIndex:idx_email"`
 	PasswordHash string
+	TeamID       int `gorm:"not null,index:idx_team_id"`
+	Team         team.Team
 	CreatedAt    time.Time
 	UpdatedAt    time.Time
 }

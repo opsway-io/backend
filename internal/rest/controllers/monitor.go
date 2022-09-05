@@ -32,17 +32,13 @@ func (h *Handlers) GetMonitors(ctx handlers.AuthenticatedContext, l *logrus.Entr
 
 	monitors, err := h.MonitorService.GetByTeamID(ctx.Request().Context(), req.TeamID, req.Offset, req.Limit)
 	if err != nil {
-		if errors.Is(err, monitor.ErrNotFound) {
-			return echo.ErrNotFound
-		}
-
 		l.WithError(err).Error("failed to get monitors")
 
 		return echo.ErrInternalServerError
 	}
 
 	return ctx.JSON(http.StatusOK, GetMonitorsResponse{
-		Monitors: models.MonitorsToResponse(monitors),
+		Monitors: models.MonitorsToResponse(*monitors),
 	})
 }
 
@@ -63,9 +59,11 @@ func (h *Handlers) GetMonitor(ctx handlers.AuthenticatedContext, l *logrus.Entry
 		return echo.ErrBadRequest
 	}
 
-	m, err := h.MonitorService.GetByTeamIDAndID(ctx.Request().Context(), req.TeamID, req.MonitorID)
+	m, err := h.MonitorService.GetByIDAndTeamID(ctx.Request().Context(), req.MonitorID, req.TeamID)
 	if err != nil {
 		if errors.Is(err, monitor.ErrNotFound) {
+			l.WithError(err).Debug("monitor not found")
+
 			return echo.ErrNotFound
 		}
 

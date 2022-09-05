@@ -5,15 +5,17 @@ import (
 
 	"github.com/lib/pq"
 	"github.com/opsway-io/backend/internal/connectors/postgres"
+	"github.com/opsway-io/backend/internal/team"
 )
 
 type Monitor struct {
 	ID         int
-	TeamID     int            `gorm:"not null,index"`
-	Name       string         `gorm:"not null"`
+	Name       string         `gorm:"not null,index:idx_name"`
 	Tags       pq.StringArray `gorm:"type:text[]"`
 	SettingsID int
 	Settings   Settings `gorm:"foreignKey:SettingsID"`
+	TeamID     int      `gorm:"not null,index:idx_team_id"`
+	Team       team.Team
 	CreatedAt  time.Time
 	UpdatedAt  time.Time
 }

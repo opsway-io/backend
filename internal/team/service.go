@@ -5,7 +5,9 @@ import (
 )
 
 type Service interface {
-	GetTeamByID(ctx context.Context, id int) (*Team, error)
+	GetByID(ctx context.Context, id int) (*Team, error)
+	Create(ctx context.Context, team *Team) error
+	Update(ctx context.Context, team *Team) error
 }
 
 type ServiceImpl struct {
@@ -18,6 +20,14 @@ func NewService(repository Repository) Service {
 	}
 }
 
-func (s *ServiceImpl) GetTeamByID(ctx context.Context, id int) (*Team, error) {
-	return s.repository.GetTeamByID(ctx, id)
+func (s *ServiceImpl) GetByID(ctx context.Context, id int) (*Team, error) {
+	return s.repository.GetByID(ctx, id)
+}
+
+func (s *ServiceImpl) Create(ctx context.Context, team *Team) error {
+	return s.repository.Create(ctx, team)
+}
+
+func (s *ServiceImpl) Update(ctx context.Context, team *Team) error {
+	return s.repository.Update(ctx, team)
 }

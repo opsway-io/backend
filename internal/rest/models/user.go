@@ -21,3 +21,12 @@ func UserToResponse(u user.User) User {
 		UpdatedAt:   u.UpdatedAt.Unix(),
 	}
 }
+
+func UsersToResponse(us []user.User) []User {
+	users := make([]User, len(us))
+	for i, u := range us {
+		users[i] = UserToResponse(u)
+	}
+
+	return users
+}

@@ -10,8 +10,8 @@ type Service interface {
 	Create(ctx context.Context, monitor *Monitor) error
 	Update(ctx context.Context, monitor *Monitor) error
 	Delete(ctx context.Context, id int) error
-	GetByTeamID(ctx context.Context, teamID int, offset int, limit int) ([]Monitor, error)
-	GetByTeamIDAndID(ctx context.Context, teamID, id int) (*Monitor, error)
+	GetByIDAndTeamID(ctx context.Context, teamID, id int) (*Monitor, error)
+	GetByTeamID(ctx context.Context, teamID int, offset int, limit int) (*[]Monitor, error)
 }
 
 type ServiceImpl struct {
@@ -36,10 +36,10 @@ func (s *ServiceImpl) Delete(ctx context.Context, id int) error {
 	return s.repository.Delete(ctx, id)
 }
 
-func (s *ServiceImpl) GetByTeamID(ctx context.Context, teamID int, offset int, limit int) ([]Monitor, error) {
+func (s *ServiceImpl) GetByTeamID(ctx context.Context, teamID int, offset int, limit int) (*[]Monitor, error) {
 	return s.repository.GetByTeamID(ctx, teamID, offset, limit)
 }
 
-func (s *ServiceImpl) GetByTeamIDAndID(ctx context.Context, teamID, id int) (*Monitor, error) {
-	return s.repository.GetByTeamIDAndID(ctx, teamID, id)
+func (s *ServiceImpl) GetByIDAndTeamID(ctx context.Context, id, teamID int) (*Monitor, error) {
+	return s.repository.GetByIDAndTeamID(ctx, id, teamID)
 }

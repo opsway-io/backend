@@ -27,9 +27,14 @@ func (h *Handlers) GetTeam(ctx handlers.AuthenticatedContext, l *logrus.Entry) e
 		return echo.ErrBadRequest
 	}
 
-	fmt.Println(req) // TODO: implement
+	team, err := h.TeamService.GetByID(ctx.Request().Context(), req.TeamID)
+	if err != nil {
+		l.WithError(err).Debug("failed to get team")
 
-	return ctx.JSON(http.StatusNotImplemented, nil)
+		return echo.ErrInternalServerError
+	}
+
+	return ctx.JSON(http.StatusOK, models.TeamToResponse(*team))
 }
 
 type PutTeamRequest struct {
@@ -70,7 +75,14 @@ func (h *Handlers) GetTeamUsers(ctx handlers.AuthenticatedContext, l *logrus.Ent
 		return echo.ErrBadRequest
 	}
 
-	fmt.Println(req) // TODO: implement
+	users, err := h.UserService.GetByTeamID(ctx.Request().Context(), req.TeamID)
+	if err != nil {
+		l.WithError(err).Debug("failed to get users")
 
-	return ctx.JSON(http.StatusNotImplemented, nil)
+		return echo.ErrInternalServerError
+	}
+
+	return ctx.JSON(http.StatusOK, GetTeamUsersResponse{
+		Users: models.UsersToResponse(*users),
+	})
 }

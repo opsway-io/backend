@@ -8,6 +8,8 @@ import (
 	"github.com/opsway-io/backend/internal/rest/handlers"
 	"github.com/opsway-io/backend/internal/rest/helpers"
 	"github.com/opsway-io/backend/internal/rest/models"
+	"github.com/opsway-io/backend/internal/user"
+	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
 
@@ -27,9 +29,20 @@ func (h *Handlers) GetUser(ctx handlers.AuthenticatedContext, l *logrus.Entry) e
 		return echo.ErrBadRequest
 	}
 
-	fmt.Println(req) // TODO: implement
+	u, err := h.UserService.GetByID(ctx.Request().Context(), req.UserID)
+	if err != nil {
+		if errors.Is(err, user.ErrNotFound) {
+			l.WithError(err).Debug("user not found")
 
-	return ctx.JSON(http.StatusNotImplemented, nil)
+			return echo.ErrNotFound
+		}
+
+		l.WithError(err).Error("failed to get user")
+
+		return echo.ErrInternalServerError
+	}
+
+	return ctx.JSON(http.StatusOK, models.UserToResponse(*u))
 }
 
 type PutUserRequest struct {

@@ -28,7 +28,7 @@ func (h *Handlers) PostLogin(ctx echo.Context, l *logrus.Entry) error {
 		return echo.ErrBadRequest
 	}
 
-	user, err := h.UserService.GetUserByEmail(ctx.Request().Context(), req.Email)
+	user, err := h.UserService.GetByEmail(ctx.Request().Context(), req.Email)
 	if err != nil {
 		l.WithError(err).Debug("failed to get user")
 
@@ -43,7 +43,7 @@ func (h *Handlers) PostLogin(ctx echo.Context, l *logrus.Entry) error {
 		return echo.ErrUnauthorized
 	}
 
-	token, err := h.JWTService.Generate(user)
+	token, err := h.AuthenticationService.Generate(user)
 	if err != nil {
 		l.WithError(err).Debug("failed to generate token for user")
 

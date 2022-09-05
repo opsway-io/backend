@@ -7,6 +7,7 @@ import (
 	"github.com/opsway-io/backend/internal/connectors/postgres"
 	"github.com/opsway-io/backend/internal/monitor"
 	"github.com/opsway-io/backend/internal/rest"
+	"github.com/opsway-io/backend/internal/team"
 	"github.com/opsway-io/backend/internal/user"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
@@ -44,28 +45,45 @@ func runAPI(cmd *cobra.Command, args []string) {
 
 	db.AutoMigrate(
 		user.User{},
+		team.Team{},
 		monitor.Monitor{},
 		monitor.Settings{},
 	)
 
+	authenticationService := authentication.NewService(conf.Authentication)
+
 	userRepository := user.NewRepository(db)
 	userService := user.NewService(userRepository)
 
+	teamRepository := team.NewRepository(db)
+	teamService := team.NewService(teamRepository)
+
+	monitorService := monitor.NewService(db)
+
 	// TODO: Remove
+	t := team.Team{
+		Name: "Test",
+	}
+	teamService.Create(ctx, &t)
+
 	u := &user.User{
 		Name:        "Douglas Adams",
 		DisplayName: "Ford Prefect",
 		Email:       "admin@opsway.io",
+		TeamID:      t.ID,
 	}
 	u.SetPassword("pass")
-	userService.CreateUser(ctx, u)
+	userService.Create(ctx, u)
 	// TODO: Remove
 
-	jwtService := authentication.NewService(conf.Authentication)
-
-	monitorService := monitor.NewService(db)
-
-	srv, err := rest.NewServer(conf.REST, l, userService, jwtService, monitorService)
+	srv, err := rest.NewServer(
+		conf.REST,
+		l,
+		authenticationService,
+		userService,
+		teamService,
+		monitorService,
+	)
 	if err != nil {
 		l.WithError(err).Fatal("Failed to create REST server")
 	}
