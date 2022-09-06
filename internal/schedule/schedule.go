@@ -11,11 +11,12 @@ import (
 
 type Schedule interface {
 	Add(ctx context.Context, interval time.Duration, data map[string]interface{}) (id string, err error)
-	Ack(ctx context.Context, streamId string, groupId string, id string) (err error)
+	CreateGroup(ctx context.Context, stream string, consumersGroup string) (err error)
+	Ack(ctx context.Context, stream string, consumersGroup string, id string) (err error)
 	Set(ctx context.Context, id string, data interface{}) (err error)
 	Remove(ctx context.Context, id string) (err error)
-	Run(ctx context.Context, id string) (err error)
-	Consume(ctx context.Context, streamId string, groupId string, id string) (msgs []redis.XStream, err error)
+	Run(ctx context.Context, stream string, group string, id string) (err error)
+	Consume(ctx context.Context, stream string, consumersGroup string, id string) (msgs []redis.XStream, err error)
 }
 
 type RedisSchedule struct {
@@ -40,8 +41,12 @@ func (rs *RedisSchedule) Add(ctx context.Context, interval time.Duration, data m
 	return cmd.Result()
 }
 
-func (rs *RedisSchedule) Ack(ctx context.Context, streamId string, groupId string, id string) (err error) {
-	return rs.client.XAck(streamId, groupId, id).Err()
+func (rs *RedisSchedule) CreateGroup(ctx context.Context, stream string, consumersGroup string) (err error) {
+	return rs.client.XGroupCreate(stream, consumersGroup, "0").Err()
+}
+
+func (rs *RedisSchedule) Ack(ctx context.Context, stream string, consumersGroup string, id string) (err error) {
+	return rs.client.XAck(stream, consumersGroup, id).Err()
 }
 
 func (rs *RedisSchedule) Set(ctx context.Context, id string, data interface{}) (err error) {
@@ -52,16 +57,15 @@ func (rs *RedisSchedule) Remove(ctx context.Context, id string) (err error) {
 	return rs.client.Del(id).Err()
 }
 
-func (rs *RedisSchedule) Run(ctx context.Context, id string) (err error) {
-	rs.client.XRead(&redis.XReadArgs{})
-	return rs.client.XGroupSetID("stream", "tickets-consumer-group", "0").Err()
+func (rs *RedisSchedule) Run(ctx context.Context, stream string, group string, id string) (err error) {
+	return rs.client.XGroupSetID(stream, group, id).Err()
 }
 
-func (rs *RedisSchedule) Consume(ctx context.Context, streamId string, groupId string, id string) (msgs []redis.XStream, err error) {
+func (rs *RedisSchedule) Consume(ctx context.Context, stream string, consumersGroup string, id string) (msgs []redis.XStream, err error) {
 	readGroupArgs := redis.XReadGroupArgs{
-		Group:    groupId,
+		Group:    consumersGroup,
 		Consumer: id,
-		Streams:  []string{streamId, ">"},
+		Streams:  []string{stream, ">"},
 		Count:    1,
 		Block:    -1,
 		NoAck:    false,

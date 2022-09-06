@@ -46,24 +46,32 @@ func runProber(cmd *cobra.Command, args []string) {
 
 	redisScheduler := scheduler.New(redisClient)
 
-	influxc, err := influxClient.NewClient(ctx, influxClient.Config{ServerURL: "http://localhost:8086", Token: "Raz0dd73B0aprtu-GKaaHHgobLcbAzZD1K3fbLLG7HVHw1zRWN2ljFbh0bd-2_4oxjyii3SLt6t01Ev3kdd8QA=="})
+	influxc, err := influxClient.NewClient(ctx, influxClient.Config{ServerURL: "http://localhost:8086", Token: "aIlugity6YsoMsmHybWgAWy37pVtP-06qmE2vNLGVmni8k33G_VdzIDaw7nUa9Pnp9UI0AdHGDJeHfkuNI7o_Q=="})
 	if err != nil {
 		panic(err)
 	}
 
-	resultService, err := result.NewService(influxc, "123", "test")
+	resultService, err := result.NewService(influxc, "1", "http")
 	if err != nil {
 		panic(err)
 	}
 
-	consume(ctx, redisScheduler, resultService, "stream-360")
+	subject := "stream-1"
+	group := "stream-1"
+
+	// err = redisScheduler.CreateGroup(ctx, subject, group)
+	// if err != nil {
+	// 	panic(err)
+	// }
+
+	consume(ctx, redisScheduler, resultService, subject, group)
 }
 
-func consume(ctx context.Context, scheduler scheduler.Schedule, rs result.Service, streamID string) {
+func consume(ctx context.Context, scheduler scheduler.Schedule, rs result.Service, subject string, group string) {
 	uniqueID := xid.New().String()
 
 	for {
-		entries, err := scheduler.Consume(ctx, streamID, "tickets-consumer-group", uniqueID)
+		entries, err := scheduler.Consume(ctx, subject, group, uniqueID)
 		if err != nil {
 			logrus.WithError(err).Fatal("failed to get stream result")
 		}
@@ -74,7 +82,7 @@ func consume(ctx context.Context, scheduler scheduler.Schedule, rs result.Servic
 				logrus.WithError(err).Fatal(err)
 			}
 
-			err = scheduler.Ack(ctx, entries[0].Stream, "tickets-consumer-group", entries[0].Messages[i].ID)
+			err = scheduler.Ack(ctx, entries[0].Stream, group, entries[0].Messages[i].ID)
 			if err != nil {
 				logrus.WithError(err).Fatal(err)
 			}
