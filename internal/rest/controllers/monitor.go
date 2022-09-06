@@ -13,7 +13,7 @@ import (
 )
 
 type GetMonitorsRequest struct {
-	TeamID int `param:"team_id" validate:"required,numeric"`
+	TeamID int `param:"team_id" validate:"required,numeric,gte=0"`
 	Offset int `query:"offset" validate:"numeric,min=0"`
 	Limit  int `query:"limit" validate:"numeric,min=0,max=100" default:"100"`
 }
@@ -43,8 +43,8 @@ func (h *Handlers) GetMonitors(ctx handlers.AuthenticatedContext, l *logrus.Entr
 }
 
 type GetMonitorRequest struct {
-	TeamID    int `param:"team_id" validate:"required,numeric"`
-	MonitorID int `param:"monitor_id" validate:"required,numeric"`
+	TeamID    int `param:"team_id" validate:"required,numeric,gte=0"`
+	MonitorID int `param:"monitor_id" validate:"required,numeric,gte=0"`
 }
 
 type GetMonitorResponse struct {
@@ -73,4 +73,96 @@ func (h *Handlers) GetMonitor(ctx handlers.AuthenticatedContext, l *logrus.Entry
 	}
 
 	return ctx.JSON(http.StatusOK, models.MonitorToResponse(*m))
+}
+
+type PostMonitorRequest struct {
+	TeamID int `param:"team_id" validate:"required,numeric,gte=0"`
+	models.Monitor
+}
+
+type PostMonitorResponse struct {
+	models.Monitor
+}
+
+func (h *Handlers) PostMonitor(ctx handlers.AuthenticatedContext, l *logrus.Entry) error {
+	req, err := helpers.Bind[PostMonitorRequest](ctx)
+	if err != nil {
+		l.WithError(err).Debug("failed to bind PostMonitorRequest")
+
+		return echo.ErrBadRequest
+	}
+
+	m := models.RequestToMonitor(req.Monitor)
+	m.TeamID = req.TeamID
+
+	if err := h.MonitorService.Create(ctx.Request().Context(), &m); err != nil {
+		l.WithError(err).Error("failed to create monitor")
+
+		return echo.ErrInternalServerError
+	}
+
+	return ctx.JSON(http.StatusCreated, models.MonitorToResponse(m))
+}
+
+type PutMonitorRequest struct {
+	TeamID    int `param:"team_id" validate:"required,numeric,gte=0"`
+	MonitorID int `param:"monitor_id" validate:"required,numeric,gte=0"`
+	models.Monitor
+}
+
+type PutMonitorResponse struct {
+	models.Monitor
+}
+
+func (h *Handlers) PutMonitor(ctx handlers.AuthenticatedContext, l *logrus.Entry) error {
+	req, err := helpers.Bind[PutMonitorRequest](ctx)
+	if err != nil {
+		l.WithError(err).Debug("failed to bind PutMonitorRequest")
+
+		return echo.ErrBadRequest
+	}
+
+	m := models.RequestToMonitor(req.Monitor)
+	m.ID = req.MonitorID
+	m.TeamID = req.TeamID
+
+	if err := h.MonitorService.Update(ctx.Request().Context(), &m); err != nil {
+		if errors.Is(err, monitor.ErrNotFound) {
+			l.WithError(err).Debug("monitor not found")
+
+			return echo.ErrNotFound
+		}
+
+		l.WithError(err).Error("failed to update monitor")
+
+		return echo.ErrInternalServerError
+	}
+
+	return ctx.JSON(http.StatusOK, models.MonitorToResponse(m))
+}
+
+type DeleteMonitorRequest struct {
+	TeamID    int `param:"team_id" validate:"required,numeric,gte=0"`
+	MonitorID int `param:"monitor_id" validate:"required,numeric,gte=0"`
+}
+
+type DeleteMonitorResponse struct {
+	models.Monitor
+}
+
+func (h *Handlers) DeleteMonitor(ctx handlers.AuthenticatedContext, l *logrus.Entry) error {
+	req, err := helpers.Bind[DeleteMonitorRequest](ctx)
+	if err != nil {
+		l.WithError(err).Debug("failed to bind DeleteMonitorRequest")
+
+		return echo.ErrBadRequest
+	}
+
+	if err := h.MonitorService.Delete(ctx.Request().Context(), req.MonitorID); err != nil {
+		l.WithError(err).Error("failed to delete monitor")
+
+		return echo.ErrInternalServerError
+	}
+
+	return ctx.NoContent(http.StatusNoContent)
 }

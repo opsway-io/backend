@@ -71,4 +71,7 @@ func Register(
 
 	monitorsGroup.GET("", hs.AuthenticatedHandler(h.GetMonitors, logger))
 	monitorsGroup.GET("/:monitor_id", hs.AuthenticatedHandler(h.GetMonitor, logger))
+	monitorsGroup.POST("", hs.AuthenticatedHandler(h.PostMonitor, logger))
+	monitorsGroup.PUT("/:monitor_id", hs.AuthenticatedHandler(h.PutMonitor, logger))
+	monitorsGroup.DELETE("/:monitor_id", hs.AuthenticatedHandler(h.DeleteMonitor, logger))
 }

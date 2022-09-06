@@ -3,21 +3,21 @@ package models
 import "github.com/opsway-io/backend/internal/monitor"
 
 type Monitor struct {
-	ID         int      `json:"id"`
-	Name       string   `json:"name"`
-	Tags       []string `json:"tags"`
-	SettingsID int      `json:"settingsId"`
+	ID         int      `json:"id" validate:"required,numeric,gte=0"`
+	Name       string   `json:"name" validate:"required,min=1,max=255"`
+	Tags       []string `json:"tags" validate:"required,min=1,max=10,dive,min=1,max=255"`
+	SettingsID int      `json:"settingsId" validate:"required,numeric,gte=0"`
 	CreatedAt  int64    `json:"createdAt"`
 	UpdatedAt  int64    `json:"updatedAt"`
 }
 
 type MonitorSettings struct {
-	ID        int                 `json:"id"`
-	Method    string              `json:"method"`
-	URL       string              `json:"url"`
-	Headers   map[string]string   `json:"headers"`
+	ID        int                 `json:"id" validate:"required,numeric,gte=0"`
+	Method    string              `json:"method" validate:"required,oneof=GET POST PUT PATCH DELETE"`
+	URL       string              `json:"url" validate:"required,url"`
+	Headers   map[string]string   `json:"headers" validate:"max=50,dive,min=1,max=255"`
 	Body      MonitorSettingsBody `json:"body"`
-	Interval  int                 `json:"interval"`
+	Interval  int                 `json:"interval" validate:"required,numeric,gte=1"`
 	CreatedAt int64               `json:"createdAt"`
 	UpdatedAt int64               `json:"updatedAt"`
 }
@@ -58,4 +58,12 @@ func MonitorsToResponse(monitors []monitor.Monitor) []Monitor {
 	}
 
 	return res
+}
+
+func RequestToMonitor(req Monitor) monitor.Monitor {
+	return monitor.Monitor{
+		ID:   req.ID,
+		Name: req.Name,
+		Tags: req.Tags,
+	}
 }

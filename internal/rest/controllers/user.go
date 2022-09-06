@@ -29,6 +29,8 @@ func (h *Handlers) GetUser(ctx handlers.AuthenticatedContext, l *logrus.Entry) e
 		return echo.ErrBadRequest
 	}
 
+	// TODO: Check if user is in the same team as the authenticated user
+
 	u, err := h.UserService.GetByID(ctx.Request().Context(), req.UserID)
 	if err != nil {
 		if errors.Is(err, user.ErrNotFound) {
@@ -62,7 +64,24 @@ func (h *Handlers) PutUser(ctx handlers.AuthenticatedContext, l *logrus.Entry) e
 		return echo.ErrBadRequest
 	}
 
-	fmt.Println(req) // TODO: implement
+	if fmt.Sprint(req.UserID) != ctx.Claims.Subject {
+		l.WithField("user_id", req.UserID).Debug("user id in request does not match authenticated user id")
+
+		return echo.ErrForbidden
+	}
+
+	u := models.RequestToUser(req.User)
+	if err := h.UserService.Update(ctx.Request().Context(), &u); err != nil {
+		if errors.Is(err, user.ErrNotFound) {
+			l.WithError(err).Debug("user not found")
+
+			return echo.ErrNotFound
+		}
+
+		l.WithError(err).Error("failed to update user")
+
+		return echo.ErrInternalServerError
+	}
 
 	return ctx.JSON(http.StatusNotImplemented, nil)
 }

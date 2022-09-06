@@ -14,7 +14,7 @@ type User struct {
 	DisplayName  string
 	Email        string `gorm:"uniqueIndex:idx_email"`
 	PasswordHash string
-	TeamID       int `gorm:"not null,index:idx_team_id"`
+	TeamID       int `gorm:"index:idx_team_id"`
 	Team         team.Team
 	CreatedAt    time.Time
 	UpdatedAt    time.Time

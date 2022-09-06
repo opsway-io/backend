@@ -1,13 +1,14 @@
 package controllers
 
 import (
-	"fmt"
 	"net/http"
 
 	"github.com/labstack/echo/v4"
 	"github.com/opsway-io/backend/internal/rest/handlers"
 	"github.com/opsway-io/backend/internal/rest/helpers"
 	"github.com/opsway-io/backend/internal/rest/models"
+	"github.com/opsway-io/backend/internal/team"
+	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
 
@@ -54,9 +55,21 @@ func (h *Handlers) PutTeam(ctx handlers.AuthenticatedContext, l *logrus.Entry) e
 		return echo.ErrBadRequest
 	}
 
-	fmt.Println(req) // TODO: implement
+	t := models.RequestToTeam(req.Team)
 
-	return ctx.JSON(http.StatusNotImplemented, nil)
+	if err := h.TeamService.Update(ctx.Request().Context(), &t); err != nil {
+		if errors.Is(err, team.ErrNotFound) {
+			l.WithError(err).Debug("team not found")
+
+			return echo.ErrNotFound
+		}
+
+		l.WithError(err).Debug("failed to update team")
+
+		return echo.ErrInternalServerError
+	}
+
+	return ctx.JSON(http.StatusOK, models.TeamToResponse(t))
 }
 
 type GetTeamUsersRequest struct {
