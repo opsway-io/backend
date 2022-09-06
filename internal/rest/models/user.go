@@ -3,7 +3,7 @@ package models
 import "github.com/opsway-io/backend/internal/user"
 
 type User struct {
-	ID          int    `json:"id" validate:"required,numeric,gte=0"`
+	ID          int    `json:"id" validate:"numeric,gte=0"`
 	Name        string `json:"name" validate:"required,min=1,max=255"`
 	DisplayName string `json:"displayName" validate:"required,min=1,max=255"`
 	Email       string `json:"email" validate:"required,email"`

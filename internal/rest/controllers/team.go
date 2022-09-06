@@ -56,6 +56,7 @@ func (h *Handlers) PutTeam(ctx handlers.AuthenticatedContext, l *logrus.Entry) e
 	}
 
 	t := models.RequestToTeam(req.Team)
+	t.ID = req.TeamID
 
 	if err := h.TeamService.Update(ctx.Request().Context(), &t); err != nil {
 		if errors.Is(err, team.ErrNotFound) {

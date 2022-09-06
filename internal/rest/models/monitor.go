@@ -3,7 +3,7 @@ package models
 import "github.com/opsway-io/backend/internal/monitor"
 
 type Monitor struct {
-	ID         int      `json:"id" validate:"required,numeric,gte=0"`
+	ID         int      `json:"id" validate:"numeric,gte=0"`
 	Name       string   `json:"name" validate:"required,min=1,max=255"`
 	Tags       []string `json:"tags" validate:"required,min=1,max=10,dive,min=1,max=255"`
 	SettingsID int      `json:"settingsId" validate:"required,numeric,gte=0"`
@@ -12,7 +12,7 @@ type Monitor struct {
 }
 
 type MonitorSettings struct {
-	ID        int                 `json:"id" validate:"required,numeric,gte=0"`
+	ID        int                 `json:"id" validate:"numeric,gte=0"`
 	Method    string              `json:"method" validate:"required,oneof=GET POST PUT PATCH DELETE"`
 	URL       string              `json:"url" validate:"required,url"`
 	Headers   map[string]string   `json:"headers" validate:"max=50,dive,min=1,max=255"`

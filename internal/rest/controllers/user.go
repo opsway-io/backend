@@ -71,6 +71,8 @@ func (h *Handlers) PutUser(ctx handlers.AuthenticatedContext, l *logrus.Entry) e
 	}
 
 	u := models.RequestToUser(req.User)
+	u.ID = req.UserID
+
 	if err := h.UserService.Update(ctx.Request().Context(), &u); err != nil {
 		if errors.Is(err, user.ErrNotFound) {
 			l.WithError(err).Debug("user not found")
@@ -83,5 +85,5 @@ func (h *Handlers) PutUser(ctx handlers.AuthenticatedContext, l *logrus.Entry) e
 		return echo.ErrInternalServerError
 	}
 
-	return ctx.JSON(http.StatusNotImplemented, nil)
+	return ctx.NoContent(http.StatusOK)
 }
