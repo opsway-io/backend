@@ -19,7 +19,7 @@ func NewClient(ctx context.Context, conf Config) (*gorm.DB, error) {
 
 	gormConfig := &gorm.Config{}
 	if !conf.Debug {
-		gormConfig.Logger = logger.Default.LogMode(logger.Silent)
+		gormConfig.Logger = logger.Default.LogMode(logger.Info)
 	}
 
 	db, err := gorm.Open(dialect, gormConfig)

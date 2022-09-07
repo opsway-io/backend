@@ -29,12 +29,16 @@ var (
 )
 
 type Team struct {
-	ID          int
-	Name        string `gorm:"uniqueIndex:idx_name"`
-	DisplayName string
+	ID          uint
+	Name        string `gorm:"uniqueIndex;not null"`
+	DisplayName string `gorm:"index"`
 	Logo        string
-	CreatedAt   time.Time
-	UpdatedAt   time.Time
+	CreatedAt   time.Time `gorm:"index"`
+	UpdatedAt   time.Time `gorm:"index"`
+}
+
+func (Team) TableName() string {
+	return "teams"
 }
 
 func (t *Team) BeforeCreate(tx *gorm.DB) (err error) {

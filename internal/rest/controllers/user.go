@@ -14,7 +14,7 @@ import (
 )
 
 type GetUserRequest struct {
-	UserID int `param:"userId" validate:"required,numeric,gt=0"`
+	UserID uint `param:"userId" validate:"required,numeric,gt=0"`
 }
 
 type GetUserResponse struct {
@@ -48,7 +48,7 @@ func (h *Handlers) GetUser(ctx handlers.AuthenticatedContext, l *logrus.Entry) e
 }
 
 type PutUserRequest struct {
-	UserID int `param:"userId" validate:"required,numeric,gt=0"`
+	UserID uint `param:"userId" validate:"required,numeric,gt=0"`
 	models.User
 }
 

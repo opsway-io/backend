@@ -5,6 +5,7 @@ import (
 
 	"github.com/opsway-io/backend/internal/authentication"
 	"github.com/opsway-io/backend/internal/connectors/postgres"
+	"github.com/opsway-io/backend/internal/maintenance"
 	"github.com/opsway-io/backend/internal/monitor"
 	"github.com/opsway-io/backend/internal/rest"
 	"github.com/opsway-io/backend/internal/team"
@@ -48,6 +49,9 @@ func runAPI(cmd *cobra.Command, args []string) {
 		team.Team{},
 		monitor.Monitor{},
 		monitor.Settings{},
+		maintenance.Maintenance{},
+		maintenance.Settings{},
+		maintenance.Comment{},
 	)
 
 	authenticationService := authentication.NewService(conf.Authentication)
@@ -61,19 +65,37 @@ func runAPI(cmd *cobra.Command, args []string) {
 	monitorService := monitor.NewService(db)
 
 	// TODO: Remove
-	t := team.Team{
-		Name: "opsway",
-	}
-	teamService.Create(ctx, &t)
+	// t := team.Team{
+	// 	Name: "opsway",
+	// }
+	// db.Create(&t)
 
-	u := &user.User{
-		Name:        "Douglas Adams",
-		DisplayName: "Ford Prefect",
-		Email:       "admin@opsway.io",
-		TeamID:      t.ID,
-	}
-	u.SetPassword("pass")
-	userService.Create(ctx, u)
+	// u := &user.User{
+	// 	Name:        "Douglas Adams",
+	// 	DisplayName: "Ford Prefect",
+	// 	Email:       "admin@opsway.io",
+	// 	TeamID:      t.ID,
+	// }
+	// u.SetPassword("pass")
+	// db.Create(u)
+
+	// m := maintenance.Maintenance{
+	// 	Title:  "Test",
+	// 	TeamID: 1,
+	// 	Settings: maintenance.Settings{
+	// 		StartAt: time.Now(),
+	// 		EndAt:   time.Now().Add(1 * time.Hour),
+	// 	},
+	// }
+	// db.Create(&m)
+
+	// c := maintenance.Comment{
+	// 	Content:       "Test",
+	// 	UserID:        1,
+	// 	MaintenanceID: 1,
+	// }
+	// db.Create(&c)
+
 	// TODO: Remove
 
 	srv, err := rest.NewServer(

@@ -14,7 +14,7 @@ var (
 )
 
 type Repository interface {
-	GetByID(ctx context.Context, id int) (*Team, error)
+	GetByID(ctx context.Context, id uint) (*Team, error)
 	Create(ctx context.Context, team *Team) error
 	Update(ctx context.Context, team *Team) error
 }
@@ -27,7 +27,7 @@ func NewRepository(db *gorm.DB) Repository {
 	return &RepositoryImpl{db: db}
 }
 
-func (s *RepositoryImpl) GetByID(ctx context.Context, id int) (*Team, error) {
+func (s *RepositoryImpl) GetByID(ctx context.Context, id uint) (*Team, error) {
 	var team Team
 	if err := s.db.WithContext(ctx).First(&team, id).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {

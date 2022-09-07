@@ -14,9 +14,9 @@ var (
 )
 
 type Repository interface {
-	GetByID(ctx context.Context, id int) (*User, error)
+	GetByID(ctx context.Context, id uint) (*User, error)
 	GetByEmail(ctx context.Context, email string) (*User, error)
-	GetUsersByTeamID(ctx context.Context, teamID int) (*[]User, error)
+	GetUsersByTeamID(ctx context.Context, teamID uint) (*[]User, error)
 	Create(ctx context.Context, user *User) error
 	Update(ctx context.Context, user *User) error
 }
@@ -29,7 +29,7 @@ func NewRepository(db *gorm.DB) Repository {
 	return &RepositoryImpl{db: db}
 }
 
-func (s *RepositoryImpl) GetByID(ctx context.Context, id int) (*User, error) {
+func (s *RepositoryImpl) GetByID(ctx context.Context, id uint) (*User, error) {
 	var user User
 	if err := s.db.WithContext(ctx).First(&user, id).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -55,9 +55,9 @@ func (s *RepositoryImpl) GetByEmail(ctx context.Context, email string) (*User, e
 	return &user, nil
 }
 
-func (s *RepositoryImpl) GetUsersByTeamID(ctx context.Context, teamID int) (*[]User, error) {
+func (s *RepositoryImpl) GetUsersByTeamID(ctx context.Context, teamID uint) (*[]User, error) {
 	var users []User
-	if err := s.db.WithContext(ctx).Where(User{TeamID: teamID}).Find(&users).Error; err != nil {
+	if err := s.db.WithContext(ctx).Where(User{TeamID: &teamID}).Find(&users).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, ErrNotFound
 		}

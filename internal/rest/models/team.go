@@ -3,7 +3,7 @@ package models
 import "github.com/opsway-io/backend/internal/team"
 
 type Team struct {
-	ID        int    `json:"id" validate:"required,numeric,gte=0"`
+	ID        uint   `json:"id" validate:"required,numeric,gte=0"`
 	Name      string `json:"name" validate:"required,min=1,max=255"`
 	Logo      string `json:"logo" validate:"required,url"`
 	CreatedAt int64  `json:"createdAt"`

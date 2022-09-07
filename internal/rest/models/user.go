@@ -3,7 +3,7 @@ package models
 import "github.com/opsway-io/backend/internal/user"
 
 type User struct {
-	ID          int    `json:"id" validate:"numeric,gte=0"`
+	ID          uint   `json:"id" validate:"numeric,gte=0"`
 	Name        string `json:"name" validate:"required,min=1,max=255"`
 	DisplayName string `json:"displayName" validate:"required,min=1,max=255"`
 	Email       string `json:"email" validate:"required,email"`
@@ -15,7 +15,7 @@ func UserToResponse(u user.User) User {
 	return User{
 		ID:          u.ID,
 		Name:        u.Name,
-		DisplayName: u.DisplayName,
+		DisplayName: *u.DisplayName,
 		Email:       u.Email,
 		CreatedAt:   u.CreatedAt.Unix(),
 		UpdatedAt:   u.UpdatedAt.Unix(),
@@ -35,7 +35,7 @@ func RequestToUser(u User) user.User {
 	return user.User{
 		ID:          u.ID,
 		Name:        u.Name,
-		DisplayName: u.DisplayName,
+		DisplayName: &u.DisplayName,
 		Email:       u.Email,
 	}
 }

@@ -6,18 +6,19 @@ import (
 	"github.com/opsway-io/backend/internal/team"
 	"github.com/pkg/errors"
 	"golang.org/x/crypto/bcrypt"
+	"k8s.io/utils/pointer"
 )
 
 type User struct {
-	ID           int
+	ID           uint
 	Name         string `gorm:"not null"`
-	DisplayName  string
-	Email        string `gorm:"uniqueIndex:idx_email"`
-	PasswordHash string
-	TeamID       int `gorm:"index:idx_team_id"`
+	DisplayName  *string
+	Email        string `gorm:"uniqueIndex"`
+	PasswordHash *string
+	TeamID       *uint `gorm:"index;not null"`
 	Team         team.Team
-	CreatedAt    time.Time
-	UpdatedAt    time.Time
+	CreatedAt    time.Time `gorm:"index"`
+	UpdatedAt    time.Time `gorm:"index"`
 }
 
 func (u *User) SetPassword(password string) error {
@@ -26,13 +27,13 @@ func (u *User) SetPassword(password string) error {
 		return errors.Wrap(err, "failed to generate password hash")
 	}
 
-	u.PasswordHash = string(hash)
+	u.PasswordHash = pointer.StringPtr(string(hash))
 
 	return nil
 }
 
 func (u *User) CheckPassword(password string) bool {
-	err := bcrypt.CompareHashAndPassword([]byte(u.PasswordHash), []byte(password))
+	err := bcrypt.CompareHashAndPassword([]byte(*u.PasswordHash), []byte(password))
 
 	return err == nil
 }

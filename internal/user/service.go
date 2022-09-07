@@ -5,9 +5,9 @@ import (
 )
 
 type Service interface {
-	GetByID(ctx context.Context, id int) (*User, error)
+	GetByID(ctx context.Context, id uint) (*User, error)
 	GetByEmail(ctx context.Context, email string) (*User, error)
-	GetByTeamID(ctx context.Context, teamID int) (*[]User, error)
+	GetByTeamID(ctx context.Context, teamID uint) (*[]User, error)
 	Create(ctx context.Context, user *User) error
 	Update(ctx context.Context, user *User) error
 }
@@ -22,7 +22,7 @@ func NewService(repository Repository) Service {
 	}
 }
 
-func (s *ServiceImpl) GetByID(ctx context.Context, id int) (*User, error) {
+func (s *ServiceImpl) GetByID(ctx context.Context, id uint) (*User, error) {
 	return s.repository.GetByID(ctx, id)
 }
 
@@ -30,7 +30,7 @@ func (s *ServiceImpl) GetByEmail(ctx context.Context, email string) (*User, erro
 	return s.repository.GetByEmail(ctx, email)
 }
 
-func (s *ServiceImpl) GetByTeamID(ctx context.Context, teamID int) (*[]User, error) {
+func (s *ServiceImpl) GetByTeamID(ctx context.Context, teamID uint) (*[]User, error) {
 	return s.repository.GetUsersByTeamID(ctx, teamID)
 }
 

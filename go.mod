@@ -23,6 +23,7 @@ require (
 	golang.org/x/crypto v0.0.0-20220622213112-05595931fe9d
 	gorm.io/driver/postgres v1.3.8
 	gorm.io/gorm v1.23.8
+	k8s.io/utils v0.0.0-20220823124924-e9cbc92d1a73
 )
 
 require (

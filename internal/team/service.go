@@ -5,7 +5,7 @@ import (
 )
 
 type Service interface {
-	GetByID(ctx context.Context, id int) (*Team, error)
+	GetByID(ctx context.Context, id uint) (*Team, error)
 	Create(ctx context.Context, team *Team) error
 	Update(ctx context.Context, team *Team) error
 }
@@ -20,7 +20,7 @@ func NewService(repository Repository) Service {
 	}
 }
 
-func (s *ServiceImpl) GetByID(ctx context.Context, id int) (*Team, error) {
+func (s *ServiceImpl) GetByID(ctx context.Context, id uint) (*Team, error) {
 	return s.repository.GetByID(ctx, id)
 }
 

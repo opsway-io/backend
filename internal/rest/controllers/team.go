@@ -13,7 +13,7 @@ import (
 )
 
 type GetTeamRequest struct {
-	TeamID int `param:"teamId" validate:"required,numeric,gt=0"`
+	TeamID uint `param:"teamId" validate:"required,numeric,gt=0"`
 }
 
 type GetTeamResponse struct {
@@ -39,7 +39,7 @@ func (h *Handlers) GetTeam(ctx handlers.AuthenticatedContext, l *logrus.Entry) e
 }
 
 type PutTeamRequest struct {
-	TeamID int `param:"teamId" validate:"required,numeric,gt=0"`
+	TeamID uint `param:"teamId" validate:"required,numeric,gt=0"`
 	models.Team
 }
 
@@ -64,6 +64,11 @@ func (h *Handlers) PutTeam(ctx handlers.AuthenticatedContext, l *logrus.Entry) e
 
 			return echo.ErrNotFound
 		}
+		if errors.Is(err, team.ErrIllegalNameFormat) {
+			l.WithError(err).Debug("illegal team name format")
+
+			return echo.ErrBadRequest
+		}
 
 		l.WithError(err).Debug("failed to update team")
 
@@ -74,7 +79,7 @@ func (h *Handlers) PutTeam(ctx handlers.AuthenticatedContext, l *logrus.Entry) e
 }
 
 type GetTeamUsersRequest struct {
-	TeamID int `param:"teamId" validate:"required,numeric,gt=0"`
+	TeamID uint `param:"teamId" validate:"required,numeric,gt=0"`
 }
 
 type GetTeamUsersResponse struct {
