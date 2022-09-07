@@ -5,18 +5,18 @@ import (
 
 	"github.com/lib/pq"
 	"github.com/opsway-io/backend/internal/connectors/postgres"
-	"github.com/opsway-io/backend/internal/team"
+	"github.com/opsway-io/backend/internal/incident"
 )
 
 type Monitor struct {
 	ID        int
-	Name      string          `gorm:"index;not null"`
-	Tags      *pq.StringArray `gorm:"type:text[]"`
-	Settings  Settings        `gorm:"not null;constraint:OnDelete:CASCADE"`
-	TeamID    int             `gorm:"index;not null"`
-	Team      team.Team
-	CreatedAt time.Time `gorm:"index"`
-	UpdatedAt time.Time `gorm:"index"`
+	Name      string              `gorm:"index;not null"`
+	Tags      *pq.StringArray     `gorm:"type:text[]"`
+	Settings  Settings            `gorm:"not null;constraint:OnDelete:CASCADE"`
+	Incidents []incident.Incident `gorm:"constraint:OnDelete:CASCADE"`
+	TeamID    int                 `gorm:"index;not null"`
+	CreatedAt time.Time           `gorm:"index"`
+	UpdatedAt time.Time           `gorm:"index"`
 }
 
 func (Monitor) TableName() string {

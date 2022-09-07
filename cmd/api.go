@@ -5,6 +5,7 @@ import (
 
 	"github.com/opsway-io/backend/internal/authentication"
 	"github.com/opsway-io/backend/internal/connectors/postgres"
+	"github.com/opsway-io/backend/internal/incident"
 	"github.com/opsway-io/backend/internal/maintenance"
 	"github.com/opsway-io/backend/internal/monitor"
 	"github.com/opsway-io/backend/internal/rest"
@@ -12,6 +13,7 @@ import (
 	"github.com/opsway-io/backend/internal/user"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
+	"k8s.io/utils/pointer"
 )
 
 //nolint:gochecknoglobals
@@ -45,13 +47,15 @@ func runAPI(cmd *cobra.Command, args []string) {
 	}
 
 	db.AutoMigrate(
-		user.User{},
 		team.Team{},
+		user.User{},
 		monitor.Monitor{},
 		monitor.Settings{},
 		maintenance.Maintenance{},
 		maintenance.Settings{},
 		maintenance.Comment{},
+		incident.Incident{},
+		incident.Comment{},
 	)
 
 	authenticationService := authentication.NewService(conf.Authentication)
@@ -65,19 +69,19 @@ func runAPI(cmd *cobra.Command, args []string) {
 	monitorService := monitor.NewService(db)
 
 	// TODO: Remove
-	// t := team.Team{
-	// 	Name: "opsway",
-	// }
-	// db.Create(&t)
+	t := team.Team{
+		Name: "opsway",
+	}
+	db.Create(&t)
 
-	// u := &user.User{
-	// 	Name:        "Douglas Adams",
-	// 	DisplayName: "Ford Prefect",
-	// 	Email:       "admin@opsway.io",
-	// 	TeamID:      t.ID,
-	// }
-	// u.SetPassword("pass")
-	// db.Create(u)
+	u := &user.User{
+		Name:        "Douglas Adams",
+		DisplayName: pointer.String("Ford Prefect"),
+		Email:       "admin@opsway.io",
+		TeamID:      pointer.Uint(t.ID),
+	}
+	u.SetPassword("pass")
+	db.Create(u)
 
 	// m := maintenance.Maintenance{
 	// 	Title:  "Test",

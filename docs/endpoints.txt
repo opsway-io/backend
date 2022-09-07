@@ -9,7 +9,6 @@
 /teams/{teamId}/maintenance
 
 /users/{userId}
-/users/{userId}/settings
 
 /monitor/{monitorId}
 /monitor/{monitorId}/metrics
@@ -21,7 +20,5 @@
 /maintenance/{maintenanceId}
 /maintenance/{maintenanceId}/settings
 /maintenance/{maintenanceId}/comments
-
-/comments/{commentId}
 
 

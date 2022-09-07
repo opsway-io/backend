@@ -3,22 +3,24 @@ package user
 import (
 	"time"
 
-	"github.com/opsway-io/backend/internal/team"
+	"github.com/opsway-io/backend/internal/incident"
+	"github.com/opsway-io/backend/internal/maintenance"
 	"github.com/pkg/errors"
 	"golang.org/x/crypto/bcrypt"
 	"k8s.io/utils/pointer"
 )
 
 type User struct {
-	ID           uint
-	Name         string `gorm:"not null"`
-	DisplayName  *string
-	Email        string `gorm:"uniqueIndex"`
-	PasswordHash *string
-	TeamID       *uint `gorm:"index;not null"`
-	Team         team.Team
-	CreatedAt    time.Time `gorm:"index"`
-	UpdatedAt    time.Time `gorm:"index"`
+	ID                  uint
+	Name                string `gorm:"not null"`
+	DisplayName         *string
+	Email               string `gorm:"uniqueIndex"`
+	PasswordHash        *string
+	TeamID              *uint `gorm:"index;not null"` // TODO: support multiple teams
+	MaintenanceComments []maintenance.Comment
+	IncidentComments    []incident.Comment
+	CreatedAt           time.Time `gorm:"index"`
+	UpdatedAt           time.Time `gorm:"index"`
 }
 
 func (u *User) SetPassword(password string) error {

@@ -5,6 +5,10 @@ import (
 	"regexp"
 	"time"
 
+	"github.com/opsway-io/backend/internal/incident"
+	"github.com/opsway-io/backend/internal/maintenance"
+	"github.com/opsway-io/backend/internal/monitor"
+	"github.com/opsway-io/backend/internal/user"
 	"gorm.io/gorm"
 )
 
@@ -33,8 +37,12 @@ type Team struct {
 	Name        string `gorm:"uniqueIndex;not null"`
 	DisplayName string `gorm:"index"`
 	Logo        string
-	CreatedAt   time.Time `gorm:"index"`
-	UpdatedAt   time.Time `gorm:"index"`
+	Users       []user.User               `gorm:"constraint:OnDelete:CASCADE"` // TODO: support multiple teams
+	Monitors    []monitor.Monitor         `gorm:"constraint:OnDelete:CASCADE"`
+	Maintenance []maintenance.Maintenance `gorm:"constraint:OnDelete:CASCADE"`
+	Incidents   []incident.Incident       `gorm:"constraint:OnDelete:CASCADE"`
+	CreatedAt   time.Time                 `gorm:"index"`
+	UpdatedAt   time.Time                 `gorm:"index"`
 }
 
 func (Team) TableName() string {
