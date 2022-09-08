@@ -1,10 +1,8 @@
-package user
+package entities
 
 import (
 	"time"
 
-	"github.com/opsway-io/backend/internal/incident"
-	"github.com/opsway-io/backend/internal/maintenance"
 	"github.com/pkg/errors"
 	"golang.org/x/crypto/bcrypt"
 	"k8s.io/utils/pointer"
@@ -16,9 +14,9 @@ type User struct {
 	DisplayName         *string
 	Email               string `gorm:"uniqueIndex"`
 	PasswordHash        *string
-	TeamID              *uint `gorm:"index;not null"` // TODO: support multiple teams
-	MaintenanceComments []maintenance.Comment
-	IncidentComments    []incident.Comment
+	Teams               []Team `gorm:"many2many:team_users;constraint:OnDelete:CASCADE"`
+	MaintenanceComments []MaintenanceComment
+	IncidentComments    []IncidentComment
 	CreatedAt           time.Time `gorm:"index"`
 	UpdatedAt           time.Time `gorm:"index"`
 }

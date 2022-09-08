@@ -5,12 +5,12 @@ import (
 	"time"
 
 	"github.com/golang-jwt/jwt"
-	"github.com/opsway-io/backend/internal/user"
+	"github.com/opsway-io/backend/internal/entities"
 	"github.com/pkg/errors"
 )
 
 type Service interface {
-	Generate(user *user.User) (tokenString string, err error)
+	Generate(user *entities.User) (tokenString string, err error)
 	Verify(tokenString string) (valid bool, claims *Claims, err error)
 }
 
@@ -32,7 +32,7 @@ func NewService(conf Config) Service {
 	}
 }
 
-func (s *ServiceImpl) Generate(user *user.User) (string, error) {
+func (s *ServiceImpl) Generate(user *entities.User) (string, error) {
 	// Token
 	tokenClaims := Claims{
 		StandardClaims: jwt.StandardClaims{

@@ -1,4 +1,4 @@
-package team
+package entities
 
 import (
 	"testing"
@@ -6,7 +6,7 @@ import (
 	"github.com/tj/assert"
 )
 
-func Test_checkNameFormatValid(t *testing.T) {
+func Test_checkTeamNameFormatValid(t *testing.T) {
 	t.Parallel()
 
 	type args struct {
@@ -55,13 +55,13 @@ func Test_checkNameFormatValid(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := checkNameFormat(tt.args.name)
+			got := checkTeamNameFormat(tt.args.name)
 			assert.Equal(t, tt.want, got)
 		})
 	}
 }
 
-func Test_checkNameFormatInvalid(t *testing.T) {
+func Test_checkTeamNameFormatInvalid(t *testing.T) {
 	t.Parallel()
 
 	type args struct {
@@ -110,7 +110,7 @@ func Test_checkNameFormatInvalid(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := checkNameFormat(tt.args.name)
+			got := checkTeamNameFormat(tt.args.name)
 			assert.Equal(t, tt.want, got)
 		})
 	}

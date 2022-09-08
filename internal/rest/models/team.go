@@ -1,6 +1,6 @@
 package models
 
-import "github.com/opsway-io/backend/internal/team"
+import "github.com/opsway-io/backend/internal/entities"
 
 type Team struct {
 	ID        uint   `json:"id" validate:"required,numeric,gte=0"`
@@ -10,7 +10,7 @@ type Team struct {
 	UpdatedAt int64  `json:"updatedAt"`
 }
 
-func TeamToResponse(team team.Team) Team {
+func TeamToResponse(team entities.Team) Team {
 	return Team{
 		ID:        team.ID,
 		Name:      team.Name,
@@ -20,8 +20,8 @@ func TeamToResponse(team team.Team) Team {
 	}
 }
 
-func RequestToTeam(req Team) team.Team {
-	return team.Team{
+func RequestToTeam(req Team) entities.Team {
+	return entities.Team{
 		Name: req.Name,
 		Logo: req.Logo,
 	}

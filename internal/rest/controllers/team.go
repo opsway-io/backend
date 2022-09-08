@@ -4,6 +4,7 @@ import (
 	"net/http"
 
 	"github.com/labstack/echo/v4"
+	"github.com/opsway-io/backend/internal/entities"
 	"github.com/opsway-io/backend/internal/rest/handlers"
 	"github.com/opsway-io/backend/internal/rest/helpers"
 	"github.com/opsway-io/backend/internal/rest/models"
@@ -64,7 +65,7 @@ func (h *Handlers) PutTeam(ctx handlers.AuthenticatedContext, l *logrus.Entry) e
 
 			return echo.ErrNotFound
 		}
-		if errors.Is(err, team.ErrIllegalNameFormat) {
+		if errors.Is(err, entities.ErrIllegalTeamNameFormat) {
 			l.WithError(err).Debug("illegal team name format")
 
 			return echo.ErrBadRequest

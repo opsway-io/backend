@@ -4,17 +4,18 @@ import (
 	"context"
 	"errors"
 
+	"github.com/opsway-io/backend/internal/entities"
 	"gorm.io/gorm"
 )
 
 var ErrNotFound = errors.New("monitor not found")
 
 type Repository interface {
-	Create(ctx context.Context, monitor *Monitor) error
-	Update(ctx context.Context, monitor *Monitor) error
+	Create(ctx context.Context, monitor *entities.Monitor) error
+	Update(ctx context.Context, monitor *entities.Monitor) error
 	Delete(ctx context.Context, id int) error
-	GetByTeamID(ctx context.Context, teamID int, offset int, limit int) (*[]Monitor, error)
-	GetByIDAndTeamID(ctx context.Context, teamID, id int) (*Monitor, error)
+	GetByTeamID(ctx context.Context, teamID int, offset int, limit int) (*[]entities.Monitor, error)
+	GetByIDAndTeamID(ctx context.Context, teamID, id int) (*entities.Monitor, error)
 }
 
 type RepositoryImpl struct {
@@ -27,11 +28,11 @@ func NewRepository(db *gorm.DB) Repository {
 	}
 }
 
-func (r *RepositoryImpl) Create(ctx context.Context, m *Monitor) error {
+func (r *RepositoryImpl) Create(ctx context.Context, m *entities.Monitor) error {
 	return r.db.WithContext(ctx).Create(m).Error
 }
 
-func (r *RepositoryImpl) Update(ctx context.Context, m *Monitor) error {
+func (r *RepositoryImpl) Update(ctx context.Context, m *entities.Monitor) error {
 	result := r.db.WithContext(ctx).Updates(m)
 	if result.Error != nil {
 		return result.Error
@@ -44,7 +45,7 @@ func (r *RepositoryImpl) Update(ctx context.Context, m *Monitor) error {
 }
 
 func (r *RepositoryImpl) Delete(ctx context.Context, id int) error {
-	err := r.db.WithContext(ctx).Delete(&Monitor{}, id).Error
+	err := r.db.WithContext(ctx).Delete(&entities.Monitor{}, id).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return ErrNotFound
 	}
@@ -52,9 +53,9 @@ func (r *RepositoryImpl) Delete(ctx context.Context, id int) error {
 	return err
 }
 
-func (r *RepositoryImpl) GetByTeamID(ctx context.Context, teamID int, offset int, limit int) (*[]Monitor, error) {
-	var monitors []Monitor
-	err := r.db.WithContext(ctx).Offset(offset).Limit(limit).Where(Monitor{
+func (r *RepositoryImpl) GetByTeamID(ctx context.Context, teamID int, offset int, limit int) (*[]entities.Monitor, error) {
+	var monitors []entities.Monitor
+	err := r.db.WithContext(ctx).Offset(offset).Limit(limit).Where(entities.Monitor{
 		TeamID: teamID,
 	}).Find(&monitors).Error
 	if err != nil {
@@ -68,9 +69,9 @@ func (r *RepositoryImpl) GetByTeamID(ctx context.Context, teamID int, offset int
 	return &monitors, err
 }
 
-func (r *RepositoryImpl) GetByIDAndTeamID(ctx context.Context, id, teamID int) (*Monitor, error) {
-	var monitor Monitor
-	err := r.db.WithContext(ctx).Where(Monitor{
+func (r *RepositoryImpl) GetByIDAndTeamID(ctx context.Context, id, teamID int) (*entities.Monitor, error) {
+	var monitor entities.Monitor
+	err := r.db.WithContext(ctx).Where(entities.Monitor{
 		ID:     id,
 		TeamID: teamID,
 	}).First(&monitor).Error

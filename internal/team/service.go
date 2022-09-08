@@ -2,12 +2,14 @@ package team
 
 import (
 	"context"
+
+	"github.com/opsway-io/backend/internal/entities"
 )
 
 type Service interface {
-	GetByID(ctx context.Context, id uint) (*Team, error)
-	Create(ctx context.Context, team *Team) error
-	Update(ctx context.Context, team *Team) error
+	GetByID(ctx context.Context, id uint) (*entities.Team, error)
+	Create(ctx context.Context, team *entities.Team) error
+	Update(ctx context.Context, team *entities.Team) error
 }
 
 type ServiceImpl struct {
@@ -20,14 +22,14 @@ func NewService(repository Repository) Service {
 	}
 }
 
-func (s *ServiceImpl) GetByID(ctx context.Context, id uint) (*Team, error) {
+func (s *ServiceImpl) GetByID(ctx context.Context, id uint) (*entities.Team, error) {
 	return s.repository.GetByID(ctx, id)
 }
 
-func (s *ServiceImpl) Create(ctx context.Context, team *Team) error {
+func (s *ServiceImpl) Create(ctx context.Context, team *entities.Team) error {
 	return s.repository.Create(ctx, team)
 }
 
-func (s *ServiceImpl) Update(ctx context.Context, team *Team) error {
+func (s *ServiceImpl) Update(ctx context.Context, team *entities.Team) error {
 	return s.repository.Update(ctx, team)
 }

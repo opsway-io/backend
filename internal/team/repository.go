@@ -5,6 +5,7 @@ import (
 	"errors"
 
 	"github.com/opsway-io/backend/internal/connectors/postgres"
+	"github.com/opsway-io/backend/internal/entities"
 	"gorm.io/gorm"
 )
 
@@ -14,9 +15,9 @@ var (
 )
 
 type Repository interface {
-	GetByID(ctx context.Context, id uint) (*Team, error)
-	Create(ctx context.Context, team *Team) error
-	Update(ctx context.Context, team *Team) error
+	GetByID(ctx context.Context, id uint) (*entities.Team, error)
+	Create(ctx context.Context, team *entities.Team) error
+	Update(ctx context.Context, team *entities.Team) error
 }
 
 type RepositoryImpl struct {
@@ -27,8 +28,8 @@ func NewRepository(db *gorm.DB) Repository {
 	return &RepositoryImpl{db: db}
 }
 
-func (s *RepositoryImpl) GetByID(ctx context.Context, id uint) (*Team, error) {
-	var team Team
+func (s *RepositoryImpl) GetByID(ctx context.Context, id uint) (*entities.Team, error) {
+	var team entities.Team
 	if err := s.db.WithContext(ctx).First(&team, id).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, ErrNotFound
@@ -40,7 +41,7 @@ func (s *RepositoryImpl) GetByID(ctx context.Context, id uint) (*Team, error) {
 	return &team, nil
 }
 
-func (s *RepositoryImpl) Create(ctx context.Context, team *Team) error {
+func (s *RepositoryImpl) Create(ctx context.Context, team *entities.Team) error {
 	if err := s.db.WithContext(ctx).Create(team).Error; err != nil {
 		if errors.As(err, &postgres.ErrDuplicateEntry) {
 			return ErrNameAlreadyExists
@@ -52,7 +53,7 @@ func (s *RepositoryImpl) Create(ctx context.Context, team *Team) error {
 	return nil
 }
 
-func (s *RepositoryImpl) Update(ctx context.Context, team *Team) error {
+func (s *RepositoryImpl) Update(ctx context.Context, team *entities.Team) error {
 	result := s.db.WithContext(ctx).Updates(team)
 	if result.Error != nil {
 		return result.Error

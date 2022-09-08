@@ -5,6 +5,7 @@ import (
 	"errors"
 
 	"github.com/opsway-io/backend/internal/connectors/postgres"
+	"github.com/opsway-io/backend/internal/entities"
 	"gorm.io/gorm"
 )
 
@@ -14,11 +15,11 @@ var (
 )
 
 type Repository interface {
-	GetByID(ctx context.Context, id uint) (*User, error)
-	GetByEmail(ctx context.Context, email string) (*User, error)
-	GetUsersByTeamID(ctx context.Context, teamID uint) (*[]User, error)
-	Create(ctx context.Context, user *User) error
-	Update(ctx context.Context, user *User) error
+	GetByID(ctx context.Context, id uint) (*entities.User, error)
+	GetByEmail(ctx context.Context, email string) (*entities.User, error)
+	GetUsersByTeamID(ctx context.Context, teamID uint) (*[]entities.User, error)
+	Create(ctx context.Context, user *entities.User) error
+	Update(ctx context.Context, user *entities.User) error
 }
 
 type RepositoryImpl struct {
@@ -29,8 +30,8 @@ func NewRepository(db *gorm.DB) Repository {
 	return &RepositoryImpl{db: db}
 }
 
-func (s *RepositoryImpl) GetByID(ctx context.Context, id uint) (*User, error) {
-	var user User
+func (s *RepositoryImpl) GetByID(ctx context.Context, id uint) (*entities.User, error) {
+	var user entities.User
 	if err := s.db.WithContext(ctx).First(&user, id).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, ErrNotFound
@@ -42,9 +43,9 @@ func (s *RepositoryImpl) GetByID(ctx context.Context, id uint) (*User, error) {
 	return &user, nil
 }
 
-func (s *RepositoryImpl) GetByEmail(ctx context.Context, email string) (*User, error) {
-	var user User
-	if err := s.db.WithContext(ctx).Where(User{Email: email}).First(&user).Error; err != nil {
+func (s *RepositoryImpl) GetByEmail(ctx context.Context, email string) (*entities.User, error) {
+	var user entities.User
+	if err := s.db.WithContext(ctx).Where(entities.User{Email: email}).First(&user).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, ErrNotFound
 		}
@@ -55,20 +56,13 @@ func (s *RepositoryImpl) GetByEmail(ctx context.Context, email string) (*User, e
 	return &user, nil
 }
 
-func (s *RepositoryImpl) GetUsersByTeamID(ctx context.Context, teamID uint) (*[]User, error) {
-	var users []User
-	if err := s.db.WithContext(ctx).Where(User{TeamID: &teamID}).Find(&users).Error; err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, ErrNotFound
-		}
+func (s *RepositoryImpl) GetUsersByTeamID(ctx context.Context, teamID uint) (*[]entities.User, error) {
+	// TODO
 
-		return nil, err
-	}
-
-	return &users, nil
+	return nil, nil
 }
 
-func (s *RepositoryImpl) Create(ctx context.Context, user *User) error {
+func (s *RepositoryImpl) Create(ctx context.Context, user *entities.User) error {
 	if err := s.db.WithContext(ctx).Create(user).Error; err != nil {
 		if errors.As(err, &postgres.ErrDuplicateEntry) {
 			return ErrEmailAlreadyExists
@@ -80,7 +74,7 @@ func (s *RepositoryImpl) Create(ctx context.Context, user *User) error {
 	return nil
 }
 
-func (s *RepositoryImpl) Update(ctx context.Context, user *User) error {
+func (s *RepositoryImpl) Update(ctx context.Context, user *entities.User) error {
 	result := s.db.WithContext(ctx).Updates(user)
 	if result.Error != nil {
 		return result.Error

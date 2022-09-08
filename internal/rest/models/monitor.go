@@ -1,7 +1,7 @@
 package models
 
 import (
-	"github.com/opsway-io/backend/internal/monitor"
+	"github.com/opsway-io/backend/internal/entities"
 )
 
 type Monitor struct {
@@ -29,7 +29,7 @@ type MonitorSettingsBody struct {
 	Content string `json:"content"`
 }
 
-func MonitorToResponse(m monitor.Monitor) Monitor {
+func MonitorToResponse(m entities.Monitor) Monitor {
 	return Monitor{
 		ID:        m.ID,
 		Name:      m.Name,
@@ -39,7 +39,7 @@ func MonitorToResponse(m monitor.Monitor) Monitor {
 	}
 }
 
-func MonitorSettingsToResponse(ms monitor.Settings) MonitorSettings {
+func MonitorSettingsToResponse(ms entities.MonitorSettings) MonitorSettings {
 	return MonitorSettings{
 		ID:        ms.ID,
 		Method:    ms.Method,
@@ -51,7 +51,7 @@ func MonitorSettingsToResponse(ms monitor.Settings) MonitorSettings {
 	}
 }
 
-func MonitorsToResponse(monitors []monitor.Monitor) []Monitor {
+func MonitorsToResponse(monitors []entities.Monitor) []Monitor {
 	res := make([]Monitor, len(monitors))
 
 	for i, m := range monitors {
@@ -61,8 +61,8 @@ func MonitorsToResponse(monitors []monitor.Monitor) []Monitor {
 	return res
 }
 
-func RequestToMonitor(req Monitor) monitor.Monitor {
-	m := monitor.Monitor{
+func RequestToMonitor(req Monitor) entities.Monitor {
+	m := entities.Monitor{
 		ID:   req.ID,
 		Name: req.Name,
 	}

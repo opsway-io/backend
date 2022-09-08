@@ -1,4 +1,4 @@
-package maintenance
+package entities
 
 import (
 	"time"
@@ -10,18 +10,18 @@ type Maintenance struct {
 	ID          uint
 	Title       string `gorm:"index;not null"`
 	Description *string
-	TeamID      uint      `gorm:"index;not null"`
-	Settings    Settings  `gorm:"constraint:OnDelete:CASCADE"`
-	Comments    []Comment `gorm:"constraint:OnDelete:CASCADE"`
-	CreatedAt   time.Time `gorm:"index"`
-	UpdatedAt   time.Time `gorm:"index"`
+	TeamID      uint                 `gorm:"index;not null"`
+	Settings    MaintenanceSettings  `gorm:"constraint:OnDelete:CASCADE"`
+	Comments    []MaintenanceComment `gorm:"constraint:OnDelete:CASCADE"`
+	CreatedAt   time.Time            `gorm:"index"`
+	UpdatedAt   time.Time            `gorm:"index"`
 }
 
 func (Maintenance) TableName() string {
 	return "maintenance"
 }
 
-type Settings struct {
+type MaintenanceSettings struct {
 	ID            uint
 	StartAt       time.Time       `gorm:"index;not null"`
 	EndAt         time.Time       `gorm:"index;not null"`
@@ -31,11 +31,11 @@ type Settings struct {
 	UpdatedAt     time.Time       `gorm:"index"`
 }
 
-func (Settings) TableName() string {
+func (MaintenanceSettings) TableName() string {
 	return "maintenance_settings"
 }
 
-type Comment struct {
+type MaintenanceComment struct {
 	ID            uint
 	Content       string
 	UserID        uint      `gorm:"index;not null"`
@@ -44,6 +44,6 @@ type Comment struct {
 	UpdatedAt     time.Time `gorm:"index"`
 }
 
-func (Comment) TableName() string {
+func (MaintenanceComment) TableName() string {
 	return "maintenance_comments"
 }

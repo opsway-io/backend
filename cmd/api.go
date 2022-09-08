@@ -5,8 +5,7 @@ import (
 
 	"github.com/opsway-io/backend/internal/authentication"
 	"github.com/opsway-io/backend/internal/connectors/postgres"
-	"github.com/opsway-io/backend/internal/incident"
-	"github.com/opsway-io/backend/internal/maintenance"
+	"github.com/opsway-io/backend/internal/entities"
 	"github.com/opsway-io/backend/internal/monitor"
 	"github.com/opsway-io/backend/internal/rest"
 	"github.com/opsway-io/backend/internal/team"
@@ -47,15 +46,15 @@ func runAPI(cmd *cobra.Command, args []string) {
 	}
 
 	db.AutoMigrate(
-		team.Team{},
-		user.User{},
-		monitor.Monitor{},
-		monitor.Settings{},
-		maintenance.Maintenance{},
-		maintenance.Settings{},
-		maintenance.Comment{},
-		incident.Incident{},
-		incident.Comment{},
+		entities.Team{},
+		entities.User{},
+		entities.Monitor{},
+		entities.MonitorSettings{},
+		entities.Maintenance{},
+		entities.MaintenanceSettings{},
+		entities.MaintenanceComment{},
+		entities.Incident{},
+		entities.IncidentComment{},
 	)
 
 	authenticationService := authentication.NewService(conf.Authentication)
@@ -69,37 +68,26 @@ func runAPI(cmd *cobra.Command, args []string) {
 	monitorService := monitor.NewService(db)
 
 	// TODO: Remove
-	t := team.Team{
+	t := entities.Team{
 		Name: "opsway",
 	}
 	db.Create(&t)
 
-	u := &user.User{
+	u := &entities.User{
 		Name:        "Douglas Adams",
 		DisplayName: pointer.String("Ford Prefect"),
 		Email:       "admin@opsway.io",
-		TeamID:      pointer.Uint(t.ID),
+		Teams: []entities.Team{
+			{
+				ID: t.ID,
+			},
+		},
 	}
 	u.SetPassword("pass")
-	db.Create(u)
 
-	// m := maintenance.Maintenance{
-	// 	Title:  "Test",
-	// 	TeamID: 1,
-	// 	Settings: maintenance.Settings{
-	// 		StartAt: time.Now(),
-	// 		EndAt:   time.Now().Add(1 * time.Hour),
-	// 	},
-	// }
-	// db.Create(&m)
-
-	// c := maintenance.Comment{
-	// 	Content:       "Test",
-	// 	UserID:        1,
-	// 	MaintenanceID: 1,
-	// }
-	// db.Create(&c)
-
+	// This creates the association to the team
+	// but not the team itself.
+	db.Omit("Teams.*").Create(u)
 	// TODO: Remove
 
 	srv, err := rest.NewServer(

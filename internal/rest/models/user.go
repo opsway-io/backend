@@ -1,6 +1,6 @@
 package models
 
-import "github.com/opsway-io/backend/internal/user"
+import "github.com/opsway-io/backend/internal/entities"
 
 type User struct {
 	ID          uint   `json:"id" validate:"numeric,gte=0"`
@@ -11,7 +11,7 @@ type User struct {
 	UpdatedAt   int64  `json:"updatedAt"`
 }
 
-func UserToResponse(u user.User) User {
+func UserToResponse(u entities.User) User {
 	return User{
 		ID:          u.ID,
 		Name:        u.Name,
@@ -22,7 +22,7 @@ func UserToResponse(u user.User) User {
 	}
 }
 
-func UsersToResponse(us []user.User) []User {
+func UsersToResponse(us []entities.User) []User {
 	users := make([]User, len(us))
 	for i, u := range us {
 		users[i] = UserToResponse(u)
@@ -31,8 +31,8 @@ func UsersToResponse(us []user.User) []User {
 	return users
 }
 
-func RequestToUser(u User) user.User {
-	return user.User{
+func RequestToUser(u User) entities.User {
+	return entities.User{
 		ID:          u.ID,
 		Name:        u.Name,
 		DisplayName: &u.DisplayName,
