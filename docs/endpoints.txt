@@ -1,24 +1,39 @@
-/auth/login
-/auth/refresh
+POST   /auth/login
+POST   /auth/refresh
+POST   /auth/signup
 
-/teams/{teamId}
-/teams/{teamId}/settings
-/teams/{teamId}/users
-/teams/{teamId}/monitors
-/teams/{teamId}/incidents
-/teams/{teamId}/maintenance
+GET    /users/{userId}
+PATCH  /users/{userId}
+DELETE /users/{userId}
 
-/users/{userId}
+POST   /teams/{teamId}
+GET    /teams/{teamId}
+GET    /teams/{teamId}/settings
+GET    /teams/{teamId}/monitors
+GET    /teams/{teamId}/incidents
+GET    /teams/{teamId}/maintenance
+GET    /teams/{teamId}/users
+DELETE /teams/{teamId}/users/{userId}
 
-/monitor/{monitorId}
-/monitor/{monitorId}/metrics
-/monitor/{monitorId}/settings
+GET    /monitor/{monitorId}
+POST   /monitor/{monitorId}
+DELETE /monitor/{monitorId}
+GET    /monitor/{monitorId}/metrics
+GET    /monitor/{monitorId}/checks
+GET    /monitor/{monitorId}/settings
+PATCH  /monitor/{monitorId}/settings
 
-/incidents/{incidentId}
-/incidents/{incidentId}/comments
+GET    /incidents/{incidentId}
+DELETE /incidents/{incidentId}
+PATCH  /incidents/{incidentId}
+GET    /incidents/{incidentId}/comments
+POST   /incidents/{incidentId}/comments
+DELETE /incidents/{incidentId}/comments/{commentId}
 
-/maintenance/{maintenanceId}
-/maintenance/{maintenanceId}/settings
-/maintenance/{maintenanceId}/comments
-
-
+GET    /maintenance/{maintenanceId}
+DELETE /maintenance/{maintenanceId}
+GET    /maintenance/{maintenanceId}/settings
+PATCH  /maintenance/{maintenanceId}/settings
+GET    /maintenance/{maintenanceId}/comments
+POST   /maintenance/{maintenanceId}/comments
+DELETE /maintenance/{maintenanceId}/comments/{commentID}
