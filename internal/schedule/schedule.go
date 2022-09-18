@@ -2,6 +2,7 @@ package scheduler
 
 import (
 	"context"
+	"fmt"
 	"strconv"
 	"time"
 
@@ -11,11 +12,11 @@ import (
 
 type Schedule interface {
 	Add(ctx context.Context, interval time.Duration, data map[string]interface{}) (id string, err error)
-	CreateGroup(ctx context.Context, stream string, consumersGroup string) (err error)
+	CreateConsumer(ctx context.Context, stream string, interval time.Duration) (err error)
 	Ack(ctx context.Context, stream string, consumersGroup string, id string) (err error)
-	Set(ctx context.Context, id string, data interface{}) (err error)
+	TriggerConsumer(ctx context.Context, id string, data interface{}) (err error)
 	Remove(ctx context.Context, id string) (err error)
-	Run(ctx context.Context, stream string, group string, id string) (err error)
+	TriggerSpecific(ctx context.Context, stream string, group string, id string) (err error)
 	Consume(ctx context.Context, stream string, consumersGroup string, id string) (msgs []redis.XStream, err error)
 }
 
@@ -41,15 +42,23 @@ func (rs *RedisSchedule) Add(ctx context.Context, interval time.Duration, data m
 	return cmd.Result()
 }
 
-func (rs *RedisSchedule) CreateGroup(ctx context.Context, stream string, consumersGroup string) (err error) {
-	return rs.client.XGroupCreate(stream, consumersGroup, "0").Err()
+func (rs *RedisSchedule) CreateConsumer(ctx context.Context, stream string, interval time.Duration) (err error) {
+	consumerName := fmt.Sprintf("%s-consumer-%s", stream, strconv.Itoa(int(interval.Seconds())))
+	err = rs.client.XGroupCreate(stream, consumerName, "0").Err()
+	if err != nil {
+		return err
+	}
+
+	setIdCmd := fmt.Sprintf("redis.call('%s', '%s', '%s', '%s', '%s')", rs.client.XGroupSetID(stream, consumerName, "0").Args()...)
+
+	return rs.client.Do("KEYDB.CRON", consumerName, "REPEAT", interval, setIdCmd).Err()
 }
 
 func (rs *RedisSchedule) Ack(ctx context.Context, stream string, consumersGroup string, id string) (err error) {
 	return rs.client.XAck(stream, consumersGroup, id).Err()
 }
 
-func (rs *RedisSchedule) Set(ctx context.Context, id string, data interface{}) (err error) {
+func (rs *RedisSchedule) TriggerConsumer(ctx context.Context, id string, data interface{}) (err error) {
 	return rs.client.Set(id, data, 0).Err()
 }
 
@@ -57,7 +66,7 @@ func (rs *RedisSchedule) Remove(ctx context.Context, id string) (err error) {
 	return rs.client.Del(id).Err()
 }
 
-func (rs *RedisSchedule) Run(ctx context.Context, stream string, group string, id string) (err error) {
+func (rs *RedisSchedule) TriggerSpecific(ctx context.Context, stream string, group string, id string) (err error) {
 	return rs.client.XGroupSetID(stream, group, id).Err()
 }
 
@@ -71,10 +80,5 @@ func (rs *RedisSchedule) Consume(ctx context.Context, stream string, consumersGr
 		NoAck:    false,
 	}
 
-	entries, err := rs.client.XReadGroup(&readGroupArgs).Result()
-	if err != nil {
-		logrus.WithError(err).Fatal("failed to get stream result")
-	}
-
-	return entries, nil
+	return rs.client.XReadGroup(&readGroupArgs).Result()
 }
