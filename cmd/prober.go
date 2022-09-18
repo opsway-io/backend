@@ -57,11 +57,11 @@ func runProber(cmd *cobra.Command, args []string) {
 		panic(err)
 	}
 
-	stream := "stream-60"
+	stream := "stream-10" // test name
 
 	res, err := redisScheduler.ListConsumerGroups(ctx, stream)
 	if err != nil {
-		panic(err)
+		logrus.WithError(err).Fatal("Failed to get list of consumers")
 	}
 
 	consume(ctx, redisScheduler, resultService, stream, res[0].Name)

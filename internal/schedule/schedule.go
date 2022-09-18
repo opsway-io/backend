@@ -54,7 +54,7 @@ func (rs *RedisSchedule) CreateStream(ctx context.Context, interval time.Duratio
 
 	setIdCmd := fmt.Sprintf("redis.call('%s', '%s', '%s', '%s', '%s')", rs.client.XGroupSetID(streamName, consumerName, "0").Args()...)
 
-	err = rs.client.Do("KEYDB.CRON", consumerName, "REPEAT", interval.Microseconds(), setIdCmd).Err()
+	err = rs.client.Do("KEYDB.CRON", streamName+"-cron", "REPEAT", interval.Milliseconds(), setIdCmd).Err()
 
 	return streamName, err
 }
