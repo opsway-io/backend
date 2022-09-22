@@ -13,29 +13,18 @@ services:
     ports:
       - 5432:5432
 
-  keydb:
-    image: eqalpha/keydb:alpine_x86_64_v6.3.1
-    restart: unless-stopped
-    command: keydb-server /etc/keydb/keydb.conf --server-threads 2
-    volumes:
-      - ./data/redis:/data
+  redis:
+    image: redis:6.2-alpine
     ports:
       - 6379:6379
+    command: redis-server
 
-  redisinsight:
-    image: redislabs/redisinsight:latest
+  asynqmon:
+    image: hibiken/asynqmon:latest
     ports:
-      - '8001:8001'
-    volumes:
-      - ./data/redisinsight:/db 
-
-  influxdb:
-    image: influxdb:2.3-alpine
-    restart: unless-stopped
-    ports:
-      - 8086:8086
-    volumes:
-      - ./data/influx:/var/lib/influxdb2:rw
+      - 8080:8080
+    environment:
+      REDIS_ADDR: redis:6379
 
   # api:
   #   build: .
@@ -49,7 +38,7 @@ services:
   #     - postgres
   #     - keydb
   #     - influxdb
-  
+
 
   # prober:
   #   build: .
