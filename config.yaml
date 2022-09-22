@@ -21,6 +21,6 @@ influxdb:
   port: 8086
   token: c2b67Z10xdccn0oWmN1d4SsBdCaU7RCDuesd0R8iSR-9pHSGfbvkTjlFCN3HONydaLjjmL82bS-sQQl2s1z6uw==
 
-redis:
+asynq:
   host: localhost
   port: 6379
