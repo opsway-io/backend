@@ -35,7 +35,7 @@ func Register(
 
 	AuthGuard := mw.AuthGuardFactory(logger, authenticationService)
 	TeamGuard := mw.TeamGuardFactory(logger)
-	RoleGuard := mw.RoleGuardFactory(logger)
+	AllowedRoles := mw.RoleGuardFactory(logger)
 
 	BaseHandler := handlers.BaseHandlerFactory(logger)
 	AuthHandler := handlers.AuthenticatedHandlerFactory(logger)
@@ -65,7 +65,7 @@ func Register(
 	)
 
 	teamsGroup.GET("", AuthHandler(h.GetTeam))
-	teamsGroup.PUT("", AuthHandler(h.PutTeam), RoleGuard(mw.UserRoleAdmin))
+	teamsGroup.PUT("", AuthHandler(h.PutTeam), AllowedRoles(mw.UserRoleAdmin))
 
 	teamsGroup.GET("/users", AuthHandler(h.GetTeamUsers))
 
@@ -78,9 +78,9 @@ func Register(
 	)
 
 	monitorsGroup.GET("", AuthHandler(h.GetMonitors))
-	monitorsGroup.POST("", AuthHandler(h.PostMonitor), RoleGuard(mw.UserRoleAdmin))
+	monitorsGroup.POST("", AuthHandler(h.PostMonitor), AllowedRoles(mw.UserRoleAdmin))
 
 	monitorsGroup.GET("/:monitor_id", AuthHandler(h.GetMonitor))
-	monitorsGroup.PUT("/:monitor_id", AuthHandler(h.PutMonitor), RoleGuard(mw.UserRoleAdmin))
-	monitorsGroup.DELETE("/:monitor_id", AuthHandler(h.DeleteMonitor), RoleGuard(mw.UserRoleAdmin))
+	monitorsGroup.PUT("/:monitor_id", AuthHandler(h.PutMonitor), AllowedRoles(mw.UserRoleAdmin))
+	monitorsGroup.DELETE("/:monitor_id", AuthHandler(h.DeleteMonitor), AllowedRoles(mw.UserRoleAdmin))
 }

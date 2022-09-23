@@ -1,8 +1,6 @@
 package middleware
 
 import (
-	"strconv"
-
 	"github.com/labstack/echo/v4"
 	"github.com/opsway-io/backend/internal/authentication"
 	"github.com/sirupsen/logrus"
@@ -20,11 +18,9 @@ func TeamGuardFactory(logger *logrus.Entry) func() func(next echo.HandlerFunc) e
 
 					return echo.ErrUnauthorized
 				}
-
-				if claims.TeamID == 0 {
-					l.Debug("missing team_id id claims")
-
-					return echo.ErrUnauthorized
+				UserID := claims.Subject
+				if UserID == "" {
+					l.Debug("missing user_id")
 				}
 
 				teamIdParam := c.Param("team_id")
@@ -32,11 +28,7 @@ func TeamGuardFactory(logger *logrus.Entry) func() func(next echo.HandlerFunc) e
 					l.Debug("missing team_id param")
 				}
 
-				if teamIdParam != strconv.Itoa(claims.TeamID) {
-					l.Debug("team_id param does not match claims")
-
-					return echo.ErrUnauthorized
-				}
+				l.Debug("Team guard TODO: implement")
 
 				return next(c)
 			}
