@@ -2,31 +2,31 @@ package asynq
 
 import (
 	"context"
-	"log"
 
 	"github.com/hibiken/asynq"
+	"github.com/sirupsen/logrus"
 )
 
 type Config struct {
 	Addr string `required:"true"`
 }
 
-func NewClient(ctx context.Context, conf Config) *asynq.Client {
-	client := asynq.NewClient(asynq.RedisClientOpt{Addr: conf.Addr})
-
-	return client
+func handleEnqueueError(task *asynq.Task, opts []asynq.Option, err error) {
+	logrus.Error(err)
 }
 
-func NewHandler(pattern string, handler func(context.Context, *asynq.Task) error, conf Config) {
-	srv := asynq.NewServer(
+func NewServer(ctx context.Context, conf Config) *asynq.Server {
+	return asynq.NewServer(
 		asynq.RedisClientOpt{Addr: conf.Addr},
-		asynq.Config{Concurrency: 10},
+		asynq.Config{
+			Concurrency: 10,
+		},
 	)
+}
 
-	mux := asynq.NewServeMux()
-	mux.HandleFunc(pattern, handler)
-
-	if err := srv.Run(mux); err != nil {
-		log.Fatal(err)
-	}
+func NewScheduler(ctx context.Context, conf Config) *asynq.Scheduler {
+	redisConnOpt := asynq.RedisClientOpt{Addr: conf.Addr}
+	return asynq.NewScheduler(redisConnOpt, &asynq.SchedulerOpts{
+		EnqueueErrorHandler: handleEnqueueError,
+	})
 }

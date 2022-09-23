@@ -8,6 +8,7 @@ import (
 	"github.com/hibiken/asynq"
 
 	asynqClient "github.com/opsway-io/backend/internal/connectors/asynq"
+	scheduler "github.com/opsway-io/backend/internal/schedule"
 
 	"github.com/spf13/cobra"
 )
@@ -31,34 +32,24 @@ func runProber(cmd *cobra.Command, args []string) {
 
 	l := getLogger(conf.Log)
 
-	// ctx := context.Background()
-
-	// influxc, err := influxClient.NewClient(ctx, influxClient.Config{ServerURL: "http://localhost:8086", Token: "aIlugity6YsoMsmHybWgAWy37pVtP-06qmE2vNLGVmni8k33G_VdzIDaw7nUa9Pnp9UI0AdHGDJeHfkuNI7o_Q=="})
-	// if err != nil {
-	// 	panic(err)
-	// }
-
-	// resultService, err := result.NewService(influxc, "1", "http")
-	// if err != nil {
-	// 	panic(err)
-	// }
+	ctx := context.Background()
 
 	l.WithField("addr", conf.Asynq.Addr).Info("connecting to asynq")
-	asynqClient.NewHandler("probe:http", probe, conf.Asynq)
+	scheduleService := scheduler.New(nil, asynqClient.NewServer(ctx, conf.Asynq))
 
-}
+	handlers := map[string]func(context.Context, *asynq.Task) error{}
+	handlers[scheduler.ProbeTask] = probe
 
-type ProbeTaskPayload struct {
-	Url string
-	Id  string
+	scheduleService.Consume(ctx, handlers)
+
 }
 
 func probe(ctx context.Context, t *asynq.Task) error {
-	var p ProbeTaskPayload
+	var p scheduler.TaskPayload
 	if err := json.Unmarshal(t.Payload(), &p); err != nil {
 		return err
 	}
-	log.Printf(" [*] Probe %s", p.Url)
+	log.Printf(" [*] Probe %s", p.Payload["URL"])
 	return nil
 }
 
