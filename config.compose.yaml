@@ -3,7 +3,7 @@ log:
   format: text
 
 rest:
-  port: 8080
+  port: 8001
 
 postgres:
   dsn: "host=postgres user=admin password=admin dbname=opsway port=5432 sslmode=disable"

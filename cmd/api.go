@@ -79,7 +79,7 @@ func runAPI(cmd *cobra.Command, args []string) {
 		Email:       "admin@opsway.io",
 		Teams: []entities.Team{
 			{
-				ID: t.ID,
+				ID: 1,
 			},
 		},
 	}

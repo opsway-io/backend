@@ -17,7 +17,7 @@ import (
 )
 
 type Config struct {
-	Port                 uint32 `default:"8080"`
+	Port                 uint32 `default:"8001"`
 	GZIPCompressionLevel int    `default:"5"`
 }
 

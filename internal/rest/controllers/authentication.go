@@ -53,7 +53,8 @@ func (h *Handlers) PostLogin(ctx hs.BaseContext) error {
 	ctx.Log.Info("user authenticated")
 
 	return ctx.JSON(http.StatusOK, PostLoginResponse{
-		Token: token,
-		User:  models.UserToResponse(*user),
+		Token:        token,
+		RefreshToken: "Not implemented",
+		User:         models.UserToResponse(*user),
 	})
 }

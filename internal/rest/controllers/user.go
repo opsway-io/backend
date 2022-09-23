@@ -28,8 +28,6 @@ func (h *Handlers) GetUser(ctx handlers.AuthenticatedContext) error {
 		return echo.ErrBadRequest
 	}
 
-	// TODO: Check if user is in the same team as the authenticated user
-
 	u, err := h.UserService.GetByID(ctx.Request().Context(), req.UserID)
 	if err != nil {
 		if errors.Is(err, user.ErrNotFound) {
