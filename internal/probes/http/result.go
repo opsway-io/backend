@@ -5,7 +5,7 @@ import "time"
 type Result struct {
 	Response Response
 	Timing   Timing
-	SSL      *SSL
+	TLS      *TLS
 }
 
 type Response struct {
@@ -13,8 +13,7 @@ type Response struct {
 }
 
 type Timing struct {
-	Phases   TimingPhases
-	Timeline TimingTimeline
+	Phases TimingPhases
 }
 
 type TimingPhases struct {
@@ -23,17 +22,9 @@ type TimingPhases struct {
 	TLSHandshake     time.Duration
 	ServerProcessing time.Duration
 	ContentTransfer  time.Duration
+	Total            time.Duration
 }
-
-type TimingTimeline struct {
-	NameLookup    time.Duration
-	Connect       time.Duration
-	PreTransfer   time.Duration
-	StartTransfer time.Duration
-	Total         time.Duration
-}
-
-type SSL struct {
+type TLS struct {
 	Version     string
 	Cipher      string
 	Certificate Certificate

@@ -61,19 +61,13 @@ func Probe(method, url string, headers map[string]string, body io.Reader, timeou
 				TLSHandshake:     result.TLSHandshake,
 				ServerProcessing: result.ServerProcessing,
 				ContentTransfer:  result.ContentTransfer,
-			},
-			Timeline: TimingTimeline{
-				NameLookup:    result.NameLookup,
-				Connect:       result.Connect,
-				PreTransfer:   result.Pretransfer,
-				StartTransfer: result.StartTransfer,
-				Total:         result.Total,
+				Total:            result.Total,
 			},
 		},
 	}
 
 	if resp.TLS != nil {
-		meta.SSL = &SSL{
+		meta.TLS = &TLS{
 			Version: TLSVersionName(resp.TLS.Version),
 			Cipher:  tls.CipherSuiteName(resp.TLS.CipherSuite),
 		}
@@ -81,7 +75,7 @@ func Probe(method, url string, headers map[string]string, body io.Reader, timeou
 		if resp.TLS.PeerCertificates != nil && len(resp.TLS.PeerCertificates) > 0 {
 			cert := resp.TLS.PeerCertificates[0]
 
-			meta.SSL.Certificate = Certificate{
+			meta.TLS.Certificate = Certificate{
 				Issuer: CertificateIssuer{
 					Organization: strings.Join(cert.Issuer.Organization, ""),
 				},
