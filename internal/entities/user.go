@@ -14,7 +14,8 @@ type User struct {
 	DisplayName         *string
 	Email               string `gorm:"uniqueIndex"`
 	PasswordHash        *string
-	Teams               []Team `gorm:"many2many:team_users;constraint:OnDelete:CASCADE"`
+	Roles               []UserRole `gorm:"constraint:OnDelete:CASCADE"`
+	Teams               []Team     `gorm:"many2many:team_users;constraint:OnDelete:CASCADE"`
 	MaintenanceComments []MaintenanceComment
 	IncidentComments    []IncidentComment
 	CreatedAt           time.Time `gorm:"index"`
@@ -36,4 +37,17 @@ func (u *User) CheckPassword(password string) bool {
 	err := bcrypt.CompareHashAndPassword([]byte(*u.PasswordHash), []byte(password))
 
 	return err == nil
+}
+
+type Role string
+
+const (
+	RoleAdmin  Role = "admin"
+	RoleMember Role = "member"
+)
+
+type UserRole struct {
+	UserID uint
+	TeamID uint
+	Role   Role
 }

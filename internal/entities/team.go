@@ -35,6 +35,7 @@ type Team struct {
 	DisplayName string `gorm:"index"`
 	Logo        string
 	Users       []User        `gorm:"many2many:team_users"`
+	UserRoles   []UserRole    `gorm:"constraint:OnDelete:CASCADE"`
 	Monitors    []Monitor     `gorm:"constraint:OnDelete:CASCADE"`
 	Maintenance []Maintenance `gorm:"constraint:OnDelete:CASCADE"`
 	Incidents   []Incident    `gorm:"constraint:OnDelete:CASCADE"`
