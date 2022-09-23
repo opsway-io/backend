@@ -33,17 +33,20 @@ func Register(
 		MonitorService:        monitorService,
 	}
 
+	AuthGuard := middleware.AuthGuardFactory(logger, authenticationService)
+	TeamGuard := middleware.TeamGuardFactory(logger)
+
 	// Authentication
 
 	authGroup := e.Group("/authentication")
 
-	authGroup.POST("/login", hs.StandardHandler(h.PostLogin, logger))
+	authGroup.POST("/login", hs.BaseHandler(h.PostLogin, logger))
 
 	// Users
 
 	usersGroup := e.Group(
 		"/users/:userId",
-		middleware.AuthGuard(logger, authenticationService),
+		AuthGuard(),
 	)
 
 	usersGroup.GET("", hs.AuthenticatedHandler(h.GetUser, logger))
@@ -53,8 +56,8 @@ func Register(
 
 	teamsGroup := e.Group(
 		"/teams/:teamId",
-		middleware.AuthGuard(logger, authenticationService),
-		middleware.TeamGuard(logger),
+		AuthGuard(),
+		TeamGuard(),
 	)
 
 	teamsGroup.GET("", hs.AuthenticatedHandler(h.GetTeam, logger))
@@ -63,10 +66,8 @@ func Register(
 
 	// Monitors
 
-	monitorsGroup := e.Group(
-		"/teams/:team_id/monitors",
-		middleware.AuthGuard(logger, authenticationService),
-		middleware.TeamGuard(logger),
+	monitorsGroup := teamsGroup.Group(
+		"/monitors",
 	)
 
 	monitorsGroup.GET("", hs.AuthenticatedHandler(h.GetMonitors, logger))

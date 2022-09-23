@@ -6,10 +6,11 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-type AuthenticatedHandlerFunc func(ctx AuthenticatedContext, l *logrus.Entry) error
+type AuthenticatedHandlerFunc func(ctx AuthenticatedContext) error
 
 type AuthenticatedContext struct {
 	echo.Context
+	Log    *logrus.Entry
 	Claims authentication.Claims
 }
 
@@ -25,6 +26,7 @@ func AuthenticatedHandler(handler AuthenticatedHandlerFunc, logger *logrus.Entry
 		return handler(AuthenticatedContext{
 			Context: ctx,
 			Claims:  *claims,
-		}, logger)
+			Log:     logger,
+		})
 	}
 }

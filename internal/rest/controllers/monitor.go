@@ -9,7 +9,6 @@ import (
 	"github.com/opsway-io/backend/internal/rest/helpers"
 	"github.com/opsway-io/backend/internal/rest/models"
 	"github.com/pkg/errors"
-	"github.com/sirupsen/logrus"
 )
 
 type GetMonitorsRequest struct {
@@ -22,17 +21,17 @@ type GetMonitorsResponse struct {
 	Monitors []models.Monitor `json:"monitors"`
 }
 
-func (h *Handlers) GetMonitors(ctx handlers.AuthenticatedContext, l *logrus.Entry) error {
+func (h *Handlers) GetMonitors(ctx handlers.AuthenticatedContext) error {
 	req, err := helpers.Bind[GetMonitorsRequest](ctx)
 	if err != nil {
-		l.WithError(err).Debug("failed to bind GetMonitorsRequest")
+		ctx.Log.WithError(err).Debug("failed to bind GetMonitorsRequest")
 
 		return echo.ErrBadRequest
 	}
 
 	monitors, err := h.MonitorService.GetByTeamID(ctx.Request().Context(), req.TeamID, req.Offset, req.Limit)
 	if err != nil {
-		l.WithError(err).Error("failed to get monitors")
+		ctx.Log.WithError(err).Error("failed to get monitors")
 
 		return echo.ErrInternalServerError
 	}
@@ -51,10 +50,10 @@ type GetMonitorResponse struct {
 	models.Monitor
 }
 
-func (h *Handlers) GetMonitor(ctx handlers.AuthenticatedContext, l *logrus.Entry) error {
+func (h *Handlers) GetMonitor(ctx handlers.AuthenticatedContext) error {
 	req, err := helpers.Bind[GetMonitorRequest](ctx)
 	if err != nil {
-		l.WithError(err).Debug("failed to bind GetMonitorRequest")
+		ctx.Log.WithError(err).Debug("failed to bind GetMonitorRequest")
 
 		return echo.ErrBadRequest
 	}
@@ -62,12 +61,12 @@ func (h *Handlers) GetMonitor(ctx handlers.AuthenticatedContext, l *logrus.Entry
 	m, err := h.MonitorService.GetByIDAndTeamID(ctx.Request().Context(), req.MonitorID, req.TeamID)
 	if err != nil {
 		if errors.Is(err, monitor.ErrNotFound) {
-			l.WithError(err).Debug("monitor not found")
+			ctx.Log.WithError(err).Debug("monitor not found")
 
 			return echo.ErrNotFound
 		}
 
-		l.WithError(err).Error("failed to get monitor")
+		ctx.Log.WithError(err).Error("failed to get monitor")
 
 		return echo.ErrInternalServerError
 	}
@@ -84,10 +83,10 @@ type PostMonitorResponse struct {
 	models.Monitor
 }
 
-func (h *Handlers) PostMonitor(ctx handlers.AuthenticatedContext, l *logrus.Entry) error {
+func (h *Handlers) PostMonitor(ctx handlers.AuthenticatedContext) error {
 	req, err := helpers.Bind[PostMonitorRequest](ctx)
 	if err != nil {
-		l.WithError(err).Debug("failed to bind PostMonitorRequest")
+		ctx.Log.WithError(err).Debug("failed to bind PostMonitorRequest")
 
 		return echo.ErrBadRequest
 	}
@@ -96,7 +95,7 @@ func (h *Handlers) PostMonitor(ctx handlers.AuthenticatedContext, l *logrus.Entr
 	m.TeamID = req.TeamID
 
 	if err := h.MonitorService.Create(ctx.Request().Context(), &m); err != nil {
-		l.WithError(err).Error("failed to create monitor")
+		ctx.Log.WithError(err).Error("failed to create monitor")
 
 		return echo.ErrInternalServerError
 	}
@@ -114,10 +113,10 @@ type PutMonitorResponse struct {
 	models.Monitor
 }
 
-func (h *Handlers) PutMonitor(ctx handlers.AuthenticatedContext, l *logrus.Entry) error {
+func (h *Handlers) PutMonitor(ctx handlers.AuthenticatedContext) error {
 	req, err := helpers.Bind[PutMonitorRequest](ctx)
 	if err != nil {
-		l.WithError(err).Debug("failed to bind PutMonitorRequest")
+		ctx.Log.WithError(err).Debug("failed to bind PutMonitorRequest")
 
 		return echo.ErrBadRequest
 	}
@@ -128,12 +127,12 @@ func (h *Handlers) PutMonitor(ctx handlers.AuthenticatedContext, l *logrus.Entry
 
 	if err := h.MonitorService.Update(ctx.Request().Context(), &m); err != nil {
 		if errors.Is(err, monitor.ErrNotFound) {
-			l.WithError(err).Debug("monitor not found")
+			ctx.Log.WithError(err).Debug("monitor not found")
 
 			return echo.ErrNotFound
 		}
 
-		l.WithError(err).Error("failed to update monitor")
+		ctx.Log.WithError(err).Error("failed to update monitor")
 
 		return echo.ErrInternalServerError
 	}
@@ -150,16 +149,16 @@ type DeleteMonitorResponse struct {
 	models.Monitor
 }
 
-func (h *Handlers) DeleteMonitor(ctx handlers.AuthenticatedContext, l *logrus.Entry) error {
+func (h *Handlers) DeleteMonitor(ctx handlers.AuthenticatedContext) error {
 	req, err := helpers.Bind[DeleteMonitorRequest](ctx)
 	if err != nil {
-		l.WithError(err).Debug("failed to bind DeleteMonitorRequest")
+		ctx.Log.WithError(err).Debug("failed to bind DeleteMonitorRequest")
 
 		return echo.ErrBadRequest
 	}
 
 	if err := h.MonitorService.Delete(ctx.Request().Context(), req.MonitorID); err != nil {
-		l.WithError(err).Error("failed to delete monitor")
+		ctx.Log.WithError(err).Error("failed to delete monitor")
 
 		return echo.ErrInternalServerError
 	}

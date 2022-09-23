@@ -5,10 +5,18 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-type StandardHandlerFunc func(ctx echo.Context, logger *logrus.Entry) error
+type BaseHandlerFunc func(ctx BaseContext) error
 
-func StandardHandler(handler StandardHandlerFunc, logger *logrus.Entry) echo.HandlerFunc {
+type BaseContext struct {
+	echo.Context
+	Log *logrus.Entry
+}
+
+func BaseHandler(handler BaseHandlerFunc, logger *logrus.Entry) echo.HandlerFunc {
 	return func(ctx echo.Context) error {
-		return handler(ctx, logger)
+		return handler(BaseContext{
+			Context: ctx,
+			Log:     logger,
+		})
 	}
 }

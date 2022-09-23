@@ -10,7 +10,6 @@ import (
 	"github.com/opsway-io/backend/internal/rest/models"
 	"github.com/opsway-io/backend/internal/team"
 	"github.com/pkg/errors"
-	"github.com/sirupsen/logrus"
 )
 
 type GetTeamRequest struct {
@@ -21,17 +20,17 @@ type GetTeamResponse struct {
 	models.Team
 }
 
-func (h *Handlers) GetTeam(ctx handlers.AuthenticatedContext, l *logrus.Entry) error {
+func (h *Handlers) GetTeam(ctx handlers.AuthenticatedContext) error {
 	req, err := helpers.Bind[GetTeamRequest](ctx)
 	if err != nil {
-		l.WithError(err).Debug("failed to bind GetTeamRequest")
+		ctx.Log.WithError(err).Debug("failed to bind GetTeamRequest")
 
 		return echo.ErrBadRequest
 	}
 
 	team, err := h.TeamService.GetByID(ctx.Request().Context(), req.TeamID)
 	if err != nil {
-		l.WithError(err).Debug("failed to get team")
+		ctx.Log.WithError(err).Debug("failed to get team")
 
 		return echo.ErrInternalServerError
 	}
@@ -48,10 +47,10 @@ type PutTeamResponse struct {
 	models.Team
 }
 
-func (h *Handlers) PutTeam(ctx handlers.AuthenticatedContext, l *logrus.Entry) error {
+func (h *Handlers) PutTeam(ctx handlers.AuthenticatedContext) error {
 	req, err := helpers.Bind[PutTeamRequest](ctx)
 	if err != nil {
-		l.WithError(err).Debug("failed to bind PutTeamRequest")
+		ctx.Log.WithError(err).Debug("failed to bind PutTeamRequest")
 
 		return echo.ErrBadRequest
 	}
@@ -61,17 +60,17 @@ func (h *Handlers) PutTeam(ctx handlers.AuthenticatedContext, l *logrus.Entry) e
 
 	if err := h.TeamService.Update(ctx.Request().Context(), &t); err != nil {
 		if errors.Is(err, team.ErrNotFound) {
-			l.WithError(err).Debug("team not found")
+			ctx.Log.WithError(err).Debug("team not found")
 
 			return echo.ErrNotFound
 		}
 		if errors.Is(err, entities.ErrIllegalTeamNameFormat) {
-			l.WithError(err).Debug("illegal team name format")
+			ctx.Log.WithError(err).Debug("illegal team name format")
 
 			return echo.ErrBadRequest
 		}
 
-		l.WithError(err).Debug("failed to update team")
+		ctx.Log.WithError(err).Debug("failed to update team")
 
 		return echo.ErrInternalServerError
 	}
@@ -87,17 +86,17 @@ type GetTeamUsersResponse struct {
 	Users []models.User `json:"users"`
 }
 
-func (h *Handlers) GetTeamUsers(ctx handlers.AuthenticatedContext, l *logrus.Entry) error {
+func (h *Handlers) GetTeamUsers(ctx handlers.AuthenticatedContext) error {
 	req, err := helpers.Bind[GetTeamUsersRequest](ctx)
 	if err != nil {
-		l.WithError(err).Debug("failed to bind GetTeamUsersRequest")
+		ctx.Log.WithError(err).Debug("failed to bind GetTeamUsersRequest")
 
 		return echo.ErrBadRequest
 	}
 
 	users, err := h.UserService.GetByTeamID(ctx.Request().Context(), req.TeamID)
 	if err != nil {
-		l.WithError(err).Debug("failed to get users")
+		ctx.Log.WithError(err).Debug("failed to get users")
 
 		return echo.ErrInternalServerError
 	}
