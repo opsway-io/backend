@@ -71,7 +71,7 @@ func Register(
 	// Monitors
 
 	monitorsGroup := e.Group(
-		"/monitors",
+		"/teams/:teamId/monitors",
 		AuthGuard(),
 		TeamGuard(),
 	)
