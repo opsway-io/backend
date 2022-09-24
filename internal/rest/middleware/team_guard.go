@@ -3,11 +3,12 @@ package middleware
 import (
 	"github.com/labstack/echo/v4"
 	"github.com/opsway-io/backend/internal/authentication"
+	"github.com/opsway-io/backend/internal/team"
 	"github.com/sirupsen/logrus"
 )
 
 // Allows only users in the same team to access the route
-func TeamGuardFactory(logger *logrus.Entry) func() func(next echo.HandlerFunc) echo.HandlerFunc {
+func TeamGuardFactory(logger *logrus.Entry, teamService team.Service) func() func(next echo.HandlerFunc) echo.HandlerFunc {
 	l := logrus.WithField("middleware", "team_guard")
 
 	return func() func(next echo.HandlerFunc) echo.HandlerFunc {

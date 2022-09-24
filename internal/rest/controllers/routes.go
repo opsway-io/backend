@@ -35,8 +35,8 @@ func Register(
 
 	AuthGuard := mw.AuthGuardFactory(logger, authenticationService)
 	CurrentUserGuard := mw.CurrentUSerGuardFactory(logger)
-	TeamGuard := mw.TeamGuardFactory(logger)
-	AllowedRoles := mw.RoleGuardFactory(logger)
+	TeamGuard := mw.TeamGuardFactory(logger, teamService)
+	AllowedRoles := mw.RoleGuardFactory(logger, teamService)
 
 	BaseHandler := handlers.BaseHandlerFactory(logger)
 	AuthHandler := handlers.AuthenticatedHandlerFactory(logger)
