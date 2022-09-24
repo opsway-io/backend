@@ -1,7 +1,6 @@
 package controllers
 
 import (
-	"fmt"
 	"net/http"
 
 	"github.com/labstack/echo/v4"
@@ -61,12 +60,6 @@ func (h *Handlers) PutUser(ctx handlers.AuthenticatedContext) error {
 		return echo.ErrBadRequest
 	}
 
-	if fmt.Sprint(req.UserID) != ctx.Claims.Subject {
-		ctx.Log.WithField("user_id", req.UserID).Debug("user id in request does not match authenticated user id")
-
-		return echo.ErrForbidden
-	}
-
 	u := models.RequestToUser(req.User)
 	u.ID = req.UserID
 
@@ -78,6 +71,29 @@ func (h *Handlers) PutUser(ctx handlers.AuthenticatedContext) error {
 		}
 
 		ctx.Log.WithError(err).Error("failed to update user")
+
+		return echo.ErrInternalServerError
+	}
+
+	return ctx.NoContent(http.StatusOK)
+}
+
+func (h *Handlers) DeleteUser(ctx handlers.AuthenticatedContext) error {
+	req, err := helpers.Bind[GetUserRequest](ctx)
+	if err != nil {
+		ctx.Log.WithError(err).Debug("failed to bind GetUserRequest")
+
+		return echo.ErrBadRequest
+	}
+
+	if err := h.UserService.Delete(ctx.Request().Context(), req.UserID); err != nil {
+		if errors.Is(err, user.ErrNotFound) {
+			ctx.Log.WithError(err).Debug("user not found")
+
+			return echo.ErrNotFound
+		}
+
+		ctx.Log.WithError(err).Error("failed to delete user")
 
 		return echo.ErrInternalServerError
 	}

@@ -8,6 +8,7 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
+// Allows only authenticated users to access the route
 func AuthGuardFactory(logger *logrus.Entry, jwtService authentication.Service) func() func(next echo.HandlerFunc) echo.HandlerFunc {
 	l := logger.WithField("middleware", "auth_guard")
 

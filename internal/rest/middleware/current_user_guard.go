@@ -6,9 +6,9 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-// Allows only users in the same team to access the route
-func TeamGuardFactory(logger *logrus.Entry) func() func(next echo.HandlerFunc) echo.HandlerFunc {
-	l := logrus.WithField("middleware", "team_guard")
+// Allows only the current user to access the route
+func CurrentUSerGuardFactory(logger *logrus.Entry) func() func(next echo.HandlerFunc) echo.HandlerFunc {
+	l := logrus.WithField("middleware", "current_user_guard")
 
 	return func() func(next echo.HandlerFunc) echo.HandlerFunc {
 		return func(next echo.HandlerFunc) echo.HandlerFunc {
@@ -19,7 +19,6 @@ func TeamGuardFactory(logger *logrus.Entry) func() func(next echo.HandlerFunc) e
 
 					return echo.ErrForbidden
 				}
-
 				UserID := claims.Subject
 				if UserID == "" {
 					l.Debug("missing subject in JWT")
@@ -27,14 +26,18 @@ func TeamGuardFactory(logger *logrus.Entry) func() func(next echo.HandlerFunc) e
 					return echo.ErrForbidden
 				}
 
-				teamIdParam := c.Param("teamId")
-				if teamIdParam == "" {
+				userIdParam := c.Param("userId")
+				if userIdParam == "" {
 					l.Debug("missing team_id param")
 
 					return echo.ErrForbidden
 				}
 
-				l.Debug("Team guard TODO: implement")
+				if userIdParam != claims.Subject {
+					l.Debug("User id in request does not match authenticated user id")
+
+					return echo.ErrForbidden
+				}
 
 				return next(c)
 			}

@@ -16,8 +16,10 @@ var (
 
 type Repository interface {
 	GetByID(ctx context.Context, id uint) (*entities.Team, error)
+	GetUsersByID(ctx context.Context, id uint) (*[]entities.User, error)
 	Create(ctx context.Context, team *entities.Team) error
 	Update(ctx context.Context, team *entities.Team) error
+	Delete(ctx context.Context, id uint) error
 }
 
 type RepositoryImpl struct {
@@ -41,6 +43,25 @@ func (s *RepositoryImpl) GetByID(ctx context.Context, id uint) (*entities.Team, 
 	return &team, nil
 }
 
+func (s *RepositoryImpl) GetUsersByID(ctx context.Context, id uint) (*[]entities.User, error) {
+	var users []entities.User
+	if err := s.db.WithContext(
+		ctx,
+	).Model(
+		&entities.Team{
+			ID: id,
+		},
+	).Association(
+		"Users",
+	).Find(
+		&users,
+	); err != nil {
+		return nil, err
+	}
+
+	return &users, nil
+}
+
 func (s *RepositoryImpl) Create(ctx context.Context, team *entities.Team) error {
 	if err := s.db.WithContext(ctx).Create(team).Error; err != nil {
 		if errors.As(err, &postgres.ErrDuplicateEntry) {
@@ -55,6 +76,18 @@ func (s *RepositoryImpl) Create(ctx context.Context, team *entities.Team) error 
 
 func (s *RepositoryImpl) Update(ctx context.Context, team *entities.Team) error {
 	result := s.db.WithContext(ctx).Updates(team)
+	if result.Error != nil {
+		return result.Error
+	}
+	if result.RowsAffected == 0 {
+		return ErrNotFound
+	}
+
+	return nil
+}
+
+func (s *RepositoryImpl) Delete(ctx context.Context, id uint) error {
+	result := s.db.WithContext(ctx).Delete(&entities.Team{}, id)
 	if result.Error != nil {
 		return result.Error
 	}

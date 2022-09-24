@@ -17,9 +17,9 @@ var (
 type Repository interface {
 	GetByID(ctx context.Context, id uint) (*entities.User, error)
 	GetByEmail(ctx context.Context, email string) (*entities.User, error)
-	GetUsersByTeamID(ctx context.Context, teamID uint) (*[]entities.User, error)
 	Create(ctx context.Context, user *entities.User) error
 	Update(ctx context.Context, user *entities.User) error
+	Delete(ctx context.Context, id uint) error
 }
 
 type RepositoryImpl struct {
@@ -56,12 +56,6 @@ func (s *RepositoryImpl) GetByEmail(ctx context.Context, email string) (*entitie
 	return &user, nil
 }
 
-func (s *RepositoryImpl) GetUsersByTeamID(ctx context.Context, teamID uint) (*[]entities.User, error) {
-	// TODO
-
-	return nil, nil
-}
-
 func (s *RepositoryImpl) Create(ctx context.Context, user *entities.User) error {
 	if err := s.db.WithContext(ctx).Create(user).Error; err != nil {
 		if errors.As(err, &postgres.ErrDuplicateEntry) {
@@ -76,6 +70,18 @@ func (s *RepositoryImpl) Create(ctx context.Context, user *entities.User) error 
 
 func (s *RepositoryImpl) Update(ctx context.Context, user *entities.User) error {
 	result := s.db.WithContext(ctx).Updates(user)
+	if result.Error != nil {
+		return result.Error
+	}
+	if result.RowsAffected == 0 {
+		return ErrNotFound
+	}
+
+	return nil
+}
+
+func (s *RepositoryImpl) Delete(ctx context.Context, id uint) error {
+	result := s.db.WithContext(ctx).Delete(&entities.User{}, id)
 	if result.Error != nil {
 		return result.Error
 	}

@@ -94,7 +94,7 @@ func (h *Handlers) GetTeamUsers(ctx handlers.AuthenticatedContext) error {
 		return echo.ErrBadRequest
 	}
 
-	users, err := h.UserService.GetByTeamID(ctx.Request().Context(), req.TeamID)
+	users, err := h.TeamService.GetUsersByID(ctx.Request().Context(), req.TeamID)
 	if err != nil {
 		ctx.Log.WithError(err).Debug("failed to get users")
 

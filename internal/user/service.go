@@ -9,9 +9,9 @@ import (
 type Service interface {
 	GetByID(ctx context.Context, id uint) (*entities.User, error)
 	GetByEmail(ctx context.Context, email string) (*entities.User, error)
-	GetByTeamID(ctx context.Context, teamID uint) (*[]entities.User, error)
 	Create(ctx context.Context, user *entities.User) error
 	Update(ctx context.Context, user *entities.User) error
+	Delete(ctx context.Context, id uint) error
 }
 
 type ServiceImpl struct {
@@ -32,14 +32,14 @@ func (s *ServiceImpl) GetByEmail(ctx context.Context, email string) (*entities.U
 	return s.repository.GetByEmail(ctx, email)
 }
 
-func (s *ServiceImpl) GetByTeamID(ctx context.Context, teamID uint) (*[]entities.User, error) {
-	return s.repository.GetUsersByTeamID(ctx, teamID)
-}
-
 func (s *ServiceImpl) Create(ctx context.Context, user *entities.User) error {
 	return s.repository.Create(ctx, user)
 }
 
 func (s *ServiceImpl) Update(ctx context.Context, user *entities.User) error {
 	return s.repository.Update(ctx, user)
+}
+
+func (s *ServiceImpl) Delete(ctx context.Context, id uint) error {
+	return s.repository.Delete(ctx, id)
 }

@@ -34,6 +34,7 @@ func Register(
 	}
 
 	AuthGuard := mw.AuthGuardFactory(logger, authenticationService)
+	CurrentUserGuard := mw.CurrentUSerGuardFactory(logger)
 	TeamGuard := mw.TeamGuardFactory(logger)
 	AllowedRoles := mw.RoleGuardFactory(logger)
 
@@ -51,10 +52,12 @@ func Register(
 	usersGroup := e.Group(
 		"/users/:userId",
 		AuthGuard(),
+		CurrentUserGuard(),
 	)
 
 	usersGroup.GET("", AuthHandler(h.GetUser))
 	usersGroup.PUT("", AuthHandler(h.PutUser))
+	usersGroup.DELETE("", AuthHandler(h.DeleteUser))
 
 	// Teams
 

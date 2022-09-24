@@ -16,6 +16,7 @@ const (
 	UserRoleMember UserRole = "member"
 )
 
+// Allows only the allowed roles to access the route
 func RoleGuardFactory(logger *logrus.Entry) func(allowedRoles ...UserRole) func(next echo.HandlerFunc) echo.HandlerFunc {
 	l := logrus.WithField("middleware", "role_guard")
 
