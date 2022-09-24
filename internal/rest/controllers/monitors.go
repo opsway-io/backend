@@ -12,7 +12,7 @@ import (
 )
 
 type GetMonitorsRequest struct {
-	TeamID int `param:"team_id" validate:"required,numeric,gte=0"`
+	TeamID int `param:"teamId" validate:"required,numeric,gte=0"`
 	Offset int `query:"offset" validate:"numeric,min=0"`
 	Limit  int `query:"limit" validate:"numeric,min=0,max=100" default:"100"`
 }
@@ -42,8 +42,8 @@ func (h *Handlers) GetMonitors(ctx handlers.AuthenticatedContext) error {
 }
 
 type GetMonitorRequest struct {
-	TeamID    int `param:"team_id" validate:"required,numeric,gte=0"`
-	MonitorID int `param:"monitor_id" validate:"required,numeric,gte=0"`
+	TeamID    int `param:"teamId" validate:"required,numeric,gte=0"`
+	MonitorID int `param:"monitorId" validate:"required,numeric,gte=0"`
 }
 
 type GetMonitorResponse struct {
@@ -75,7 +75,7 @@ func (h *Handlers) GetMonitor(ctx handlers.AuthenticatedContext) error {
 }
 
 type PostMonitorRequest struct {
-	TeamID int `param:"team_id" validate:"required,numeric,gte=0"`
+	TeamID int `param:"teamId" validate:"required,numeric,gte=0"`
 	models.Monitor
 }
 
@@ -104,8 +104,8 @@ func (h *Handlers) PostMonitor(ctx handlers.AuthenticatedContext) error {
 }
 
 type PutMonitorRequest struct {
-	TeamID    int `param:"team_id" validate:"required,numeric,gte=0"`
-	MonitorID int `param:"monitor_id" validate:"required,numeric,gte=0"`
+	TeamID    int `param:"teamId" validate:"required,numeric,gte=0"`
+	MonitorID int `param:"monitorId" validate:"required,numeric,gte=0"`
 	models.Monitor
 }
 
@@ -141,8 +141,8 @@ func (h *Handlers) PutMonitor(ctx handlers.AuthenticatedContext) error {
 }
 
 type DeleteMonitorRequest struct {
-	TeamID    int `param:"team_id" validate:"required,numeric,gte=0"`
-	MonitorID int `param:"monitor_id" validate:"required,numeric,gte=0"`
+	TeamID    int `param:"teamId" validate:"required,numeric,gte=0"`
+	MonitorID int `param:"monitorId" validate:"required,numeric,gte=0"`
 }
 
 type DeleteMonitorResponse struct {
