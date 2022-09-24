@@ -28,7 +28,7 @@ func CurrentUSerGuardFactory(logger *logrus.Entry) func() func(next echo.Handler
 
 				userIdParam := c.Param("userId")
 				if userIdParam == "" {
-					l.Debug("missing team_id param")
+					l.Debug("missing userId param")
 
 					return echo.ErrForbidden
 				}

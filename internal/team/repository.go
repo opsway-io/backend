@@ -11,12 +11,14 @@ import (
 
 var (
 	ErrNotFound          = errors.New("team not found")
+	ErrUserNotFound      = errors.New("team user not found")
 	ErrNameAlreadyExists = errors.New("team name already exists")
 )
 
 type Repository interface {
 	GetByID(ctx context.Context, id uint) (*entities.Team, error)
 	GetUsersByID(ctx context.Context, id uint) (*[]entities.User, error)
+	GetUserRole(ctx context.Context, teamID, userID uint) (*entities.Role, error)
 	Create(ctx context.Context, team *entities.Team) error
 	Update(ctx context.Context, team *entities.Team) error
 	Delete(ctx context.Context, id uint) error
@@ -96,4 +98,22 @@ func (s *RepositoryImpl) Delete(ctx context.Context, id uint) error {
 	}
 
 	return nil
+}
+
+func (s *RepositoryImpl) GetUserRole(ctx context.Context, teamID, userID uint) (*entities.Role, error) {
+	var userRole entities.UserRole
+	if err := s.db.WithContext(ctx).Where(
+		entities.UserRole{
+			TeamID: teamID,
+			UserID: userID,
+		},
+	).First(&userRole).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, ErrUserNotFound
+		}
+
+		return nil, err
+	}
+
+	return &userRole.Role, nil
 }
