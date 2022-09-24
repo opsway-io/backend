@@ -18,7 +18,7 @@ var (
 type Repository interface {
 	GetByID(ctx context.Context, id uint) (*entities.Team, error)
 	GetUsersByID(ctx context.Context, id uint) (*[]entities.User, error)
-	GetUserRole(ctx context.Context, teamID, userID uint) (*entities.Role, error)
+	GetUserRole(ctx context.Context, teamID, userID uint) (*entities.UserRole, error)
 	Create(ctx context.Context, team *entities.Team) error
 	Update(ctx context.Context, team *entities.Team) error
 	Delete(ctx context.Context, id uint) error
@@ -100,7 +100,7 @@ func (s *RepositoryImpl) Delete(ctx context.Context, id uint) error {
 	return nil
 }
 
-func (s *RepositoryImpl) GetUserRole(ctx context.Context, teamID, userID uint) (*entities.Role, error) {
+func (s *RepositoryImpl) GetUserRole(ctx context.Context, teamID, userID uint) (*entities.UserRole, error) {
 	var userRole entities.UserRole
 	if err := s.db.WithContext(ctx).Where(
 		entities.UserRole{
@@ -115,5 +115,5 @@ func (s *RepositoryImpl) GetUserRole(ctx context.Context, teamID, userID uint) (
 		return nil, err
 	}
 
-	return &userRole.Role, nil
+	return &userRole, nil
 }

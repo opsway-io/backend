@@ -9,7 +9,7 @@ import (
 type Service interface {
 	GetByID(ctx context.Context, id uint) (*entities.Team, error)
 	GetUsersByID(ctx context.Context, id uint) (*[]entities.User, error)
-	GetUserRole(ctx context.Context, teamID, userID uint) (*entities.Role, error)
+	GetUserRole(ctx context.Context, teamID, userID uint) (*entities.UserRole, error)
 	Create(ctx context.Context, team *entities.Team) error
 	Update(ctx context.Context, team *entities.Team) error
 	Delete(ctx context.Context, id uint) error
@@ -45,6 +45,6 @@ func (s *ServiceImpl) GetUsersByID(ctx context.Context, id uint) (*[]entities.Us
 	return s.repository.GetUsersByID(ctx, id)
 }
 
-func (s *ServiceImpl) GetUserRole(ctx context.Context, teamID, userID uint) (*entities.Role, error) {
+func (s *ServiceImpl) GetUserRole(ctx context.Context, teamID, userID uint) (*entities.UserRole, error) {
 	return s.repository.GetUserRole(ctx, teamID, userID)
 }

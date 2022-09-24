@@ -1,6 +1,8 @@
 package middleware
 
 import (
+	"strconv"
+
 	"github.com/labstack/echo/v4"
 	"github.com/opsway-io/backend/internal/authentication"
 	"github.com/opsway-io/backend/internal/team"
@@ -21,21 +23,42 @@ func TeamGuardFactory(logger *logrus.Entry, teamService team.Service) func() fun
 					return echo.ErrForbidden
 				}
 
-				UserID := claims.Subject
-				if UserID == "" {
+				userIDStr := claims.Subject
+				if userIDStr == "" {
 					l.Debug("missing subject in JWT")
 
 					return echo.ErrForbidden
 				}
 
-				teamIdParam := c.Param("teamId")
-				if teamIdParam == "" {
+				userID, err := strconv.ParseUint(userIDStr, 10, 64)
+				if err != nil {
+					l.WithError(err).Debug("failed to parse user ID")
+
+					return echo.ErrForbidden
+				}
+
+				teamIDStr := c.Param("teamId")
+				if teamIDStr == "" {
 					l.Debug("missing team_id param")
 
 					return echo.ErrForbidden
 				}
 
-				l.Debug("Team guard TODO: implement")
+				teamID, err := strconv.ParseUint(teamIDStr, 10, 64)
+				if err != nil {
+					l.WithError(err).Debug("failed to parse team ID")
+
+					return echo.ErrForbidden
+				}
+
+				userRole, err := teamService.GetUserRole(c.Request().Context(), uint(teamID), uint(userID))
+				if err != nil {
+					l.WithError(err).Debug("failed to get user role")
+
+					return echo.ErrForbidden
+				}
+
+				c.Set("team_role", userRole)
 
 				return next(c)
 			}
