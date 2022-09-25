@@ -90,7 +90,7 @@ func (s *ServiceImpl) VerifyRefreshToken(tokenString string) (bool, *RefreshClai
 func (s *ServiceImpl) newAccessTokenClaims(subject string) Claims {
 	return Claims{
 		StandardClaims: jwt.StandardClaims{
-			ExpiresAt: time.Now().Add(time.Second * 10).Unix(),
+			ExpiresAt: time.Now().Add(s.Config.ExpiresIn).Unix(),
 			IssuedAt:  time.Now().Unix(),
 			NotBefore: time.Now().Unix(),
 			Issuer:    s.Config.Issuer,
