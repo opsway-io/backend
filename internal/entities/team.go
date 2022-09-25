@@ -35,7 +35,7 @@ type Team struct {
 	DisplayName string `gorm:"index"`
 	Logo        string
 	Users       []User        `gorm:"many2many:team_users"`
-	UserRoles   []UserRole    `gorm:"constraint:OnDelete:CASCADE"`
+	Roles       []TeamRole    `gorm:"constraint:OnDelete:CASCADE"`
 	Monitors    []Monitor     `gorm:"constraint:OnDelete:CASCADE"`
 	Maintenance []Maintenance `gorm:"constraint:OnDelete:CASCADE"`
 	Incidents   []Incident    `gorm:"constraint:OnDelete:CASCADE"`
@@ -68,4 +68,17 @@ func (t *Team) BeforeUpdate(tx *gorm.DB) (err error) {
 
 func checkTeamNameFormat(name string) bool {
 	return NameFormatRegex.MatchString(name)
+}
+
+type Role string
+
+const (
+	TeamRoleAdmin  Role = "admin"
+	TeamRoleMember Role = "member"
+)
+
+type TeamRole struct {
+	UserID uint `gorm:"primaryKey"`
+	TeamID uint `gorm:"primaryKey"`
+	Role   Role
 }

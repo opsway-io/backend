@@ -48,6 +48,7 @@ func runAPI(cmd *cobra.Command, args []string) {
 	db.AutoMigrate(
 		entities.Team{},
 		entities.User{},
+		entities.TeamRole{},
 		entities.Monitor{},
 		entities.MonitorSettings{},
 		entities.Maintenance{},
@@ -68,26 +69,32 @@ func runAPI(cmd *cobra.Command, args []string) {
 	monitorService := monitor.NewService(db)
 
 	// TODO: Remove
-	t := entities.Team{
-		Name: "opsway",
-	}
-	db.Create(&t)
 
 	u := &entities.User{
 		Name:        "Douglas Adams",
 		DisplayName: pointer.String("Ford Prefect"),
 		Email:       "admin@opsway.io",
-		Teams: []entities.Team{
+	}
+	u.SetPassword("pass")
+	db.Create(u)
+
+	t := entities.Team{
+		Name: "opsway",
+		Users: []entities.User{
 			{
-				ID: 1,
+				ID: u.ID,
+			},
+		},
+		Roles: []entities.TeamRole{
+			{
+				UserID: u.ID,
+				Role:   entities.TeamRoleAdmin,
 			},
 		},
 	}
-	u.SetPassword("pass")
+	// omit user creation
+	db.Omit("Users.*").Create(&t)
 
-	// This creates the association to the team
-	// but not the team itself.
-	db.Omit("Teams.*").Create(u)
 	// TODO: Remove
 
 	srv, err := rest.NewServer(

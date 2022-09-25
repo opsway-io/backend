@@ -43,9 +43,10 @@ func Register(
 
 	// Authentication
 
-	authGroup := e.Group("/authentication")
+	authGroup := e.Group("/auth")
 
 	authGroup.POST("/login", BaseHandler(h.PostLogin))
+	authGroup.POST("/refresh", BaseHandler(h.PostRefreshToken))
 
 	// Users
 
