@@ -14,6 +14,7 @@ require (
 	github.com/jeremywohl/flatten v1.0.1
 	github.com/labstack/echo/v4 v4.7.2
 	github.com/lib/pq v1.10.2
+	github.com/mcuadros/go-defaults v1.2.0
 	github.com/opsway-io/go-httpstat v1.0.0
 	github.com/pkg/errors v0.9.1
 	github.com/sirupsen/logrus v1.9.0

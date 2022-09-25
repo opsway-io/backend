@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"github.com/mcuadros/go-defaults"
 	"github.com/opsway-io/backend/internal/authentication"
 	"github.com/opsway-io/backend/internal/connectors/asynq"
 	"github.com/opsway-io/backend/internal/connectors/influxdb"
@@ -59,6 +60,8 @@ func initConfig() {
 
 func loadConfig() (*Config, error) {
 	var config Config
+	defaults.SetDefaults(&config)
+
 	if err := viper.Unmarshal(&config); err != nil {
 		return nil, err
 	}

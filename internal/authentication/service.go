@@ -50,9 +50,7 @@ func (s *ServiceImpl) Refresh(refreshToken string) (newAccessToken string, newRe
 		return "", "", errors.New("invalid token")
 	}
 
-	tokenClaims := s.newAccessTokenClaims(claims.Subject)
-
-	return s.generateTokenPair(tokenClaims.Subject)
+	return s.generateTokenPair(claims.Subject)
 }
 
 func (s *ServiceImpl) VerifyAccessToken(tokenString string) (bool, *Claims, error) {
