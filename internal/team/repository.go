@@ -17,7 +17,7 @@ var (
 
 type Repository interface {
 	GetByID(ctx context.Context, id uint) (*entities.Team, error)
-	GetUsersByID(ctx context.Context, id uint) (*[]entities.User, error)
+	GetUsersByID(ctx context.Context, id uint) (*[]TeamUser, error)
 	GetUserRole(ctx context.Context, teamID, userID uint) (*entities.TeamRole, error)
 	Create(ctx context.Context, team *entities.Team) error
 	Update(ctx context.Context, team *entities.Team) error
@@ -45,21 +45,21 @@ func (s *RepositoryImpl) GetByID(ctx context.Context, id uint) (*entities.Team, 
 	return &team, nil
 }
 
-func (s *RepositoryImpl) GetUsersByID(ctx context.Context, id uint) (*[]entities.User, error) {
-	var users []entities.User
-	if err := s.db.WithContext(
-		ctx,
-	).Model(
-		&entities.Team{
-			ID: id,
-		},
-	).Association(
-		"Users",
-	).Find(
-		&users,
-	); err != nil {
-		return nil, err
-	}
+type TeamUser struct {
+	entities.User
+	Role entities.Role
+}
+
+func (s *RepositoryImpl) GetUsersByID(ctx context.Context, id uint) (*[]TeamUser, error) {
+	var users []TeamUser
+
+	s.db.WithContext(ctx).
+		Select("u.id, u.name, u.display_name, u.email, tr.role").
+		Table("team_users as tu").
+		Joins("INNER JOIN team_roles AS tr ON tr.user_id = tu.user_id").
+		Joins("INNER JOIN users as u ON u.id = tu.user_id").
+		Where("tu.team_id = ?", id).
+		Find(&users)
 
 	return &users, nil
 }
