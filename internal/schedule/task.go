@@ -1,7 +1,9 @@
 package scheduler
 
+type TaskType string
+
 const (
-	ProbeTask = "probe:http"
+	ProbeTask TaskType = "probe:http"
 )
 
 type TaskPayload struct {

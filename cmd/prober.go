@@ -37,11 +37,10 @@ func runProber(cmd *cobra.Command, args []string) {
 	l.WithField("addr", conf.Asynq.Addr).Info("connecting to asynq")
 	scheduleService := scheduler.New(nil, asynqClient.NewServer(ctx, conf.Asynq))
 
-	handlers := map[string]func(context.Context, *asynq.Task) error{}
+	handlers := map[scheduler.TaskType]func(context.Context, *asynq.Task) error{}
 	handlers[scheduler.ProbeTask] = probe
 
 	scheduleService.Consume(ctx, handlers)
-
 }
 
 func probe(ctx context.Context, t *asynq.Task) error {
