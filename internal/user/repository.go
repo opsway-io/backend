@@ -15,8 +15,8 @@ var (
 )
 
 type Repository interface {
-	GetByID(ctx context.Context, id uint) (*entities.User, error)
-	GetByEmail(ctx context.Context, email string) (*entities.User, error)
+	GetUserAndTeamsByUserID(ctx context.Context, userID uint) (*entities.User, error)
+	GetUserAndTeamsByEmailAddress(ctx context.Context, email string) (*entities.User, error)
 	Create(ctx context.Context, user *entities.User) error
 	Update(ctx context.Context, user *entities.User) error
 	Delete(ctx context.Context, id uint) error
@@ -30,9 +30,9 @@ func NewRepository(db *gorm.DB) Repository {
 	return &RepositoryImpl{db: db}
 }
 
-func (s *RepositoryImpl) GetByID(ctx context.Context, id uint) (*entities.User, error) {
+func (s *RepositoryImpl) GetUserAndTeamsByUserID(ctx context.Context, userID uint) (*entities.User, error) {
 	var user entities.User
-	if err := s.db.WithContext(ctx).First(&user, id).Error; err != nil {
+	if err := s.db.WithContext(ctx).Preload("Teams").Where(entities.User{ID: userID}).First(&user).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, ErrNotFound
 		}
@@ -43,9 +43,9 @@ func (s *RepositoryImpl) GetByID(ctx context.Context, id uint) (*entities.User, 
 	return &user, nil
 }
 
-func (s *RepositoryImpl) GetByEmail(ctx context.Context, email string) (*entities.User, error) {
+func (s *RepositoryImpl) GetUserAndTeamsByEmailAddress(ctx context.Context, email string) (*entities.User, error) {
 	var user entities.User
-	if err := s.db.WithContext(ctx).Where(entities.User{Email: email}).First(&user).Error; err != nil {
+	if err := s.db.WithContext(ctx).Preload("Teams").Where(entities.User{Email: email}).First(&user).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, ErrNotFound
 		}

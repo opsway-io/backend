@@ -69,7 +69,6 @@ func Register(
 	)
 
 	teamsGroup.GET("", AuthHandler(h.GetTeam))
-	teamsGroup.PUT("", AuthHandler(h.PutTeam), AllowedRoles(mw.UserRoleAdmin))
 
 	teamsGroup.GET("/users", AuthHandler(h.GetTeamUsers))
 
@@ -82,9 +81,6 @@ func Register(
 	)
 
 	monitorsGroup.GET("", AuthHandler(h.GetMonitors))
-	monitorsGroup.POST("", AuthHandler(h.PostMonitor), AllowedRoles(mw.UserRoleAdmin))
-
 	monitorsGroup.GET("/:monitorId", AuthHandler(h.GetMonitor))
-	monitorsGroup.PUT("/:monitorId", AuthHandler(h.PutMonitor), AllowedRoles(mw.UserRoleAdmin))
 	monitorsGroup.DELETE("/:monitorId", AuthHandler(h.DeleteMonitor), AllowedRoles(mw.UserRoleAdmin))
 }

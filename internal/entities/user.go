@@ -10,16 +10,17 @@ import (
 
 type User struct {
 	ID                  uint
-	Name                string `gorm:"not null"`
-	DisplayName         *string
-	Email               string `gorm:"uniqueIndex"`
+	Name                string  `gorm:"index;not null"`
+	DisplayName         *string `gorm:"index"`
+	Email               string  `gorm:"uniqueIndex"`
+	Avatar              *string
 	PasswordHash        *string
-	Roles               []TeamRole `gorm:"constraint:OnDelete:CASCADE"`
-	Teams               []Team     `gorm:"many2many:team_users;constraint:OnDelete:CASCADE"`
-	MaintenanceComments []MaintenanceComment
-	IncidentComments    []IncidentComment
-	CreatedAt           time.Time `gorm:"index"`
-	UpdatedAt           time.Time `gorm:"index"`
+	Roles               []TeamRole           `gorm:"constraint:OnDelete:CASCADE"`
+	Teams               []Team               `gorm:"many2many:team_users;constraint:OnDelete:CASCADE"`
+	MaintenanceComments []MaintenanceComment `gorm:"constraint:OnDelete:CASCADE"`
+	IncidentComments    []IncidentComment    `gorm:"constraint:OnDelete:CASCADE"`
+	CreatedAt           time.Time            `gorm:"index"`
+	UpdatedAt           time.Time            `gorm:"index"`
 }
 
 func (u *User) SetPassword(password string) error {

@@ -7,8 +7,8 @@ import (
 )
 
 type Service interface {
-	GetByID(ctx context.Context, id uint) (*entities.User, error)
-	GetByEmail(ctx context.Context, email string) (*entities.User, error)
+	GetUserAndTeamsByUserID(ctx context.Context, userId uint) (*entities.User, error)
+	GetUserAndTeamsByEmailAddress(ctx context.Context, email string) (*entities.User, error)
 	Create(ctx context.Context, user *entities.User) error
 	Update(ctx context.Context, user *entities.User) error
 	Delete(ctx context.Context, id uint) error
@@ -24,12 +24,12 @@ func NewService(repository Repository) Service {
 	}
 }
 
-func (s *ServiceImpl) GetByID(ctx context.Context, id uint) (*entities.User, error) {
-	return s.repository.GetByID(ctx, id)
+func (s *ServiceImpl) GetUserAndTeamsByUserID(ctx context.Context, userId uint) (*entities.User, error) {
+	return s.repository.GetUserAndTeamsByUserID(ctx, userId)
 }
 
-func (s *ServiceImpl) GetByEmail(ctx context.Context, email string) (*entities.User, error) {
-	return s.repository.GetByEmail(ctx, email)
+func (s *ServiceImpl) GetUserAndTeamsByEmailAddress(ctx context.Context, email string) (*entities.User, error) {
+	return s.repository.GetUserAndTeamsByEmailAddress(ctx, email)
 }
 
 func (s *ServiceImpl) Create(ctx context.Context, user *entities.User) error {

@@ -5,11 +5,9 @@ import (
 
 	"github.com/labstack/echo/v4"
 	"github.com/opsway-io/backend/internal/entities"
-	"github.com/opsway-io/backend/internal/rest/handlers"
+	hs "github.com/opsway-io/backend/internal/rest/handlers"
 	"github.com/opsway-io/backend/internal/rest/helpers"
-	"github.com/opsway-io/backend/internal/rest/models"
 	"github.com/opsway-io/backend/internal/team"
-	"github.com/pkg/errors"
 )
 
 type GetTeamRequest struct {
@@ -17,65 +15,20 @@ type GetTeamRequest struct {
 }
 
 type GetTeamResponse struct {
-	models.Team
+	// TODO
 }
 
-func (h *Handlers) GetTeam(ctx handlers.AuthenticatedContext) error {
-	req, err := helpers.Bind[GetTeamRequest](ctx)
+func (h *Handlers) GetTeam(ctx hs.AuthenticatedContext) error {
+	_, err := helpers.Bind[GetTeamRequest](ctx)
 	if err != nil {
 		ctx.Log.WithError(err).Debug("failed to bind GetTeamRequest")
 
 		return echo.ErrBadRequest
 	}
 
-	team, err := h.TeamService.GetByID(ctx.Request().Context(), req.TeamID)
-	if err != nil {
-		ctx.Log.WithError(err).Debug("failed to get team")
+	// TODO
 
-		return echo.ErrInternalServerError
-	}
-
-	return ctx.JSON(http.StatusOK, models.TeamToResponse(*team))
-}
-
-type PutTeamRequest struct {
-	TeamID uint `param:"teamId" validate:"required,numeric,gt=0"`
-	models.Team
-}
-
-type PutTeamResponse struct {
-	models.Team
-}
-
-func (h *Handlers) PutTeam(ctx handlers.AuthenticatedContext) error {
-	req, err := helpers.Bind[PutTeamRequest](ctx)
-	if err != nil {
-		ctx.Log.WithError(err).Debug("failed to bind PutTeamRequest")
-
-		return echo.ErrBadRequest
-	}
-
-	t := models.RequestToTeam(req.Team)
-	t.ID = req.TeamID
-
-	if err := h.TeamService.Update(ctx.Request().Context(), &t); err != nil {
-		if errors.Is(err, team.ErrNotFound) {
-			ctx.Log.WithError(err).Debug("team not found")
-
-			return echo.ErrNotFound
-		}
-		if errors.Is(err, entities.ErrIllegalTeamNameFormat) {
-			ctx.Log.WithError(err).Debug("illegal team name format")
-
-			return echo.ErrBadRequest
-		}
-
-		ctx.Log.WithError(err).Debug("failed to update team")
-
-		return echo.ErrInternalServerError
-	}
-
-	return ctx.JSON(http.StatusOK, models.TeamToResponse(t))
+	return ctx.JSON(http.StatusNotImplemented, nil)
 }
 
 type GetTeamUsersRequest struct {
@@ -88,14 +41,14 @@ type GetTeamUsersResponse struct {
 
 type GetTeamUsersResponseUser struct {
 	ID          uint          `json:"id"`
-	Email       string        `json:"email"`
-	DisplayName string        `json:"displayName"`
 	Name        string        `json:"name"`
-	Picture     string        `json:"picture"`
+	DisplayName *string       `json:"displayName"`
+	Email       string        `json:"email"`
+	AvatarURL   *string       `json:"avatarUrl"`
 	Role        entities.Role `json:"role"`
 }
 
-func (h *Handlers) GetTeamUsers(ctx handlers.AuthenticatedContext) error {
+func (h *Handlers) GetTeamUsers(ctx hs.AuthenticatedContext) error {
 	req, err := helpers.Bind[GetTeamUsersRequest](ctx)
 	if err != nil {
 		ctx.Log.WithError(err).Debug("failed to bind GetTeamUsersRequest")
@@ -120,10 +73,10 @@ func newGetTeamUsersResponse(users *[]team.TeamUser) GetTeamUsersResponse {
 		res[i] = GetTeamUsersResponseUser{
 			ID:          u.ID,
 			Email:       u.Email,
-			DisplayName: *u.DisplayName,
+			DisplayName: u.DisplayName,
 			Name:        u.Name,
-			// Picture:     u.Picture,
-			Role: u.Role,
+			AvatarURL:   u.Avatar,
+			Role:        u.Role,
 		}
 	}
 

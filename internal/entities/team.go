@@ -31,9 +31,9 @@ var (
 
 type Team struct {
 	ID          uint
-	Name        string `gorm:"uniqueIndex;not null"`
-	DisplayName string `gorm:"index"`
-	Logo        string
+	Name        string  `gorm:"uniqueIndex;not null"`
+	DisplayName *string `gorm:"index"`
+	Avatar      *string
 	Users       []User        `gorm:"many2many:team_users"`
 	Roles       []TeamRole    `gorm:"constraint:OnDelete:CASCADE"`
 	Monitors    []Monitor     `gorm:"constraint:OnDelete:CASCADE"`

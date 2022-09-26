@@ -2,11 +2,12 @@ package controllers
 
 import (
 	"net/http"
+	"time"
 
 	"github.com/labstack/echo/v4"
+	"github.com/opsway-io/backend/internal/entities"
 	hs "github.com/opsway-io/backend/internal/rest/handlers"
 	"github.com/opsway-io/backend/internal/rest/helpers"
-	"github.com/opsway-io/backend/internal/rest/models"
 )
 
 type PostLoginRequest struct {
@@ -15,9 +16,27 @@ type PostLoginRequest struct {
 }
 
 type PostLoginResponse struct {
-	AccessToken  string      `json:"accessToken"`
-	RefreshToken string      `json:"refreshToken"`
-	User         models.User `json:"user"`
+	AccessToken  string                `json:"accessToken"`
+	RefreshToken string                `json:"refreshToken"`
+	User         PostLoginResponseUser `json:"user"`
+}
+
+type PostLoginResponseUser struct {
+	ID          uint                    `json:"id"`
+	Name        string                  `json:"name"`
+	DisplayName *string                 `json:"displayName"`
+	Email       string                  `json:"email"`
+	AvatarURL   *string                 `json:"avatarUrl"`
+	Teams       []PostLoginResponseTeam `json:"teams"`
+	CreatedAt   time.Time               `json:"createdAt"`
+	UpdatedAt   time.Time               `json:"updatedAt"`
+}
+
+type PostLoginResponseTeam struct {
+	ID          uint    `json:"id"`
+	Name        string  `json:"name"`
+	DisplayName *string `json:"displayName"`
+	AvatarURL   *string `json:"avatarUrl"`
 }
 
 func (h *Handlers) PostLogin(ctx hs.BaseContext) error {
@@ -28,7 +47,7 @@ func (h *Handlers) PostLogin(ctx hs.BaseContext) error {
 		return echo.ErrBadRequest
 	}
 
-	user, err := h.UserService.GetByEmail(ctx.Request().Context(), req.Email)
+	user, err := h.UserService.GetUserAndTeamsByEmailAddress(ctx.Request().Context(), req.Email)
 	if err != nil {
 		ctx.Log.WithError(err).Debug("failed to get user")
 
@@ -52,11 +71,34 @@ func (h *Handlers) PostLogin(ctx hs.BaseContext) error {
 
 	ctx.Log.Info("user authenticated")
 
-	return ctx.JSON(http.StatusOK, PostLoginResponse{
+	return ctx.JSON(http.StatusOK, newPostLoginResponse(user, accessToken, refreshToken))
+}
+
+func newPostLoginResponse(user *entities.User, accessToken, refreshToken string) PostLoginResponse {
+	teams := make([]PostLoginResponseTeam, len(user.Teams))
+	for i, team := range user.Teams {
+		teams[i] = PostLoginResponseTeam{
+			ID:          team.ID,
+			Name:        team.Name,
+			DisplayName: team.DisplayName,
+			AvatarURL:   team.Avatar,
+		}
+	}
+
+	return PostLoginResponse{
 		AccessToken:  accessToken,
 		RefreshToken: refreshToken,
-		User:         models.UserToResponse(*user),
-	})
+		User: PostLoginResponseUser{
+			ID:          user.ID,
+			Name:        user.Name,
+			DisplayName: user.DisplayName,
+			Email:       user.Email,
+			AvatarURL:   user.Avatar,
+			Teams:       teams,
+			CreatedAt:   user.CreatedAt,
+			UpdatedAt:   user.UpdatedAt,
+		},
+	}
 }
 
 type PostRefreshTokenRequest struct {
