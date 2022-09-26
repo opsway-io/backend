@@ -35,7 +35,7 @@ func (rs *AsynqSchedule) Add(ctx context.Context, internval time.Duration, typen
 
 	task := asynq.NewTask(typename, payload)
 
-	return rs.Scheduler.Register(fmt.Sprintf("@every %f", internval.Seconds()), task)
+	return rs.Scheduler.Register(fmt.Sprintf("@every %s", internval.String()), task)
 }
 
 func (rs *AsynqSchedule) Remove(ctx context.Context, entryID string) (err error) {
@@ -45,6 +45,7 @@ func (rs *AsynqSchedule) Remove(ctx context.Context, entryID string) (err error)
 func (rs *AsynqSchedule) Consume(ctx context.Context, handlers map[string]func(context.Context, *asynq.Task) error) error {
 	mux := asynq.NewServeMux()
 	for pattern, handler := range handlers {
+		logrus.Info("Handling events of type", pattern)
 		mux.HandleFunc(pattern, handler)
 	}
 

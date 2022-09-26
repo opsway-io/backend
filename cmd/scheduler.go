@@ -35,8 +35,14 @@ func runScheduler(cmd *cobra.Command, args []string) {
 	l.WithField("addr", conf.Asynq.Addr).Info("connecting to asynq")
 	scheduleService := scheduler.New(asynqClient.NewScheduler(ctx, conf.Asynq), nil)
 
-	scheduleService.Add(ctx, time.Second*10, scheduler.ProbeTask, scheduler.TaskPayload{ID: 1, Payload: map[string]string{"URL": "opsway.io"}})
-	scheduleService.Add(ctx, time.Second*20, scheduler.ProbeTask, scheduler.TaskPayload{ID: 2, Payload: map[string]string{"URL": "google.com"}})
+	_, err = scheduleService.Add(ctx, time.Second*10, scheduler.ProbeTask, scheduler.TaskPayload{ID: 1, Payload: map[string]string{"URL": "opsway.io"}})
+	if err != nil {
+		l.Fatal(err)
+	}
+	_, err = scheduleService.Add(ctx, time.Second*20, scheduler.ProbeTask, scheduler.TaskPayload{ID: 2, Payload: map[string]string{"URL": "google.com"}})
+	if err != nil {
+		l.Fatal(err)
+	}
 
 	if err := scheduleService.Scheduler.Run(); err != nil {
 		logrus.Fatalf("could not run server: %v", err)
