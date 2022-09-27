@@ -55,31 +55,3 @@ func runProber(cmd *cobra.Command, args []string) {
 
 	scheduleService.Consume(ctx, handlers)
 }
-
-// func consume(ctx context.Context, scheduler scheduler.Schedule, rs result.Service, stream string, group string) {
-// 	uniqueID := xid.New().String()
-
-// 	for {
-// 		entries, err := scheduler.Consume(ctx, stream, group, uniqueID)
-// 		if err != nil {
-// 			logrus.WithError(err).Fatal("failed to get stream result")
-// 		}
-
-// 		for i := 0; i < len(entries[0].Messages); i++ {
-// 			url := fmt.Sprint(entries[0].Messages[i].Values["url"])
-// 			orgId := fmt.Sprint(entries[0].Messages[i].Values["id"])
-
-// 			res, err := httpProbe.Probe(http.MethodGet, "http://"+url, nil, nil, time.Second*5)
-// 			if err != nil {
-// 				logrus.WithError(err).Fatal("error probing url")
-// 			}
-
-// 			err = scheduler.Ack(ctx, entries[0].Stream, group, entries[0].Messages[i].ID)
-// 			if err != nil {
-// 				logrus.WithError(err).Fatal("Error ack message")
-// 			}
-
-// 			rs.WriteResult(url, orgId, res)
-// 		}
-// 	}
-// }
