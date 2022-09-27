@@ -80,5 +80,5 @@ type TeamRole struct {
 }
 
 func (TeamRole) TableName() string {
-	return "teams_roles"
+	return "team_roles"
 }

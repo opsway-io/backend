@@ -6,6 +6,7 @@ import (
 	asynqClient "github.com/opsway-io/backend/internal/connectors/asynq"
 	"github.com/opsway-io/backend/internal/connectors/postgres"
 	"github.com/opsway-io/backend/internal/monitor"
+	schedule "github.com/opsway-io/backend/internal/schedule"
 	scheduler "github.com/opsway-io/backend/internal/schedule"
 	"github.com/sirupsen/logrus"
 
@@ -34,7 +35,7 @@ func runScheduler(cmd *cobra.Command, args []string) {
 	ctx := context.Background()
 
 	l.WithField("addr", conf.Asynq.Addr).Info("connecting to asynq")
-	scheduleService := scheduler.New(asynqClient.NewScheduler(ctx, conf.Asynq), nil)
+	scheduleService := schedule.NewAsynqSchedule(asynqClient.NewScheduler(ctx, conf.Asynq), nil)
 
 	db, err := postgres.NewClient(ctx, conf.Postgres)
 	if err != nil {
@@ -54,5 +55,4 @@ func runScheduler(cmd *cobra.Command, args []string) {
 	if err := scheduleService.Scheduler.Run(); err != nil {
 		logrus.Fatalf("could not run server: %v", err)
 	}
-
 }

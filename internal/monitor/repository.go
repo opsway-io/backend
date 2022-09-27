@@ -14,6 +14,8 @@ type Repository interface {
 	GetMonitors(ctx context.Context) (*[]entities.Monitor, error)
 	GetMonitorByTeamID(ctx context.Context, teamID uint, offset int, limit int) (*[]entities.Monitor, error)
 	GetMonitorByIDAndTeamID(ctx context.Context, teamID uint, monitorID uint) (*entities.Monitor, error)
+	GetMonitorAndSettingsByID(ctx context.Context, monitorID uint) (*entities.Monitor, error)
+	GetMonitorsAndSettingsByTeamID(ctx context.Context, teamID uint, offset int, limit int) (*[]entities.Monitor, error)
 	Create(ctx context.Context, monitor *entities.Monitor) error
 	Update(ctx context.Context, monitor *entities.Monitor) error
 	Delete(ctx context.Context, id int) error
@@ -70,6 +72,34 @@ func (r *RepositoryImpl) GetMonitorByIDAndTeamID(ctx context.Context, monitorID 
 	}
 
 	return &monitor, err
+}
+
+func (r *RepositoryImpl) GetMonitorAndSettingsByID(ctx context.Context, monitorID uint) (*entities.Monitor, error) {
+	var monitor entities.Monitor
+	err := r.db.WithContext(ctx).Preload("Settings").Where(entities.Monitor{
+		ID: monitorID,
+	}).First(&monitor).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, ErrNotFound
+	}
+
+	return &monitor, err
+}
+
+func (r *RepositoryImpl) GetMonitorsAndSettingsByTeamID(ctx context.Context, teamID uint, offset int, limit int) (*[]entities.Monitor, error) {
+	var monitors []entities.Monitor
+	err := r.db.WithContext(ctx).Offset(offset).Limit(limit).Preload("Settings").Where(entities.Monitor{
+		TeamID: teamID,
+	}).Find(&monitors).Error
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, nil
+		}
+
+		return nil, err
+	}
+
+	return &monitors, err
 }
 
 func (r *RepositoryImpl) Create(ctx context.Context, m *entities.Monitor) error {

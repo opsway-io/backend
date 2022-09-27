@@ -9,7 +9,7 @@ import (
 	"github.com/opsway-io/backend/internal/connectors/clickhouse"
 	"github.com/opsway-io/backend/internal/entities"
 	"github.com/opsway-io/backend/internal/probes"
-	scheduler "github.com/opsway-io/backend/internal/schedule"
+	schedule "github.com/opsway-io/backend/internal/schedule"
 
 	"github.com/spf13/cobra"
 )
@@ -47,11 +47,11 @@ func runProber(cmd *cobra.Command, args []string) {
 	probeResultService := probes.NewService(db)
 
 	l.WithField("addr", conf.Asynq.Addr).Info("connecting to asynq")
-	scheduleService := scheduler.New(nil, asynqClient.NewServer(ctx, conf.Asynq))
+	scheduleService := schedule.NewAsynqSchedule(nil, asynqClient.NewServer(ctx, conf.Asynq))
 
 	// create task handlers
-	handlers := map[scheduler.TaskType]asynq.HandlerFunc{}
-	handlers[scheduler.ProbeTask] = scheduler.HandleTask(probeResultService)
+	handlers := map[schedule.TaskType]asynq.HandlerFunc{}
+	handlers[schedule.ProbeTask] = schedule.HandleTask(probeResultService)
 
 	scheduleService.Consume(ctx, handlers)
 }
