@@ -76,15 +76,25 @@ func newGetMonitorsResponse(monitors *[]entities.Monitor) (*GetMonitorsResponse,
 			return nil, err
 		}
 
+		var body *string
+		if monitor.Settings.Body != nil {
+			body = pointer.String(string(*monitor.Settings.Body))
+		}
+
+		var tags []string
+		if monitor.Tags != nil {
+			tags = *monitor.Tags
+		}
+
 		res.Monitors[i] = GetMonitorResponseMonitor{
 			ID:   monitor.ID,
 			Name: monitor.Name,
-			Tags: *monitor.Tags,
+			Tags: tags,
 			Settings: GetMonitorResponseMonitorSettings{
 				Method:    monitor.Settings.Method,
 				URL:       monitor.Settings.URL,
 				Headers:   headers,
-				Body:      pointer.String(string(*monitor.Settings.Body)),
+				Body:      body,
 				Frequency: monitor.Settings.Frequency,
 			},
 		}
@@ -110,7 +120,7 @@ type GetMonitorResponseSettings struct {
 	Method    string            `json:"method"`
 	URL       string            `json:"url"`
 	Headers   map[string]string `json:"headers"`
-	Body      string            `json:"body"`
+	Body      *string           `json:"body"`
 	Frequency time.Duration     `json:"frequency"`
 }
 
@@ -149,15 +159,25 @@ func newGetMonitorResponse(m *entities.Monitor) (*GetMonitorResponse, error) {
 		return nil, err
 	}
 
+	var body *string
+	if m.Settings.Body != nil {
+		body = pointer.String(string(*m.Settings.Body))
+	}
+
+	var tags []string
+	if m.Tags != nil {
+		tags = *m.Tags
+	}
+
 	return &GetMonitorResponse{
 		ID:   m.ID,
 		Name: m.Name,
-		Tags: *m.Tags,
+		Tags: tags,
 		Settings: GetMonitorResponseSettings{
 			Method:    m.Settings.Method,
 			URL:       m.Settings.URL,
 			Headers:   headers,
-			Body:      string(*m.Settings.Body),
+			Body:      body,
 			Frequency: m.Settings.Frequency,
 		},
 	}, nil
