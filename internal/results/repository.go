@@ -7,7 +7,7 @@ import (
 	"gorm.io/gorm"
 )
 
-var ErrNotFound = errors.New("maintenance not found")
+var ErrNotFound = errors.New("probe result not found")
 
 type Repository interface {
 	Get(ctx context.Context, id uint) (*ProbeResult, error)

@@ -25,6 +25,20 @@ services:
       - 8080:8080
     environment:
       REDIS_ADDR: redis:6379
+  ch_server:
+    image: clickhouse/clickhouse-server
+    ports:
+      - "8123:8123"
+    volumes:
+      - ./db:/var/lib/clickhouse
+      
+  ch_client:
+    image: clickhouse/clickhouse-client
+    entrypoint:
+      - /bin/sleep
+    command:
+      - infinity
+
 
   # api:
   #   build: .
