@@ -16,7 +16,7 @@ type Incident struct {
 }
 
 func (Incident) TableName() string {
-	return "incident"
+	return "incidents"
 }
 
 type IncidentComment struct {

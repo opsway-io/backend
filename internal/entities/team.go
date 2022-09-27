@@ -2,7 +2,6 @@ package entities
 
 import (
 	"errors"
-	"fmt"
 	"regexp"
 	"time"
 
@@ -49,7 +48,6 @@ func (Team) TableName() string {
 
 func (t *Team) BeforeCreate(tx *gorm.DB) (err error) {
 	if ok := checkTeamNameFormat(t.Name); !ok {
-		fmt.Println("Create", t.Name)
 		return ErrIllegalTeamNameFormat
 	}
 
@@ -58,8 +56,6 @@ func (t *Team) BeforeCreate(tx *gorm.DB) (err error) {
 
 func (t *Team) BeforeUpdate(tx *gorm.DB) (err error) {
 	if ok := checkTeamNameFormat(t.Name); !ok {
-		fmt.Println("Update", t.Name)
-
 		return ErrIllegalTeamNameFormat
 	}
 
@@ -81,4 +77,8 @@ type TeamRole struct {
 	UserID uint `gorm:"primaryKey"`
 	TeamID uint `gorm:"primaryKey"`
 	Role   Role
+}
+
+func (TeamRole) TableName() string {
+	return "teams_roles"
 }

@@ -8,12 +8,12 @@ import (
 )
 
 type Monitor struct {
-	ID        int
+	ID        uint
 	Name      string          `gorm:"index;not null"`
 	Tags      *pq.StringArray `gorm:"type:text[]"`
 	Settings  MonitorSettings `gorm:"not null;constraint:OnDelete:CASCADE"`
 	Incidents []Incident      `gorm:"constraint:OnDelete:CASCADE"`
-	TeamID    int             `gorm:"index;not null"`
+	TeamID    uint            `gorm:"index;not null"`
 	CreatedAt time.Time       `gorm:"index"`
 	UpdatedAt time.Time       `gorm:"index"`
 }
@@ -27,7 +27,7 @@ func (m *Monitor) SetTags(tags []string) {
 }
 
 type MonitorSettings struct {
-	ID        int
+	ID        uint
 	Method    string         `gorm:"not null"`
 	URL       string         `gorm:"not null"`
 	Headers   *postgres.JSON `gorm:"type:jsonb"`

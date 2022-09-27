@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"context"
+	"time"
 
 	"github.com/opsway-io/backend/internal/authentication"
 	"github.com/opsway-io/backend/internal/connectors/postgres"
@@ -94,6 +95,18 @@ func runAPI(cmd *cobra.Command, args []string) {
 	}
 	// omit user creation
 	db.Omit("Users.*").Create(&t)
+
+	m := &entities.Monitor{
+		Name: "opsway.io",
+		Settings: entities.MonitorSettings{
+			Method:    "GET",
+			URL:       "https://opsway.io",
+			Frequency: time.Minute * 5,
+		},
+		TeamID: t.ID,
+	}
+
+	db.Create(m)
 
 	// TODO: Remove
 

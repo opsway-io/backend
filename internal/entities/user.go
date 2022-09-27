@@ -23,6 +23,10 @@ type User struct {
 	UpdatedAt           time.Time            `gorm:"index"`
 }
 
+func (User) TableName() string {
+	return "users"
+}
+
 func (u *User) SetPassword(password string) error {
 	hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
 	if err != nil {

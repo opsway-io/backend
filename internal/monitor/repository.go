@@ -11,8 +11,8 @@ import (
 var ErrNotFound = errors.New("monitor not found")
 
 type Repository interface {
-	GetMonitorByTeamID(ctx context.Context, teamID int, offset int, limit int) (*[]entities.Monitor, error)
-	GetMonitorByIDAndTeamID(ctx context.Context, teamID, id int) (*entities.Monitor, error)
+	GetMonitorByTeamID(ctx context.Context, teamID uint, offset int, limit int) (*[]entities.Monitor, error)
+	GetMonitorByIDAndTeamID(ctx context.Context, teamID uint, monitorID uint) (*entities.Monitor, error)
 	Create(ctx context.Context, monitor *entities.Monitor) error
 	Update(ctx context.Context, monitor *entities.Monitor) error
 	Delete(ctx context.Context, id int) error
@@ -28,7 +28,7 @@ func NewRepository(db *gorm.DB) Repository {
 	}
 }
 
-func (r *RepositoryImpl) GetMonitorByTeamID(ctx context.Context, teamID int, offset int, limit int) (*[]entities.Monitor, error) {
+func (r *RepositoryImpl) GetMonitorByTeamID(ctx context.Context, teamID uint, offset int, limit int) (*[]entities.Monitor, error) {
 	var monitors []entities.Monitor
 	err := r.db.WithContext(ctx).Offset(offset).Limit(limit).Where(entities.Monitor{
 		TeamID: teamID,
@@ -44,10 +44,10 @@ func (r *RepositoryImpl) GetMonitorByTeamID(ctx context.Context, teamID int, off
 	return &monitors, err
 }
 
-func (r *RepositoryImpl) GetMonitorByIDAndTeamID(ctx context.Context, id, teamID int) (*entities.Monitor, error) {
+func (r *RepositoryImpl) GetMonitorByIDAndTeamID(ctx context.Context, monitorID uint, teamID uint) (*entities.Monitor, error) {
 	var monitor entities.Monitor
 	err := r.db.WithContext(ctx).Where(entities.Monitor{
-		ID:     id,
+		ID:     monitorID,
 		TeamID: teamID,
 	}).First(&monitor).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {

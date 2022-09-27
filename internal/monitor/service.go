@@ -8,8 +8,8 @@ import (
 )
 
 type Service interface {
-	GetMonitorByIDAndTeamID(ctx context.Context, teamID, id int) (*entities.Monitor, error)
-	GetMonitorByTeamID(ctx context.Context, teamID int, offset int, limit int) (*[]entities.Monitor, error)
+	GetMonitorByIDAndTeamID(ctx context.Context, teamID uint, monitorID uint) (*entities.Monitor, error)
+	GetMonitorByTeamID(ctx context.Context, teamID uint, offset int, limit int) (*[]entities.Monitor, error)
 	Create(ctx context.Context, monitor *entities.Monitor) error
 	Update(ctx context.Context, monitor *entities.Monitor) error
 	Delete(ctx context.Context, id int) error
@@ -25,12 +25,12 @@ func NewService(db *gorm.DB) Service {
 	}
 }
 
-func (s *ServiceImpl) GetMonitorByTeamID(ctx context.Context, teamID int, offset int, limit int) (*[]entities.Monitor, error) {
+func (s *ServiceImpl) GetMonitorByTeamID(ctx context.Context, teamID uint, offset int, limit int) (*[]entities.Monitor, error) {
 	return s.repository.GetMonitorByTeamID(ctx, teamID, offset, limit)
 }
 
-func (s *ServiceImpl) GetMonitorByIDAndTeamID(ctx context.Context, id, teamID int) (*entities.Monitor, error) {
-	return s.repository.GetMonitorByIDAndTeamID(ctx, id, teamID)
+func (s *ServiceImpl) GetMonitorByIDAndTeamID(ctx context.Context, monitorID uint, teamID uint) (*entities.Monitor, error) {
+	return s.repository.GetMonitorByIDAndTeamID(ctx, monitorID, teamID)
 }
 
 func (s *ServiceImpl) Create(ctx context.Context, m *entities.Monitor) error {
