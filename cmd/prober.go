@@ -2,12 +2,13 @@ package cmd
 
 import (
 	"context"
-	"encoding/json"
-	"log"
 
 	"github.com/hibiken/asynq"
 
 	asynqClient "github.com/opsway-io/backend/internal/connectors/asynq"
+	"github.com/opsway-io/backend/internal/connectors/clickhouse"
+	"github.com/opsway-io/backend/internal/entities"
+	"github.com/opsway-io/backend/internal/probes"
 	scheduler "github.com/opsway-io/backend/internal/schedule"
 
 	"github.com/spf13/cobra"
@@ -34,22 +35,25 @@ func runProber(cmd *cobra.Command, args []string) {
 
 	ctx := context.Background()
 
+	db, err := clickhouse.NewClient(ctx, conf.Clickhouse)
+	if err != nil {
+		l.WithError(err).Fatal("Failed to create clickhouse")
+	}
+
+	db.AutoMigrate(
+		entities.ProbeResult{},
+	)
+
+	probeResultService := probes.NewService(db)
+
 	l.WithField("addr", conf.Asynq.Addr).Info("connecting to asynq")
 	scheduleService := scheduler.New(nil, asynqClient.NewServer(ctx, conf.Asynq))
 
-	handlers := map[scheduler.TaskType]func(context.Context, *asynq.Task) error{}
-	handlers[scheduler.ProbeTask] = probe
+	// create task handlers
+	handlers := map[scheduler.TaskType]asynq.HandlerFunc{}
+	handlers[scheduler.ProbeTask] = scheduler.HandleTask(&probeResultService)
 
 	scheduleService.Consume(ctx, handlers)
-}
-
-func probe(ctx context.Context, t *asynq.Task) error {
-	var p scheduler.TaskPayload
-	if err := json.Unmarshal(t.Payload(), &p); err != nil {
-		return err
-	}
-	log.Printf(" [*] Probe %s", p.Payload["URL"])
-	return nil
 }
 
 // func consume(ctx context.Context, scheduler scheduler.Schedule, rs result.Service, stream string, group string) {

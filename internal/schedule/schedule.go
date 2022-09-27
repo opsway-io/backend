@@ -13,7 +13,7 @@ import (
 type Schedule interface {
 	Add(ctx context.Context, internval time.Duration, taskType TaskType, taskPayload TaskPayload) (string, error)
 	Remove(ctx context.Context, EntryID string) (err error)
-	Consume(ctx context.Context, handlers map[string]func(context.Context, *asynq.Task) error) (err error)
+	Consume(ctx context.Context, handlers map[string]asynq.HandlerFunc) error
 }
 
 type AsynqSchedule struct {
@@ -42,7 +42,7 @@ func (rs *AsynqSchedule) Remove(ctx context.Context, entryID string) (err error)
 	return rs.Scheduler.Unregister(entryID)
 }
 
-func (rs *AsynqSchedule) Consume(ctx context.Context, handlers map[TaskType]func(context.Context, *asynq.Task) error) error {
+func (rs *AsynqSchedule) Consume(ctx context.Context, handlers map[TaskType]asynq.HandlerFunc) error {
 	mux := asynq.NewServeMux()
 	for pattern, handler := range handlers {
 		logrus.Info("Handling events of type", pattern)
