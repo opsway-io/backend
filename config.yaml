@@ -17,7 +17,7 @@ authentication:
   refresh_expires_in: 720h
 
 clickhouse:
-  dsn: "clickhouse://default:@localhost:9000/opsway?dial_timeout=200ms&max_execution_time=60"
+  dsn: "clickhouse://default:@localhost:9000/default?dial_timeout=200ms&max_execution_time=60"
   debug: true
 
 asynq:
