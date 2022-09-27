@@ -2,9 +2,10 @@ package cmd
 
 import (
 	"context"
-	"time"
 
 	asynqClient "github.com/opsway-io/backend/internal/connectors/asynq"
+	"github.com/opsway-io/backend/internal/connectors/postgres"
+	"github.com/opsway-io/backend/internal/monitor"
 	scheduler "github.com/opsway-io/backend/internal/schedule"
 	"github.com/sirupsen/logrus"
 
@@ -35,13 +36,19 @@ func runScheduler(cmd *cobra.Command, args []string) {
 	l.WithField("addr", conf.Asynq.Addr).Info("connecting to asynq")
 	scheduleService := scheduler.New(asynqClient.NewScheduler(ctx, conf.Asynq), nil)
 
-	_, err = scheduleService.Add(ctx, time.Second*10, scheduler.ProbeTask, scheduler.TaskPayload{ID: 1, Payload: map[string]string{"URL": "opsway.io"}})
+	db, err := postgres.NewClient(ctx, conf.Postgres)
 	if err != nil {
-		l.Fatal(err)
+		l.WithError(err).Fatal("Failed to create Postgres client")
 	}
-	_, err = scheduleService.Add(ctx, time.Second*20, scheduler.ProbeTask, scheduler.TaskPayload{ID: 2, Payload: map[string]string{"URL": "google.com"}})
-	if err != nil {
-		l.Fatal(err)
+
+	monitorService := monitor.NewService(db)
+	monitors, err := monitorService.GetMonitors(ctx)
+
+	for _, monitor := range *monitors {
+		_, err = scheduleService.Add(ctx, monitor.Settings.Frequency, scheduler.ProbeTask, scheduler.TaskPayload{ID: monitor.Settings.MonitorID, Payload: map[string]string{"URL": monitor.Settings.URL}})
+		if err != nil {
+			l.Fatal(err)
+		}
 	}
 
 	if err := scheduleService.Scheduler.Run(); err != nil {

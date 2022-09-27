@@ -11,6 +11,7 @@ import (
 var ErrNotFound = errors.New("monitor not found")
 
 type Repository interface {
+	GetMonitors(ctx context.Context) (*[]entities.Monitor, error)
 	GetMonitorByTeamID(ctx context.Context, teamID uint, offset int, limit int) (*[]entities.Monitor, error)
 	GetMonitorByIDAndTeamID(ctx context.Context, teamID uint, monitorID uint) (*entities.Monitor, error)
 	Create(ctx context.Context, monitor *entities.Monitor) error
@@ -26,6 +27,20 @@ func NewRepository(db *gorm.DB) Repository {
 	return &RepositoryImpl{
 		db: db,
 	}
+}
+
+func (r *RepositoryImpl) GetMonitors(ctx context.Context) (*[]entities.Monitor, error) {
+	var monitors []entities.Monitor
+	err := r.db.WithContext(ctx).Preload("Settings").Find(&monitors).Error
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, nil
+		}
+
+		return nil, err
+	}
+
+	return &monitors, err
 }
 
 func (r *RepositoryImpl) GetMonitorByTeamID(ctx context.Context, teamID uint, offset int, limit int) (*[]entities.Monitor, error) {

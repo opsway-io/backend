@@ -27,7 +27,6 @@ func New(scheduler *asynq.Scheduler, server *asynq.Server) *AsynqSchedule {
 
 func (rs *AsynqSchedule) Add(ctx context.Context, internval time.Duration, taskType TaskType, taskPayload TaskPayload) (string, error) {
 	logrus.Info("Publishing event")
-
 	payload, err := json.Marshal(taskPayload)
 	if err != nil {
 		return "", err

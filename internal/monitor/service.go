@@ -8,6 +8,7 @@ import (
 )
 
 type Service interface {
+	GetMonitors(ctx context.Context) (*[]entities.Monitor, error)
 	GetMonitorByIDAndTeamID(ctx context.Context, teamID uint, monitorID uint) (*entities.Monitor, error)
 	GetMonitorByTeamID(ctx context.Context, teamID uint, offset int, limit int) (*[]entities.Monitor, error)
 	Create(ctx context.Context, monitor *entities.Monitor) error
@@ -23,6 +24,10 @@ func NewService(db *gorm.DB) Service {
 	return &ServiceImpl{
 		repository: NewRepository(db),
 	}
+}
+
+func (s *ServiceImpl) GetMonitors(ctx context.Context) (*[]entities.Monitor, error) {
+	return s.repository.GetMonitors(ctx)
 }
 
 func (s *ServiceImpl) GetMonitorByTeamID(ctx context.Context, teamID uint, offset int, limit int) (*[]entities.Monitor, error) {

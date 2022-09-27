@@ -31,7 +31,7 @@ func HandleTask(serv probes.Service) asynq.HandlerFunc {
 			return err
 		}
 
-		res, err := httpProbe.Probe(http.MethodGet, "http://"+p.Payload["URL"], nil, nil, time.Second*5)
+		res, err := httpProbe.Probe(http.MethodGet, p.Payload["URL"], nil, nil, time.Second*5)
 		if err != nil {
 			logrus.WithError(err).Fatal("error probing url")
 		}
