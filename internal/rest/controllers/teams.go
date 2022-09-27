@@ -2,6 +2,7 @@ package controllers
 
 import (
 	"net/http"
+	"time"
 
 	"github.com/labstack/echo/v4"
 	"github.com/opsway-io/backend/internal/entities"
@@ -15,20 +16,41 @@ type GetTeamRequest struct {
 }
 
 type GetTeamResponse struct {
-	// TODO
+	ID          uint      `json:"id"`
+	Name        string    `json:"name"`
+	DisplayName *string   `json:"displayName"`
+	AvatarURL   *string   `json:"avatarUrl"`
+	CreatedAt   time.Time `json:"createdAt"`
+	UpdatedAt   time.Time `json:"updatedAt"`
 }
 
 func (h *Handlers) GetTeam(ctx hs.AuthenticatedContext) error {
-	_, err := helpers.Bind[GetTeamRequest](ctx)
+	req, err := helpers.Bind[GetTeamRequest](ctx)
 	if err != nil {
 		ctx.Log.WithError(err).Debug("failed to bind GetTeamRequest")
 
 		return echo.ErrBadRequest
 	}
 
-	// TODO
+	team, err := h.TeamService.GetByID(ctx.Request().Context(), req.TeamID)
+	if err != nil {
+		ctx.Log.WithError(err).Debug("failed to get team")
 
-	return ctx.JSON(http.StatusNotImplemented, nil)
+		return echo.ErrInternalServerError
+	}
+
+	return ctx.JSON(http.StatusOK, newGetTeamResponse(team))
+}
+
+func newGetTeamResponse(t *entities.Team) GetTeamResponse {
+	return GetTeamResponse{
+		ID:          t.ID,
+		Name:        t.Name,
+		DisplayName: t.DisplayName,
+		AvatarURL:   t.Avatar,
+		CreatedAt:   t.CreatedAt,
+		UpdatedAt:   t.UpdatedAt,
+	}
 }
 
 type GetTeamUsersRequest struct {
