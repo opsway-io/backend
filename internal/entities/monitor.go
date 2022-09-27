@@ -1,6 +1,7 @@
 package entities
 
 import (
+	"encoding/json"
 	"time"
 
 	"github.com/lib/pq"
@@ -40,4 +41,28 @@ type MonitorSettings struct {
 
 func (MonitorSettings) TableName() string {
 	return "monitor_settings"
+}
+
+func (ms *MonitorSettings) SetHeaders(headers map[string]string) error {
+	b, err := json.Marshal(headers)
+	if err != nil {
+		return err
+	}
+
+	ms.Headers = (*postgres.JSON)(&b)
+
+	return nil
+}
+
+func (ms *MonitorSettings) GetHeaders() (map[string]string, error) {
+	if ms.Headers == nil {
+		return nil, nil
+	}
+
+	var headers map[string]string
+	if err := json.Unmarshal(*ms.Headers, &headers); err != nil {
+		return nil, err
+	}
+
+	return headers, nil
 }

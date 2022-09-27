@@ -1,7 +1,6 @@
 package controllers
 
 import (
-	"encoding/json"
 	"net/http"
 	"time"
 
@@ -11,6 +10,7 @@ import (
 	hs "github.com/opsway-io/backend/internal/rest/handlers"
 	"github.com/opsway-io/backend/internal/rest/helpers"
 	"github.com/pkg/errors"
+	"k8s.io/utils/pointer"
 )
 
 type GetMonitorsRequest struct {
@@ -33,11 +33,11 @@ type GetMonitorResponseMonitor struct {
 }
 
 type GetMonitorResponseMonitorSettings struct {
-	Method    string          `json:"method"`
-	URL       string          `json:"url"`
-	Headers   json.RawMessage `json:"headers"`
-	Body      string          `json:"body"`
-	Frequency time.Duration   `json:"frequency"`
+	Method    string            `json:"method"`
+	URL       string            `json:"url"`
+	Headers   map[string]string `json:"headers"`
+	Body      *string           `json:"body"`
+	Frequency time.Duration     `json:"frequency"`
 }
 
 func (h *Handlers) GetMonitors(ctx hs.AuthenticatedContext) error {
@@ -55,31 +55,42 @@ func (h *Handlers) GetMonitors(ctx hs.AuthenticatedContext) error {
 		return echo.ErrInternalServerError
 	}
 
-	return ctx.JSON(http.StatusOK, newGetMonitorsResponse(monitors))
+	resp, err := newGetMonitorsResponse(monitors)
+	if err != nil {
+		ctx.Log.WithError(err).Error("failed to create GetMonitorsResponse")
+
+		return echo.ErrInternalServerError
+	}
+
+	return ctx.JSON(http.StatusOK, resp)
 }
 
-func newGetMonitorsResponse(monitors *[]entities.Monitor) GetMonitorsResponse {
+func newGetMonitorsResponse(monitors *[]entities.Monitor) (*GetMonitorsResponse, error) {
 	res := GetMonitorsResponse{
 		Monitors: make([]GetMonitorResponseMonitor, len(*monitors)),
 	}
 
 	for i, monitor := range *monitors {
+		headers, err := monitor.Settings.GetHeaders()
+		if err != nil {
+			return nil, err
+		}
+
 		res.Monitors[i] = GetMonitorResponseMonitor{
 			ID:   monitor.ID,
 			Name: monitor.Name,
 			Tags: *monitor.Tags,
 			Settings: GetMonitorResponseMonitorSettings{
-				Method: monitor.Settings.Method,
-				URL:    monitor.Settings.URL,
-				// TODO: fix this
-				// Headers:   *monitor.Settings.Headers,
-				Body:      string(*monitor.Settings.Body),
+				Method:    monitor.Settings.Method,
+				URL:       monitor.Settings.URL,
+				Headers:   headers,
+				Body:      pointer.String(string(*monitor.Settings.Body)),
 				Frequency: monitor.Settings.Frequency,
 			},
 		}
 	}
 
-	return res
+	return &res, nil
 }
 
 type GetMonitorRequest struct {
@@ -96,11 +107,11 @@ type GetMonitorResponse struct {
 }
 
 type GetMonitorResponseSettings struct {
-	Method    string          `json:"method"`
-	URL       string          `json:"url"`
-	Headers   json.RawMessage `json:"headers"`
-	Body      string          `json:"body"`
-	Frequency time.Duration   `json:"frequency"`
+	Method    string            `json:"method"`
+	URL       string            `json:"url"`
+	Headers   map[string]string `json:"headers"`
+	Body      string            `json:"body"`
+	Frequency time.Duration     `json:"frequency"`
 }
 
 func (h *Handlers) GetMonitor(ctx hs.AuthenticatedContext) error {
@@ -122,23 +133,34 @@ func (h *Handlers) GetMonitor(ctx hs.AuthenticatedContext) error {
 		return echo.ErrInternalServerError
 	}
 
-	return ctx.JSON(http.StatusNotImplemented, newGetMonitorResponse(m))
+	resp, err := newGetMonitorResponse(m)
+	if err != nil {
+		ctx.Log.WithError(err).Error("failed to create GetMonitorResponse")
+
+		return echo.ErrInternalServerError
+	}
+
+	return ctx.JSON(http.StatusNotImplemented, resp)
 }
 
-func newGetMonitorResponse(m *entities.Monitor) GetMonitorResponse {
-	return GetMonitorResponse{
+func newGetMonitorResponse(m *entities.Monitor) (*GetMonitorResponse, error) {
+	headers, err := m.Settings.GetHeaders()
+	if err != nil {
+		return nil, err
+	}
+
+	return &GetMonitorResponse{
 		ID:   m.ID,
 		Name: m.Name,
 		Tags: *m.Tags,
 		Settings: GetMonitorResponseSettings{
-			Method: m.Settings.Method,
-			URL:    m.Settings.URL,
-			// TODO: fix this
-			// Headers:   *m.Settings.Headers,
+			Method:    m.Settings.Method,
+			URL:       m.Settings.URL,
+			Headers:   headers,
 			Body:      string(*m.Settings.Body),
 			Frequency: m.Settings.Frequency,
 		},
-	}
+	}, nil
 }
 
 type DeleteMonitorRequest struct {
