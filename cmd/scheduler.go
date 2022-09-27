@@ -5,7 +5,7 @@ import (
 	"time"
 
 	asynqClient "github.com/opsway-io/backend/internal/connectors/asynq"
-	scheduler "github.com/opsway-io/backend/internal/schedule"
+	schedule "github.com/opsway-io/backend/internal/schedule"
 	"github.com/sirupsen/logrus"
 
 	"github.com/spf13/cobra"
@@ -33,13 +33,13 @@ func runScheduler(cmd *cobra.Command, args []string) {
 	ctx := context.Background()
 
 	l.WithField("addr", conf.Asynq.Addr).Info("connecting to asynq")
-	scheduleService := scheduler.New(asynqClient.NewScheduler(ctx, conf.Asynq), nil)
+	scheduleService := schedule.NewAsynqSchedule(asynqClient.NewScheduler(ctx, conf.Asynq), nil)
 
-	_, err = scheduleService.Add(ctx, time.Second*10, scheduler.ProbeTask, scheduler.TaskPayload{ID: 1, Payload: map[string]string{"URL": "opsway.io"}})
+	_, err = scheduleService.Add(ctx, time.Second*10, schedule.ProbeTask, schedule.TaskPayload{ID: 1, Payload: map[string]string{"URL": "opsway.io"}})
 	if err != nil {
 		l.Fatal(err)
 	}
-	_, err = scheduleService.Add(ctx, time.Second*20, scheduler.ProbeTask, scheduler.TaskPayload{ID: 2, Payload: map[string]string{"URL": "google.com"}})
+	_, err = scheduleService.Add(ctx, time.Second*20, schedule.ProbeTask, schedule.TaskPayload{ID: 2, Payload: map[string]string{"URL": "google.com"}})
 	if err != nil {
 		l.Fatal(err)
 	}
@@ -47,5 +47,4 @@ func runScheduler(cmd *cobra.Command, args []string) {
 	if err := scheduleService.Scheduler.Run(); err != nil {
 		logrus.Fatalf("could not run server: %v", err)
 	}
-
 }
