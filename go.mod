@@ -6,7 +6,6 @@ require (
 	github.com/creasty/defaults v1.6.0
 	github.com/fatih/structs v1.1.0
 	github.com/go-playground/validator v9.31.0+incompatible
-	github.com/go-redis/redis v6.15.9+incompatible
 	github.com/golang-jwt/jwt v3.2.2+incompatible
 	github.com/hibiken/asynq v0.23.0
 	github.com/influxdata/influxdb-client-go/v2 v2.9.1
@@ -22,6 +21,7 @@ require (
 	github.com/spf13/viper v1.12.0
 	github.com/tj/assert v0.0.3
 	golang.org/x/crypto v0.0.0-20220622213112-05595931fe9d
+	gorm.io/driver/clickhouse v0.4.2
 	gorm.io/driver/postgres v1.3.8
 	gorm.io/gorm v1.23.8
 	k8s.io/utils v0.0.0-20220823124924-e9cbc92d1a73
@@ -85,5 +85,4 @@ require (
 	gopkg.in/ini.v1 v1.66.4 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
-	gorm.io/driver/clickhouse v0.4.2 // indirect
 )

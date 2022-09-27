@@ -4,7 +4,6 @@ import (
 	"github.com/mcuadros/go-defaults"
 	"github.com/opsway-io/backend/internal/authentication"
 	"github.com/opsway-io/backend/internal/connectors/asynq"
-	"github.com/opsway-io/backend/internal/connectors/influxdb"
 	"github.com/opsway-io/backend/internal/connectors/postgres"
 	"github.com/opsway-io/backend/internal/rest"
 	"github.com/sirupsen/logrus"
@@ -18,7 +17,6 @@ type Config struct {
 	Log            LogConfig             `mapstructure:"log"`
 	Postgres       postgres.Config       `mapstructure:"postgres"`
 	Asynq          asynq.Config          `mapstructure:"asynq"`
-	InfluxDB       influxdb.Config       `mapstructure:"influxdb"`
 	REST           rest.Config           `mapstructure:"rest"`
 	Authentication authentication.Config `mapstructure:"authentication"`
 }
