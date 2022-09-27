@@ -51,7 +51,6 @@ services:
   #   depends_on:
   #     - postgres
   #     - keydb
-  #     - influxdb
 
 
   # prober:
@@ -60,4 +59,3 @@ services:
   #   command: prober
   #   depends_on:
   #     - keydb
-  #     - influxdb
