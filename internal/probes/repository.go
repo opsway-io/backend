@@ -1,17 +1,18 @@
-package results
+package probes
 
 import (
 	"context"
 	"errors"
 
+	"github.com/opsway-io/backend/internal/entities"
 	"gorm.io/gorm"
 )
 
 var ErrNotFound = errors.New("probe result not found")
 
 type Repository interface {
-	Get(ctx context.Context, id uint) (*ProbeResult, error)
-	Create(ctx context.Context, maintenance *ProbeResult) error
+	Get(ctx context.Context, id uint) (*entities.ProbeResult, error)
+	Create(ctx context.Context, maintenance *entities.ProbeResult) error
 }
 
 type RepositoryImpl struct {
@@ -22,11 +23,11 @@ func NewRepository(db *gorm.DB) Repository {
 	return &RepositoryImpl{db: db}
 }
 
-func (r *RepositoryImpl) Get(ctx context.Context, id uint) (*ProbeResult, error) {
-	var probeResult ProbeResult
+func (r *RepositoryImpl) Get(ctx context.Context, id uint) (*entities.ProbeResult, error) {
+	var probeResult entities.ProbeResult
 	if err := r.db.WithContext(
 		ctx,
-	).Where(ProbeResult{
+	).Where(entities.ProbeResult{
 		ID: id,
 	}).First(&probeResult).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -39,6 +40,6 @@ func (r *RepositoryImpl) Get(ctx context.Context, id uint) (*ProbeResult, error)
 	return &probeResult, nil
 }
 
-func (r *RepositoryImpl) Create(ctx context.Context, probeResult *ProbeResult) error {
+func (r *RepositoryImpl) Create(ctx context.Context, probeResult *entities.ProbeResult) error {
 	return r.db.WithContext(ctx).Create(probeResult).Error
 }
