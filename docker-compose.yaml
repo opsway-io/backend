@@ -30,7 +30,7 @@ services:
     ports:
       - "8123:8123"
     volumes:
-      - ./db:/var/lib/clickhouse
+      - ./data/clickhouse:/var/lib/clickhouse
       
   ch_client:
     image: clickhouse/clickhouse-client
