@@ -17,7 +17,7 @@ authentication:
   refresh_expires_in: 720h 
 
 clickhouse:
-  dsn: "host=clickhouse user=default password= dbname=opsway port=8123 sslmode=disable"
+  dsn: "host=clickhouse user=default dbname=opsway port=8123 sslmode=disable"
   debug: true
 
 asynq:

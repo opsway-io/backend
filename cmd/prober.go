@@ -51,7 +51,7 @@ func runProber(cmd *cobra.Command, args []string) {
 
 	// create task handlers
 	handlers := map[scheduler.TaskType]asynq.HandlerFunc{}
-	handlers[scheduler.ProbeTask] = scheduler.HandleTask(&probeResultService)
+	handlers[scheduler.ProbeTask] = scheduler.HandleTask(probeResultService)
 
 	scheduleService.Consume(ctx, handlers)
 }

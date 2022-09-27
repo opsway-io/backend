@@ -17,7 +17,7 @@ authentication:
   refresh_expires_in: 720h
 
 clickhouse:
-  dsn: "host=localhost user=default password= dbname=opsway port=8123 sslmode=disable"
+  dsn: "clickhouse://default:@localhost:9000/opsway?dial_timeout=200ms&max_execution_time=60"
   debug: true
 
 asynq:
