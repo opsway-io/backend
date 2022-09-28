@@ -10,7 +10,6 @@ import (
 	hs "github.com/opsway-io/backend/internal/rest/handlers"
 	"github.com/opsway-io/backend/internal/rest/helpers"
 	"github.com/pkg/errors"
-	"k8s.io/utils/pointer"
 )
 
 type GetMonitorsRequest struct {
@@ -70,32 +69,22 @@ func newGetMonitorsResponse(monitors *[]entities.Monitor) (*GetMonitorsResponse,
 		Monitors: make([]GetMonitorResponseMonitor, len(*monitors)),
 	}
 
-	for i, monitor := range *monitors {
-		headers, err := monitor.Settings.GetHeaders()
+	for i, m := range *monitors {
+		headers, err := m.Settings.GetHeaders()
 		if err != nil {
 			return nil, err
 		}
 
-		var body *string
-		if monitor.Settings.Body != nil {
-			body = pointer.String(string(*monitor.Settings.Body))
-		}
-
-		var tags []string
-		if monitor.Tags != nil {
-			tags = *monitor.Tags
-		}
-
 		res.Monitors[i] = GetMonitorResponseMonitor{
-			ID:   monitor.ID,
-			Name: monitor.Name,
-			Tags: tags,
+			ID:   m.ID,
+			Name: m.Name,
+			Tags: m.GetTags(),
 			Settings: GetMonitorResponseMonitorSettings{
-				Method:    monitor.Settings.Method,
-				URL:       monitor.Settings.URL,
+				Method:    m.Settings.Method,
+				URL:       m.Settings.URL,
 				Headers:   headers,
-				Body:      body,
-				Frequency: monitor.Settings.Frequency,
+				Body:      m.GetBodyStr(),
+				Frequency: m.Settings.Frequency,
 			},
 		}
 	}
@@ -160,25 +149,15 @@ func newGetMonitorResponse(m *entities.Monitor) (*GetMonitorResponse, error) {
 		return nil, err
 	}
 
-	var body *string
-	if m.Settings.Body != nil {
-		body = pointer.String(string(*m.Settings.Body))
-	}
-
-	var tags []string
-	if m.Tags != nil {
-		tags = *m.Tags
-	}
-
 	return &GetMonitorResponse{
 		ID:   m.ID,
 		Name: m.Name,
-		Tags: tags,
+		Tags: m.GetTags(),
 		Settings: GetMonitorResponseSettings{
 			Method:    m.Settings.Method,
 			URL:       m.Settings.URL,
 			Headers:   headers,
-			Body:      body,
+			Body:      m.GetBodyStr(),
 			Frequency: m.Settings.Frequency,
 		},
 	}, nil

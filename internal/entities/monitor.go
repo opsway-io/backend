@@ -27,6 +27,20 @@ func (m *Monitor) SetTags(tags []string) {
 	m.Tags = (*pq.StringArray)(&tags)
 }
 
+func (m *Monitor) GetTags() []string {
+	return []string(*m.Tags)
+}
+
+func (m *Monitor) GetBodyStr() *string {
+	if m.Settings.Body == nil {
+		return nil
+	}
+
+	body := string(*m.Settings.Body)
+
+	return &body
+}
+
 type MonitorSettings struct {
 	ID        uint
 	Method    string         `gorm:"not null"`
