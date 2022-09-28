@@ -140,7 +140,7 @@ func (h *Handlers) GetMonitor(ctx hs.AuthenticatedContext) error {
 		return echo.ErrInternalServerError
 	}
 
-	return ctx.JSON(http.StatusNotImplemented, resp)
+	return ctx.JSON(http.StatusOK, resp)
 }
 
 func newGetMonitorResponse(m *entities.Monitor) (*GetMonitorResponse, error) {
