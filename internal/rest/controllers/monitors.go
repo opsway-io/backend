@@ -104,6 +104,7 @@ func newGetMonitorsResponse(monitors *[]entities.Monitor) (*GetMonitorsResponse,
 }
 
 type GetMonitorRequest struct {
+	TeamID    uint `param:"teamId" validate:"required,numeric,gte=0"`
 	MonitorID uint `param:"monitorId" validate:"required,numeric,gte=0"`
 }
 
@@ -132,7 +133,7 @@ func (h *Handlers) GetMonitor(ctx hs.AuthenticatedContext) error {
 		return echo.ErrBadRequest
 	}
 
-	m, err := h.MonitorService.GetMonitorAndSettingsByID(ctx.Request().Context(), req.MonitorID)
+	m, err := h.MonitorService.GetMonitorAndSettingsByTeamIDAndID(ctx.Request().Context(), req.TeamID, req.MonitorID)
 	if err != nil {
 		if errors.Is(err, monitor.ErrNotFound) {
 			return echo.ErrNotFound
@@ -184,8 +185,8 @@ func newGetMonitorResponse(m *entities.Monitor) (*GetMonitorResponse, error) {
 }
 
 type DeleteMonitorRequest struct {
-	TeamID    int `param:"teamId" validate:"required,numeric,gte=0"`
-	MonitorID int `param:"monitorId" validate:"required,numeric,gte=0"`
+	TeamID    uint `param:"teamId" validate:"required,numeric,gte=0"`
+	MonitorID uint `param:"monitorId" validate:"required,numeric,gte=0"`
 }
 
 func (h *Handlers) DeleteMonitor(ctx hs.AuthenticatedContext) error {

@@ -14,11 +14,11 @@ type Repository interface {
 	GetMonitors(ctx context.Context) (*[]entities.Monitor, error)
 	GetMonitorByTeamID(ctx context.Context, teamID uint, offset int, limit int) (*[]entities.Monitor, error)
 	GetMonitorByIDAndTeamID(ctx context.Context, teamID uint, monitorID uint) (*entities.Monitor, error)
-	GetMonitorAndSettingsByID(ctx context.Context, monitorID uint) (*entities.Monitor, error)
+	GetMonitorAndSettingsByTeamIDAndID(ctx context.Context, teamID uint, monitorID uint) (*entities.Monitor, error)
 	GetMonitorsAndSettingsByTeamID(ctx context.Context, teamID uint, offset int, limit int) (*[]entities.Monitor, error)
 	Create(ctx context.Context, monitor *entities.Monitor) error
 	Update(ctx context.Context, monitor *entities.Monitor) error
-	Delete(ctx context.Context, id int) error
+	Delete(ctx context.Context, id uint) error
 }
 
 type RepositoryImpl struct {
@@ -74,10 +74,11 @@ func (r *RepositoryImpl) GetMonitorByIDAndTeamID(ctx context.Context, monitorID 
 	return &monitor, err
 }
 
-func (r *RepositoryImpl) GetMonitorAndSettingsByID(ctx context.Context, monitorID uint) (*entities.Monitor, error) {
+func (r *RepositoryImpl) GetMonitorAndSettingsByTeamIDAndID(ctx context.Context, teamID uint, monitorID uint) (*entities.Monitor, error) {
 	var monitor entities.Monitor
 	err := r.db.WithContext(ctx).Preload("Settings").Where(entities.Monitor{
-		ID: monitorID,
+		ID:     monitorID,
+		TeamID: teamID,
 	}).First(&monitor).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return nil, ErrNotFound
@@ -118,7 +119,7 @@ func (r *RepositoryImpl) Update(ctx context.Context, m *entities.Monitor) error 
 	return nil
 }
 
-func (r *RepositoryImpl) Delete(ctx context.Context, id int) error {
+func (r *RepositoryImpl) Delete(ctx context.Context, id uint) error {
 	err := r.db.WithContext(ctx).Delete(&entities.Monitor{}, id).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return ErrNotFound

@@ -11,11 +11,11 @@ type Service interface {
 	GetMonitors(ctx context.Context) (*[]entities.Monitor, error)
 	GetMonitorByIDAndTeamID(ctx context.Context, teamID uint, monitorID uint) (*entities.Monitor, error)
 	GetMonitorByTeamID(ctx context.Context, teamID uint, offset int, limit int) (*[]entities.Monitor, error)
-	GetMonitorAndSettingsByID(ctx context.Context, monitorID uint) (*entities.Monitor, error)
+	GetMonitorAndSettingsByTeamIDAndID(ctx context.Context, teamID uint, monitorID uint) (*entities.Monitor, error)
 	GetMonitorsAndSettingsByTeamID(ctx context.Context, teamID uint, offset int, limit int) (*[]entities.Monitor, error)
 	Create(ctx context.Context, monitor *entities.Monitor) error
 	Update(ctx context.Context, monitor *entities.Monitor) error
-	Delete(ctx context.Context, id int) error
+	Delete(ctx context.Context, id uint) error
 }
 
 type ServiceImpl struct {
@@ -40,8 +40,8 @@ func (s *ServiceImpl) GetMonitorByIDAndTeamID(ctx context.Context, monitorID uin
 	return s.repository.GetMonitorByIDAndTeamID(ctx, monitorID, teamID)
 }
 
-func (s *ServiceImpl) GetMonitorAndSettingsByID(ctx context.Context, monitorID uint) (*entities.Monitor, error) {
-	return s.repository.GetMonitorAndSettingsByID(ctx, monitorID)
+func (s *ServiceImpl) GetMonitorAndSettingsByTeamIDAndID(ctx context.Context, teamID uint, monitorID uint) (*entities.Monitor, error) {
+	return s.repository.GetMonitorAndSettingsByTeamIDAndID(ctx, teamID, monitorID)
 }
 
 func (s *ServiceImpl) GetMonitorsAndSettingsByTeamID(ctx context.Context, teamID uint, offset int, limit int) (*[]entities.Monitor, error) {
@@ -56,6 +56,6 @@ func (s *ServiceImpl) Update(ctx context.Context, m *entities.Monitor) error {
 	return s.repository.Update(ctx, m)
 }
 
-func (s *ServiceImpl) Delete(ctx context.Context, id int) error {
+func (s *ServiceImpl) Delete(ctx context.Context, id uint) error {
 	return s.repository.Delete(ctx, id)
 }
