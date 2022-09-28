@@ -28,6 +28,10 @@ func (m *Monitor) SetTags(tags []string) {
 }
 
 func (m *Monitor) GetTags() []string {
+	if m.Tags == nil {
+		return []string{}
+	}
+
 	return []string(*m.Tags)
 }
 
