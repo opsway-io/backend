@@ -9,18 +9,18 @@ import (
 	"github.com/sendgrid/sendgrid-go/helpers/mail"
 )
 
-type Config struct {
+type SendConfig struct {
 	SendgridAPIKey string
 	SenderName     string
 	SenderEmail    string
 }
 
 type SendgridSender struct {
-	config Config
+	config SendConfig
 	client *sendgrid.Client
 }
 
-func NewSendgridSender(config Config) Sender {
+func NewSendgridSender(config SendConfig) Sender {
 	return &SendgridSender{
 		config: config,
 		client: sendgrid.NewSendClient(config.SendgridAPIKey),
