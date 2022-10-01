@@ -23,8 +23,8 @@ type Config struct {
 	GoogleClientSecret string `mapstructure:"google_client_secret"`
 	GoogleCallbackURL  string `mapstructure:"google_callback_url"`
 
-	SuccessURL string `mapstructure:"oauth_success_url" default:"/login/oauth"`
-	FailedURL  string `mapstructure:"oauth_failed_url" default:"/login"`
+	SuccessURL string `mapstructure:"success_url" default:"/login/oauth"`
+	FailedURL  string `mapstructure:"failed_url" default:"/login"`
 }
 
 func Register(
