@@ -7,6 +7,7 @@ import (
 	"github.com/opsway-io/backend/internal/connectors/clickhouse"
 	"github.com/opsway-io/backend/internal/connectors/postgres"
 	"github.com/opsway-io/backend/internal/rest"
+	"github.com/opsway-io/backend/internal/rest/oauth"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -21,6 +22,7 @@ type Config struct {
 	Clickhouse     clickhouse.Config     `mapstructure:"clickhouse"`
 	REST           rest.Config           `mapstructure:"rest"`
 	Authentication authentication.Config `mapstructure:"authentication"`
+	OAuth          *oauth.Config         `mapstructure:"oauth"`
 }
 
 type LogConfig struct {

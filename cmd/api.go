@@ -112,6 +112,7 @@ func runAPI(cmd *cobra.Command, args []string) {
 
 	srv, err := rest.NewServer(
 		conf.REST,
+		conf.OAuth,
 		l,
 		authenticationService,
 		userService,

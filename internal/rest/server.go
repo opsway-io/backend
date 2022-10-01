@@ -10,6 +10,7 @@ import (
 	"github.com/opsway-io/backend/internal/monitor"
 	"github.com/opsway-io/backend/internal/rest/controllers"
 	"github.com/opsway-io/backend/internal/rest/helpers"
+	"github.com/opsway-io/backend/internal/rest/oauth"
 	"github.com/opsway-io/backend/internal/team"
 	"github.com/opsway-io/backend/internal/user"
 	"github.com/pkg/errors"
@@ -28,6 +29,7 @@ type Server struct {
 
 func NewServer(
 	conf Config,
+	oauthConfig *oauth.Config,
 	logger *logrus.Logger,
 	authenticationService authentication.Service,
 	userService user.Service,
@@ -56,12 +58,24 @@ func NewServer(
 
 	controllers.Register(
 		root,
-		logger.WithField("module", "rest"),
+		logger.WithField("module", "rest_controllers"),
 		authenticationService,
 		userService,
 		teamService,
 		monitorService,
 	)
+
+	if oauthConfig != nil {
+		oauth.Register(
+			root,
+			logger.WithField("module", "rest_oauth"),
+			oauthConfig,
+			authenticationService,
+			userService,
+		)
+
+		logger.Info("OAuth endpoints registered")
+	}
 
 	return &Server{
 		echo:   e,
