@@ -8,6 +8,7 @@ import (
 	"github.com/markbates/goth"
 	"github.com/markbates/goth/gothic"
 	"github.com/markbates/goth/providers/github"
+	"github.com/markbates/goth/providers/google"
 	"github.com/opsway-io/backend/internal/authentication"
 	"github.com/opsway-io/backend/internal/user"
 	"github.com/sirupsen/logrus"
@@ -17,6 +18,10 @@ type Config struct {
 	GithubClientID     string `mapstructure:"github_client_id"`
 	GithubClientSecret string `mapstructure:"github_client_secret"`
 	GithubCallbackURL  string `mapstructure:"github_callback_url"`
+
+	GoogleClientID     string `mapstructure:"google_client_id"`
+	GoogleClientSecret string `mapstructure:"google_client_secret"`
+	GoogleCallbackURL  string `mapstructure:"google_callback_url"`
 }
 
 func Register(
@@ -28,13 +33,16 @@ func Register(
 ) {
 	// Setup providers
 
-	githubScopes := []string{
-		"user:email",
-		"read:user",
-	}
-
 	goth.UseProviders(
-		github.New(config.GithubClientID, config.GithubClientSecret, config.GithubCallbackURL, githubScopes...),
+		github.New(config.GithubClientID, config.GithubClientSecret, config.GithubCallbackURL, []string{
+			"user:email",
+			"read:user",
+		}...),
+
+		google.New(config.GoogleClientID, config.GoogleClientSecret, config.GoogleCallbackURL, []string{
+			"https://www.googleapis.com/auth/userinfo.email",
+			"https://www.googleapis.com/auth/userinfo.profile",
+		}...),
 	)
 
 	// Routes
