@@ -22,6 +22,9 @@ type Config struct {
 	GoogleClientID     string `mapstructure:"google_client_id"`
 	GoogleClientSecret string `mapstructure:"google_client_secret"`
 	GoogleCallbackURL  string `mapstructure:"google_callback_url"`
+
+	SuccessURL string `mapstructure:"oauth_success_url" default:"/login/oauth"`
+	FailedURL  string `mapstructure:"oauth_failed_url" default:"/login"`
 }
 
 func Register(
@@ -62,17 +65,21 @@ func Register(
 		if err != nil {
 			logger.WithError(err).Error("failed to complete user oauth flow")
 
-			return echo.ErrUnauthorized
+			return c.Redirect(http.StatusTemporaryRedirect, config.FailedURL)
 		}
 
 		user, err := userService.GetUserAndTeamsByEmailAddress(c.Request().Context(), gothUser.Email)
 		if err != nil {
-			return echo.ErrUnauthorized
+			logger.WithError(err).Error("failed to get user by email address")
+
+			return c.Redirect(http.StatusTemporaryRedirect, config.FailedURL)
 		}
 
 		accessToken, refreshToken, err := authenticationService.Generate(user)
 		if err != nil {
-			return echo.ErrInternalServerError
+			logger.WithError(err).Error("failed to generate access token")
+
+			return c.Redirect(http.StatusTemporaryRedirect, config.FailedURL)
 		}
 
 		c.SetCookie(&http.Cookie{
@@ -85,6 +92,6 @@ func Register(
 			Value: refreshToken,
 		})
 
-		return c.Redirect(http.StatusTemporaryRedirect, "/login/oauth")
+		return c.Redirect(http.StatusTemporaryRedirect, config.SuccessURL)
 	})
 }
