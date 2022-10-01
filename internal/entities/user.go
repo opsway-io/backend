@@ -1,6 +1,7 @@
 package entities
 
 import (
+	"strings"
 	"time"
 
 	"github.com/pkg/errors"
@@ -25,6 +26,10 @@ type User struct {
 
 func (User) TableName() string {
 	return "users"
+}
+
+func (u *User) SetEmail(email string) {
+	u.Email = strings.ToLower(email)
 }
 
 func (u *User) SetPassword(password string) error {

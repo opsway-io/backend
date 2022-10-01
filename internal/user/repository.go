@@ -3,6 +3,7 @@ package user
 import (
 	"context"
 	"errors"
+	"strings"
 
 	"github.com/opsway-io/backend/internal/connectors/postgres"
 	"github.com/opsway-io/backend/internal/entities"
@@ -45,7 +46,7 @@ func (s *RepositoryImpl) GetUserAndTeamsByUserID(ctx context.Context, userID uin
 
 func (s *RepositoryImpl) GetUserAndTeamsByEmailAddress(ctx context.Context, email string) (*entities.User, error) {
 	var user entities.User
-	if err := s.db.WithContext(ctx).Preload("Teams").Where(entities.User{Email: email}).First(&user).Error; err != nil {
+	if err := s.db.WithContext(ctx).Preload("Teams").Where(entities.User{Email: strings.ToLower(email)}).First(&user).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, ErrNotFound
 		}

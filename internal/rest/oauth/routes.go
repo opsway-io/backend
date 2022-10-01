@@ -2,6 +2,8 @@ package oauth
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"net/http"
 
 	"github.com/labstack/echo/v4"
@@ -10,6 +12,7 @@ import (
 	"github.com/markbates/goth/providers/github"
 	"github.com/markbates/goth/providers/google"
 	"github.com/opsway-io/backend/internal/authentication"
+	"github.com/opsway-io/backend/internal/entities"
 	"github.com/opsway-io/backend/internal/user"
 	"github.com/sirupsen/logrus"
 )
@@ -68,16 +71,16 @@ func Register(
 			return c.Redirect(http.StatusTemporaryRedirect, config.FailureURL)
 		}
 
-		user, err := userService.GetUserAndTeamsByEmailAddress(c.Request().Context(), gothUser.Email)
+		user, err := getOrCreateUser(c, userService, gothUser)
 		if err != nil {
-			logger.WithError(err).Error("failed to get user by email address")
+			logger.WithError(err).Error("failed to get or create user to complete oauth flow")
 
 			return c.Redirect(http.StatusTemporaryRedirect, config.FailureURL)
 		}
 
 		accessToken, refreshToken, err := authenticationService.Generate(user)
 		if err != nil {
-			logger.WithError(err).Error("failed to generate access token")
+			logger.WithError(err).Error("failed to generate access token to complete oauth flow")
 
 			return c.Redirect(http.StatusTemporaryRedirect, config.FailureURL)
 		}
@@ -92,6 +95,33 @@ func Register(
 			Value: refreshToken,
 		})
 
+		c.SetCookie(&http.Cookie{
+			Name:  "user_id",
+			Value: fmt.Sprintf("%s", user.ID),
+		})
+
 		return c.Redirect(http.StatusTemporaryRedirect, config.SuccessURL)
 	})
+}
+
+func getOrCreateUser(c echo.Context, userService user.Service, gothUser goth.User) (*entities.User, error) {
+	u, err := userService.GetUserAndTeamsByEmailAddress(c.Request().Context(), gothUser.Email)
+	if err != nil {
+		if errors.Is(err, user.ErrNotFound) {
+			u := entities.User{
+				Name:        gothUser.Name,
+				DisplayName: &gothUser.NickName,
+			}
+
+			u.SetEmail(gothUser.Email)
+
+			if err := userService.Create(c.Request().Context(), &u); err != nil {
+				return nil, err
+			}
+		}
+
+		return nil, err
+	}
+
+	return u, nil
 }
