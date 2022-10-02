@@ -101,24 +101,27 @@ func Register(
 }
 
 func getOrCreateUser(c echo.Context, userService user.Service, gothUser goth.User) (*entities.User, error) {
-	var u *entities.User
-	var err error
+	u, err := userService.GetUserAndTeamsByEmailAddress(c.Request().Context(), gothUser.Email)
+	if err != nil && errors.Is(err, user.ErrNotFound) {
+		return nil, err
+	}
 
-	u, err = userService.GetUserAndTeamsByEmailAddress(c.Request().Context(), gothUser.Email)
-	if err != nil {
-		if errors.Is(err, user.ErrNotFound) {
-			u = &entities.User{
-				Name:        gothUser.Name,
-				DisplayName: &gothUser.NickName,
-			}
+	// User already exists, return it
 
-			u.SetEmail(gothUser.Email)
+	if u != nil {
+		return u, nil
+	}
 
-			if err := userService.Create(c.Request().Context(), u); err != nil {
-				return nil, err
-			}
-		}
+	// User does not exist, create it
 
+	u = &entities.User{
+		Name:        gothUser.Name,
+		DisplayName: &gothUser.NickName,
+	}
+
+	u.SetEmail(gothUser.Email)
+
+	if err := userService.Create(c.Request().Context(), u); err != nil {
 		return nil, err
 	}
 
