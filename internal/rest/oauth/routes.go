@@ -101,17 +101,20 @@ func Register(
 }
 
 func getOrCreateUser(c echo.Context, userService user.Service, gothUser goth.User) (*entities.User, error) {
-	u, err := userService.GetUserAndTeamsByEmailAddress(c.Request().Context(), gothUser.Email)
+	var u *entities.User
+	var err error
+
+	u, err = userService.GetUserAndTeamsByEmailAddress(c.Request().Context(), gothUser.Email)
 	if err != nil {
 		if errors.Is(err, user.ErrNotFound) {
-			u := entities.User{
+			u = &entities.User{
 				Name:        gothUser.Name,
 				DisplayName: &gothUser.NickName,
 			}
 
 			u.SetEmail(gothUser.Email)
 
-			if err := userService.Create(c.Request().Context(), &u); err != nil {
+			if err := userService.Create(c.Request().Context(), u); err != nil {
 				return nil, err
 			}
 		}
