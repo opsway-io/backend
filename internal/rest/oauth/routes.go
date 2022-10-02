@@ -3,8 +3,8 @@ package oauth
 import (
 	"context"
 	"errors"
-	"fmt"
 	"net/http"
+	"net/url"
 
 	"github.com/labstack/echo/v4"
 	"github.com/markbates/goth"
@@ -78,27 +78,23 @@ func Register(
 			return c.Redirect(http.StatusTemporaryRedirect, config.FailureURL)
 		}
 
-		accessToken, refreshToken, err := authenticationService.Generate(user)
+		_, refreshToken, err := authenticationService.Generate(user)
 		if err != nil {
 			logger.WithError(err).Error("failed to generate access token to complete oauth flow")
 
 			return c.Redirect(http.StatusTemporaryRedirect, config.FailureURL)
 		}
 
-		c.SetCookie(&http.Cookie{
-			Name:  "access_token",
-			Value: accessToken,
-		})
+		targetURL, err := url.Parse(config.SuccessURL)
+		if err != nil {
+			logger.WithError(err).Error("failed to parse success url to complete oauth flow")
 
-		c.SetCookie(&http.Cookie{
-			Name:  "refresh_token",
-			Value: refreshToken,
-		})
+			return c.Redirect(http.StatusTemporaryRedirect, config.FailureURL)
+		}
 
-		c.SetCookie(&http.Cookie{
-			Name:  "user_id",
-			Value: fmt.Sprintf("%s", user.ID),
-		})
+		q := targetURL.Query()
+		q.Add("refresh_token", refreshToken)
+		targetURL.RawQuery = q.Encode()
 
 		return c.Redirect(http.StatusTemporaryRedirect, config.SuccessURL)
 	})
