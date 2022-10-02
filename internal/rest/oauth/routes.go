@@ -96,7 +96,7 @@ func Register(
 		q.Add("refresh_token", refreshToken)
 		targetURL.RawQuery = q.Encode()
 
-		return c.Redirect(http.StatusTemporaryRedirect, config.SuccessURL)
+		return c.Redirect(http.StatusTemporaryRedirect, targetURL.String())
 	})
 }
 
