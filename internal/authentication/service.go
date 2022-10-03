@@ -84,6 +84,10 @@ func (s *ServiceImpl) verifyAndDeleteRefreshToken(ctx context.Context, refreshTo
 		return false, nil, errors.Wrap(err, "failed to parse token")
 	}
 
+	if claims.Type != "refresh_token" {
+		return false, nil, errors.New("invalid token type")
+	}
+
 	if !token.Valid {
 		return false, nil, nil
 	}
