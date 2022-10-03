@@ -1,26 +1,20 @@
-package mail
+package email
 
 import (
 	"fmt"
 	"net/http"
 
-	"github.com/opsway-io/backend/internal/notification/mail/templates"
+	"github.com/opsway-io/backend/internal/notification/email/templates"
 	"github.com/sendgrid/sendgrid-go"
 	"github.com/sendgrid/sendgrid-go/helpers/mail"
 )
 
-type SendConfig struct {
-	SendgridAPIKey string
-	SenderName     string
-	SenderEmail    string
-}
-
 type SendgridSender struct {
-	config SendConfig
+	config Config
 	client *sendgrid.Client
 }
 
-func NewSendgridSender(config SendConfig) Sender {
+func NewSendgridSender(config Config) Sender {
 	return &SendgridSender{
 		config: config,
 		client: sendgrid.NewSendClient(config.SendgridAPIKey),

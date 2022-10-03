@@ -1,19 +1,20 @@
-package mail
+package email
 
 import (
 	"fmt"
 
-	"github.com/opsway-io/backend/internal/notification/mail/templates"
+	"github.com/opsway-io/backend/internal/notification/email/templates"
 )
 
-type DummySender struct{}
+type ConsoleSender struct{}
 
-func NewDummySender() Sender {
-	return &DummySender{}
+// Prints email to console. Useful for development.
+func NewConsoleSender() Sender {
+	return &ConsoleSender{}
 }
 
 //nolint:forbidigo
-func (s *DummySender) Send(name string, to string, template templates.Template) error {
+func (s *ConsoleSender) Send(name string, to string, template templates.Template) error {
 	fmt.Println("------------------------------------------------------------")
 	fmt.Printf("To: %s <%s>\n", name, to)
 	fmt.Printf("Subject: %s\n", template.Subject())
