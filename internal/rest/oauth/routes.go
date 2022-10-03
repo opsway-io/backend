@@ -4,7 +4,7 @@ import (
 	"context"
 	"errors"
 	"net/http"
-	"net/url"
+	"time"
 
 	"github.com/labstack/echo/v4"
 	"github.com/markbates/goth"
@@ -78,25 +78,30 @@ func Register(
 			return c.Redirect(http.StatusTemporaryRedirect, config.FailureURL)
 		}
 
-		_, refreshToken, err := authenticationService.Generate(c.Request().Context(), user)
+		accessToken, refreshToken, err := authenticationService.Generate(c.Request().Context(), user)
 		if err != nil {
 			logger.WithError(err).Error("failed to generate access token to complete oauth flow")
 
 			return c.Redirect(http.StatusTemporaryRedirect, config.FailureURL)
 		}
 
-		targetURL, err := url.Parse(config.SuccessURL)
-		if err != nil {
-			logger.WithError(err).Error("failed to parse success url to complete oauth flow")
+		c.SetCookie(&http.Cookie{
+			Name:     "refresh_token",
+			Value:    refreshToken,
+			Path:     "/",
+			SameSite: http.SameSiteLaxMode,
+			Expires:  time.Now().Add(1 * time.Minute),
+		})
 
-			return c.Redirect(http.StatusTemporaryRedirect, config.FailureURL)
-		}
+		c.SetCookie(&http.Cookie{
+			Name:     "access_token",
+			Value:    accessToken,
+			Path:     "/",
+			SameSite: http.SameSiteLaxMode,
+			Expires:  time.Now().Add(1 * time.Minute),
+		})
 
-		q := targetURL.Query()
-		q.Add("refresh_token", refreshToken)
-		targetURL.RawQuery = q.Encode()
-
-		return c.Redirect(http.StatusTemporaryRedirect, targetURL.String())
+		return c.Redirect(http.StatusTemporaryRedirect, config.SuccessURL)
 	})
 }
 
