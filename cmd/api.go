@@ -6,6 +6,7 @@ import (
 
 	"github.com/opsway-io/backend/internal/authentication"
 	"github.com/opsway-io/backend/internal/connectors/postgres"
+	"github.com/opsway-io/backend/internal/connectors/redis"
 	"github.com/opsway-io/backend/internal/entities"
 	"github.com/opsway-io/backend/internal/monitor"
 	"github.com/opsway-io/backend/internal/rest"
@@ -41,6 +42,11 @@ func runAPI(cmd *cobra.Command, args []string) {
 
 	ctx := context.Background()
 
+	redisClient, err := redis.NewClient(ctx, conf.Redis)
+	if err != nil {
+		l.WithError(err).Fatal("Failed to connect to Redis")
+	}
+
 	db, err := postgres.NewClient(ctx, conf.Postgres)
 	if err != nil {
 		l.WithError(err).Fatal("Failed to create Postgres client")
@@ -59,7 +65,7 @@ func runAPI(cmd *cobra.Command, args []string) {
 		entities.IncidentComment{},
 	)
 
-	authenticationService := authentication.NewService(conf.Authentication)
+	authenticationService := authentication.NewService(conf.Authentication, redisClient)
 
 	userRepository := user.NewRepository(db)
 	userService := user.NewService(userRepository)

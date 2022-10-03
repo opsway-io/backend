@@ -6,6 +6,7 @@ import (
 	"github.com/opsway-io/backend/internal/connectors/asynq"
 	"github.com/opsway-io/backend/internal/connectors/clickhouse"
 	"github.com/opsway-io/backend/internal/connectors/postgres"
+	"github.com/opsway-io/backend/internal/connectors/redis"
 	"github.com/opsway-io/backend/internal/rest"
 	"github.com/opsway-io/backend/internal/rest/oauth"
 	"github.com/sirupsen/logrus"
@@ -20,6 +21,7 @@ type Config struct {
 	Postgres       postgres.Config       `mapstructure:"postgres"`
 	Asynq          asynq.Config          `mapstructure:"asynq"`
 	Clickhouse     clickhouse.Config     `mapstructure:"clickhouse"`
+	Redis          redis.Config          `mapstructure:"redis"`
 	REST           rest.Config           `mapstructure:"rest"`
 	Authentication authentication.Config `mapstructure:"authentication"`
 	OAuth          *oauth.Config         `mapstructure:"oauth"`

@@ -78,7 +78,7 @@ func Register(
 			return c.Redirect(http.StatusTemporaryRedirect, config.FailureURL)
 		}
 
-		_, refreshToken, err := authenticationService.Generate(user)
+		_, refreshToken, err := authenticationService.Generate(c.Request().Context(), user)
 		if err != nil {
 			logger.WithError(err).Error("failed to generate access token to complete oauth flow")
 

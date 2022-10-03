@@ -62,7 +62,7 @@ func (h *Handlers) PostLogin(ctx hs.BaseContext) error {
 		return echo.ErrUnauthorized
 	}
 
-	accessToken, refreshToken, err := h.AuthenticationService.Generate(user)
+	accessToken, refreshToken, err := h.AuthenticationService.Generate(ctx.Request().Context(), user)
 	if err != nil {
 		ctx.Log.WithError(err).Debug("failed to generate access and refresh token for user")
 
@@ -118,7 +118,7 @@ func (h *Handlers) PostRefreshToken(ctx hs.BaseContext) error {
 		return echo.ErrBadRequest
 	}
 
-	accessToken, refreshToken, err := h.AuthenticationService.Refresh(req.RefreshToken)
+	accessToken, refreshToken, err := h.AuthenticationService.Refresh(ctx.Request().Context(), req.RefreshToken)
 	if err != nil {
 		ctx.Log.WithError(err).Debug("failed to refresh access and refresh token")
 

@@ -35,7 +35,7 @@ func AuthGuardFactory(logger *logrus.Entry, jwtService authentication.Service) f
 					return echo.ErrUnauthorized
 				}
 
-				valid, claims, err := jwtService.VerifyAccessToken(token)
+				valid, claims, err := jwtService.Verify(c.Request().Context(), token)
 				if err != nil {
 					l.WithError(err).Debug("failed to verify token")
 
