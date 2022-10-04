@@ -4,13 +4,13 @@ import (
 	"time"
 )
 
-type ProbeResult struct {
+type HttpResult struct {
 	ID        uint
 	Body      *[]byte   `gorm:"type:bytea"`
 	MonitorID int       `gorm:"index;not null"`
 	CreatedAt time.Time `gorm:"index"`
 }
 
-func (ProbeResult) TableName() string {
-	return "ProbeResults"
+func (HttpResult) TableName() string {
+	return "HttpResults"
 }

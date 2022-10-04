@@ -8,8 +8,8 @@ import (
 )
 
 type Service interface {
-	GetMonitorByTeamID(ctx context.Context, monitorID int) (*entities.ProbeResult, error)
-	Create(ctx context.Context, monitor *entities.ProbeResult) error
+	GetMonitorByTeamID(ctx context.Context, monitorID int) (*entities.HttpResult, error)
+	Create(ctx context.Context, monitor *entities.HttpResult) error
 }
 
 type ServiceImpl struct {
@@ -22,10 +22,10 @@ func NewService(db *gorm.DB) Service {
 	}
 }
 
-func (s *ServiceImpl) GetMonitorByTeamID(ctx context.Context, monitorID int) (*entities.ProbeResult, error) {
+func (s *ServiceImpl) GetMonitorByTeamID(ctx context.Context, monitorID int) (*entities.HttpResult, error) {
 	return s.repository.Get(ctx, monitorID)
 }
 
-func (s *ServiceImpl) Create(ctx context.Context, m *entities.ProbeResult) error {
+func (s *ServiceImpl) Create(ctx context.Context, m *entities.HttpResult) error {
 	return s.repository.Create(ctx, m)
 }
