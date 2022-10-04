@@ -41,7 +41,7 @@ func runProber(cmd *cobra.Command, args []string) {
 	}
 
 	db.AutoMigrate(
-		entities.ProbeResult{},
+		entities.HttpResult{},
 	)
 
 	probeResultService := probes.NewService(db)

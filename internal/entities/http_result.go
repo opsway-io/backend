@@ -6,7 +6,7 @@ import (
 
 type HttpResult struct {
 	ID        uint
-	Body      *[]byte   `gorm:"type:bytea"`
+	Result    string
 	MonitorID int       `gorm:"index;not null"`
 	CreatedAt time.Time `gorm:"index"`
 }
