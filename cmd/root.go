@@ -9,6 +9,7 @@ import (
 	"github.com/opsway-io/backend/internal/connectors/redis"
 	"github.com/opsway-io/backend/internal/rest"
 	"github.com/opsway-io/backend/internal/rest/oauth"
+	"github.com/opsway-io/backend/internal/storage"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -17,14 +18,15 @@ import (
 var cfgFile string
 
 type Config struct {
-	Log            LogConfig             `mapstructure:"log"`
-	Postgres       postgres.Config       `mapstructure:"postgres"`
-	Asynq          asynq.Config          `mapstructure:"asynq"`
-	Clickhouse     clickhouse.Config     `mapstructure:"clickhouse"`
-	Redis          redis.Config          `mapstructure:"redis"`
-	REST           rest.Config           `mapstructure:"rest"`
-	Authentication authentication.Config `mapstructure:"authentication"`
-	OAuth          *oauth.Config         `mapstructure:"oauth"`
+	Log            LogConfig                             `mapstructure:"log"`
+	Postgres       postgres.Config                       `mapstructure:"postgres"`
+	Asynq          asynq.Config                          `mapstructure:"asynq"`
+	Clickhouse     clickhouse.Config                     `mapstructure:"clickhouse"`
+	Redis          redis.Config                          `mapstructure:"redis"`
+	REST           rest.Config                           `mapstructure:"rest"`
+	Authentication authentication.Config                 `mapstructure:"authentication"`
+	OAuth          *oauth.Config                         `mapstructure:"oauth"`
+	ObjectStorage  storage.ObjectStorageRepositoryConfig `mapstructure:"object_storage"`
 }
 
 type LogConfig struct {

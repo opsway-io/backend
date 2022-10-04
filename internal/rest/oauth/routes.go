@@ -17,6 +17,8 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
+var ErrCouldNotScrapeAvatar = errors.New("could not scrape avatar")
+
 type Config struct {
 	GithubClientID     string `mapstructure:"github_client_id"`
 	GithubClientSecret string `mapstructure:"github_client_secret"`
@@ -128,6 +130,12 @@ func getOrCreateUser(c echo.Context, userService user.Service, gothUser goth.Use
 
 	if err := userService.Create(c.Request().Context(), u); err != nil {
 		return nil, err
+	}
+
+	if gothUser.AvatarURL != "" {
+		if err := userService.ScrapeUserAvatarFromURL(c.Request().Context(), u.ID, gothUser.AvatarURL); err != nil {
+			return nil, err
+		}
 	}
 
 	return u, nil

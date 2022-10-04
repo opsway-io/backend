@@ -1,22 +1,29 @@
 package storage
 
-import "io"
+import (
+	"context"
+	"io"
+)
 
 type Service interface {
-	GetAvatarURL(userID uint) (string, error)
-	UploadAvatar(data io.Reader, userID uint) ([]byte, error)
+	GetPublicFileURL(bucket string, key string) (url string)
+	PutFile(ctx context.Context, bucket string, key string, data io.Reader) (err error)
 }
 
-type ServiceImpl struct{}
+type ServiceImpl struct {
+	repository Repository
+}
 
 func NewService(repository Repository) Service {
-	return &ServiceImpl{}
+	return &ServiceImpl{
+		repository: repository,
+	}
 }
 
-func (s *ServiceImpl) GetAvatarURL(userID uint) (string, error) {
-	return "", nil
+func (s *ServiceImpl) GetPublicFileURL(bucket string, key string) (url string) {
+	return s.repository.GetPublicFileURL(bucket, key)
 }
 
-func (s *ServiceImpl) UploadAvatar(data io.Reader, userID uint) ([]byte, error) {
-	return nil, nil
+func (s *ServiceImpl) PutFile(ctx context.Context, bucket string, key string, data io.Reader) (err error) {
+	return s.repository.PutFile(ctx, bucket, key, data)
 }

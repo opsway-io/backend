@@ -10,6 +10,7 @@ import (
 	"github.com/opsway-io/backend/internal/entities"
 	"github.com/opsway-io/backend/internal/monitor"
 	"github.com/opsway-io/backend/internal/rest"
+	"github.com/opsway-io/backend/internal/storage"
 	"github.com/opsway-io/backend/internal/team"
 	"github.com/opsway-io/backend/internal/user"
 	"github.com/sirupsen/logrus"
@@ -65,10 +66,13 @@ func runAPI(cmd *cobra.Command, args []string) {
 		entities.IncidentComment{},
 	)
 
+	storageRepository := storage.NewObjectStorageRepository(ctx, conf.ObjectStorage)
+	storageService := storage.NewService(storageRepository)
+
 	authenticationService := authentication.NewService(conf.Authentication, redisClient)
 
 	userRepository := user.NewRepository(db)
-	userService := user.NewService(userRepository)
+	userService := user.NewService(userRepository, storageService)
 
 	teamRepository := team.NewRepository(db)
 	teamService := team.NewService(teamRepository)

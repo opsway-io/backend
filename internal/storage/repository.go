@@ -6,6 +6,6 @@ import (
 )
 
 type Repository interface {
-	GetPublicFileURL(ctx context.Context, bucket string, key string) (string, error)
-	PutFile(ctx context.Context, bucket string, key string, data io.Reader) error
+	GetPublicFileURL(bucket string, key string) (url string)
+	PutFile(ctx context.Context, bucket string, key string, data io.Reader) (err error)
 }
