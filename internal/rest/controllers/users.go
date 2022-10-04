@@ -1,6 +1,7 @@
 package controllers
 
 import (
+	"context"
 	"net/http"
 	"time"
 
@@ -55,10 +56,10 @@ func (h *Handlers) GetUser(ctx hs.AuthenticatedContext) error {
 		return echo.ErrInternalServerError
 	}
 
-	return ctx.JSON(http.StatusOK, newGetUserResponse(u))
+	return ctx.JSON(http.StatusOK, newGetUserResponse(ctx.Request().Context(), u, h.UserService))
 }
 
-func newGetUserResponse(u *entities.User) GetUserResponse {
+func newGetUserResponse(ctx context.Context, u *entities.User, userService user.Service) GetUserResponse {
 	teams := make([]GetUserResponseTeam, len(u.Teams))
 
 	for i, t := range u.Teams {
@@ -66,7 +67,7 @@ func newGetUserResponse(u *entities.User) GetUserResponse {
 			ID:          t.ID,
 			Name:        t.Name,
 			DisplayName: t.DisplayName,
-			AvatarURL:   t.Avatar,
+			AvatarURL:   nil, // TODO
 		}
 	}
 
@@ -75,7 +76,7 @@ func newGetUserResponse(u *entities.User) GetUserResponse {
 		Name:        u.Name,
 		DisplayName: u.DisplayName,
 		Email:       u.Email,
-		AvatarURL:   u.Avatar,
+		AvatarURL:   userService.GetUserAvatarURL(ctx, u),
 		Teams:       teams,
 		CreatedAt:   u.CreatedAt,
 		UpdatedAt:   u.UpdatedAt,

@@ -4,11 +4,10 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"log"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
-	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/credentials"
+	"github.com/aws/aws-sdk-go-v2/feature/s3/manager"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 )
 
@@ -20,39 +19,36 @@ type ObjectStorageRepositoryConfig struct {
 }
 
 type ObjectStorageRepository struct {
-	config ObjectStorageRepositoryConfig
-	s3     *s3.Client
+	config   ObjectStorageRepositoryConfig
+	s3       *s3.Client
+	uploader *manager.Uploader
 }
 
 func NewObjectStorageRepository(ctx context.Context, conf ObjectStorageRepositoryConfig) *ObjectStorageRepository {
-	var options []func(*config.LoadOptions) error
+	cfg := aws.Config{
+		Region:      conf.Region,
+		Credentials: credentials.NewStaticCredentialsProvider(conf.AccessKey, conf.SecretKey, ""),
+	}
 
-	options = append(options, config.WithRegion(conf.Region))
-	options = append(options, config.WithCredentialsProvider(
-		credentials.NewStaticCredentialsProvider(
-			conf.AccessKey,
-			conf.SecretKey,
-			"",
-		),
-	))
 	if conf.EndpointURL != nil {
-		options = append(options, config.WithEndpointResolver(
-			aws.EndpointResolverFunc(func(service, region string) (aws.Endpoint, error) {
-				return aws.Endpoint{
-					URL: *conf.EndpointURL,
-				}, nil
-			}),
-		))
+		cfg.EndpointResolver = aws.EndpointResolverFunc(func(service, region string) (aws.Endpoint, error) {
+			return aws.Endpoint{
+				PartitionID:       "aws",
+				URL:               *conf.EndpointURL,
+				SigningRegion:     conf.Region,
+				HostnameImmutable: true,
+			}, nil
+		})
 	}
 
-	cfg, err := config.LoadDefaultConfig(ctx, options...)
-	if err != nil {
-		log.Fatal(err)
-	}
+	uploader := manager.NewUploader(s3.NewFromConfig(cfg), func(u *manager.Uploader) {
+		u.BufferProvider = manager.NewBufferedReadSeekerWriteToPool(25 * 1024 * 1024)
+	})
 
 	return &ObjectStorageRepository{
-		config: conf,
-		s3:     s3.NewFromConfig(cfg),
+		config:   conf,
+		s3:       s3.NewFromConfig(cfg),
+		uploader: uploader,
 	}
 }
 
@@ -61,7 +57,7 @@ func (r *ObjectStorageRepository) GetPublicFileURL(bucket string, key string) st
 }
 
 func (r *ObjectStorageRepository) PutFile(ctx context.Context, bucket string, key string, data io.Reader) error {
-	_, err := r.s3.PutObject(ctx, &s3.PutObjectInput{
+	_, err := r.uploader.Upload(ctx, &s3.PutObjectInput{
 		Bucket: aws.String(bucket),
 		Key:    aws.String(key),
 		Body:   data,

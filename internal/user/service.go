@@ -75,7 +75,7 @@ func (s *ServiceImpl) ScrapeUserAvatarFromURL(ctx context.Context, userID uint, 
 }
 
 func (s *ServiceImpl) GetUserAvatarURL(ctx context.Context, user *entities.User) *string {
-	if user.Avatar != nil {
+	if user.Avatar == nil {
 		return nil
 	}
 
