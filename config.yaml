@@ -38,7 +38,7 @@ notification:
     sendgrid_api_key: ""
 
 object_storage:
-  endpoint: "http://localhost:9001"
+  endpoint_url: "http://localhost:9001"
   access_key: "guest"
   secret_key: "guest"
   region: "eu-central-1"
