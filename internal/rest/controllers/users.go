@@ -71,16 +71,21 @@ func newGetUserResponse(u *entities.User, userService user.Service) GetUserRespo
 		}
 	}
 
-	return GetUserResponse{
+	res := GetUserResponse{
 		ID:          u.ID,
 		Name:        u.Name,
 		DisplayName: u.DisplayName,
 		Email:       u.Email,
-		AvatarURL:   pointer.String(userService.GetUserAvatarURLByID(u.ID)),
 		Teams:       teams,
 		CreatedAt:   u.CreatedAt,
 		UpdatedAt:   u.UpdatedAt,
 	}
+
+	if u.HasAvatar {
+		res.AvatarURL = pointer.StringPtr(userService.GetUserAvatarURLByID(u.ID))
+	}
+
+	return res
 }
 
 type PutUserRequest struct {

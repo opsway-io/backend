@@ -96,10 +96,13 @@ func newPostLoginResponse(user *entities.User, accessToken, refreshToken string,
 			DisplayName: user.DisplayName,
 			Email:       user.Email,
 			Teams:       teams,
-			AvatarURL:   pointer.String(userService.GetUserAvatarURLByID(user.ID)),
 			CreatedAt:   user.CreatedAt,
 			UpdatedAt:   user.UpdatedAt,
 		},
+	}
+
+	if user.HasAvatar {
+		res.User.AvatarURL = pointer.String(userService.GetUserAvatarURLByID(user.ID))
 	}
 
 	return res

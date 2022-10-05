@@ -99,8 +99,11 @@ func newGetTeamUsersResponse(users *[]team.TeamUser, userService user.Service) G
 			Email:       u.Email,
 			DisplayName: u.DisplayName,
 			Name:        u.Name,
-			AvatarURL:   pointer.String(userService.GetUserAvatarURLByID(u.ID)),
 			Role:        u.Role,
+		}
+
+		if u.HasAvatar {
+			res[i].AvatarURL = pointer.String(userService.GetUserAvatarURLByID(u.ID))
 		}
 	}
 
