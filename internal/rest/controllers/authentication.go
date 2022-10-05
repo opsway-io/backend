@@ -8,6 +8,8 @@ import (
 	"github.com/opsway-io/backend/internal/entities"
 	hs "github.com/opsway-io/backend/internal/rest/handlers"
 	"github.com/opsway-io/backend/internal/rest/helpers"
+	"github.com/opsway-io/backend/internal/user"
+	"k8s.io/utils/pointer"
 )
 
 type PostLoginRequest struct {
@@ -71,21 +73,21 @@ func (h *Handlers) PostLogin(ctx hs.BaseContext) error {
 
 	ctx.Log.Info("user authenticated")
 
-	return ctx.JSON(http.StatusOK, newPostLoginResponse(user, accessToken, refreshToken))
+	return ctx.JSON(http.StatusOK, newPostLoginResponse(user, accessToken, refreshToken, h.UserService))
 }
 
-func newPostLoginResponse(user *entities.User, accessToken, refreshToken string) PostLoginResponse {
+func newPostLoginResponse(user *entities.User, accessToken, refreshToken string, userService user.Service) PostLoginResponse {
 	teams := make([]PostLoginResponseTeam, len(user.Teams))
 	for i, team := range user.Teams {
 		teams[i] = PostLoginResponseTeam{
 			ID:          team.ID,
 			Name:        team.Name,
 			DisplayName: team.DisplayName,
-			AvatarURL:   team.Avatar,
+			AvatarURL:   nil, // TODO
 		}
 	}
 
-	return PostLoginResponse{
+	res := PostLoginResponse{
 		AccessToken:  accessToken,
 		RefreshToken: refreshToken,
 		User: PostLoginResponseUser{
@@ -93,12 +95,14 @@ func newPostLoginResponse(user *entities.User, accessToken, refreshToken string)
 			Name:        user.Name,
 			DisplayName: user.DisplayName,
 			Email:       user.Email,
-			AvatarURL:   user.Avatar,
 			Teams:       teams,
+			AvatarURL:   pointer.String(userService.GetUserAvatarURLByID(user.ID)),
 			CreatedAt:   user.CreatedAt,
 			UpdatedAt:   user.UpdatedAt,
 		},
 	}
+
+	return res
 }
 
 type PostRefreshTokenRequest struct {

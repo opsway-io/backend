@@ -9,6 +9,8 @@ import (
 	hs "github.com/opsway-io/backend/internal/rest/handlers"
 	"github.com/opsway-io/backend/internal/rest/helpers"
 	"github.com/opsway-io/backend/internal/team"
+	"github.com/opsway-io/backend/internal/user"
+	"k8s.io/utils/pointer"
 )
 
 type GetTeamRequest struct {
@@ -47,7 +49,7 @@ func newGetTeamResponse(t *entities.Team) GetTeamResponse {
 		ID:          t.ID,
 		Name:        t.Name,
 		DisplayName: t.DisplayName,
-		AvatarURL:   t.Avatar,
+		AvatarURL:   nil, // TODO
 		CreatedAt:   t.CreatedAt,
 		UpdatedAt:   t.UpdatedAt,
 	}
@@ -85,10 +87,10 @@ func (h *Handlers) GetTeamUsers(ctx hs.AuthenticatedContext) error {
 		return echo.ErrInternalServerError
 	}
 
-	return ctx.JSON(http.StatusOK, newGetTeamUsersResponse(users))
+	return ctx.JSON(http.StatusOK, newGetTeamUsersResponse(users, h.UserService))
 }
 
-func newGetTeamUsersResponse(users *[]team.TeamUser) GetTeamUsersResponse {
+func newGetTeamUsersResponse(users *[]team.TeamUser, userService user.Service) GetTeamUsersResponse {
 	res := make([]GetTeamUsersResponseUser, len(*users))
 
 	for i, u := range *users {
@@ -97,7 +99,7 @@ func newGetTeamUsersResponse(users *[]team.TeamUser) GetTeamUsersResponse {
 			Email:       u.Email,
 			DisplayName: u.DisplayName,
 			Name:        u.Name,
-			AvatarURL:   u.Avatar,
+			AvatarURL:   pointer.String(userService.GetUserAvatarURLByID(u.ID)),
 			Role:        u.Role,
 		}
 	}

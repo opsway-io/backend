@@ -17,7 +17,7 @@ type Service interface {
 	Update(ctx context.Context, user *entities.User) error
 	Delete(ctx context.Context, id uint) error
 	ScrapeUserAvatarFromURL(ctx context.Context, userID uint, URL string) error
-	GetUserAvatarURL(ctx context.Context, user *entities.User) (URL *string)
+	GetUserAvatarURLByID(userID uint) (URL string)
 }
 
 type ServiceImpl struct {
@@ -67,22 +67,17 @@ func (s *ServiceImpl) ScrapeUserAvatarFromURL(ctx context.Context, userID uint, 
 	}
 
 	s.repository.Update(ctx, &entities.User{
-		ID:     userID,
-		Avatar: &key,
+		ID:        userID,
+		HasAvatar: true,
 	})
 
 	return nil
 }
 
-func (s *ServiceImpl) GetUserAvatarURL(ctx context.Context, user *entities.User) *string {
-	if user.Avatar == nil {
-		return nil
-	}
+func (s *ServiceImpl) GetUserAvatarURLByID(userID uint) string {
+	key := s.getUserAvatarKey(userID)
 
-	key := s.getUserAvatarKey(user.ID)
-	url := s.storage.GetPublicFileURL("avatars", key)
-
-	return &url
+	return s.storage.GetPublicFileURL("avatars", key)
 }
 
 func (s *ServiceImpl) getUserAvatarKey(userID uint) string {

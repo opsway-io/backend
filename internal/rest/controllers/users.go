@@ -1,7 +1,6 @@
 package controllers
 
 import (
-	"context"
 	"net/http"
 	"time"
 
@@ -11,6 +10,7 @@ import (
 	"github.com/opsway-io/backend/internal/rest/helpers"
 	"github.com/opsway-io/backend/internal/user"
 	"github.com/pkg/errors"
+	"k8s.io/utils/pointer"
 )
 
 type GetUserRequest struct {
@@ -56,10 +56,10 @@ func (h *Handlers) GetUser(ctx hs.AuthenticatedContext) error {
 		return echo.ErrInternalServerError
 	}
 
-	return ctx.JSON(http.StatusOK, newGetUserResponse(ctx.Request().Context(), u, h.UserService))
+	return ctx.JSON(http.StatusOK, newGetUserResponse(u, h.UserService))
 }
 
-func newGetUserResponse(ctx context.Context, u *entities.User, userService user.Service) GetUserResponse {
+func newGetUserResponse(u *entities.User, userService user.Service) GetUserResponse {
 	teams := make([]GetUserResponseTeam, len(u.Teams))
 
 	for i, t := range u.Teams {
@@ -76,7 +76,7 @@ func newGetUserResponse(ctx context.Context, u *entities.User, userService user.
 		Name:        u.Name,
 		DisplayName: u.DisplayName,
 		Email:       u.Email,
-		AvatarURL:   userService.GetUserAvatarURL(ctx, u),
+		AvatarURL:   pointer.String(userService.GetUserAvatarURLByID(u.ID)),
 		Teams:       teams,
 		CreatedAt:   u.CreatedAt,
 		UpdatedAt:   u.UpdatedAt,

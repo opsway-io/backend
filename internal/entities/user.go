@@ -14,7 +14,7 @@ type User struct {
 	Name                string  `gorm:"index;not null"`
 	DisplayName         *string `gorm:"index"`
 	Email               string  `gorm:"uniqueIndex"`
-	Avatar              *string
+	HasAvatar           bool
 	PasswordHash        *string
 	Roles               []TeamRole           `gorm:"constraint:OnDelete:CASCADE"`
 	Teams               []Team               `gorm:"many2many:team_users;constraint:OnDelete:CASCADE"`
