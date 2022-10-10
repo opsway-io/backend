@@ -7,7 +7,6 @@ import (
 
 	asynqClient "github.com/opsway-io/backend/internal/connectors/asynq"
 	"github.com/opsway-io/backend/internal/connectors/clickhouse"
-	"github.com/opsway-io/backend/internal/entities"
 	"github.com/opsway-io/backend/internal/probes"
 	schedule "github.com/opsway-io/backend/internal/schedule"
 
@@ -39,10 +38,6 @@ func runProber(cmd *cobra.Command, args []string) {
 	if err != nil {
 		l.WithError(err).Fatal("Failed to create clickhouse")
 	}
-
-	db.AutoMigrate(
-		entities.HttpResult{},
-	)
 
 	probeResultService := probes.NewService(db)
 
