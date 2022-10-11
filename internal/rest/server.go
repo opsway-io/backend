@@ -65,6 +65,7 @@ func NewServer(
 		userService,
 		teamService,
 		monitorService,
+		httpResultService,
 	)
 
 	if oauthConfig != nil {

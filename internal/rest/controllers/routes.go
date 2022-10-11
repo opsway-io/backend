@@ -4,6 +4,7 @@ import (
 	"github.com/labstack/echo/v4"
 	"github.com/opsway-io/backend/internal/authentication"
 	"github.com/opsway-io/backend/internal/monitor"
+	"github.com/opsway-io/backend/internal/probes"
 	"github.com/opsway-io/backend/internal/rest/handlers"
 	mw "github.com/opsway-io/backend/internal/rest/middleware"
 	"github.com/opsway-io/backend/internal/team"
@@ -16,6 +17,7 @@ type Handlers struct {
 	UserService           user.Service
 	TeamService           team.Service
 	MonitorService        monitor.Service
+	HttpResultService     probes.Service
 }
 
 func Register(
@@ -25,12 +27,14 @@ func Register(
 	userService user.Service,
 	teamService team.Service,
 	monitorService monitor.Service,
+	httpResultService probes.Service,
 ) {
 	h := &Handlers{
 		AuthenticationService: authenticationService,
 		UserService:           userService,
 		TeamService:           teamService,
 		MonitorService:        monitorService,
+		HttpResultService:     httpResultService,
 	}
 
 	AuthGuard := mw.AuthGuardFactory(logger, authenticationService)
