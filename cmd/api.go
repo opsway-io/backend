@@ -9,6 +9,7 @@ import (
 	"github.com/opsway-io/backend/internal/connectors/redis"
 	"github.com/opsway-io/backend/internal/entities"
 	"github.com/opsway-io/backend/internal/monitor"
+	"github.com/opsway-io/backend/internal/probes"
 	"github.com/opsway-io/backend/internal/rest"
 	"github.com/opsway-io/backend/internal/storage"
 	"github.com/opsway-io/backend/internal/team"
@@ -79,6 +80,8 @@ func runAPI(cmd *cobra.Command, args []string) {
 
 	monitorService := monitor.NewService(db)
 
+	httpResultService := probes.NewService(db)
+
 	// TODO: Remove
 
 	u := &entities.User{
@@ -128,6 +131,7 @@ func runAPI(cmd *cobra.Command, args []string) {
 		userService,
 		teamService,
 		monitorService,
+		httpResultService,
 	)
 	if err != nil {
 		l.WithError(err).Fatal("Failed to create REST server")
