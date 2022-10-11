@@ -37,6 +37,7 @@ func runMigrations(cmd *cobra.Command, args []string) {
 		l.WithError(err).Fatal("Failed to create clickhouse")
 	}
 
+	db.Exec("CREATE DATABASE opsway")
 	db.AutoMigrate(
 		entities.HttpResult{},
 	)
