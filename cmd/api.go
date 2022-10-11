@@ -111,7 +111,7 @@ func runAPI(cmd *cobra.Command, args []string) {
 		Settings: entities.MonitorSettings{
 			Method:    "GET",
 			URL:       "https://opsway.io",
-			Frequency: time.Minute * 5,
+			Frequency: time.Second * 10,
 		},
 		TeamID: t.ID,
 	}

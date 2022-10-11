@@ -37,12 +37,16 @@ func HandleTask(serv probes.Service) asynq.HandlerFunc {
 			logrus.WithError(err).Fatal("error probing url")
 		}
 
-		result, err := json.Marshal(res)
+		tls, err := json.Marshal(res.TLS)
+		if err != nil {
+			logrus.WithError(err).Fatal("error parsing result")
+		}
+		timing, err := json.Marshal(res.Timing.Phases)
 		if err != nil {
 			logrus.WithError(err).Fatal("error parsing result")
 		}
 
-		serv.Create(ctx, &entities.HttpResult{MonitorID: p.ID, Result: string(result)})
+		serv.Create(ctx, &entities.HttpResult{MonitorID: uint64(p.ID), TLS: string(tls), Timing: string(timing), StatusCode: uint64(res.Response.StatusCode)})
 		log.Printf(" [*] Probe %s", p.Payload["URL"])
 		log.Printf("Result: %v", res.Response)
 		return nil

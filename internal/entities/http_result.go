@@ -5,12 +5,14 @@ import (
 )
 
 type HttpResult struct {
-	ID        uint
-	Result    string
-	MonitorID int       `gorm:"index;not null"`
-	CreatedAt time.Time `gorm:"index"`
+	ID         uint
+	StatusCode uint64 `gorm:"index; not null"`
+	Timing     string
+	TLS        string
+	MonitorID  uint64    `gorm:"index;not null"`
+	CreatedAt  time.Time `gorm:"index"`
 }
 
 func (HttpResult) TableName() string {
-	return "HttpResults"
+	return "http"
 }
