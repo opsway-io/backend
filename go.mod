@@ -9,8 +9,6 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/s3 v1.27.11
 	github.com/creasty/defaults v1.6.0
 	github.com/go-playground/validator v9.31.0+incompatible
-	github.com/go-redis/redis/v8 v8.11.5
-	github.com/go-redis/redis/v9 v9.0.0-rc.1
 	github.com/golang-jwt/jwt v3.2.2+incompatible
 	github.com/google/uuid v1.3.0
 	github.com/hibiken/asynq v0.23.0
@@ -32,6 +30,8 @@ require (
 	gorm.io/gorm v1.24.0
 	k8s.io/utils v0.0.0-20221012122500-cfd413dd9e85
 )
+
+require github.com/go-redis/redis/v8 v8.11.5 // indirect
 
 require (
 	cloud.google.com/go/compute v1.6.1 // indirect

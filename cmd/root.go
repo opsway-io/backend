@@ -3,7 +3,6 @@ package cmd
 import (
 	"github.com/mcuadros/go-defaults"
 	"github.com/opsway-io/backend/internal/authentication"
-	"github.com/opsway-io/backend/internal/connectors/asynq"
 	"github.com/opsway-io/backend/internal/connectors/clickhouse"
 	"github.com/opsway-io/backend/internal/connectors/postgres"
 	"github.com/opsway-io/backend/internal/connectors/redis"
@@ -20,7 +19,6 @@ var cfgFile string
 type Config struct {
 	Log            LogConfig                             `mapstructure:"log"`
 	Postgres       postgres.Config                       `mapstructure:"postgres"`
-	Asynq          asynq.Config                          `mapstructure:"asynq"`
 	Clickhouse     clickhouse.Config                     `mapstructure:"clickhouse"`
 	Redis          redis.Config                          `mapstructure:"redis"`
 	REST           rest.Config                           `mapstructure:"rest"`
