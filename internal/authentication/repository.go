@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/go-redis/redis/v8"
+	"github.com/go-redis/redis"
 	"github.com/pkg/errors"
 	"golang.org/x/crypto/bcrypt"
 )
@@ -28,7 +28,7 @@ func NewRepository(redis *redis.Client) Repository {
 func (r *RepositoryImpl) CheckAndDeleteRefreshToken(ctx context.Context, refreshTokenID string, refreshToken string) (ok bool, err error) {
 	key := r.getRefreshTokenKey(refreshTokenID)
 
-	val, err := r.redis.Get(ctx, key).Result()
+	val, err := r.redis.WithContext(ctx).Get(key).Result()
 	if err != nil {
 		if err == redis.Nil {
 			return false, nil
@@ -41,7 +41,7 @@ func (r *RepositoryImpl) CheckAndDeleteRefreshToken(ctx context.Context, refresh
 		return false, nil
 	}
 
-	deleted, err := r.redis.Del(ctx, key).Result()
+	deleted, err := r.redis.WithContext(ctx).Del(key).Result()
 	if err != nil {
 		return false, err
 	}
@@ -59,7 +59,7 @@ func (r *RepositoryImpl) CreateRefreshToken(ctx context.Context, refreshTokenID 
 
 	hashStr := string(hashedPassword)
 
-	return r.redis.Set(ctx, key, hashStr, exp).Err()
+	return r.redis.WithContext(ctx).Set(key, hashStr, exp).Err()
 }
 
 func (r *RepositoryImpl) getRefreshTokenKey(refreshToken string) string {

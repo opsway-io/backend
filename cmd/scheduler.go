@@ -2,16 +2,21 @@ package cmd
 
 import (
 	"context"
+	"os"
+	"os/signal"
+	"sync"
+	"syscall"
 
-	asynqClient "github.com/opsway-io/backend/internal/connectors/asynq"
-	"github.com/opsway-io/backend/internal/connectors/postgres"
-	"github.com/opsway-io/backend/internal/monitor"
-	schedule "github.com/opsway-io/backend/internal/schedule"
-	scheduler "github.com/opsway-io/backend/internal/schedule"
+	connectorRedis "github.com/opsway-io/backend/internal/connectors/redis"
+	"github.com/opsway-io/boomerang"
 	"github.com/sirupsen/logrus"
-
 	"github.com/spf13/cobra"
 )
+
+type SchedulerConfig struct {
+	Redis       connectorRedis.Config `mapstructure:"redis"`
+	Concurrency int                   `mapstructure:"concurrency"`
+}
 
 //nolint:gochecknoglobals
 var schedulerCmd = &cobra.Command{
@@ -25,34 +30,57 @@ func init() {
 }
 
 func runScheduler(cmd *cobra.Command, args []string) {
+	ctx, cancel := context.WithCancel(cmd.Context())
+	var wg sync.WaitGroup
+
 	conf, err := loadConfig()
 	if err != nil {
 		panic(err)
 	}
 
-	l := getLogger(conf.Log)
+	// Connect to redis
 
-	ctx := context.Background()
-
-	l.WithField("addr", conf.Asynq.Addr).Info("connecting to asynq")
-	scheduleService := schedule.NewAsynqSchedule(asynqClient.NewScheduler(ctx, conf.Asynq), nil)
-
-	db, err := postgres.NewClient(ctx, conf.Postgres)
+	redisClient, err := connectorRedis.NewClient(ctx, conf.Scheduler.Redis)
 	if err != nil {
-		l.WithError(err).Fatal("Failed to create Postgres client")
+		logrus.New().WithError(err).Fatal("failed to connect to redis")
 	}
 
-	monitorService := monitor.NewService(db)
-	monitors, err := monitorService.GetMonitors(ctx)
+	logrus.WithFields(logrus.Fields{
+		"host": conf.Redis.Host,
+		"port": conf.Redis.Port,
+		"db":   conf.Redis.DB,
+	}).Info("Connected to redis")
 
-	for _, monitor := range *monitors {
-		_, err = scheduleService.Add(ctx, monitor.Settings.Frequency, scheduler.ProbeTask, scheduler.TaskPayload{ID: monitor.Settings.MonitorID, Payload: map[string]string{"URL": monitor.Settings.URL}})
-		if err != nil {
-			l.Fatal(err)
-		}
+	// Start schedulers
+
+	schedule := boomerang.NewSchedule(redisClient)
+
+	logrus.WithFields(logrus.Fields{
+		"concurrency": conf.Scheduler.Concurrency,
+	}).Infof("Starting scheduler with %d workers", conf.Scheduler.Concurrency)
+
+	for i := 0; i < conf.Scheduler.Concurrency; i++ {
+		go func() {
+			wg.Add(1)
+			defer wg.Done()
+
+			if err := schedule.Run(ctx); err != nil {
+				logrus.New().WithError(err).Fatal("failed to run schedule")
+			}
+		}()
 	}
 
-	if err := scheduleService.Scheduler.Run(); err != nil {
-		logrus.Fatalf("could not run server: %v", err)
-	}
+	logrus.Info("Scheduler(s) started")
+
+	// Wait for interrupt signal to gracefully shutdown the application
+
+	termChan := make(chan os.Signal)
+	signal.Notify(termChan, syscall.SIGINT, syscall.SIGTERM)
+	<-termChan
+
+	logrus.Info("Shutting down...")
+
+	cancel()
+
+	wg.Wait()
 }

@@ -27,6 +27,7 @@ type Config struct {
 	Authentication authentication.Config                 `mapstructure:"authentication"`
 	OAuth          *oauth.Config                         `mapstructure:"oauth"`
 	ObjectStorage  storage.ObjectStorageRepositoryConfig `mapstructure:"object_storage"`
+	Scheduler      SchedulerConfig                       `mapstructure:"scheduler"`
 }
 
 type LogConfig struct {

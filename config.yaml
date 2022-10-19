@@ -27,8 +27,8 @@ asynq:
 redis:
   host: localhost
   port: 6379
-  user: ""
   password: ""
+  db: 0
 
 notification:
   email:
@@ -42,3 +42,11 @@ object_storage:
   access_key: "guest"
   secret_key: "guest"
   region: "eu-central-1"
+
+scheduler:
+  redis: 
+    host: localhost
+    port: 6379
+    password: ""
+    db: 1
+  concurrency: 1
