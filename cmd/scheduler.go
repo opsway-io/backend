@@ -38,14 +38,16 @@ func runScheduler(cmd *cobra.Command, args []string) {
 		panic(err)
 	}
 
+	l := getLogger(conf.Log)
+
 	// Connect to redis
 
 	redisClient, err := connectorRedis.NewClient(ctx, conf.Scheduler.Redis)
 	if err != nil {
-		logrus.New().WithError(err).Fatal("failed to connect to redis")
+		l.WithError(err).Fatal("failed to connect to redis")
 	}
 
-	logrus.WithFields(logrus.Fields{
+	l.WithFields(logrus.Fields{
 		"host": conf.Redis.Host,
 		"port": conf.Redis.Port,
 		"db":   conf.Redis.DB,
@@ -55,7 +57,7 @@ func runScheduler(cmd *cobra.Command, args []string) {
 
 	schedule := boomerang.NewSchedule(redisClient)
 
-	logrus.WithFields(logrus.Fields{
+	l.WithFields(logrus.Fields{
 		"concurrency": conf.Scheduler.Concurrency,
 	}).Infof("Starting scheduler with %d workers", conf.Scheduler.Concurrency)
 
@@ -65,12 +67,12 @@ func runScheduler(cmd *cobra.Command, args []string) {
 			defer wg.Done()
 
 			if err := schedule.Run(ctx); err != nil {
-				logrus.New().WithError(err).Fatal("failed to run schedule")
+				l.WithError(err).Fatal("failed to run schedule")
 			}
 		}()
 	}
 
-	logrus.Info("Scheduler(s) started")
+	l.Info("Scheduler(s) started")
 
 	// Wait for interrupt signal to gracefully shutdown the application
 
@@ -78,7 +80,7 @@ func runScheduler(cmd *cobra.Command, args []string) {
 	signal.Notify(termChan, syscall.SIGINT, syscall.SIGTERM)
 	<-termChan
 
-	logrus.Info("Shutting down...")
+	l.Info("Shutting down...")
 
 	cancel()
 
