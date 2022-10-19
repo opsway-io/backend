@@ -5,10 +5,6 @@ log:
 rest:
   port: 8001
 
-postgres:
-  dsn: "host=localhost user=admin password=admin dbname=opsway port=5432 sslmode=disable"
-  debug: false
-
 authentication:
   secret: "secret"
   audience: "https://opsway.io"
@@ -16,13 +12,14 @@ authentication:
   expires_in: 5m
   refresh_expires_in: 720h
 
+postgres:
+  dsn: "host=localhost user=admin password=admin dbname=opsway port=5432 sslmode=disable"
+  debug: false
+
+
 clickhouse:
   dsn: "clickhouse://default:@localhost:9000/opsway?dial_timeout=200ms&max_execution_time=60"
   debug: true
-
-asynq:
-  host: localhost
-  port: 6379
 
 redis:
   host: localhost
@@ -44,9 +41,7 @@ object_storage:
   region: "eu-central-1"
 
 scheduler:
-  redis: 
-    host: localhost
-    port: 6379
-    password: ""
-    db: 1
+  concurrency: 1
+
+http_prober:
   concurrency: 1

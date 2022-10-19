@@ -2,16 +2,21 @@ package cmd
 
 import (
 	"context"
+	"os"
+	"os/signal"
+	"sync"
+	"syscall"
 
-	"github.com/hibiken/asynq"
-
-	asynqClient "github.com/opsway-io/backend/internal/connectors/asynq"
-	"github.com/opsway-io/backend/internal/connectors/clickhouse"
-	"github.com/opsway-io/backend/internal/probes"
-	schedule "github.com/opsway-io/backend/internal/schedule"
+	connectorRedis "github.com/opsway-io/backend/internal/connectors/redis"
+	"github.com/opsway-io/boomerang"
+	"github.com/sirupsen/logrus"
 
 	"github.com/spf13/cobra"
 )
+
+type ProberConfig struct {
+	Concurrency int `mapstructure:"concurrency"`
+}
 
 //nolint:gochecknoglobals
 var proberCmd = &cobra.Command{
@@ -25,6 +30,9 @@ func init() {
 }
 
 func runProber(cmd *cobra.Command, args []string) {
+	ctx, cancel := context.WithCancel(cmd.Context())
+	var wg *sync.WaitGroup
+
 	conf, err := loadConfig()
 	if err != nil {
 		panic(err)
@@ -32,21 +40,65 @@ func runProber(cmd *cobra.Command, args []string) {
 
 	l := getLogger(conf.Log)
 
-	ctx := context.Background()
+	// Connect to redis
 
-	db, err := clickhouse.NewClient(ctx, conf.Clickhouse)
+	redisClient, err := connectorRedis.NewClient(ctx, conf.Redis)
 	if err != nil {
-		l.WithError(err).Fatal("Failed to create clickhouse")
+		l.WithError(err).Fatal("failed to connect to redis")
 	}
 
-	probeResultService := probes.NewService(db)
+	l.WithFields(logrus.Fields{
+		"host": conf.Redis.Host,
+		"port": conf.Redis.Port,
+		"db":   conf.Redis.DB,
+	}).Info("Connected to redis")
 
-	l.WithField("addr", conf.Asynq.Addr).Info("connecting to asynq")
-	scheduleService := schedule.NewAsynqSchedule(nil, asynqClient.NewServer(ctx, conf.Asynq))
+	// Connect to clickhouse and initialize probes services
 
-	// create task handlers
-	handlers := map[schedule.TaskType]asynq.HandlerFunc{}
-	handlers[schedule.ProbeTask] = schedule.HandleTask(probeResultService)
+	/*
+		db, err := clickhouse.NewClient(ctx, conf.Clickhouse)
+		if err != nil {
+			l.WithError(err).Fatal("Failed to connect to clickhouse")
+		}
 
-	scheduleService.Consume(ctx, handlers)
+		l.Info("Connected to clickhouse")
+
+		probeResultService := probes.NewService(db)
+	*/
+
+	// Register consumers
+
+	schedule := boomerang.NewSchedule(redisClient)
+
+	for i := 0; i < conf.Prober.Concurrency; i++ {
+		go func() {
+			wg.Add(1)
+			defer wg.Done()
+
+			schedule.Consume(
+				ctx,
+				"probe:http",
+				[]string{"eu-central-1"},
+				handleHttpProbe,
+			)
+		}()
+	}
+
+	// Wait for interrupt signal to gracefully shutdown the application
+
+	termChan := make(chan os.Signal)
+	signal.Notify(termChan, syscall.SIGINT, syscall.SIGTERM)
+	<-termChan
+
+	l.Info("Shutting down...")
+
+	cancel()
+
+	wg.Wait()
+}
+
+func handleHttpProbe(ctx context.Context, task boomerang.Task) error {
+	// TODO: implement
+
+	return nil
 }

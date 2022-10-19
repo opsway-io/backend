@@ -14,8 +14,7 @@ import (
 )
 
 type SchedulerConfig struct {
-	Redis       connectorRedis.Config `mapstructure:"redis"`
-	Concurrency int                   `mapstructure:"concurrency"`
+	Concurrency int `mapstructure:"concurrency"`
 }
 
 //nolint:gochecknoglobals
@@ -42,7 +41,7 @@ func runScheduler(cmd *cobra.Command, args []string) {
 
 	// Connect to redis
 
-	redisClient, err := connectorRedis.NewClient(ctx, conf.Scheduler.Redis)
+	redisClient, err := connectorRedis.NewClient(ctx, conf.Redis)
 	if err != nil {
 		l.WithError(err).Fatal("failed to connect to redis")
 	}
