@@ -84,7 +84,7 @@ func (s *RepositoryImpl) Create(ctx context.Context, user *entities.User) error 
 }
 
 func (s *RepositoryImpl) Update(ctx context.Context, user *entities.User) error {
-	result := s.db.WithContext(ctx).Updates(user)
+	result := s.db.WithContext(ctx).Model(user).Updates(user)
 	if result.Error != nil {
 		return result.Error
 	}

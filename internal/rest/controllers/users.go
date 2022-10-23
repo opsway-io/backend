@@ -89,22 +89,36 @@ func newGetUserResponse(u *entities.User, userService user.Service) GetUserRespo
 }
 
 type PutUserRequest struct {
-	UserID      uint    `param:"userId" validate:"required,numeric,gt=0"`
-	Name        string  `json:"fullName" validate:"required"`
-	DisplayName *string `json:"displayName"`
+	UserID      uint   `param:"userId" validate:"required,numeric,gt=0"`
+	Name        string `json:"fullName" validate:"required,min=1,max=255"`
+	DisplayName string `json:"displayName" validate:"required,min=0,max=255"`
 }
 
 func (h *Handlers) PutUser(ctx hs.AuthenticatedContext) error {
-	_, err := helpers.Bind[PutUserRequest](ctx)
+	req, err := helpers.Bind[PutUserRequest](ctx)
 	if err != nil {
 		ctx.Log.WithError(err).Debug("failed to bind PutUserRequest")
 
 		return echo.ErrBadRequest
 	}
 
-	// TODO
+	if err := h.UserService.Update(ctx.Request().Context(), &entities.User{
+		ID:          req.UserID,
+		Name:        req.Name,
+		DisplayName: &req.DisplayName,
+	}); err != nil {
+		if errors.Is(err, user.ErrNotFound) {
+			ctx.Log.WithError(err).Debug("user not found")
 
-	return ctx.NoContent(http.StatusNotImplemented)
+			return echo.ErrNotFound
+		}
+
+		ctx.Log.WithError(err).Error("failed to update user")
+
+		return echo.ErrInternalServerError
+	}
+
+	return ctx.NoContent(http.StatusNoContent)
 }
 
 func (h *Handlers) DeleteUser(ctx hs.AuthenticatedContext) error {
@@ -127,7 +141,7 @@ func (h *Handlers) DeleteUser(ctx hs.AuthenticatedContext) error {
 		return echo.ErrInternalServerError
 	}
 
-	return ctx.NoContent(http.StatusOK)
+	return ctx.NoContent(http.StatusNoContent)
 }
 
 type PutUserPasswordRequest struct {
@@ -167,7 +181,7 @@ func (h *Handlers) PutUserPassword(ctx hs.AuthenticatedContext) error {
 		return echo.ErrInternalServerError
 	}
 
-	return ctx.NoContent(http.StatusOK)
+	return ctx.NoContent(http.StatusNoContent)
 }
 
 type PutUserAvatarRequest struct {
@@ -209,7 +223,7 @@ func (h *Handlers) PutUserAvatar(ctx hs.AuthenticatedContext) error {
 		return echo.ErrInternalServerError
 	}
 
-	return ctx.NoContent(http.StatusCreated)
+	return ctx.NoContent(http.StatusNoContent)
 }
 
 type DeleteUserAvatarRequest struct {
@@ -236,5 +250,5 @@ func (h *Handlers) DeleteUserAvatar(ctx hs.AuthenticatedContext) error {
 		return echo.ErrInternalServerError
 	}
 
-	return ctx.NoContent(http.StatusOK)
+	return ctx.NoContent(http.StatusNoContent)
 }
