@@ -90,8 +90,9 @@ func newGetUserResponse(u *entities.User, userService user.Service) GetUserRespo
 
 type PutUserRequest struct {
 	UserID      uint   `param:"userId" validate:"required,numeric,gt=0"`
-	Name        string `json:"fullName" validate:"required,min=1,max=255"`
+	Name        string `json:"name" validate:"required,min=1,max=255"`
 	DisplayName string `json:"displayName" validate:"required,min=0,max=255"`
+	Email       string `json:"email" validate:"required,email"`
 }
 
 func (h *Handlers) PutUser(ctx hs.AuthenticatedContext) error {
@@ -102,11 +103,14 @@ func (h *Handlers) PutUser(ctx hs.AuthenticatedContext) error {
 		return echo.ErrBadRequest
 	}
 
-	if err := h.UserService.Update(ctx.Request().Context(), &entities.User{
+	u := &entities.User{
 		ID:          req.UserID,
 		Name:        req.Name,
 		DisplayName: &req.DisplayName,
-	}); err != nil {
+	}
+	u.SetEmail(req.Email)
+
+	if err := h.UserService.Update(ctx.Request().Context(), u); err != nil {
 		if errors.Is(err, user.ErrNotFound) {
 			ctx.Log.WithError(err).Debug("user not found")
 
