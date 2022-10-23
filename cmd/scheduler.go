@@ -14,7 +14,7 @@ import (
 )
 
 type SchedulerConfig struct {
-	Concurrency int `mapstructure:"concurrency"`
+	Concurrency int `mapstructure:"concurrency" default:"1"`
 }
 
 //nolint:gochecknoglobals
@@ -34,7 +34,7 @@ func runScheduler(cmd *cobra.Command, args []string) {
 
 	conf, err := loadConfig()
 	if err != nil {
-		panic(err)
+		logrus.WithError(err).Fatal("Failed to load config")
 	}
 
 	l := getLogger(conf.Log)
@@ -71,7 +71,9 @@ func runScheduler(cmd *cobra.Command, args []string) {
 		}()
 	}
 
-	l.Info("Scheduler(s) started")
+	l.WithFields(logrus.Fields{
+		"concurrency": conf.Scheduler.Concurrency,
+	}).Info("Scheduler(s) started")
 
 	// Wait for interrupt signal to gracefully shutdown the application
 

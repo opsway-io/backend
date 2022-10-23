@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"os/signal"
 	"sync"
@@ -15,7 +16,7 @@ import (
 )
 
 type ProberConfig struct {
-	Concurrency int `mapstructure:"concurrency"`
+	Concurrency int `mapstructure:"concurrency" default:"1"`
 }
 
 //nolint:gochecknoglobals
@@ -31,11 +32,11 @@ func init() {
 
 func runProber(cmd *cobra.Command, args []string) {
 	ctx, cancel := context.WithCancel(cmd.Context())
-	var wg *sync.WaitGroup
+	var wg sync.WaitGroup
 
 	conf, err := loadConfig()
 	if err != nil {
-		panic(err)
+		logrus.WithError(err).Fatal("Failed to load config")
 	}
 
 	l := getLogger(conf.Log)
@@ -53,19 +54,6 @@ func runProber(cmd *cobra.Command, args []string) {
 		"db":   conf.Redis.DB,
 	}).Info("Connected to redis")
 
-	// Connect to clickhouse and initialize probes services
-
-	/*
-		db, err := clickhouse.NewClient(ctx, conf.Clickhouse)
-		if err != nil {
-			l.WithError(err).Fatal("Failed to connect to clickhouse")
-		}
-
-		l.Info("Connected to clickhouse")
-
-		probeResultService := probes.NewService(db)
-	*/
-
 	// Register consumers
 
 	schedule := boomerang.NewSchedule(redisClient)
@@ -77,12 +65,16 @@ func runProber(cmd *cobra.Command, args []string) {
 
 			schedule.Consume(
 				ctx,
-				"probe:http",
+				"http_probe",
 				[]string{"eu-central-1"},
 				handleHttpProbe,
 			)
 		}()
 	}
+
+	l.WithFields(logrus.Fields{
+		"concurrency": conf.Prober.Concurrency,
+	}).Info("Probers(s) started")
 
 	// Wait for interrupt signal to gracefully shutdown the application
 
@@ -98,6 +90,8 @@ func runProber(cmd *cobra.Command, args []string) {
 }
 
 func handleHttpProbe(ctx context.Context, task boomerang.Task) error {
+	fmt.Println(task)
+
 	// TODO: implement
 
 	return nil

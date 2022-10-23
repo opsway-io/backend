@@ -1,38 +1,28 @@
 version: '3.1'
-
 services:
   postgres:
-    image: postgres:14.4-alpine
+    image: 'postgres:14.4-alpine'
     restart: unless-stopped
     environment:
       POSTGRES_USER: admin
       POSTGRES_PASSWORD: admin
       POSTGRES_DB: opsway
     volumes:
-      - ./data/postgres:/var/lib/posgresql/data
+      - './data/postgres:/var/lib/posgresql/data'
     ports:
-      - 5432:5432
-
+      - '5432:5432'
   redis:
-    image: redis:6.2-alpine
+    image: 'redis:6.2-alpine'
     ports:
-      - 6379:6379
+      - '6379:6379'
     command: redis-server
-
-  asynqmon:
-    image: hibiken/asynqmon:latest
-    ports:
-      - 8080:8080
-    environment:
-      REDIS_ADDR: redis:6379
   ch_server:
     image: clickhouse/clickhouse-server
     ports:
-      - "8123:8123"
-      - "9000:9000"
+      - '8123:8123'
+      - '9000:9000'
     volumes:
-      - ./data/clickhouse:/var/lib/clickhouse
-      
+      - './data/clickhouse:/var/lib/clickhouse'
   ch_client:
     image: clickhouse/clickhouse-client
     entrypoint:
@@ -42,31 +32,11 @@ services:
   s3:
     image: minio/minio
     ports:
-      - "9001:9001"
-      - "5566:5566"
+      - '9001:9001'
+      - '5566:5566'
     volumes:
-      - ./data:/data
+      - './data:/data'
     environment:
       MINIO_ACCESS_KEY: guest
-      MINIO_SECRET_KEY: "supersecret"
-    command: server --address 0.0.0.0:9001 --console-address 0.0.0.0:5566 /data
-
-  # api:
-  #   build: .
-  #   command: api
-  #   restart: unless-stopped
-  #   ports:
-  #     - 8001:8001
-  #   volumes:
-  #     - ./config.compose.yaml:/app/config.yaml:r
-  #   depends_on:
-  #     - postgres
-  #     - keydb
-
-
-  # prober:
-  #   build: .
-  #   restart: unless-stopped
-  #   command: prober
-  #   depends_on:
-  #     - keydb
+      MINIO_SECRET_KEY: supersecret
+    command: 'server --address 0.0.0.0:9001 --console-address 0.0.0.0:5566 /data'

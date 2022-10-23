@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"github.com/go-playground/validator/v10"
 	"github.com/mcuadros/go-defaults"
 	"github.com/opsway-io/backend/internal/authentication"
 	"github.com/opsway-io/backend/internal/connectors/clickhouse"
@@ -28,6 +29,8 @@ type Config struct {
 	Scheduler      SchedulerConfig                       `mapstructure:"scheduler"`
 	Prober         ProberConfig                          `mapstructure:"prober"`
 }
+
+var validate = validator.New()
 
 type LogConfig struct {
 	Level  string `mapstructure:"level"`
@@ -69,6 +72,10 @@ func loadConfig() (*Config, error) {
 	defaults.SetDefaults(&config)
 
 	if err := viper.Unmarshal(&config); err != nil {
+		return nil, err
+	}
+
+	if err := validate.Struct(config); err != nil {
 		return nil, err
 	}
 

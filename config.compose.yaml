@@ -35,5 +35,5 @@ notification:
 scheduler:
   concurrency: 1
 
-http_prober:
+prober:
   concurrency: 1

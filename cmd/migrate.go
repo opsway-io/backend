@@ -23,7 +23,7 @@ func init() {
 func runMigrations(cmd *cobra.Command, args []string) {
 	conf, err := loadConfig()
 	if err != nil {
-		panic(err)
+		logrus.WithError(err).Fatal("Failed to load config")
 	}
 
 	l := getLogger(conf.Log)
