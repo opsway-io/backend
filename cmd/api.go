@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/opsway-io/backend/internal/authentication"
+	"github.com/opsway-io/backend/internal/connectors/clickhouse"
 	"github.com/opsway-io/backend/internal/connectors/postgres"
 	"github.com/opsway-io/backend/internal/connectors/redis"
 	"github.com/opsway-io/backend/internal/entities"
@@ -67,6 +68,16 @@ func runAPI(cmd *cobra.Command, args []string) {
 		entities.IncidentComment{},
 	)
 
+	// CLICKHOUSE
+	ch_db, err := clickhouse.NewClient(ctx, conf.Clickhouse)
+	if err != nil {
+		l.WithError(err).Fatal("Failed to create clickhouse")
+	}
+
+	ch_db.AutoMigrate(
+		entities.HttpResult{},
+	)
+
 	storageRepository := storage.NewObjectStorageRepository(ctx, conf.ObjectStorage)
 	storageService := storage.NewService(storageRepository)
 
@@ -80,7 +91,7 @@ func runAPI(cmd *cobra.Command, args []string) {
 
 	monitorService := monitor.NewService(db)
 
-	httpResultService := probes.NewService(db)
+	httpResultService := probes.NewService(ch_db)
 
 	// TODO: Remove
 

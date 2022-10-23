@@ -11,7 +11,7 @@ import (
 var ErrNotFound = errors.New("probe result not found")
 
 type Repository interface {
-	Get(ctx context.Context, monitorID uint64) (*entities.HttpResult, error)
+	Get(ctx context.Context, monitorID uint64) (*[]entities.HttpResult, error)
 	Create(ctx context.Context, maintenance *entities.HttpResult) error
 }
 
@@ -23,21 +23,13 @@ func NewRepository(db *gorm.DB) Repository {
 	return &RepositoryImpl{db: db}
 }
 
-func (r *RepositoryImpl) Get(ctx context.Context, monitorID uint64) (*entities.HttpResult, error) {
-	var probeResult entities.HttpResult
-	if err := r.db.WithContext(
+func (r *RepositoryImpl) Get(ctx context.Context, monitorID uint64) (*[]entities.HttpResult, error) {
+	var probeResults []entities.HttpResult
+	err := r.db.WithContext(
 		ctx,
-	).Where(entities.HttpResult{
-		MonitorID: monitorID,
-	}).First(&probeResult).Error; err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, ErrNotFound
-		}
+	).Where("monitor_id = ?", monitorID).Find(&probeResults).Error
 
-		return nil, err
-	}
-
-	return &probeResult, nil
+	return &probeResults, err
 }
 
 func (r *RepositoryImpl) Create(ctx context.Context, probeResult *entities.HttpResult) error {
