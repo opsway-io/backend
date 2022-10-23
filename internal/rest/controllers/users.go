@@ -89,12 +89,9 @@ func newGetUserResponse(u *entities.User, userService user.Service) GetUserRespo
 }
 
 type PutUserRequest struct {
-	UserID uint `param:"userId" validate:"required,numeric,gt=0"`
-	// TODO
-}
-
-type PutUserResponse struct {
-	// TODO
+	UserID      uint    `param:"userId" validate:"required,numeric,gt=0"`
+	Name        string  `json:"fullName" validate:"required"`
+	DisplayName *string `json:"displayName"`
 }
 
 func (h *Handlers) PutUser(ctx hs.AuthenticatedContext) error {
@@ -126,6 +123,115 @@ func (h *Handlers) DeleteUser(ctx hs.AuthenticatedContext) error {
 		}
 
 		ctx.Log.WithError(err).Error("failed to delete user")
+
+		return echo.ErrInternalServerError
+	}
+
+	return ctx.NoContent(http.StatusOK)
+}
+
+type PutUserPasswordRequest struct {
+	UserID      uint   `param:"userId" validate:"required,numeric,gt=0"`
+	OldPassword string `json:"oldPassword" validate:"required,min=8,max=255"`
+	NewPassword string `json:"newPassword" validate:"required,min=8,max=255"`
+}
+
+func (h *Handlers) PutUserPassword(ctx hs.AuthenticatedContext) error {
+	req, err := helpers.Bind[PutUserPasswordRequest](ctx)
+	if err != nil {
+		ctx.Log.WithError(err).Debug("failed to bind PutUserPasswordRequest")
+
+		return echo.ErrBadRequest
+	}
+
+	if err := h.UserService.ChangePassword(
+		ctx.Request().Context(),
+		req.UserID,
+		req.OldPassword,
+		req.NewPassword,
+	); err != nil {
+		if errors.Is(err, user.ErrNotFound) {
+			ctx.Log.WithError(err).Debug("user not found")
+
+			return echo.ErrNotFound
+		}
+
+		if errors.Is(err, user.ErrInvalidPassword) {
+			ctx.Log.WithError(err).Debug("invalid password")
+
+			return echo.ErrUnauthorized
+		}
+
+		ctx.Log.WithError(err).Error("failed to change user password")
+
+		return echo.ErrInternalServerError
+	}
+
+	return ctx.NoContent(http.StatusOK)
+}
+
+type PutUserAvatarRequest struct {
+	UserID uint `param:"userId" validate:"required,numeric,gt=0"`
+}
+
+func (h *Handlers) PutUserAvatar(ctx hs.AuthenticatedContext) error {
+	req, err := helpers.Bind[PutUserAvatarRequest](ctx)
+	if err != nil {
+		ctx.Log.WithError(err).Debug("failed to bind PutUserAvatarRequest")
+
+		return echo.ErrBadRequest
+	}
+
+	file, err := ctx.FormFile("file")
+	if err != nil {
+		ctx.Log.WithError(err).Debug("failed to get file from form")
+
+		return echo.ErrBadRequest
+	}
+
+	src, err := file.Open()
+	if err != nil {
+		ctx.Log.WithError(err).Debug("failed to open file")
+
+		return echo.ErrBadRequest
+	}
+	defer src.Close()
+
+	if err := h.UserService.UploadUserAvatar(ctx.Request().Context(), req.UserID, src); err != nil {
+		if errors.Is(err, user.ErrNotFound) {
+			ctx.Log.WithError(err).Debug("user not found")
+
+			return echo.ErrNotFound
+		}
+
+		ctx.Log.WithError(err).Error("failed to set user avatar")
+
+		return echo.ErrInternalServerError
+	}
+
+	return ctx.NoContent(http.StatusCreated)
+}
+
+type DeleteUserAvatarRequest struct {
+	UserID uint `param:"userId" validate:"required,numeric,gt=0"`
+}
+
+func (h *Handlers) DeleteUserAvatar(ctx hs.AuthenticatedContext) error {
+	req, err := helpers.Bind[DeleteUserAvatarRequest](ctx)
+	if err != nil {
+		ctx.Log.WithError(err).Debug("failed to bind DeleteUserAvatarRequest")
+
+		return echo.ErrBadRequest
+	}
+
+	if err := h.UserService.DeleteUserAvatar(ctx.Request().Context(), req.UserID); err != nil {
+		if errors.Is(err, user.ErrNotFound) {
+			ctx.Log.WithError(err).Debug("user not found")
+
+			return echo.ErrNotFound
+		}
+
+		ctx.Log.WithError(err).Error("failed to delete user avatar")
 
 		return echo.ErrInternalServerError
 	}

@@ -63,6 +63,9 @@ func Register(
 	usersGroup.GET("", AuthHandler(h.GetUser))
 	usersGroup.PUT("", AuthHandler(h.PutUser))
 	usersGroup.DELETE("", AuthHandler(h.DeleteUser))
+	usersGroup.PUT("/password", AuthHandler(h.PutUserPassword))
+	usersGroup.PUT("/avatar", AuthHandler(h.PutUserAvatar))
+	usersGroup.DELETE("/avatar", AuthHandler(h.DeleteUserAvatar))
 
 	// Teams
 

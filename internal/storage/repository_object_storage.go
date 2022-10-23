@@ -65,3 +65,12 @@ func (r *ObjectStorageRepository) PutFile(ctx context.Context, bucket string, ke
 
 	return err
 }
+
+func (r *ObjectStorageRepository) DeleteFile(ctx context.Context, bucket string, key string) error {
+	_, err := r.s3.DeleteObject(ctx, &s3.DeleteObjectInput{
+		Bucket: aws.String(bucket),
+		Key:    aws.String(key),
+	})
+
+	return err
+}

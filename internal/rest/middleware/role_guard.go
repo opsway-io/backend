@@ -9,7 +9,10 @@ import (
 type UserRole string
 
 const (
-	// Admin is a user with full access to the organization.
+	// Owner is the owner of the team and has full access to the team.
+	UserRoleOwner UserRole = "owner"
+
+	// Admin is a user with full administrative access to the team.
 	UserRoleAdmin UserRole = "admin"
 
 	// Members can view and act on events, as well as view most other data within the organization.

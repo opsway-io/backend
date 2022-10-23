@@ -1,10 +1,13 @@
-- POST   /auth/login
+POST   /auth/login
 POST   /auth/refresh
 POST   /auth/signup
 
-- GET    /users/{userId}
-- PATCH  /users/{userId}
-- DELETE /users/{userId}
+GET    /users/{userId}
+PUT    /users/{userId}
+DELETE /users/{userId}
+PUT    /users/{userId}/password
+PUT    /users/{userId}/avatar
+DELETE /users/{userId}/avatar
 
 POST   /teams/{teamId}
 GET    /teams/{teamId}
@@ -22,6 +25,8 @@ GET    /monitors/{monitorId}/metrics
 GET    /monitors/{monitorId}/checks
 GET    /monitors/{monitorId}/settings
 PATCH  /monitors/{monitorId}/settings
+
+----
 
 GET    /incidents/{incidentId}
 DELETE /incidents/{incidentId}

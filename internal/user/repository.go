@@ -16,6 +16,7 @@ var (
 )
 
 type Repository interface {
+	GetUserByID(ctx context.Context, userID uint) (*entities.User, error)
 	GetUserAndTeamsByUserID(ctx context.Context, userID uint) (*entities.User, error)
 	GetUserAndTeamsByEmailAddress(ctx context.Context, email string) (*entities.User, error)
 	Create(ctx context.Context, user *entities.User) error
@@ -29,6 +30,19 @@ type RepositoryImpl struct {
 
 func NewRepository(db *gorm.DB) Repository {
 	return &RepositoryImpl{db: db}
+}
+
+func (r *RepositoryImpl) GetUserByID(ctx context.Context, userID uint) (*entities.User, error) {
+	var user entities.User
+	err := r.db.WithContext(ctx).First(&user, userID).Error
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, ErrNotFound
+		}
+		return nil, err
+	}
+
+	return &user, nil
 }
 
 func (s *RepositoryImpl) GetUserAndTeamsByUserID(ctx context.Context, userID uint) (*entities.User, error) {
