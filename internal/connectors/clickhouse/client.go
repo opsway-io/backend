@@ -2,6 +2,7 @@ package clickhouse
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/pkg/errors"
 	"gorm.io/driver/clickhouse"
@@ -10,12 +11,17 @@ import (
 )
 
 type Config struct {
-	DSN   string `default:"db.clickhouse"`
-	Debug bool   `default:"false"`
+	Host     string `required:"true"`
+	Port     int    `required:"true"`
+	User     string `required:"true"`
+	Password string `required:"true"`
+	Database string `required:"true"`
+	Secure   bool   `default:"true"`
+	Debug    bool   `default:"false"`
 }
 
 func NewClient(ctx context.Context, conf Config) (*gorm.DB, error) {
-	dialect := clickhouse.Open(conf.DSN)
+	dsn := fmt.Sprintf("clickhouse+native://%s:%s@%s:%v/%s", conf.User, conf.Password, conf.Host, conf.Port, conf.Database)
 
 	gormConfig := &gorm.Config{}
 	if conf.Debug {
@@ -24,7 +30,9 @@ func NewClient(ctx context.Context, conf Config) (*gorm.DB, error) {
 		gormConfig.Logger = logger.Default.LogMode(logger.Silent)
 	}
 
-	db, err := gorm.Open(dialect, gormConfig)
+	db, err := gorm.Open(clickhouse.New(clickhouse.Config{
+		DSN: dsn,
+	}), gormConfig)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to connect to database")
 	}

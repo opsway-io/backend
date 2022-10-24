@@ -18,7 +18,12 @@ postgres:
 
 
 clickhouse:
-  dsn: "clickhouse://default:@localhost:9000/opsway?dial_timeout=200ms&max_execution_time=60"
+  host: "localhost"
+  port: 9000
+  user: "default"
+  password: ""
+  database: "opsway"
+  secure: false
   debug: true
 
 redis:
