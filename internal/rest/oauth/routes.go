@@ -3,6 +3,7 @@ package oauth
 import (
 	"context"
 	"errors"
+	"fmt"
 	"net/http"
 	"time"
 
@@ -102,6 +103,16 @@ func Register(
 			SameSite: http.SameSiteLaxMode,
 			Expires:  time.Now().Add(1 * time.Minute),
 		})
+
+		if len(user.Teams) > 0 {
+			c.SetCookie(&http.Cookie{
+				Name:     "team_id",
+				Value:    fmt.Sprintf("%d", user.Teams[0].ID),
+				Path:     "/",
+				SameSite: http.SameSiteLaxMode,
+				Expires:  time.Now().Add(1 * time.Minute),
+			})
+		}
 
 		return c.Redirect(http.StatusTemporaryRedirect, config.SuccessURL)
 	})
