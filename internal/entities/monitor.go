@@ -35,6 +35,11 @@ func (m *Monitor) GetTags() []string {
 	return []string(*m.Tags)
 }
 
+func (m *Monitor) SetBodyStr(body string) {
+	byts := []byte(body)
+	m.Settings.Body = &byts
+}
+
 func (m *Monitor) GetBodyStr() *string {
 	if m.Settings.Body == nil {
 		return nil
@@ -43,6 +48,31 @@ func (m *Monitor) GetBodyStr() *string {
 	body := string(*m.Settings.Body)
 
 	return &body
+}
+
+func (m *Monitor) SetHeaders(headers map[string]string) error {
+	byts, err := json.Marshal(headers)
+	if err != nil {
+		return err
+	}
+
+	m.Settings.Headers = (*postgres.JSON)(&byts)
+
+	return nil
+}
+
+func (m *Monitor) GetHeaders() (map[string]string, error) {
+	if m.Settings.Headers == nil {
+		return nil, nil
+	}
+
+	headers := map[string]string{}
+	err := json.Unmarshal([]byte(*m.Settings.Headers), &headers)
+	if err != nil {
+		return nil, err
+	}
+
+	return headers, nil
 }
 
 type MonitorSettings struct {

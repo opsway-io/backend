@@ -18,15 +18,16 @@ GET    /teams/{teamId}/maintenance
 GET    /teams/{teamId}/users
 DELETE /teams/{teamId}/users/{userId}
 
+// Endpoints below should be prefixed with:
+// /teams/{teamId}
+
+POST   /monitors
 GET    /monitors/{monitorId}
-POST   /monitors/{monitorId}
 DELETE /monitors/{monitorId}
 GET    /monitors/{monitorId}/metrics
 GET    /monitors/{monitorId}/checks
 GET    /monitors/{monitorId}/settings
 PATCH  /monitors/{monitorId}/settings
-
-----
 
 GET    /incidents/{incidentId}
 DELETE /incidents/{incidentId}

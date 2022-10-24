@@ -87,8 +87,9 @@ func Register(
 	)
 
 	monitorsGroup.GET("", AuthHandler(h.GetMonitors))
+	monitorsGroup.POST("", AuthHandler(h.PostMonitor), AllowedRoles(mw.UserRoleOwner, mw.UserRoleAdmin))
 	monitorsGroup.GET("/:monitorId", AuthHandler(h.GetMonitor))
-	monitorsGroup.DELETE("/:monitorId", AuthHandler(h.DeleteMonitor), AllowedRoles(mw.UserRoleAdmin))
+	monitorsGroup.DELETE("/:monitorId", AuthHandler(h.DeleteMonitor), AllowedRoles(mw.UserRoleOwner, mw.UserRoleAdmin))
 
 	// Result
 	resultGroup := e.Group(

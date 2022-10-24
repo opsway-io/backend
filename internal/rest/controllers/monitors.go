@@ -188,3 +188,49 @@ func (h *Handlers) DeleteMonitor(ctx hs.AuthenticatedContext) error {
 
 	return ctx.NoContent(http.StatusNoContent)
 }
+
+type PostMonitorRequest struct {
+	TeamID   uint                       `param:"teamId" validate:"required,numeric,gte=0"`
+	Name     string                     `json:"name" validate:"required,max=255"`
+	Tags     []string                   `json:"tags" validate:"required,max=255,dive,max=255"`
+	Settings PostMonitorRequestSettings `json:"settings" validate:"required,dive"`
+}
+
+type PostMonitorRequestSettings struct {
+	Method    string            `json:"method" validate:"required,oneof=GET POST PUT PATCH DELETE"`
+	URL       string            `json:"url" validate:"required,url"`
+	Headers   map[string]string `json:"headers" validate:"required,dive,max=255"`
+	Body      string            `json:"body"`
+	Frequency time.Duration     `json:"frequency" validate:"required"`
+}
+
+func (h *Handlers) PostMonitor(ctx hs.AuthenticatedContext) error {
+	req, err := helpers.Bind[PostMonitorRequest](ctx)
+	if err != nil {
+		ctx.Log.WithError(err).Debug("failed to bind PostMonitorRequest")
+
+		return echo.ErrBadRequest
+	}
+
+	m := &entities.Monitor{
+		TeamID: req.TeamID,
+		Name:   req.Name,
+		Settings: entities.MonitorSettings{
+			Method:    req.Settings.Method,
+			URL:       req.Settings.URL,
+			Frequency: req.Settings.Frequency,
+		},
+	}
+
+	m.SetTags(req.Tags)
+	m.SetBodyStr(req.Settings.Body)
+	m.SetHeaders(req.Settings.Headers)
+
+	if err := h.MonitorService.Create(ctx.Request().Context(), m); err != nil {
+		ctx.Log.WithError(err).Error("failed to create monitor")
+
+		return echo.ErrInternalServerError
+	}
+
+	return ctx.NoContent(http.StatusCreated)
+}
