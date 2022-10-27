@@ -9,8 +9,8 @@ import (
 )
 
 type GetMonitorResultsRequest struct {
-	TeamID    uint64 `param:"teamId" validate:"required,numeric,gte=0"`
-	MonitorID uint64 `param:"monitorId" validate:"required,numeric,gte=0"`
+	TeamID    uint `param:"teamId" validate:"required,numeric,gte=0"`
+	MonitorID uint `param:"monitorId" validate:"required,numeric,gte=0"`
 }
 
 func (h *Handlers) GetResults(ctx hs.AuthenticatedContext) error {

@@ -8,7 +8,7 @@ import (
 )
 
 type Service interface {
-	GetMonitorResultsID(ctx context.Context, monitorID uint64) (*[]entities.HttpResult, error)
+	GetMonitorResultsID(ctx context.Context, monitorID uint) (*[]entities.HttpResult, error)
 	Create(ctx context.Context, monitor *entities.HttpResult) error
 }
 
@@ -22,7 +22,7 @@ func NewService(db *gorm.DB) Service {
 	}
 }
 
-func (s *ServiceImpl) GetMonitorResultsID(ctx context.Context, monitorID uint64) (*[]entities.HttpResult, error) {
+func (s *ServiceImpl) GetMonitorResultsID(ctx context.Context, monitorID uint) (*[]entities.HttpResult, error) {
 	return s.repository.Get(ctx, monitorID)
 }
 

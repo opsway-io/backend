@@ -90,12 +90,5 @@ func Register(
 	monitorsGroup.POST("", AuthHandler(h.PostMonitor), AllowedRoles(mw.UserRoleOwner, mw.UserRoleAdmin))
 	monitorsGroup.GET("/:monitorId", AuthHandler(h.GetMonitor))
 	monitorsGroup.DELETE("/:monitorId", AuthHandler(h.DeleteMonitor), AllowedRoles(mw.UserRoleOwner, mw.UserRoleAdmin))
-
-	// Result
-	resultGroup := e.Group(
-		"/teams/:teamId/results",
-		AuthGuard(),
-		TeamGuard(),
-	)
-	resultGroup.GET("/:monitorId", AuthHandler(h.GetResults))
+	monitorsGroup.GET("(/:monitorId/checks", AuthHandler(h.GetResults))
 }
