@@ -5,12 +5,12 @@ import (
 	"time"
 
 	"github.com/opsway-io/backend/internal/authentication"
+	"github.com/opsway-io/backend/internal/check"
 	"github.com/opsway-io/backend/internal/connectors/clickhouse"
 	"github.com/opsway-io/backend/internal/connectors/postgres"
 	"github.com/opsway-io/backend/internal/connectors/redis"
 	"github.com/opsway-io/backend/internal/entities"
 	"github.com/opsway-io/backend/internal/monitor"
-	"github.com/opsway-io/backend/internal/probes"
 	"github.com/opsway-io/backend/internal/rest"
 	"github.com/opsway-io/backend/internal/storage"
 	"github.com/opsway-io/backend/internal/team"
@@ -75,7 +75,7 @@ func runAPI(cmd *cobra.Command, args []string) {
 	}
 
 	ch_db.AutoMigrate(
-		entities.HttpResult{},
+		check.Check{},
 	)
 
 	storageRepository := storage.NewObjectStorageRepository(ctx, conf.ObjectStorage)
@@ -91,7 +91,7 @@ func runAPI(cmd *cobra.Command, args []string) {
 
 	monitorService := monitor.NewService(db)
 
-	httpResultService := probes.NewService(ch_db)
+	httpResultService := check.NewService(ch_db)
 
 	// TODO: Remove
 

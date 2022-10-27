@@ -8,8 +8,7 @@ import (
 	"time"
 
 	"github.com/hibiken/asynq"
-	"github.com/opsway-io/backend/internal/entities"
-	"github.com/opsway-io/backend/internal/probes"
+	"github.com/opsway-io/backend/internal/check"
 	httpProbe "github.com/opsway-io/backend/internal/probes/http"
 	"github.com/sirupsen/logrus"
 )
@@ -25,7 +24,7 @@ type TaskPayload struct {
 	Payload map[string]string
 }
 
-func HandleTask(serv probes.Service) asynq.HandlerFunc {
+func HandleTask(serv check.Service) asynq.HandlerFunc {
 	fn := func(ctx context.Context, t *asynq.Task) error {
 		var p TaskPayload
 		if err := json.Unmarshal(t.Payload(), &p); err != nil {
@@ -46,7 +45,7 @@ func HandleTask(serv probes.Service) asynq.HandlerFunc {
 			logrus.WithError(err).Fatal("error parsing result")
 		}
 
-		serv.Create(ctx, &entities.HttpResult{MonitorID: uint64(p.ID), TLS: string(tls), Timing: string(timing), StatusCode: uint64(res.Response.StatusCode)})
+		serv.Create(ctx, &check.Check{MonitorID: uint64(p.ID), TLS: string(tls), Timing: string(timing), StatusCode: uint64(res.Response.StatusCode)})
 		log.Printf(" [*] Probe %s", p.Payload["URL"])
 		log.Printf("Result: %v", res.Response)
 		return nil

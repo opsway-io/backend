@@ -234,3 +234,28 @@ func (h *Handlers) PostMonitor(ctx hs.AuthenticatedContext) error {
 
 	return ctx.NoContent(http.StatusCreated)
 }
+
+type GetMonitorChecksRequest struct {
+	TeamID    uint `param:"teamId" validate:"required,numeric,gte=0"`
+	MonitorID uint `param:"monitorId" validate:"required,numeric,gte=0"`
+}
+
+func (h *Handlers) GetMonitorChecks(ctx hs.AuthenticatedContext) error {
+	req, err := helpers.Bind[GetMonitorChecksRequest](ctx)
+	if err != nil {
+		ctx.Log.WithError(err).Debug("failed to bind GetMonitorsRequest")
+
+		return echo.ErrBadRequest
+	}
+
+	results, err := h.CheckService.GetMonitorChecksByID(ctx.Request().Context(), req.MonitorID)
+	if err != nil {
+		ctx.Log.WithError(err).Error("failed to get monitors")
+
+		return echo.ErrInternalServerError
+	}
+
+	// TODO CREATE RESONSE MAPPING
+
+	return ctx.JSON(http.StatusOK, results)
+}

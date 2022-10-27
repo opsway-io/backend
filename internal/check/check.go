@@ -1,10 +1,10 @@
-package entities
+package check
 
 import (
 	"time"
 )
 
-type HttpResult struct {
+type Check struct {
 	ID         uint
 	StatusCode uint64 `gorm:"index; not null"`
 	Timing     string
@@ -13,6 +13,6 @@ type HttpResult struct {
 	CreatedAt  time.Time `gorm:"index"`
 }
 
-func (HttpResult) TableName() string {
-	return "http"
+func (Check) TableName() string {
+	return "checks"
 }

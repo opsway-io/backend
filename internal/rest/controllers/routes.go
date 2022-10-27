@@ -3,8 +3,8 @@ package controllers
 import (
 	"github.com/labstack/echo/v4"
 	"github.com/opsway-io/backend/internal/authentication"
+	"github.com/opsway-io/backend/internal/check"
 	"github.com/opsway-io/backend/internal/monitor"
-	"github.com/opsway-io/backend/internal/probes"
 	"github.com/opsway-io/backend/internal/rest/handlers"
 	mw "github.com/opsway-io/backend/internal/rest/middleware"
 	"github.com/opsway-io/backend/internal/team"
@@ -17,7 +17,7 @@ type Handlers struct {
 	UserService           user.Service
 	TeamService           team.Service
 	MonitorService        monitor.Service
-	HttpResultService     probes.Service
+	CheckService          check.Service
 }
 
 func Register(
@@ -27,14 +27,14 @@ func Register(
 	userService user.Service,
 	teamService team.Service,
 	monitorService monitor.Service,
-	httpResultService probes.Service,
+	checkService check.Service,
 ) {
 	h := &Handlers{
 		AuthenticationService: authenticationService,
 		UserService:           userService,
 		TeamService:           teamService,
 		MonitorService:        monitorService,
-		HttpResultService:     httpResultService,
+		CheckService:          checkService,
 	}
 
 	AuthGuard := mw.AuthGuardFactory(logger, authenticationService)
@@ -90,5 +90,5 @@ func Register(
 	monitorsGroup.POST("", AuthHandler(h.PostMonitor), AllowedRoles(mw.UserRoleOwner, mw.UserRoleAdmin))
 	monitorsGroup.GET("/:monitorId", AuthHandler(h.GetMonitor))
 	monitorsGroup.DELETE("/:monitorId", AuthHandler(h.DeleteMonitor), AllowedRoles(mw.UserRoleOwner, mw.UserRoleAdmin))
-	monitorsGroup.GET("(/:monitorId/checks", AuthHandler(h.GetResults))
+	monitorsGroup.GET("/:monitorId/checks", AuthHandler(h.GetMonitorChecks))
 }

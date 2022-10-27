@@ -7,8 +7,8 @@ import (
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
 	"github.com/opsway-io/backend/internal/authentication"
+	"github.com/opsway-io/backend/internal/check"
 	"github.com/opsway-io/backend/internal/monitor"
-	"github.com/opsway-io/backend/internal/probes"
 	"github.com/opsway-io/backend/internal/rest/controllers"
 	"github.com/opsway-io/backend/internal/rest/helpers"
 	"github.com/opsway-io/backend/internal/rest/oauth"
@@ -36,7 +36,7 @@ func NewServer(
 	userService user.Service,
 	teamService team.Service,
 	monitorService monitor.Service,
-	httpResultService probes.Service,
+	checkService check.Service,
 ) (*Server, error) {
 	e := echo.New()
 
@@ -65,7 +65,7 @@ func NewServer(
 		userService,
 		teamService,
 		monitorService,
-		httpResultService,
+		checkService,
 	)
 
 	if oauthConfig != nil {
