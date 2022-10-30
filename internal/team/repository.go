@@ -54,7 +54,7 @@ func (s *RepositoryImpl) GetUsersByID(ctx context.Context, id uint) (*[]TeamUser
 	var users []TeamUser
 
 	s.db.WithContext(ctx).
-		Select("u.id, u.name, u.display_name, u.email, tr.role").
+		Select("u.*, tr.role").
 		Table("team_users as tu").
 		Joins("INNER JOIN team_roles AS tr ON tr.user_id = tu.user_id").
 		Joins("INNER JOIN users as u ON u.id = tu.user_id").
