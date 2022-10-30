@@ -91,4 +91,5 @@ func Register(
 	monitorsGroup.GET("/:monitorId", AuthHandler(h.GetMonitor))
 	monitorsGroup.DELETE("/:monitorId", AuthHandler(h.DeleteMonitor), AllowedRoles(mw.UserRoleOwner, mw.UserRoleAdmin))
 	monitorsGroup.GET("/:monitorId/checks", AuthHandler(h.GetMonitorChecks))
+	monitorsGroup.GET("/:monitorId/metrics", AuthHandler(h.GetMonitorMetrics))
 }
