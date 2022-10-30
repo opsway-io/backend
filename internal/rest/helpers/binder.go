@@ -12,12 +12,12 @@ func Bind[V interface{}](ctx echo.Context) (*V, error) {
 		return nil, errors.Wrap(err, "failed to bind request")
 	}
 
-	if err := ctx.Validate(&data); err != nil {
-		return nil, errors.Wrap(err, "request failed validation")
-	}
-
 	if err := defaults.Set(&data); err != nil {
 		return nil, errors.Wrap(err, "failed to set defaults")
+	}
+
+	if err := ctx.Validate(&data); err != nil {
+		return nil, errors.Wrap(err, "request failed validation")
 	}
 
 	return &data, nil

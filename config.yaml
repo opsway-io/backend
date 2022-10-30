@@ -14,7 +14,7 @@ authentication:
 
 postgres:
   dsn: "host=localhost user=admin password=admin dbname=opsway port=5432 sslmode=disable"
-  debug: false
+  debug: true
 
 
 clickhouse:

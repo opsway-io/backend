@@ -16,8 +16,8 @@ var (
 )
 
 type Repository interface {
-	GetByID(ctx context.Context, id uint) (*entities.Team, error)
-	GetUsersByID(ctx context.Context, id uint) (*[]TeamUser, error)
+	GetByID(ctx context.Context, teamId uint) (*entities.Team, error)
+	GetUsersByID(ctx context.Context, teamId uint, offset *int, limit *int, query *string) (*[]TeamUser, error)
 	GetUserRole(ctx context.Context, teamID, userID uint) (*entities.TeamRole, error)
 	Create(ctx context.Context, team *entities.Team) error
 	Update(ctx context.Context, team *entities.Team) error
@@ -50,7 +50,7 @@ type TeamUser struct {
 	Role entities.Role
 }
 
-func (s *RepositoryImpl) GetUsersByID(ctx context.Context, id uint) (*[]TeamUser, error) {
+func (s *RepositoryImpl) GetUsersByID(ctx context.Context, teamId uint, offset *int, limit *int, query *string) (*[]TeamUser, error) {
 	var users []TeamUser
 
 	s.db.WithContext(ctx).
@@ -58,7 +58,11 @@ func (s *RepositoryImpl) GetUsersByID(ctx context.Context, id uint) (*[]TeamUser
 		Table("team_users as tu").
 		Joins("INNER JOIN team_roles AS tr ON tr.user_id = tu.user_id").
 		Joins("INNER JOIN users as u ON u.id = tu.user_id").
-		Where("tu.team_id = ?", id).
+		Scopes(
+			postgres.Paginated(offset, limit),
+			postgres.Search([]string{"u.name", "u.display_name", "u.email"}, query),
+		).
+		Where("tu.team_id = ?", teamId).
 		Find(&users)
 
 	return &users, nil
