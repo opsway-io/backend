@@ -59,11 +59,12 @@ type GetTeamUsersRequest struct {
 	TeamID uint    `param:"teamId" validate:"required,numeric,gt=0"`
 	Offset *int    `query:"offset" validate:"numeric,gte=0" default:"0"`
 	Limit  *int    `query:"limit" validate:"numeric,gt=0" default:"10"`
-	Query  *string `query:"query" validate:"omitempty,min=3"`
+	Query  *string `query:"query" validate:"omitempty"`
 }
 
 type GetTeamUsersResponse struct {
-	Users []GetTeamUsersResponseUser `json:"users"`
+	Users      []GetTeamUsersResponseUser `json:"users"`
+	TotalCount int                        `json:"totalCount"`
 }
 
 type GetTeamUsersResponseUser struct {
@@ -110,7 +111,13 @@ func newGetTeamUsersResponse(users *[]team.TeamUser, userService user.Service) G
 		}
 	}
 
+	totalCount := 0
+	if len(*users) > 0 {
+		totalCount = (*users)[0].TotalCount
+	}
+
 	return GetTeamUsersResponse{
-		Users: res,
+		Users:      res,
+		TotalCount: totalCount,
 	}
 }

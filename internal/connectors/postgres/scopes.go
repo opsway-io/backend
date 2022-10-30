@@ -16,14 +16,20 @@ func Paginated(offset *int, limit *int) func(db *gorm.DB) *gorm.DB {
 	}
 }
 
+func IncludeTotalCount(columnName string) func(db *gorm.DB) *gorm.DB {
+	return func(db *gorm.DB) *gorm.DB {
+		return db.Select("*, COUNT(*) OVER() AS " + columnName)
+	}
+}
+
 func Search(column []string, search *string) func(db *gorm.DB) *gorm.DB {
 	return func(db *gorm.DB) *gorm.DB {
 		if search != nil {
 			for i, c := range column {
 				if i == 0 {
-					db = db.Where(c+" LIKE ?", "%"+*search+"%")
+					db = db.Where(c+" ILIKE ?", "%"+*search+"%")
 				} else {
-					db = db.Or(c+" LIKE ?", "%"+*search+"%")
+					db = db.Or(c+" ILIKE ?", "%"+*search+"%")
 				}
 			}
 		}

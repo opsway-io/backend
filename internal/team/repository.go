@@ -47,7 +47,8 @@ func (s *RepositoryImpl) GetByID(ctx context.Context, id uint) (*entities.Team, 
 
 type TeamUser struct {
 	entities.User
-	Role entities.Role
+	Role       entities.Role
+	TotalCount int
 }
 
 func (s *RepositoryImpl) GetUsersByID(ctx context.Context, teamId uint, offset *int, limit *int, query *string) (*[]TeamUser, error) {
@@ -60,6 +61,7 @@ func (s *RepositoryImpl) GetUsersByID(ctx context.Context, teamId uint, offset *
 		Joins("INNER JOIN users as u ON u.id = tu.user_id").
 		Scopes(
 			postgres.Paginated(offset, limit),
+			postgres.IncludeTotalCount("total_count"),
 			postgres.Search([]string{"u.name", "u.display_name", "u.email"}, query),
 		).
 		Where("tu.team_id = ?", teamId).
