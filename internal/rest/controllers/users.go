@@ -150,7 +150,7 @@ func (h *Handlers) DeleteUser(ctx hs.AuthenticatedContext) error {
 
 type PutUserPasswordRequest struct {
 	UserID      uint   `param:"userId" validate:"required,numeric,gt=0"`
-	OldPassword string `json:"oldPassword" validate:"required,min=8,max=255"`
+	OldPassword string `json:"oldPassword" validate:"required,max=255"`
 	NewPassword string `json:"newPassword" validate:"required,min=8,max=255"`
 }
 
