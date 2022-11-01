@@ -177,7 +177,7 @@ func (h *Handlers) PutUserPassword(ctx hs.AuthenticatedContext) error {
 		if errors.Is(err, user.ErrInvalidPassword) {
 			ctx.Log.WithError(err).Debug("invalid password")
 
-			return echo.ErrUnauthorized
+			return echo.ErrBadRequest
 		}
 
 		ctx.Log.WithError(err).Error("failed to change user password")
