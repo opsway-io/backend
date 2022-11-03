@@ -35,8 +35,9 @@ services:
       - '9001:9001'
       - '5566:5566'
     volumes:
-      - './data:/data'
+      - './data/minio:/data'
     environment:
       MINIO_ACCESS_KEY: guest
       MINIO_SECRET_KEY: supersecret
+      
     command: 'server --address 0.0.0.0:9001 --console-address 0.0.0.0:5566 /data'

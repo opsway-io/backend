@@ -42,7 +42,7 @@ notification:
 object_storage:
   endpoint_url: "http://localhost:9001"
   access_key: "guest"
-  secret_key: "guest"
+  secret_key: "supersecret"
   region: "eu-central-1"
 
 scheduler:
