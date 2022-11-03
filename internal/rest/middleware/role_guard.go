@@ -2,6 +2,7 @@ package middleware
 
 import (
 	"github.com/labstack/echo/v4"
+	"github.com/opsway-io/backend/internal/entities"
 	"github.com/opsway-io/backend/internal/team"
 	"github.com/sirupsen/logrus"
 )
@@ -22,12 +23,12 @@ const (
 // Allows only the allowed roles to access the route.
 // A team guard must be set before this guard.
 func RoleGuardFactory(logger *logrus.Entry, teamService team.Service) func(allowedRoles ...UserRole) func(next echo.HandlerFunc) echo.HandlerFunc {
-	l := logrus.WithField("middleware", "role_guard")
+	l := logger.WithField("middleware", "role_guard")
 
 	return func(allowedRoles ...UserRole) func(next echo.HandlerFunc) echo.HandlerFunc {
 		return func(next echo.HandlerFunc) echo.HandlerFunc {
 			return func(c echo.Context) error {
-				role, ok := c.Get("team_role").(string)
+				role, ok := c.Get("team_role").(*entities.TeamRole)
 				if !ok {
 					l.Debug("missing team_role, are you missing a team guard?")
 
@@ -35,12 +36,14 @@ func RoleGuardFactory(logger *logrus.Entry, teamService team.Service) func(allow
 				}
 
 				for _, allowedRole := range allowedRoles {
-					if role == string(allowedRole) {
+					if string(role.Role) == string(allowedRole) {
+						l.Debug("role guard passed")
+
 						return next(c)
 					}
 				}
 
-				l.Debug("user role is not allowed")
+				l.Debug("user does not have required role")
 
 				return echo.ErrForbidden
 			}

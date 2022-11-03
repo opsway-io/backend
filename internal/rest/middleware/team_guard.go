@@ -11,7 +11,7 @@ import (
 
 // Allows only users in the same team to access the route
 func TeamGuardFactory(logger *logrus.Entry, teamService team.Service) func() func(next echo.HandlerFunc) echo.HandlerFunc {
-	l := logrus.WithField("middleware", "team_guard")
+	l := logger.WithField("middleware", "team_guard")
 
 	return func() func(next echo.HandlerFunc) echo.HandlerFunc {
 		return func(next echo.HandlerFunc) echo.HandlerFunc {
@@ -51,12 +51,19 @@ func TeamGuardFactory(logger *logrus.Entry, teamService team.Service) func() fun
 					return echo.ErrForbidden
 				}
 
+				l = l.WithFields(logrus.Fields{
+					"team_id": teamID,
+					"user_id": userID,
+				})
+
 				userRole, err := teamService.GetUserRole(c.Request().Context(), uint(teamID), uint(userID))
 				if err != nil {
 					l.WithError(err).Debug("failed to get user role")
 
 					return echo.ErrForbidden
 				}
+
+				l.WithField("role", userRole).Debug("team guard passed")
 
 				c.Set("team_role", userRole)
 

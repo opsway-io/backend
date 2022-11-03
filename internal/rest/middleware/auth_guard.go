@@ -48,6 +48,8 @@ func AuthGuardFactory(logger *logrus.Entry, jwtService authentication.Service) f
 					return echo.ErrUnauthorized
 				}
 
+				l.Debug("auth guard passed")
+
 				c.Set("jwt_claims", claims)
 
 				return next(c)
