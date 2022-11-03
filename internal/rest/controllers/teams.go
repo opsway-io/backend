@@ -121,3 +121,29 @@ func newGetTeamUsersResponse(users *[]team.TeamUser, userService user.Service) G
 		TotalCount: totalCount,
 	}
 }
+
+type PutTeamRequest struct {
+	TeamID      uint   `param:"teamId" validate:"required,numeric,gt=0"`
+	DisplayName string `json:"displayName" validate:"max=255"`
+}
+
+func (h *Handlers) PutTeam(ctx hs.AuthenticatedContext) error {
+	req, err := helpers.Bind[PutTeamRequest](ctx)
+	if err != nil {
+		ctx.Log.WithError(err).Debug("failed to bind PutTeamRequest")
+
+		return echo.ErrBadRequest
+	}
+
+	if err = h.TeamService.UpdateDisplayName(
+		ctx.Request().Context(),
+		req.TeamID,
+		req.DisplayName,
+	); err != nil {
+		ctx.Log.WithError(err).Debug("failed to update team")
+
+		return echo.ErrInternalServerError
+	}
+
+	return ctx.NoContent(http.StatusNoContent)
+}

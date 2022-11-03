@@ -55,6 +55,10 @@ func (t *Team) BeforeCreate(tx *gorm.DB) (err error) {
 }
 
 func (t *Team) BeforeUpdate(tx *gorm.DB) (err error) {
+	if t.Name == "" {
+		return nil
+	}
+
 	if ok := checkTeamNameFormat(t.Name); !ok {
 		return ErrIllegalTeamNameFormat
 	}

@@ -11,7 +11,7 @@ type Service interface {
 	GetUsersByID(ctx context.Context, teamId uint, offset *int, limit *int, query *string) (*[]TeamUser, error)
 	GetUserRole(ctx context.Context, teamID, userID uint) (*entities.TeamRole, error)
 	Create(ctx context.Context, team *entities.Team) error
-	Update(ctx context.Context, team *entities.Team) error
+	UpdateDisplayName(ctx context.Context, teamID uint, displayName string) error
 	Delete(ctx context.Context, id uint) error
 }
 
@@ -33,8 +33,8 @@ func (s *ServiceImpl) Create(ctx context.Context, team *entities.Team) error {
 	return s.repository.Create(ctx, team)
 }
 
-func (s *ServiceImpl) Update(ctx context.Context, team *entities.Team) error {
-	return s.repository.Update(ctx, team)
+func (s *ServiceImpl) UpdateDisplayName(ctx context.Context, teamID uint, displayName string) error {
+	return s.repository.UpdateDisplayName(ctx, teamID, displayName)
 }
 
 func (s *ServiceImpl) Delete(ctx context.Context, id uint) error {

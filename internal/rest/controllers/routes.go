@@ -76,6 +76,7 @@ func Register(
 	)
 
 	teamsGroup.GET("", AuthHandler(h.GetTeam))
+	teamsGroup.PUT("", AuthHandler(h.PutTeam))
 	teamsGroup.GET("/users", AuthHandler(h.GetTeamUsers))
 
 	// Monitors

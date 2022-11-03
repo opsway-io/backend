@@ -19,8 +19,8 @@ type Repository interface {
 	GetByID(ctx context.Context, teamId uint) (*entities.Team, error)
 	GetUsersByID(ctx context.Context, teamId uint, offset *int, limit *int, query *string) (*[]TeamUser, error)
 	GetUserRole(ctx context.Context, teamID, userID uint) (*entities.TeamRole, error)
+	UpdateDisplayName(ctx context.Context, teamID uint, displayName string) error
 	Create(ctx context.Context, team *entities.Team) error
-	Update(ctx context.Context, team *entities.Team) error
 	Delete(ctx context.Context, id uint) error
 }
 
@@ -82,8 +82,10 @@ func (s *RepositoryImpl) Create(ctx context.Context, team *entities.Team) error 
 	return nil
 }
 
-func (s *RepositoryImpl) Update(ctx context.Context, team *entities.Team) error {
-	result := s.db.WithContext(ctx).Updates(team)
+func (s *RepositoryImpl) UpdateDisplayName(ctx context.Context, teamID uint, displayName string) error {
+	result := s.db.WithContext(ctx).Model(&entities.Team{}).Where(entities.Team{
+		ID: teamID,
+	}).Update("display_name", displayName)
 	if result.Error != nil {
 		return result.Error
 	}
