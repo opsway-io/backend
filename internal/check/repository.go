@@ -33,15 +33,15 @@ func (r *RepositoryImpl) Get(ctx context.Context, monitorID uint) (*[]Check, err
 }
 
 type AggMetric struct {
-	Start string
-	Time  string
+	Start  string
+	Timing string
 }
 
 func (r *RepositoryImpl) GetAggMetrics(ctx context.Context, monitorID uint) (*[]AggMetric, error) {
 	var metrics []AggMetric
 	err := r.db.WithContext(
 		ctx,
-	).Select("tumbleStart(wndw) as start, avg(JSONExtractFloat(timing, 'total')) as time").
+	).Select("tumbleStart(wndw) as start, avg(JSONExtractFloat(timing, 'total')) as timing").
 		Where("monitor_id = ?", monitorID).
 		Group("tumble(toDateTime(created_at), INTERVAL 1 HOUR) as wndw").
 		Find(&metrics).Error
