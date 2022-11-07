@@ -44,7 +44,7 @@ func (r *RepositoryImpl) GetAggMetrics(ctx context.Context, monitorID uint) (*[]
 	).Select("tumbleStart(wndw) as start, avg(JSONExtractFloat(timing, 'total')) as timing").
 		Where("monitor_id = ?", monitorID).
 		Group("tumble(toDateTime(created_at), INTERVAL 1 HOUR) as wndw").
-		Where("created_at  > DATE_SUB(NOW(), INTERVAL 24 HOUR) AND created_at <= NOW()").
+		Where("created_at BETWEEN DATE_SUB(NOW(), INTERVAL 24 HOUR) AND NOW()").
 		Find(&metrics).Error
 
 	return &metrics, err
