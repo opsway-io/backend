@@ -73,8 +73,9 @@ func checkTeamNameFormat(name string) bool {
 type Role string
 
 const (
-	TeamRoleAdmin  Role = "admin"
-	TeamRoleMember Role = "member"
+	TeamRoleOwner  Role = "OWNER"
+	TeamRoleAdmin  Role = "ADMIN"
+	TeamRoleMember Role = "MEMBER"
 )
 
 type TeamRole struct {
