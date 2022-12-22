@@ -79,8 +79,9 @@ func handleTask(ctx context.Context, l *logrus.Logger, m *entities.Monitor) {
 	}
 
 	l.WithFields(logrus.Fields{
-		"status": res.Response.StatusCode,
-		"total":  fmt.Sprintf("%v", res.Timing.Phases.Total),
+		"monitor_id": m.ID,
+		"status":     res.Response.StatusCode,
+		"total":      fmt.Sprintf("%v", res.Timing.Phases.Total),
 	}).Info("probe successful")
 
 	// TODO: save result
