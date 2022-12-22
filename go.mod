@@ -26,6 +26,7 @@ require (
 	github.com/spf13/cobra v1.6.1
 	github.com/spf13/viper v1.14.0
 	github.com/tj/assert v0.0.3
+	github.com/vmihailenco/msgpack v4.0.4+incompatible
 	golang.org/x/crypto v0.4.0
 	gorm.io/driver/clickhouse v0.5.0
 	gorm.io/driver/postgres v1.4.5

@@ -2,13 +2,13 @@ package monitor
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"time"
 
 	"github.com/go-redis/redis/v8"
 	"github.com/opsway-io/backend/internal/entities"
 	"github.com/opsway-io/boomerang"
+	"github.com/vmihailenco/msgpack"
 )
 
 const taskKind = "http-probe"
@@ -56,12 +56,12 @@ func (s *ScheduleImpl) On(ctx context.Context, handler func(ctx context.Context,
 }
 
 func (s *ScheduleImpl) marshalMonitor(monitor *entities.Monitor) ([]byte, error) {
-	return json.Marshal(monitor)
+	return msgpack.Marshal(monitor)
 }
 
 func (s *ScheduleImpl) unmarshalMonitor(data []byte) (*entities.Monitor, error) {
 	var monitor entities.Monitor
-	if err := json.Unmarshal(data, &monitor); err != nil {
+	if err := msgpack.Unmarshal(data, &monitor); err != nil {
 		return nil, err
 	}
 
