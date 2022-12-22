@@ -1,6 +1,7 @@
 package http
 
 import (
+	"context"
 	"crypto/tls"
 	"io"
 	"io/ioutil"
@@ -17,8 +18,8 @@ const (
 	UserAgent = "opsway 1.0.0"
 )
 
-func Probe(method, url string, headers map[string]string, body io.Reader, timeout time.Duration) (*Result, error) {
-	req, err := xhttp.NewRequest(method, url, body)
+func Probe(ctx context.Context, method, url string, headers map[string]string, body io.Reader, timeout time.Duration) (*Result, error) {
+	req, err := xhttp.NewRequestWithContext(ctx, method, url, body)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to create request")
 	}
@@ -32,8 +33,8 @@ func Probe(method, url string, headers map[string]string, body io.Reader, timeou
 	req.Header.Set("User-Agent", UserAgent)
 
 	var result httpstat.Result
-	ctx := httpstat.WithHTTPStat(req.Context(), &result)
-	req = req.WithContext(ctx)
+	httpStatCtx := httpstat.WithHTTPStat(ctx, &result)
+	req = req.WithContext(httpStatCtx)
 
 	client := &xhttp.Client{
 		Timeout: timeout,

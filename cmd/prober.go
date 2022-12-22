@@ -3,10 +3,12 @@ package cmd
 import (
 	"context"
 	"fmt"
+	"time"
 
 	connectorRedis "github.com/opsway-io/backend/internal/connectors/redis"
 	"github.com/opsway-io/backend/internal/entities"
 	"github.com/opsway-io/backend/internal/monitor"
+	"github.com/opsway-io/backend/internal/probes/http"
 	"github.com/sirupsen/logrus"
 
 	"github.com/spf13/cobra"
@@ -37,8 +39,6 @@ func runProber(cmd *cobra.Command, args []string) {
 
 	l := getLogger(conf.Log)
 
-	// Connect to redis
-
 	redisClient, err := connectorRedis.NewClient(ctx, conf.Redis)
 	if err != nil {
 		l.WithError(err).Fatal("failed to connect to redis")
@@ -54,13 +54,34 @@ func runProber(cmd *cobra.Command, args []string) {
 
 	l.Info("Waiting for tasks...")
 
-	if err := schedule.On(ctx, handleTask); err != nil {
+	if err := schedule.On(ctx, func(ctx context.Context, monitor *entities.Monitor) {
+		handleTask(ctx, l, monitor)
+	}); err != nil {
 		l.WithError(err).Fatal("failed to start schedule")
 	}
 
 	l.Info("Goodbye!")
 }
 
-func handleTask(ctx context.Context, m *entities.Monitor) {
-	fmt.Printf("Got monitor: %v", m.ID)
+func handleTask(ctx context.Context, l *logrus.Logger, m *entities.Monitor) {
+	res, err := http.Probe(
+		ctx,
+		m.Settings.Method,
+		m.Settings.URL,
+		nil,
+		nil,
+		time.Duration(time.Second*5),
+	)
+	if err != nil {
+		l.WithError(err).Error("failed to probe")
+
+		return
+	}
+
+	l.WithFields(logrus.Fields{
+		"status": res.Response.StatusCode,
+		"total":  fmt.Sprintf("%v", res.Timing.Phases.Total),
+	}).Info("probe successful")
+
+	// TODO: save result
 }
