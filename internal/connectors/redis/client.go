@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/go-redis/redis"
+	"github.com/go-redis/redis/v8"
 	"github.com/pkg/errors"
 )
 
@@ -35,7 +35,7 @@ func NewClient(ctx context.Context, conf Config) (*redis.Client, error) {
 		})
 	}
 
-	if _, err := cli.Ping().Result(); err != nil {
+	if _, err := cli.Ping(ctx).Result(); err != nil {
 		return nil, errors.Wrap(err, "Failed to ping redis")
 	}
 

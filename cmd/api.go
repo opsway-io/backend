@@ -89,7 +89,7 @@ func runAPI(cmd *cobra.Command, args []string) {
 	teamRepository := team.NewRepository(db)
 	teamService := team.NewService(teamRepository)
 
-	monitorService := monitor.NewService(db)
+	monitorService := monitor.NewService(db, redisClient)
 
 	httpResultService := check.NewService(ch_db)
 

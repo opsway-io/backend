@@ -1,7 +1,7 @@
 ############################
 # STEP 1 build base
 ############################
-FROM golang:1.18-alpine3.16 AS build-base
+FROM golang:1.19-alpine3.16 AS build-base
 WORKDIR /build
 COPY ["go.mod", "go.sum", "./"]
 RUN go mod download -x

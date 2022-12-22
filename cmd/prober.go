@@ -3,13 +3,10 @@ package cmd
 import (
 	"context"
 	"fmt"
-	"os"
-	"os/signal"
-	"sync"
-	"syscall"
 
 	connectorRedis "github.com/opsway-io/backend/internal/connectors/redis"
-	"github.com/opsway-io/boomerang"
+	"github.com/opsway-io/backend/internal/entities"
+	"github.com/opsway-io/backend/internal/monitor"
 	"github.com/sirupsen/logrus"
 
 	"github.com/spf13/cobra"
@@ -31,8 +28,7 @@ func init() {
 }
 
 func runProber(cmd *cobra.Command, args []string) {
-	ctx, cancel := context.WithCancel(cmd.Context())
-	var wg sync.WaitGroup
+	ctx := cmd.Context()
 
 	conf, err := loadConfig()
 	if err != nil {
@@ -54,45 +50,17 @@ func runProber(cmd *cobra.Command, args []string) {
 		"db":   conf.Redis.DB,
 	}).Info("Connected to redis")
 
-	// Register consumers
+	schedule := monitor.NewSchedule(redisClient)
 
-	schedule := boomerang.NewSchedule(redisClient)
+	l.Info("Waiting for tasks...")
 
-	for i := 0; i < conf.Prober.Concurrency; i++ {
-		go func() {
-			wg.Add(1)
-			defer wg.Done()
-
-			schedule.Consume(
-				ctx,
-				"http_probe",
-				[]string{"eu-central-1"},
-				handleHttpProbe,
-			)
-		}()
+	if err := schedule.On(ctx, handleTask); err != nil {
+		l.WithError(err).Fatal("failed to start schedule")
 	}
 
-	l.WithFields(logrus.Fields{
-		"concurrency": conf.Prober.Concurrency,
-	}).Info("Probers(s) started")
-
-	// Wait for interrupt signal to gracefully shutdown the application
-
-	termChan := make(chan os.Signal)
-	signal.Notify(termChan, syscall.SIGINT, syscall.SIGTERM)
-	<-termChan
-
-	l.Info("Shutting down...")
-
-	cancel()
-
-	wg.Wait()
+	l.Info("Goodbye!")
 }
 
-func handleHttpProbe(ctx context.Context, task boomerang.Task) error {
-	fmt.Println(task)
-
-	// TODO: implement
-
-	return nil
+func handleTask(ctx context.Context, m *entities.Monitor) {
+	fmt.Printf("Got monitor: %v", m.ID)
 }

@@ -3,6 +3,7 @@ package monitor
 import (
 	"context"
 
+	"github.com/go-redis/redis/v8"
 	"github.com/opsway-io/backend/internal/entities"
 	"gorm.io/gorm"
 )
@@ -20,11 +21,13 @@ type Service interface {
 
 type ServiceImpl struct {
 	repository Repository
+	schedule   Schedule
 }
 
-func NewService(db *gorm.DB) Service {
+func NewService(db *gorm.DB, redisClient *redis.Client) Service {
 	return &ServiceImpl{
 		repository: NewRepository(db),
+		schedule:   NewSchedule(redisClient),
 	}
 }
 
@@ -49,13 +52,25 @@ func (s *ServiceImpl) GetMonitorsAndSettingsByTeamID(ctx context.Context, teamID
 }
 
 func (s *ServiceImpl) Create(ctx context.Context, m *entities.Monitor) error {
-	return s.repository.Create(ctx, m)
+	err := s.repository.Create(ctx, m)
+	if err != nil {
+		return err
+	}
+
+	return s.schedule.Add(ctx, m)
 }
 
 func (s *ServiceImpl) Update(ctx context.Context, m *entities.Monitor) error {
 	return s.repository.Update(ctx, m)
+
+	// TODO: remove and reschedule the monitor
 }
 
 func (s *ServiceImpl) Delete(ctx context.Context, id uint) error {
-	return s.repository.Delete(ctx, id)
+	err := s.repository.Delete(ctx, id)
+	if err != nil {
+		return err
+	}
+
+	return s.schedule.Remove(ctx, id)
 }
