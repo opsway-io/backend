@@ -1,43 +1,81 @@
 version: '3.1'
+name: opsway
+
 services:
+  # Application
+  api:
+    image: acim/go-reflex
+    restart: unless-stopped
+    command: reflex -r '\.go|\.yaml$' -s -- sh -c 'go run main.go api'
+    environment:
+      - RACE_DETECTOR=1
+    volumes:
+      - .:/app
+    ports:
+      - 8001:8001
+    depends_on:
+      - postgres
+      - redis
+      - ch_server
+      - s3
+  prober:
+    image: acim/go-reflex
+    restart: unless-stopped
+    command: reflex -r '\.go|\.yaml$' -s -- sh -c 'go run main.go prober'
+    environment:
+      - RACE_DETECTOR=1
+    volumes:
+      - .:/app
+    depends_on:
+      - redis
+      - ch_server
+
+  # Dependencies
   postgres:
     image: 'postgres:14.4-alpine'
     restart: unless-stopped
     environment:
-      POSTGRES_USER: admin
-      POSTGRES_PASSWORD: admin
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: pass
       POSTGRES_DB: opsway
     volumes:
-      - './data/postgres:/var/lib/posgresql/data'
+      - './.data/postgres:/var/lib/posgresql/data'
     ports:
       - '5432:5432'
   redis:
-    image: 'redis:6.2-alpine'
+    image: 'redis:7.0.7-alpine'
+    restart: unless-stopped
     ports:
       - '6379:6379'
     command: redis-server
   ch_server:
     image: clickhouse/clickhouse-server
+    restart: unless-stopped
+    environment:
+      - CLICKHOUSE_USER=default
+      - CLICKHOUSE_PASSWORD=
+      - CLICKHOUSE_DB=opsway
     ports:
       - '8123:8123'
       - '9000:9000'
     volumes:
-      - './data/clickhouse:/var/lib/clickhouse'
+      - './.data/clickhouse:/var/lib/clickhouse'
   ch_client:
     image: clickhouse/clickhouse-client
+    restart: unless-stopped
     entrypoint:
       - /bin/sleep
     command:
       - infinity
   s3:
     image: minio/minio
+    restart: unless-stopped
     ports:
       - '9001:9001'
       - '5566:5566'
     volumes:
-      - './data/minio:/data'
+      - './.data/minio:/data'
     environment:
       MINIO_ACCESS_KEY: guest
       MINIO_SECRET_KEY: supersecret
-      
     command: 'server --address 0.0.0.0:9001 --console-address 0.0.0.0:5566 /data'

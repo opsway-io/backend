@@ -39,16 +39,16 @@ func runProber(cmd *cobra.Command, args []string) {
 
 	l := getLogger(conf.Log)
 
-	redisClient, err := connectorRedis.NewClient(ctx, conf.Redis)
-	if err != nil {
-		l.WithError(err).Fatal("failed to connect to redis")
-	}
-
 	l.WithFields(logrus.Fields{
 		"host": conf.Redis.Host,
 		"port": conf.Redis.Port,
 		"db":   conf.Redis.DB,
-	}).Info("Connected to redis")
+	}).Info("Connecting to redis")
+
+	redisClient, err := connectorRedis.NewClient(ctx, conf.Redis)
+	if err != nil {
+		l.WithError(err).Fatal("failed to connect to redis")
+	}
 
 	schedule := monitor.NewSchedule(redisClient)
 
