@@ -56,7 +56,7 @@ func NewServer(
 		}),
 	)
 
-	root := e.Group("/api/v1")
+	root := e.Group("/v1")
 
 	controllers.Register(
 		root,
