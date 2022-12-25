@@ -4,14 +4,13 @@ import (
 	"encoding/json"
 	"time"
 
-	"github.com/lib/pq"
 	"github.com/opsway-io/backend/internal/connectors/postgres"
 )
 
 type Monitor struct {
 	ID        uint
 	Name      string          `gorm:"index;not null"`
-	Tags      *pq.StringArray `gorm:"type:text[]"`
+	Tags      []string        `gorm:"type:text[]"`
 	Settings  MonitorSettings `gorm:"not null;constraint:OnDelete:CASCADE"`
 	Incidents []Incident      `gorm:"constraint:OnDelete:CASCADE"`
 	TeamID    uint            `gorm:"index;not null"`
@@ -21,18 +20,6 @@ type Monitor struct {
 
 func (Monitor) TableName() string {
 	return "monitors"
-}
-
-func (m *Monitor) SetTags(tags []string) {
-	m.Tags = (*pq.StringArray)(&tags)
-}
-
-func (m *Monitor) GetTags() []string {
-	if m.Tags == nil {
-		return []string{}
-	}
-
-	return []string(*m.Tags)
 }
 
 func (m *Monitor) SetBodyStr(body string) {
@@ -81,6 +68,7 @@ type MonitorSettings struct {
 	URL       string         `gorm:"not null"`
 	Headers   *postgres.JSON `gorm:"type:jsonb"`
 	Body      *[]byte        `gorm:"type:bytea"`
+	BodyType  string         `gorm:"not null"`
 	Frequency time.Duration  `gorm:"not null"`
 	MonitorID int            `gorm:"index;not null"`
 	CreatedAt time.Time      `gorm:"index"`
