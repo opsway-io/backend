@@ -2,9 +2,12 @@ package cmd
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"time"
 
+	"github.com/opsway-io/backend/internal/check"
+	"github.com/opsway-io/backend/internal/connectors/clickhouse"
 	connectorRedis "github.com/opsway-io/backend/internal/connectors/redis"
 	"github.com/opsway-io/backend/internal/entities"
 	"github.com/opsway-io/backend/internal/monitor"
@@ -52,10 +55,17 @@ func runProber(cmd *cobra.Command, args []string) {
 
 	schedule := monitor.NewSchedule(redisClient)
 
+	ch, err := clickhouse.NewClient(ctx, conf.Clickhouse)
+	if err != nil {
+		l.WithError(err).Fatal("Failed to create clickhouse")
+	}
+
+	httpResultService := check.NewService(ch)
+
 	l.Info("Waiting for tasks...")
 
 	if err := schedule.On(ctx, func(ctx context.Context, monitor *entities.Monitor) {
-		handleTask(ctx, l, monitor)
+		handleTask(ctx, l, monitor, httpResultService)
 	}); err != nil {
 		l.WithError(err).Fatal("failed to start schedule")
 	}
@@ -63,7 +73,7 @@ func runProber(cmd *cobra.Command, args []string) {
 	l.Info("Goodbye!")
 }
 
-func handleTask(ctx context.Context, l *logrus.Logger, m *entities.Monitor) {
+func handleTask(ctx context.Context, l *logrus.Logger, m *entities.Monitor, c check.Service) {
 	res, err := http.Probe(
 		ctx,
 		m.Settings.Method,
@@ -84,5 +94,30 @@ func handleTask(ctx context.Context, l *logrus.Logger, m *entities.Monitor) {
 		"total":      fmt.Sprintf("%v", res.Timing.Phases.Total),
 	}).Info("probe successful")
 
-	// TODO: save result
+	timings, err := json.Marshal(res.Timing.Phases)
+	if err != nil {
+		l.WithError(err).Error("failed to marshal timings")
+
+		return
+	}
+
+	tls, err := json.Marshal(res.TLS)
+	if err != nil {
+		l.WithError(err).Error("failed to marshal tls")
+
+		return
+	}
+
+	result := check.Check{
+		StatusCode: uint64(res.Response.StatusCode),
+		Timing:     string(timings),
+		TLS:        string(tls),
+		MonitorID:  m.ID,
+	}
+
+	err = c.Create(ctx, &result)
+	if err != nil {
+		l.WithError(err).Error("failed add result to clickhouse")
+	}
+
 }

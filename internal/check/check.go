@@ -9,7 +9,7 @@ type Check struct {
 	StatusCode uint64 `gorm:"index; not null"`
 	Timing     string
 	TLS        string
-	MonitorID  uint64    `gorm:"index;not null"`
+	MonitorID  uint      `gorm:"index;not null"`
 	CreatedAt  time.Time `gorm:"index"`
 }
 
