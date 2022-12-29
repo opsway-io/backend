@@ -2,6 +2,7 @@ package clickhouse
 
 import (
 	"context"
+	"time"
 
 	"github.com/pkg/errors"
 	"gorm.io/driver/clickhouse"
@@ -33,6 +34,10 @@ func NewClient(ctx context.Context, conf Config) (*gorm.DB, error) {
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to get database connection for pinging")
 	}
+
+	clickhouseDB.SetMaxOpenConns(10)
+	clickhouseDB.SetMaxIdleConns(5)
+	clickhouseDB.SetConnMaxLifetime(time.Hour)
 
 	if err = clickhouseDB.PingContext(ctx); err != nil {
 		return nil, errors.Wrap(err, "failed to ping database")
