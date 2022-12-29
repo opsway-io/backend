@@ -1,6 +1,7 @@
 .vscode/
 .idea/
 .data/
+data/
 
 .env
 *.exe
