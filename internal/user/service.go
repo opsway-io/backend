@@ -20,9 +20,9 @@ type Service interface {
 	Update(ctx context.Context, user *entities.User) error
 	Delete(ctx context.Context, id uint) error
 	ScrapeUserAvatarFromURL(ctx context.Context, userID uint, URL string) error
-	GetUserAvatarURLByID(userID uint) (URL string)
-	DeleteUserAvatar(ctx context.Context, userID uint) error
-	UploadUserAvatar(ctx context.Context, userID uint, file io.Reader) error
+	GetAvatarURLByID(userID uint) (URL string)
+	UploadAvatar(ctx context.Context, userID uint, file io.Reader) error
+	DeleteAvatar(ctx context.Context, userID uint) error
 	ChangePassword(ctx context.Context, userID uint, oldPassword string, newPassword string) error
 }
 
@@ -66,7 +66,7 @@ func (s *ServiceImpl) ScrapeUserAvatarFromURL(ctx context.Context, userID uint, 
 
 	defer resp.Body.Close()
 
-	key := s.getUserAvatarKey(userID)
+	key := s.getAvatarKey(userID)
 	err = s.storage.PutFile(ctx, "avatars", key, resp.Body)
 	if err != nil {
 		return errors.Wrap(err, "failed to upload avatar to storage")
@@ -80,36 +80,18 @@ func (s *ServiceImpl) ScrapeUserAvatarFromURL(ctx context.Context, userID uint, 
 	return nil
 }
 
-func (s *ServiceImpl) GetUserAvatarURLByID(userID uint) string {
-	key := s.getUserAvatarKey(userID)
+func (s *ServiceImpl) GetAvatarURLByID(userID uint) string {
+	key := s.getAvatarKey(userID)
 
 	return s.storage.GetPublicFileURL("avatars", key)
 }
 
-func (s *ServiceImpl) getUserAvatarKey(userID uint) string {
+func (s *ServiceImpl) getAvatarKey(userID uint) string {
 	return fmt.Sprintf("users/%d", userID)
 }
 
-func (s *ServiceImpl) DeleteUserAvatar(ctx context.Context, userID uint) error {
-	if err := s.repository.Update(ctx, &entities.User{
-		ID:        userID,
-		HasAvatar: false,
-	}); err != nil {
-		return errors.Wrap(err, "failed to update user")
-	}
-
-	key := s.getUserAvatarKey(userID)
-
-	err := s.storage.DeleteFile(ctx, "avatars", key)
-	if err != nil {
-		return errors.Wrap(err, "failed to delete avatar from storage")
-	}
-
-	return nil
-}
-
-func (s *ServiceImpl) UploadUserAvatar(ctx context.Context, userID uint, file io.Reader) error {
-	key := s.getUserAvatarKey(userID)
+func (s *ServiceImpl) UploadAvatar(ctx context.Context, userID uint, file io.Reader) error {
+	key := s.getAvatarKey(userID)
 
 	err := s.storage.PutFile(ctx, "avatars", key, file)
 	if err != nil {
@@ -121,6 +103,24 @@ func (s *ServiceImpl) UploadUserAvatar(ctx context.Context, userID uint, file io
 		HasAvatar: true,
 	}); err != nil {
 		return errors.Wrap(err, "failed to update user")
+	}
+
+	return nil
+}
+
+func (s *ServiceImpl) DeleteAvatar(ctx context.Context, userID uint) error {
+	if err := s.repository.Update(ctx, &entities.User{
+		ID:        userID,
+		HasAvatar: false,
+	}); err != nil {
+		return errors.Wrap(err, "failed to update user")
+	}
+
+	key := s.getAvatarKey(userID)
+
+	err := s.storage.DeleteFile(ctx, "avatars", key)
+	if err != nil {
+		return errors.Wrap(err, "failed to delete avatar from storage")
 	}
 
 	return nil

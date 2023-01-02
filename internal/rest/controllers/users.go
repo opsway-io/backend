@@ -82,7 +82,7 @@ func newGetUserResponse(u *entities.User, userService user.Service) GetUserRespo
 	}
 
 	if u.HasAvatar {
-		res.AvatarURL = pointer.StringPtr(userService.GetUserAvatarURLByID(u.ID))
+		res.AvatarURL = pointer.StringPtr(userService.GetAvatarURLByID(u.ID))
 	}
 
 	return res
@@ -215,7 +215,11 @@ func (h *Handlers) PutUserAvatar(ctx hs.AuthenticatedContext) error {
 	}
 	defer src.Close()
 
-	if err := h.UserService.UploadUserAvatar(ctx.Request().Context(), req.UserID, src); err != nil {
+	if err := h.UserService.UploadAvatar(
+		ctx.Request().Context(),
+		req.UserID,
+		src,
+	); err != nil {
 		if errors.Is(err, user.ErrNotFound) {
 			ctx.Log.WithError(err).Debug("user not found")
 
@@ -242,7 +246,7 @@ func (h *Handlers) DeleteUserAvatar(ctx hs.AuthenticatedContext) error {
 		return echo.ErrBadRequest
 	}
 
-	if err := h.UserService.DeleteUserAvatar(ctx.Request().Context(), req.UserID); err != nil {
+	if err := h.UserService.DeleteAvatar(ctx.Request().Context(), req.UserID); err != nil {
 		if errors.Is(err, user.ErrNotFound) {
 			ctx.Log.WithError(err).Debug("user not found")
 

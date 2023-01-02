@@ -78,6 +78,8 @@ func Register(
 	teamsGroup.GET("", AuthHandler(h.GetTeam))
 	teamsGroup.PUT("", AuthHandler(h.PutTeam), AllowedRoles(mw.UserRoleOwner, mw.UserRoleAdmin))
 	teamsGroup.GET("/users", AuthHandler(h.GetTeamUsers))
+	teamsGroup.PUT("/avatar", AuthHandler(h.PutTeamAvatar), AllowedRoles(mw.UserRoleOwner, mw.UserRoleAdmin))
+	teamsGroup.DELETE("/avatar", AuthHandler(h.DeleteTeamAvatar), AllowedRoles(mw.UserRoleOwner, mw.UserRoleAdmin))
 
 	// Monitors
 

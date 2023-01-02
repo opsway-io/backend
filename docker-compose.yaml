@@ -17,7 +17,7 @@ services:
       - postgres
       - redis
       - ch_server
-      - s3
+      - storage
   prober:
     image: acim/go-reflex
     restart: unless-stopped
@@ -61,12 +61,6 @@ services:
     volumes:
       - './.data/clickhouse:/var/lib/clickhouse'
 
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8123/"]
-      interval: 1s
-      timeout: 5s
-      retries: 10
-
   ch_client:
     image: clickhouse/clickhouse-client
     restart: unless-stopped
@@ -74,7 +68,7 @@ services:
       - /bin/sleep
     command:
       - infinity
-  s3:
+  storage:
     image: minio/minio
     restart: unless-stopped
     ports:
@@ -86,3 +80,16 @@ services:
       MINIO_ACCESS_KEY: guest
       MINIO_SECRET_KEY: supersecret
     command: 'server --address 0.0.0.0:9001 --console-address 0.0.0.0:5566 /data'
+
+  storage_init:
+    image: minio/mc:latest
+    depends_on:
+      - storage
+    entrypoint: >
+      /bin/sh -c "
+      /usr/bin/mc config host rm local;
+      /usr/bin/mc config host add --quiet --api s3v4 local http://storage:9001 guest supersecret;
+      
+      /usr/bin/mc mb --quiet local/avatars/;
+      /usr/bin/mc anonymous set download local/avatars;
+      "

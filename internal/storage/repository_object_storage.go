@@ -16,6 +16,7 @@ type ObjectStorageRepositoryConfig struct {
 	AccessKey   string  `mapstructure:"access_key"`
 	SecretKey   string  `mapstructure:"secret_key"`
 	EndpointURL *string `mapstructure:"endpoint_url,omitempty"`
+	PublicURL   *string `mapstructure:"public_url,omitempty"`
 }
 
 type ObjectStorageRepository struct {
@@ -53,7 +54,7 @@ func NewObjectStorageRepository(ctx context.Context, conf ObjectStorageRepositor
 }
 
 func (r *ObjectStorageRepository) GetPublicFileURL(bucket string, key string) string {
-	return fmt.Sprintf("%s/%s/%s", *r.config.EndpointURL, bucket, key)
+	return fmt.Sprintf("%s/%s/%s", *r.config.PublicURL, bucket, key)
 }
 
 func (r *ObjectStorageRepository) PutFile(ctx context.Context, bucket string, key string, data io.Reader) error {

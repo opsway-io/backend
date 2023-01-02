@@ -22,6 +22,7 @@ type Repository interface {
 	UpdateDisplayName(ctx context.Context, teamID uint, displayName string) error
 	Create(ctx context.Context, team *entities.Team) error
 	Delete(ctx context.Context, id uint) error
+	Update(ctx context.Context, team *entities.Team) error
 }
 
 type RepositoryImpl struct {
@@ -124,4 +125,16 @@ func (s *RepositoryImpl) GetUserRole(ctx context.Context, teamID, userID uint) (
 	}
 
 	return &userRole, nil
+}
+
+func (s *RepositoryImpl) Update(ctx context.Context, team *entities.Team) error {
+	result := s.db.WithContext(ctx).Model(team).Updates(team)
+	if result.Error != nil {
+		return result.Error
+	}
+	if result.RowsAffected == 0 {
+		return ErrNotFound
+	}
+
+	return nil
 }

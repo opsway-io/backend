@@ -32,10 +32,11 @@ notification:
     sender_email: "no-reply@opsway.io"
 
 object_storage:
-  endpoint_url: "http://localhost:9001"
+  endpoint_url: "http://storage:9001"
   access_key: "guest"
   secret_key: "supersecret"
   region: "eu-central-1"
+  public_url: "http://localhost:9001"
 
 prober:
   concurrency: 1

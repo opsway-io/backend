@@ -102,7 +102,7 @@ func newPostLoginResponse(user *entities.User, accessToken, refreshToken string,
 	}
 
 	if user.HasAvatar {
-		res.User.AvatarURL = pointer.String(userService.GetUserAvatarURLByID(user.ID))
+		res.User.AvatarURL = pointer.String(userService.GetAvatarURLByID(user.ID))
 	}
 
 	return res

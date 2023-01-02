@@ -1,6 +1,7 @@
 package controllers
 
 import (
+	"errors"
 	"net/http"
 	"time"
 
@@ -107,7 +108,7 @@ func newGetTeamUsersResponse(users *[]team.TeamUser, userService user.Service) G
 		}
 
 		if u.HasAvatar {
-			res[i].AvatarURL = pointer.String(userService.GetUserAvatarURLByID(u.ID))
+			res[i].AvatarURL = pointer.String(userService.GetAvatarURLByID(u.ID))
 		}
 	}
 
@@ -141,6 +142,76 @@ func (h *Handlers) PutTeam(ctx hs.AuthenticatedContext) error {
 		req.DisplayName,
 	); err != nil {
 		ctx.Log.WithError(err).Debug("failed to update team")
+
+		return echo.ErrInternalServerError
+	}
+
+	return ctx.NoContent(http.StatusNoContent)
+}
+
+type PutTeamAvatarRequest struct {
+	TeamID uint `param:"teamId" validate:"required,numeric,gt=0"`
+}
+
+func (h *Handlers) PutTeamAvatar(ctx hs.AuthenticatedContext) error {
+	req, err := helpers.Bind[PutTeamAvatarRequest](ctx)
+	if err != nil {
+		ctx.Log.WithError(err).Debug("failed to bind PutTeamAvatarRequest")
+
+		return echo.ErrBadRequest
+	}
+
+	file, err := ctx.FormFile("file")
+	if err != nil {
+		ctx.Log.WithError(err).Debug("failed to get file from form")
+
+		return echo.ErrBadRequest
+	}
+
+	src, err := file.Open()
+	if err != nil {
+		ctx.Log.WithError(err).Debug("failed to open file")
+
+		return echo.ErrBadRequest
+	}
+	defer src.Close()
+
+	if err = h.TeamService.UploadAvatar(
+		ctx.Request().Context(),
+		req.TeamID,
+		src,
+	); err != nil {
+		ctx.Log.WithError(err).Debug("failed to update team")
+
+		return echo.ErrInternalServerError
+	}
+
+	return ctx.NoContent(http.StatusNoContent)
+}
+
+type DeleteTeamAvatarRequest struct {
+	TeamID uint `param:"teamId" validate:"required,numeric,gt=0"`
+}
+
+func (h *Handlers) DeleteTeamAvatar(ctx hs.AuthenticatedContext) error {
+	req, err := helpers.Bind[DeleteTeamAvatarRequest](ctx)
+	if err != nil {
+		ctx.Log.WithError(err).Debug("failed to bind DeleteTeamAvatarRequest")
+
+		return echo.ErrBadRequest
+	}
+
+	if err = h.TeamService.DeleteAvatar(
+		ctx.Request().Context(),
+		req.TeamID,
+	); err != nil {
+		if errors.Is(err, team.ErrNotFound) {
+			ctx.Log.WithError(err).Debug("team not found")
+
+			return echo.ErrNotFound
+		}
+
+		ctx.Log.WithError(err).Debug("failed to delete team avatar")
 
 		return echo.ErrInternalServerError
 	}

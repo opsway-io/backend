@@ -2,8 +2,12 @@ package team
 
 import (
 	"context"
+	"fmt"
+	"io"
 
 	"github.com/opsway-io/backend/internal/entities"
+	"github.com/opsway-io/backend/internal/storage"
+	"github.com/pkg/errors"
 )
 
 type Service interface {
@@ -13,15 +17,20 @@ type Service interface {
 	Create(ctx context.Context, team *entities.Team) error
 	UpdateDisplayName(ctx context.Context, teamID uint, displayName string) error
 	Delete(ctx context.Context, id uint) error
+	UploadAvatar(ctx context.Context, teamID uint, file io.Reader) error
+	DeleteAvatar(ctx context.Context, teamID uint) error
+	GetAvatarURLByID(teamID uint) (URL string)
 }
 
 type ServiceImpl struct {
 	repository Repository
+	storage    storage.Service
 }
 
-func NewService(repository Repository) Service {
+func NewService(repository Repository, storage storage.Service) Service {
 	return &ServiceImpl{
 		repository: repository,
+		storage:    storage,
 	}
 }
 
@@ -47,4 +56,50 @@ func (s *ServiceImpl) GetUsersByID(ctx context.Context, id uint, offset *int, li
 
 func (s *ServiceImpl) GetUserRole(ctx context.Context, teamID, userID uint) (*entities.TeamRole, error) {
 	return s.repository.GetUserRole(ctx, teamID, userID)
+}
+
+func (s *ServiceImpl) UploadAvatar(ctx context.Context, teamID uint, file io.Reader) error {
+	key := s.getAvatarKey(teamID)
+
+	err := s.storage.PutFile(ctx, "avatars", key, file)
+	if err != nil {
+		return errors.Wrap(err, "failed to upload avatar to storage")
+	}
+
+	if err := s.repository.Update(ctx, &entities.Team{
+		ID:        teamID,
+		HasAvatar: true,
+	}); err != nil {
+		return errors.Wrap(err, "failed to update team")
+	}
+
+	return nil
+}
+
+func (s *ServiceImpl) DeleteAvatar(ctx context.Context, teamID uint) error {
+	if err := s.repository.Update(ctx, &entities.Team{
+		ID:        teamID,
+		HasAvatar: false,
+	}); err != nil {
+		return errors.Wrap(err, "failed to update team")
+	}
+
+	key := s.getAvatarKey(teamID)
+
+	err := s.storage.DeleteFile(ctx, "avatars", key)
+	if err != nil {
+		return errors.Wrap(err, "failed to delete avatar from storage")
+	}
+
+	return nil
+}
+
+func (s *ServiceImpl) GetAvatarURLByID(teamID uint) string {
+	key := s.getAvatarKey(teamID)
+
+	return s.storage.GetPublicFileURL("avatars", key)
+}
+
+func (s *ServiceImpl) getAvatarKey(teamID uint) string {
+	return fmt.Sprintf("teams/%d", teamID)
 }
