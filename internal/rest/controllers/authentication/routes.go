@@ -2,6 +2,9 @@ package authentication
 
 import (
 	"github.com/labstack/echo/v4"
+	"github.com/markbates/goth"
+	"github.com/markbates/goth/providers/github"
+	"github.com/markbates/goth/providers/google"
 	"github.com/opsway-io/backend/internal/authentication"
 	"github.com/opsway-io/backend/internal/rest/handlers"
 	"github.com/opsway-io/backend/internal/team"
@@ -39,6 +42,18 @@ func Register(
 	authGroup.POST("/refresh", BaseHandler(h.PostRefreshToken))
 
 	if oAuthConfig != nil {
+		goth.UseProviders(
+			github.New(oAuthConfig.GithubClientID, oAuthConfig.GithubClientSecret, oAuthConfig.GithubCallbackURL, []string{
+				"user:email",
+				"read:user",
+			}...),
+
+			google.New(oAuthConfig.GoogleClientID, oAuthConfig.GoogleClientSecret, oAuthConfig.GoogleCallbackURL, []string{
+				"https://www.googleapis.com/auth/userinfo.email",
+				"https://www.googleapis.com/auth/userinfo.profile",
+			}...),
+		)
+
 		oAuthGroup := e.Group("/auth/:provider")
 
 		oAuthGroup.GET("", BaseHandler(h.GetOAuthLogin))
