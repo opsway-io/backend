@@ -1,4 +1,4 @@
-package controllers
+package authentication
 
 import (
 	"net/http"
