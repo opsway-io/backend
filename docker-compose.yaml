@@ -60,6 +60,13 @@ services:
       - '9000:9000'
     volumes:
       - './.data/clickhouse:/var/lib/clickhouse'
+
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8123/"]
+      interval: 1s
+      timeout: 5s
+      retries: 10
+
   ch_client:
     image: clickhouse/clickhouse-client
     restart: unless-stopped
