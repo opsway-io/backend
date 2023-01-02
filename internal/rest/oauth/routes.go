@@ -31,6 +31,8 @@ type Config struct {
 
 	SuccessURL string `mapstructure:"success_url" default:"/login/oauth"`
 	FailureURL string `mapstructure:"failure_url" default:"/login"`
+
+	CookieDomain string `mapstructure:"cookie_domain"`
 }
 
 func Register(
@@ -92,6 +94,7 @@ func Register(
 			Name:     "refresh_token",
 			Value:    refreshToken,
 			Path:     "/",
+			Domain:   config.CookieDomain,
 			SameSite: http.SameSiteLaxMode,
 			Expires:  time.Now().Add(1 * time.Minute),
 		})
@@ -99,6 +102,7 @@ func Register(
 		c.SetCookie(&http.Cookie{
 			Name:     "access_token",
 			Value:    accessToken,
+			Domain:   config.CookieDomain,
 			Path:     "/",
 			SameSite: http.SameSiteLaxMode,
 			Expires:  time.Now().Add(1 * time.Minute),
@@ -109,6 +113,7 @@ func Register(
 				Name:     "team_id",
 				Value:    fmt.Sprintf("%d", user.Teams[0].ID),
 				Path:     "/",
+				Domain:   config.CookieDomain,
 				SameSite: http.SameSiteLaxMode,
 				Expires:  time.Now().Add(1 * time.Minute),
 			})
