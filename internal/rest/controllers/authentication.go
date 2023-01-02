@@ -8,6 +8,7 @@ import (
 	"github.com/opsway-io/backend/internal/entities"
 	hs "github.com/opsway-io/backend/internal/rest/handlers"
 	"github.com/opsway-io/backend/internal/rest/helpers"
+	"github.com/opsway-io/backend/internal/team"
 	"github.com/opsway-io/backend/internal/user"
 	"k8s.io/utils/pointer"
 )
@@ -73,17 +74,20 @@ func (h *Handlers) PostLogin(ctx hs.BaseContext) error {
 
 	ctx.Log.Info("user authenticated")
 
-	return ctx.JSON(http.StatusOK, newPostLoginResponse(user, accessToken, refreshToken, h.UserService))
+	return ctx.JSON(http.StatusOK, newPostLoginResponse(user, accessToken, refreshToken, h.UserService, h.TeamService))
 }
 
-func newPostLoginResponse(user *entities.User, accessToken, refreshToken string, userService user.Service) PostLoginResponse {
+func newPostLoginResponse(user *entities.User, accessToken, refreshToken string, userService user.Service, teamService team.Service) PostLoginResponse {
 	teams := make([]PostLoginResponseTeam, len(user.Teams))
 	for i, team := range user.Teams {
 		teams[i] = PostLoginResponseTeam{
 			ID:          team.ID,
 			Name:        team.Name,
 			DisplayName: team.DisplayName,
-			AvatarURL:   nil, // TODO
+		}
+
+		if team.HasAvatar {
+			teams[i].AvatarURL = pointer.String(teamService.GetAvatarURLByID(team.ID))
 		}
 	}
 
