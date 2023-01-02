@@ -8,6 +8,7 @@ import (
 	"github.com/opsway-io/backend/internal/entities"
 	hs "github.com/opsway-io/backend/internal/rest/handlers"
 	"github.com/opsway-io/backend/internal/rest/helpers"
+	"github.com/opsway-io/backend/internal/team"
 	"github.com/opsway-io/backend/internal/user"
 	"github.com/pkg/errors"
 	"k8s.io/utils/pointer"
@@ -56,10 +57,10 @@ func (h *Handlers) GetUser(ctx hs.AuthenticatedContext) error {
 		return echo.ErrInternalServerError
 	}
 
-	return ctx.JSON(http.StatusOK, newGetUserResponse(u, h.UserService))
+	return ctx.JSON(http.StatusOK, newGetUserResponse(u, h.UserService, h.TeamService))
 }
 
-func newGetUserResponse(u *entities.User, userService user.Service) GetUserResponse {
+func newGetUserResponse(u *entities.User, userService user.Service, teamService team.Service) GetUserResponse {
 	teams := make([]GetUserResponseTeam, len(u.Teams))
 
 	for i, t := range u.Teams {
@@ -67,7 +68,10 @@ func newGetUserResponse(u *entities.User, userService user.Service) GetUserRespo
 			ID:          t.ID,
 			Name:        t.Name,
 			DisplayName: t.DisplayName,
-			AvatarURL:   nil, // TODO
+		}
+
+		if t.HasAvatar {
+			teams[i].AvatarURL = pointer.StringPtr(teamService.GetAvatarURLByID(t.ID))
 		}
 	}
 

@@ -42,18 +42,23 @@ func (h *Handlers) GetTeam(ctx hs.AuthenticatedContext) error {
 		return echo.ErrInternalServerError
 	}
 
-	return ctx.JSON(http.StatusOK, newGetTeamResponse(team))
+	return ctx.JSON(http.StatusOK, newGetTeamResponse(team, h.TeamService))
 }
 
-func newGetTeamResponse(t *entities.Team) GetTeamResponse {
-	return GetTeamResponse{
+func newGetTeamResponse(t *entities.Team, teamService team.Service) GetTeamResponse {
+	team := GetTeamResponse{
 		ID:          t.ID,
 		Name:        t.Name,
 		DisplayName: t.DisplayName,
-		AvatarURL:   nil, // TODO
 		CreatedAt:   t.CreatedAt,
 		UpdatedAt:   t.UpdatedAt,
 	}
+
+	if t.HasAvatar {
+		team.AvatarURL = pointer.StringPtr(teamService.GetAvatarURLByID(t.ID))
+	}
+
+	return team
 }
 
 type GetTeamUsersRequest struct {
