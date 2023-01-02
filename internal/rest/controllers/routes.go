@@ -63,7 +63,9 @@ func Register(
 	usersGroup.GET("", AuthHandler(h.GetUser))
 	usersGroup.PUT("", AuthHandler(h.PutUser))
 	usersGroup.DELETE("", AuthHandler(h.DeleteUser))
+
 	usersGroup.PUT("/password", AuthHandler(h.PutUserPassword))
+
 	usersGroup.PUT("/avatar", AuthHandler(h.PutUserAvatar))
 	usersGroup.DELETE("/avatar", AuthHandler(h.DeleteUserAvatar))
 
@@ -77,7 +79,11 @@ func Register(
 
 	teamsGroup.GET("", AuthHandler(h.GetTeam))
 	teamsGroup.PUT("", AuthHandler(h.PutTeam), AllowedRoles(mw.UserRoleOwner, mw.UserRoleAdmin))
+
 	teamsGroup.GET("/users", AuthHandler(h.GetTeamUsers))
+	teamsGroup.DELETE("/users/:userId", AuthHandler(h.DeleteTeamUser), AllowedRoles(mw.UserRoleOwner, mw.UserRoleAdmin))
+	teamsGroup.PUT("/users/:userId", AuthHandler(h.PutTeamUser), AllowedRoles(mw.UserRoleOwner, mw.UserRoleAdmin))
+
 	teamsGroup.PUT("/avatar", AuthHandler(h.PutTeamAvatar), AllowedRoles(mw.UserRoleOwner, mw.UserRoleAdmin))
 	teamsGroup.DELETE("/avatar", AuthHandler(h.DeleteTeamAvatar), AllowedRoles(mw.UserRoleOwner, mw.UserRoleAdmin))
 
@@ -91,8 +97,11 @@ func Register(
 
 	monitorsGroup.GET("", AuthHandler(h.GetMonitors))
 	monitorsGroup.POST("", AuthHandler(h.PostMonitor), AllowedRoles(mw.UserRoleOwner, mw.UserRoleAdmin))
+
 	monitorsGroup.GET("/:monitorId", AuthHandler(h.GetMonitor))
 	monitorsGroup.DELETE("/:monitorId", AuthHandler(h.DeleteMonitor), AllowedRoles(mw.UserRoleOwner, mw.UserRoleAdmin))
+
 	monitorsGroup.GET("/:monitorId/checks", AuthHandler(h.GetMonitorChecks))
+
 	monitorsGroup.GET("/:monitorId/metrics", AuthHandler(h.GetMonitorMetrics))
 }

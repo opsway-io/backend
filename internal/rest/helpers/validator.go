@@ -5,12 +5,24 @@ import (
 	"github.com/pkg/errors"
 )
 
+var AllowedRoles = []string{"admin", "member", "owner"}
+
 type Validator struct {
 	validator *validator.Validate
 }
 
 func NewValidator() *Validator {
 	v := validator.New()
+
+	v.RegisterValidation("teamRole", func(fl validator.FieldLevel) bool {
+		for _, role := range AllowedRoles {
+			if role == fl.Field().String() {
+				return true
+			}
+		}
+
+		return false
+	})
 
 	return &Validator{
 		validator: v,

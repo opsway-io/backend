@@ -14,8 +14,10 @@ type Service interface {
 	GetByID(ctx context.Context, teamId uint) (*entities.Team, error)
 	GetUsersByID(ctx context.Context, teamId uint, offset *int, limit *int, query *string) (*[]TeamUser, error)
 	GetUserRole(ctx context.Context, teamID, userID uint) (*entities.TeamRole, error)
+	RemoveUser(ctx context.Context, teamID, userID uint) error
 	Create(ctx context.Context, team *entities.Team) error
 	UpdateDisplayName(ctx context.Context, teamID uint, displayName string) error
+	UpdateUserRole(ctx context.Context, teamID, userID uint, role entities.Role) error
 	Delete(ctx context.Context, id uint) error
 	UploadAvatar(ctx context.Context, teamID uint, file io.Reader) error
 	DeleteAvatar(ctx context.Context, teamID uint) error
@@ -58,6 +60,12 @@ func (s *ServiceImpl) GetUserRole(ctx context.Context, teamID, userID uint) (*en
 	return s.repository.GetUserRole(ctx, teamID, userID)
 }
 
+func (s *ServiceImpl) RemoveUser(ctx context.Context, teamID, userID uint) error {
+	// TODO: make sure team still has at least one owner
+
+	return s.repository.RemoveUser(ctx, teamID, userID)
+}
+
 func (s *ServiceImpl) UploadAvatar(ctx context.Context, teamID uint, file io.Reader) error {
 	key := s.getAvatarKey(teamID)
 
@@ -98,6 +106,12 @@ func (s *ServiceImpl) GetAvatarURLByID(teamID uint) string {
 	key := s.getAvatarKey(teamID)
 
 	return s.storage.GetPublicFileURL("avatars", key)
+}
+
+func (s *ServiceImpl) UpdateUserRole(ctx context.Context, teamID, userID uint, role entities.Role) error {
+	// TODO: make sure team still has at least one owner
+
+	return s.repository.UpdateUserRole(ctx, teamID, userID, role)
 }
 
 func (s *ServiceImpl) getAvatarKey(teamID uint) string {

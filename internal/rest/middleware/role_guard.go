@@ -39,6 +39,8 @@ func RoleGuardFactory(logger *logrus.Entry, teamService team.Service) func(allow
 					if string(teamRole.Role) == string(allowedRole) {
 						l.Debug("role guard passed")
 
+						c.Set("team_role", teamRole)
+
 						return next(c)
 					}
 				}

@@ -210,13 +210,73 @@ func (h *Handlers) DeleteTeamAvatar(ctx hs.AuthenticatedContext) error {
 		ctx.Request().Context(),
 		req.TeamID,
 	); err != nil {
-		if errors.Is(err, team.ErrNotFound) {
-			ctx.Log.WithError(err).Debug("team not found")
+		ctx.Log.WithError(err).Debug("failed to delete team avatar")
+
+		return echo.ErrInternalServerError
+	}
+
+	return ctx.NoContent(http.StatusNoContent)
+}
+
+type DeleteTeamUserRequest struct {
+	TeamID uint `param:"teamId" validate:"required,numeric,gt=0"`
+	UserID uint `param:"userId" validate:"required,numeric,gt=0"`
+}
+
+func (h *Handlers) DeleteTeamUser(ctx hs.AuthenticatedContext) error {
+	req, err := helpers.Bind[DeleteTeamUserRequest](ctx)
+	if err != nil {
+		ctx.Log.WithError(err).Debug("failed to bind DeleteTeamUserRequest")
+
+		return echo.ErrBadRequest
+	}
+
+	if err = h.TeamService.RemoveUser(
+		ctx.Request().Context(),
+		req.TeamID,
+		req.UserID,
+	); err != nil {
+		if errors.Is(err, team.ErrUserNotFound) {
+			ctx.Log.WithError(err).Debug("failed to delete team user")
 
 			return echo.ErrNotFound
 		}
 
-		ctx.Log.WithError(err).Debug("failed to delete team avatar")
+		ctx.Log.WithError(err).Debug("failed to delete team user")
+
+		return echo.ErrInternalServerError
+	}
+
+	return ctx.NoContent(http.StatusNoContent)
+}
+
+type PutTeamUserRequest struct {
+	TeamID uint          `param:"teamId" validate:"required,numeric,gt=0"`
+	UserID uint          `param:"userId" validate:"required,numeric,gt=0"`
+	Role   entities.Role `json:"role" validate:"required,role"`
+}
+
+func (h *Handlers) PutTeamUser(ctx hs.AuthenticatedContext) error {
+	req, err := helpers.Bind[PutTeamUserRequest](ctx)
+	if err != nil {
+		ctx.Log.WithError(err).Debug("failed to bind PutTeamUserRequest")
+
+		return echo.ErrBadRequest
+	}
+
+	if err = h.TeamService.UpdateUserRole(
+		ctx.Request().Context(),
+		req.TeamID,
+		req.UserID,
+		req.Role,
+	); err != nil {
+		if errors.Is(err, team.ErrUserNotFound) {
+			ctx.Log.WithError(err).Debug("failed to update team user")
+
+			return echo.ErrNotFound
+		}
+
+		ctx.Log.WithError(err).Debug("failed to update team user")
 
 		return echo.ErrInternalServerError
 	}

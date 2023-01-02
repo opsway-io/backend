@@ -19,7 +19,9 @@ type Repository interface {
 	GetByID(ctx context.Context, teamId uint) (*entities.Team, error)
 	GetUsersByID(ctx context.Context, teamId uint, offset *int, limit *int, query *string) (*[]TeamUser, error)
 	GetUserRole(ctx context.Context, teamID, userID uint) (*entities.TeamRole, error)
+	RemoveUser(ctx context.Context, teamID, userID uint) error
 	UpdateDisplayName(ctx context.Context, teamID uint, displayName string) error
+	UpdateUserRole(ctx context.Context, teamID, userID uint, role entities.Role) error
 	Create(ctx context.Context, team *entities.Team) error
 	Delete(ctx context.Context, id uint) error
 	Update(ctx context.Context, team *entities.Team) error
@@ -97,6 +99,21 @@ func (s *RepositoryImpl) UpdateDisplayName(ctx context.Context, teamID uint, dis
 	return nil
 }
 
+func (s *RepositoryImpl) UpdateUserRole(ctx context.Context, teamID, userID uint, role entities.Role) error {
+	result := s.db.WithContext(ctx).Model(&entities.TeamRole{}).Where(entities.TeamRole{
+		TeamID: teamID,
+		UserID: userID,
+	}).Update("role", role)
+	if result.Error != nil {
+		return result.Error
+	}
+	if result.RowsAffected == 0 {
+		return ErrUserNotFound
+	}
+
+	return nil
+}
+
 func (s *RepositoryImpl) Delete(ctx context.Context, id uint) error {
 	result := s.db.WithContext(ctx).Delete(&entities.Team{}, id)
 	if result.Error != nil {
@@ -125,6 +142,21 @@ func (s *RepositoryImpl) GetUserRole(ctx context.Context, teamID, userID uint) (
 	}
 
 	return &userRole, nil
+}
+
+func (s *RepositoryImpl) RemoveUser(ctx context.Context, teamID, userID uint) error {
+	result := s.db.WithContext(ctx).Delete(&entities.TeamRole{}, entities.TeamRole{
+		TeamID: teamID,
+		UserID: userID,
+	})
+	if result.Error != nil {
+		return result.Error
+	}
+	if result.RowsAffected == 0 {
+		return ErrUserNotFound
+	}
+
+	return nil
 }
 
 func (s *RepositoryImpl) Update(ctx context.Context, team *entities.Team) error {
