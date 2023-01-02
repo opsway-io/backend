@@ -3,12 +3,12 @@ package cmd
 import (
 	"github.com/go-playground/validator/v10"
 	"github.com/mcuadros/go-defaults"
-	"github.com/opsway-io/backend/internal/authentication"
+	auth "github.com/opsway-io/backend/internal/authentication"
 	"github.com/opsway-io/backend/internal/connectors/clickhouse"
 	"github.com/opsway-io/backend/internal/connectors/postgres"
 	"github.com/opsway-io/backend/internal/connectors/redis"
 	"github.com/opsway-io/backend/internal/rest"
-	"github.com/opsway-io/backend/internal/rest/oauth"
+	"github.com/opsway-io/backend/internal/rest/controllers/authentication"
 	"github.com/opsway-io/backend/internal/storage"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
@@ -23,8 +23,8 @@ type Config struct {
 	Clickhouse     clickhouse.Config                     `mapstructure:"clickhouse"`
 	Redis          redis.Config                          `mapstructure:"redis"`
 	REST           rest.Config                           `mapstructure:"rest"`
-	Authentication authentication.Config                 `mapstructure:"authentication"`
-	OAuth          *oauth.Config                         `mapstructure:"oauth"`
+	Authentication auth.Config                           `mapstructure:"authentication"`
+	OAuth          *authentication.OAuthConfig           `mapstructure:"oauth"`
 	ObjectStorage  storage.ObjectStorageRepositoryConfig `mapstructure:"object_storage"`
 	Prober         ProberConfig                          `mapstructure:"prober"`
 }

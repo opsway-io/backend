@@ -17,6 +17,7 @@ import (
 func Register(
 	e *echo.Group,
 	logger *logrus.Entry,
+	oAuthConfig *authentication.OAuthConfig,
 	authenticationService auth.Service,
 	userService user.Service,
 	teamService team.Service,
@@ -25,7 +26,7 @@ func Register(
 ) {
 	// Authentication
 
-	authentication.Register(e, logger, authenticationService, teamService, userService)
+	authentication.Register(e, logger, oAuthConfig, authenticationService, teamService, userService)
 
 	// Users
 

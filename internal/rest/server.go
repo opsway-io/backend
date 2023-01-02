@@ -6,12 +6,12 @@ import (
 
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
-	"github.com/opsway-io/backend/internal/authentication"
+	auth "github.com/opsway-io/backend/internal/authentication"
 	"github.com/opsway-io/backend/internal/check"
 	"github.com/opsway-io/backend/internal/monitor"
 	"github.com/opsway-io/backend/internal/rest/controllers"
+	"github.com/opsway-io/backend/internal/rest/controllers/authentication"
 	"github.com/opsway-io/backend/internal/rest/helpers"
-	"github.com/opsway-io/backend/internal/rest/oauth"
 	"github.com/opsway-io/backend/internal/team"
 	"github.com/opsway-io/backend/internal/user"
 	"github.com/pkg/errors"
@@ -30,9 +30,9 @@ type Server struct {
 
 func NewServer(
 	conf Config,
-	oauthConfig *oauth.Config,
+	oauthConfig *authentication.OAuthConfig,
 	logger *logrus.Logger,
-	authenticationService authentication.Service,
+	authenticationService auth.Service,
 	userService user.Service,
 	teamService team.Service,
 	monitorService monitor.Service,
@@ -61,24 +61,13 @@ func NewServer(
 	controllers.Register(
 		root,
 		logger.WithField("module", "rest_controllers"),
+		oauthConfig,
 		authenticationService,
 		userService,
 		teamService,
 		monitorService,
 		checkService,
 	)
-
-	if oauthConfig != nil {
-		oauth.Register(
-			root,
-			logger.WithField("module", "rest_oauth"),
-			oauthConfig,
-			authenticationService,
-			userService,
-		)
-
-		logger.Info("OAuth endpoints registered")
-	}
 
 	return &Server{
 		echo:   e,
