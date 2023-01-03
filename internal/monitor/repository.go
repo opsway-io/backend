@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 
+	"github.com/opsway-io/backend/internal/connectors/postgres"
 	"github.com/opsway-io/backend/internal/entities"
 	"gorm.io/gorm"
 )
@@ -11,11 +12,9 @@ import (
 var ErrNotFound = errors.New("monitor not found")
 
 type Repository interface {
-	GetMonitors(ctx context.Context) (*[]entities.Monitor, error)
-	GetMonitorByTeamID(ctx context.Context, teamID uint, offset int, limit int) (*[]entities.Monitor, error)
 	GetMonitorByIDAndTeamID(ctx context.Context, teamID uint, monitorID uint) (*entities.Monitor, error)
 	GetMonitorAndSettingsByTeamIDAndID(ctx context.Context, teamID uint, monitorID uint) (*entities.Monitor, error)
-	GetMonitorsAndSettingsByTeamID(ctx context.Context, teamID uint, offset int, limit int) (*[]entities.Monitor, error)
+	GetMonitorsAndSettingsByTeamID(ctx context.Context, teamID uint, offset *int, limit *int, query *string) (*[]MonitorWithTotalCount, error)
 	Create(ctx context.Context, monitor *entities.Monitor) error
 	Update(ctx context.Context, monitor *entities.Monitor) error
 	Delete(ctx context.Context, id uint) error
@@ -29,36 +28,6 @@ func NewRepository(db *gorm.DB) Repository {
 	return &RepositoryImpl{
 		db: db,
 	}
-}
-
-func (r *RepositoryImpl) GetMonitors(ctx context.Context) (*[]entities.Monitor, error) {
-	var monitors []entities.Monitor
-	err := r.db.WithContext(ctx).Preload("Settings").Find(&monitors).Error
-	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, nil
-		}
-
-		return nil, err
-	}
-
-	return &monitors, err
-}
-
-func (r *RepositoryImpl) GetMonitorByTeamID(ctx context.Context, teamID uint, offset int, limit int) (*[]entities.Monitor, error) {
-	var monitors []entities.Monitor
-	err := r.db.WithContext(ctx).Offset(offset).Limit(limit).Where(entities.Monitor{
-		TeamID: teamID,
-	}).Find(&monitors).Error
-	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, nil
-		}
-
-		return nil, err
-	}
-
-	return &monitors, err
 }
 
 func (r *RepositoryImpl) GetMonitorByIDAndTeamID(ctx context.Context, monitorID uint, teamID uint) (*entities.Monitor, error) {
@@ -87,9 +56,20 @@ func (r *RepositoryImpl) GetMonitorAndSettingsByTeamIDAndID(ctx context.Context,
 	return &monitor, err
 }
 
-func (r *RepositoryImpl) GetMonitorsAndSettingsByTeamID(ctx context.Context, teamID uint, offset int, limit int) (*[]entities.Monitor, error) {
-	var monitors []entities.Monitor
-	err := r.db.WithContext(ctx).Offset(offset).Limit(limit).Preload("Settings").Where(entities.Monitor{
+type MonitorWithTotalCount struct {
+	entities.Monitor
+	TotalCount int
+}
+
+func (r *RepositoryImpl) GetMonitorsAndSettingsByTeamID(ctx context.Context, teamID uint, offset *int, limit *int, query *string) (*[]MonitorWithTotalCount, error) {
+	var monitors []MonitorWithTotalCount
+	err := r.db.WithContext(ctx).Scopes(
+		postgres.Paginated(offset, limit),
+		postgres.IncludeTotalCount("total_count"),
+		postgres.Search([]string{"name"}, query),
+	).Preload(
+		"Settings",
+	).Where(entities.Monitor{
 		TeamID: teamID,
 	}).Find(&monitors).Error
 	if err != nil {

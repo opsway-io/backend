@@ -9,11 +9,9 @@ import (
 )
 
 type Service interface {
-	GetMonitors(ctx context.Context) (*[]entities.Monitor, error)
 	GetMonitorByIDAndTeamID(ctx context.Context, teamID uint, monitorID uint) (*entities.Monitor, error)
-	GetMonitorByTeamID(ctx context.Context, teamID uint, offset int, limit int) (*[]entities.Monitor, error)
 	GetMonitorAndSettingsByTeamIDAndID(ctx context.Context, teamID uint, monitorID uint) (*entities.Monitor, error)
-	GetMonitorsAndSettingsByTeamID(ctx context.Context, teamID uint, offset int, limit int) (*[]entities.Monitor, error)
+	GetMonitorsAndSettingsByTeamID(ctx context.Context, teamID uint, offset *int, limit *int, query *string) (*[]MonitorWithTotalCount, error)
 	Create(ctx context.Context, monitor *entities.Monitor) error
 	Update(ctx context.Context, monitor *entities.Monitor) error
 	Delete(ctx context.Context, id uint) error
@@ -31,14 +29,6 @@ func NewService(db *gorm.DB, redisClient *redis.Client) Service {
 	}
 }
 
-func (s *ServiceImpl) GetMonitors(ctx context.Context) (*[]entities.Monitor, error) {
-	return s.repository.GetMonitors(ctx)
-}
-
-func (s *ServiceImpl) GetMonitorByTeamID(ctx context.Context, teamID uint, offset int, limit int) (*[]entities.Monitor, error) {
-	return s.repository.GetMonitorByTeamID(ctx, teamID, offset, limit)
-}
-
 func (s *ServiceImpl) GetMonitorByIDAndTeamID(ctx context.Context, monitorID uint, teamID uint) (*entities.Monitor, error) {
 	return s.repository.GetMonitorByIDAndTeamID(ctx, monitorID, teamID)
 }
@@ -47,8 +37,8 @@ func (s *ServiceImpl) GetMonitorAndSettingsByTeamIDAndID(ctx context.Context, te
 	return s.repository.GetMonitorAndSettingsByTeamIDAndID(ctx, teamID, monitorID)
 }
 
-func (s *ServiceImpl) GetMonitorsAndSettingsByTeamID(ctx context.Context, teamID uint, offset int, limit int) (*[]entities.Monitor, error) {
-	return s.repository.GetMonitorsAndSettingsByTeamID(ctx, teamID, offset, limit)
+func (s *ServiceImpl) GetMonitorsAndSettingsByTeamID(ctx context.Context, teamID uint, offset *int, limit *int, query *string) (*[]MonitorWithTotalCount, error) {
+	return s.repository.GetMonitorsAndSettingsByTeamID(ctx, teamID, offset, limit, query)
 }
 
 func (s *ServiceImpl) Create(ctx context.Context, m *entities.Monitor) error {

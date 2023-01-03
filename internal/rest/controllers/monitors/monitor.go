@@ -13,13 +13,15 @@ import (
 )
 
 type GetMonitorsRequest struct {
-	TeamID uint `param:"teamId" validate:"required,numeric,gte=0"`
-	Offset int  `query:"offset" validate:"numeric,min=0"`
-	Limit  int  `query:"limit" validate:"numeric,min=0,max=100" default:"25"`
+	TeamID uint    `param:"teamId" validate:"required,numeric,gte=0"`
+	Offset *int    `query:"offset" validate:"numeric,gte=0" default:"0"`
+	Limit  *int    `query:"limit" validate:"numeric,gt=0" default:"10"`
+	Query  *string `query:"query" validate:"omitempty"`
 }
 
 type GetMonitorsResponse struct {
-	Monitors []GetMonitorResponseMonitor `json:"monitors"`
+	Monitors   []GetMonitorResponseMonitor `json:"monitors"`
+	TotalCount int                         `json:"totalCount"`
 }
 
 type GetMonitorResponseMonitor struct {
@@ -48,7 +50,7 @@ func (h *Handlers) GetMonitors(ctx hs.AuthenticatedContext) error {
 		return echo.ErrBadRequest
 	}
 
-	monitors, err := h.MonitorService.GetMonitorsAndSettingsByTeamID(ctx.Request().Context(), req.TeamID, req.Offset, req.Limit)
+	monitors, err := h.MonitorService.GetMonitorsAndSettingsByTeamID(ctx.Request().Context(), req.TeamID, req.Offset, req.Limit, req.Query)
 	if err != nil {
 		ctx.Log.WithError(err).Error("failed to get monitors")
 
@@ -65,10 +67,8 @@ func (h *Handlers) GetMonitors(ctx hs.AuthenticatedContext) error {
 	return ctx.JSON(http.StatusOK, resp)
 }
 
-func newGetMonitorsResponse(monitors *[]entities.Monitor) (*GetMonitorsResponse, error) {
-	res := GetMonitorsResponse{
-		Monitors: make([]GetMonitorResponseMonitor, len(*monitors)),
-	}
+func newGetMonitorsResponse(monitors *[]monitor.MonitorWithTotalCount) (*GetMonitorsResponse, error) {
+	res := make([]GetMonitorResponseMonitor, len(*monitors))
 
 	for i, m := range *monitors {
 		headers, err := m.Settings.GetHeaders()
@@ -76,7 +76,7 @@ func newGetMonitorsResponse(monitors *[]entities.Monitor) (*GetMonitorsResponse,
 			return nil, err
 		}
 
-		res.Monitors[i] = GetMonitorResponseMonitor{
+		res[i] = GetMonitorResponseMonitor{
 			ID:        m.ID,
 			Name:      m.Name,
 			Tags:      m.Tags,
@@ -93,7 +93,15 @@ func newGetMonitorsResponse(monitors *[]entities.Monitor) (*GetMonitorsResponse,
 		}
 	}
 
-	return &res, nil
+	totalCount := 0
+	if len(*monitors) > 0 {
+		totalCount = (*monitors)[0].TotalCount
+	}
+
+	return &GetMonitorsResponse{
+		Monitors:   res,
+		TotalCount: totalCount,
+	}, nil
 }
 
 type GetMonitorRequest struct {

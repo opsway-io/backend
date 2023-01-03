@@ -17,16 +17,19 @@ func Seed001(db *gorm.DB) {
 	db.FirstOrCreate(&t)
 
 	// Monitors
-	m := &entities.Monitor{
-		Name: "opsway.io",
-		Settings: entities.MonitorSettings{
-			Method:    "GET",
-			URL:       "https://opsway.io",
-			Frequency: time.Minute,
-		},
-		TeamID: t.ID,
+	for i := 0; i < 30; i++ {
+		m := &entities.Monitor{
+			ID:   uint(i + 1),
+			Name: gofakeit.Word(),
+			Settings: entities.MonitorSettings{
+				Method:    "GET",
+				URL:       gofakeit.URL(),
+				Frequency: time.Minute,
+			},
+			TeamID: t.ID,
+		}
+		db.FirstOrCreate(m)
 	}
-	db.FirstOrCreate(m)
 
 	// Users
 	defaultUsers := []entities.User{
