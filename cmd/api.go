@@ -14,7 +14,6 @@ import (
 	"github.com/opsway-io/backend/internal/storage"
 	"github.com/opsway-io/backend/internal/team"
 	"github.com/opsway-io/backend/internal/user"
-	"github.com/opsway-io/backend/seeds"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 )
@@ -68,13 +67,6 @@ func runAPI(cmd *cobra.Command, args []string) {
 		entities.IncidentComment{},
 	)
 
-	// TODO: Remove
-
-	seeds.Seed001(db)
-
-	// TODO: Remove
-
-	// CLICKHOUSE
 	ch_db, err := clickhouse.NewClient(ctx, conf.Clickhouse)
 	if err != nil {
 		l.WithError(err).Fatal("Failed to create clickhouse")
