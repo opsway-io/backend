@@ -78,8 +78,8 @@ const (
 )
 
 type TeamUser struct {
-	UserID    uint
-	TeamID    uint
+	UserID    uint     `gorm:"primaryKey;autoIncrement:false"`
+	TeamID    uint     `gorm:"primaryKey;autoIncrement:false"`
 	Role      TeamRole `gorm:"index"`
 	CreatedAt time.Time
 }
