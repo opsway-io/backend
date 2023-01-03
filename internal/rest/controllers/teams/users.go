@@ -26,12 +26,12 @@ type GetTeamUsersResponse struct {
 }
 
 type GetTeamUsersResponseUser struct {
-	ID          uint          `json:"id"`
-	Name        string        `json:"name"`
-	DisplayName *string       `json:"displayName"`
-	Email       string        `json:"email"`
-	AvatarURL   *string       `json:"avatarUrl"`
-	Role        entities.Role `json:"role"`
+	ID          uint              `json:"id"`
+	Name        string            `json:"name"`
+	DisplayName *string           `json:"displayName"`
+	Email       string            `json:"email"`
+	AvatarURL   *string           `json:"avatarUrl"`
+	Role        entities.TeamRole `json:"role"`
 }
 
 func (h *Handlers) GetTeamUsers(ctx hs.AuthenticatedContext) error {
@@ -113,9 +113,9 @@ func (h *Handlers) DeleteTeamUser(ctx hs.AuthenticatedContext) error {
 }
 
 type PutTeamUserRequest struct {
-	TeamID uint          `param:"teamId" validate:"required,numeric,gt=0"`
-	UserID uint          `param:"userId" validate:"required,numeric,gt=0"`
-	Role   entities.Role `json:"role" validate:"required,role"`
+	TeamID uint              `param:"teamId" validate:"required,numeric,gt=0"`
+	UserID uint              `param:"userId" validate:"required,numeric,gt=0"`
+	Role   entities.TeamRole `json:"role" validate:"required,role"`
 }
 
 func (h *Handlers) PutTeamUser(ctx hs.AuthenticatedContext) error {

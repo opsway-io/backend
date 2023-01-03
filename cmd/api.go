@@ -55,10 +55,11 @@ func runAPI(cmd *cobra.Command, args []string) {
 		l.WithError(err).Fatal("Failed to create Postgres client")
 	}
 
+	db.SetupJoinTable(&entities.Team{}, "Users", &entities.TeamUser{})
+
 	db.AutoMigrate(
-		entities.Team{},
 		entities.User{},
-		entities.TeamRole{},
+		entities.Team{},
 		entities.Monitor{},
 		entities.MonitorSettings{},
 		entities.Maintenance{},
@@ -101,24 +102,18 @@ func runAPI(cmd *cobra.Command, args []string) {
 		Email:       "admin@opsway.io",
 	}
 	u.SetPassword("pass")
-	db.Create(u)
+	db.FirstOrCreate(u)
 
 	t := entities.Team{
 		Name: "opsway",
-		Users: []entities.User{
-			{
-				ID: u.ID,
-			},
-		},
-		Roles: []entities.TeamRole{
-			{
-				UserID: u.ID,
-				Role:   entities.TeamRoleAdmin,
-			},
-		},
 	}
-	// omit user creation
-	db.Omit("Users.*").Create(&t)
+	db.FirstOrCreate(&t)
+
+	db.FirstOrCreate(&entities.TeamUser{
+		UserID: u.ID,
+		TeamID: t.ID,
+		Role:   entities.TeamRoleOwner,
+	})
 
 	m := &entities.Monitor{
 		Name: "opsway.io",
@@ -130,7 +125,7 @@ func runAPI(cmd *cobra.Command, args []string) {
 		TeamID: t.ID,
 	}
 
-	db.Create(m)
+	db.FirstOrCreate(m)
 
 	// TODO: Remove
 

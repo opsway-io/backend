@@ -7,6 +7,7 @@ import (
 	"github.com/opsway-io/backend/internal/connectors/postgres"
 	"github.com/opsway-io/backend/internal/entities"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 var (
@@ -19,12 +20,12 @@ type Repository interface {
 	GetByID(ctx context.Context, teamId uint) (*entities.Team, error)
 	GetUsersByID(ctx context.Context, teamId uint, offset *int, limit *int, query *string) (*[]TeamUser, error)
 	GetUserRole(ctx context.Context, teamID, userID uint) (*entities.TeamRole, error)
-	RemoveUser(ctx context.Context, teamID, userID uint) error
+	UpdateUserRole(ctx context.Context, teamID, userID uint, role entities.TeamRole) error
 	UpdateDisplayName(ctx context.Context, teamID uint, displayName string) error
-	UpdateUserRole(ctx context.Context, teamID, userID uint, role entities.Role) error
 	Create(ctx context.Context, team *entities.Team) error
 	Delete(ctx context.Context, id uint) error
 	Update(ctx context.Context, team *entities.Team) error
+	RemoveUser(ctx context.Context, teamID, userID uint) error
 }
 
 type RepositoryImpl struct {
@@ -50,7 +51,7 @@ func (s *RepositoryImpl) GetByID(ctx context.Context, id uint) (*entities.Team, 
 
 type TeamUser struct {
 	entities.User
-	Role       entities.Role
+	Role       entities.TeamRole
 	TotalCount int
 }
 
@@ -58,9 +59,8 @@ func (s *RepositoryImpl) GetUsersByID(ctx context.Context, teamId uint, offset *
 	var users []TeamUser
 
 	s.db.WithContext(ctx).
-		Select("u.*, tr.role").
+		Select("u.*, tu.role").
 		Table("team_users as tu").
-		Joins("INNER JOIN team_roles AS tr ON tr.user_id = tu.user_id").
 		Joins("INNER JOIN users as u ON u.id = tu.user_id").
 		Scopes(
 			postgres.Paginated(offset, limit),
@@ -99,8 +99,8 @@ func (s *RepositoryImpl) UpdateDisplayName(ctx context.Context, teamID uint, dis
 	return nil
 }
 
-func (s *RepositoryImpl) UpdateUserRole(ctx context.Context, teamID, userID uint, role entities.Role) error {
-	result := s.db.WithContext(ctx).Model(&entities.TeamRole{}).Where(entities.TeamRole{
+func (s *RepositoryImpl) UpdateUserRole(ctx context.Context, teamID, userID uint, role entities.TeamRole) error {
+	result := s.db.WithContext(ctx).Model(&entities.TeamUser{}).Where(entities.TeamUser{
 		TeamID: teamID,
 		UserID: userID,
 	}).Update("role", role)
@@ -115,7 +115,9 @@ func (s *RepositoryImpl) UpdateUserRole(ctx context.Context, teamID, userID uint
 }
 
 func (s *RepositoryImpl) Delete(ctx context.Context, id uint) error {
-	result := s.db.WithContext(ctx).Delete(&entities.Team{}, id)
+	result := s.db.WithContext(ctx).Select(clause.Associations).Delete(&entities.Team{
+		ID: id,
+	})
 	if result.Error != nil {
 		return result.Error
 	}
@@ -127,13 +129,13 @@ func (s *RepositoryImpl) Delete(ctx context.Context, id uint) error {
 }
 
 func (s *RepositoryImpl) GetUserRole(ctx context.Context, teamID, userID uint) (*entities.TeamRole, error) {
-	var userRole entities.TeamRole
+	var teamUser entities.TeamUser
 	if err := s.db.WithContext(ctx).Where(
-		entities.TeamRole{
+		entities.TeamUser{
 			TeamID: teamID,
 			UserID: userID,
 		},
-	).First(&userRole).Error; err != nil {
+	).First(&teamUser).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, ErrUserNotFound
 		}
@@ -141,11 +143,11 @@ func (s *RepositoryImpl) GetUserRole(ctx context.Context, teamID, userID uint) (
 		return nil, err
 	}
 
-	return &userRole, nil
+	return &teamUser.Role, nil
 }
 
 func (s *RepositoryImpl) RemoveUser(ctx context.Context, teamID, userID uint) error {
-	result := s.db.WithContext(ctx).Delete(&entities.TeamRole{}, entities.TeamRole{
+	result := s.db.WithContext(ctx).Delete(&entities.TeamUser{}, entities.TeamUser{
 		TeamID: teamID,
 		UserID: userID,
 	})

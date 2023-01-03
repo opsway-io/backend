@@ -34,7 +34,6 @@ type Team struct {
 	DisplayName *string `gorm:"index"`
 	HasAvatar   bool
 	Users       []User        `gorm:"many2many:team_users"`
-	Roles       []TeamRole    `gorm:"constraint:OnDelete:CASCADE"`
 	Monitors    []Monitor     `gorm:"constraint:OnDelete:CASCADE"`
 	Maintenance []Maintenance `gorm:"constraint:OnDelete:CASCADE"`
 	Incidents   []Incident    `gorm:"constraint:OnDelete:CASCADE"`
@@ -70,20 +69,21 @@ func checkTeamNameFormat(name string) bool {
 	return NameFormatRegex.MatchString(name)
 }
 
-type Role string
+type TeamRole string
 
 const (
-	TeamRoleOwner  Role = "OWNER"
-	TeamRoleAdmin  Role = "ADMIN"
-	TeamRoleMember Role = "MEMBER"
+	TeamRoleOwner  TeamRole = "OWNER"
+	TeamRoleAdmin  TeamRole = "ADMIN"
+	TeamRoleMember TeamRole = "MEMBER"
 )
 
-type TeamRole struct {
-	UserID uint `gorm:"primaryKey"`
-	TeamID uint `gorm:"primaryKey"`
-	Role   Role
+type TeamUser struct {
+	UserID    uint
+	TeamID    uint
+	Role      TeamRole `gorm:"index"`
+	CreatedAt time.Time
 }
 
-func (TeamRole) TableName() string {
-	return "team_roles"
+func (TeamUser) TableName() string {
+	return "team_users"
 }

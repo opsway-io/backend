@@ -16,8 +16,7 @@ type User struct {
 	Email               string  `gorm:"uniqueIndex"`
 	HasAvatar           bool
 	PasswordHash        *string
-	Roles               []TeamRole           `gorm:"constraint:OnDelete:CASCADE"`
-	Teams               []Team               `gorm:"many2many:team_users;constraint:OnDelete:CASCADE"`
+	Teams               []Team               `gorm:"many2many:team_users"`
 	MaintenanceComments []MaintenanceComment `gorm:"constraint:OnDelete:CASCADE"`
 	IncidentComments    []IncidentComment    `gorm:"constraint:OnDelete:CASCADE"`
 	CreatedAt           time.Time            `gorm:"index"`

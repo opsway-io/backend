@@ -63,9 +63,9 @@ func TeamGuardFactory(logger *logrus.Entry, teamService team.Service) func() fun
 					return echo.ErrForbidden
 				}
 
-				l.WithField("role", userRole).Debug("team guard passed")
+				l.WithField("role", *userRole).Debug("team guard passed")
 
-				c.Set("team_role", userRole)
+				c.Set("team_role", *userRole)
 
 				return next(c)
 			}

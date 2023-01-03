@@ -17,7 +17,7 @@ type Service interface {
 	RemoveUser(ctx context.Context, teamID, userID uint) error
 	Create(ctx context.Context, team *entities.Team) error
 	UpdateDisplayName(ctx context.Context, teamID uint, displayName string) error
-	UpdateUserRole(ctx context.Context, teamID, userID uint, role entities.Role) error
+	UpdateUserRole(ctx context.Context, teamID, userID uint, role entities.TeamRole) error
 	Delete(ctx context.Context, id uint) error
 	UploadAvatar(ctx context.Context, teamID uint, file io.Reader) error
 	DeleteAvatar(ctx context.Context, teamID uint) error
@@ -108,7 +108,7 @@ func (s *ServiceImpl) GetAvatarURLByID(teamID uint) string {
 	return s.storage.GetPublicFileURL("avatars", key)
 }
 
-func (s *ServiceImpl) UpdateUserRole(ctx context.Context, teamID, userID uint, role entities.Role) error {
+func (s *ServiceImpl) UpdateUserRole(ctx context.Context, teamID, userID uint, role entities.TeamRole) error {
 	// TODO: make sure team still has at least one owner
 
 	return s.repository.UpdateUserRole(ctx, teamID, userID, role)

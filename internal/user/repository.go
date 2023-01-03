@@ -8,6 +8,7 @@ import (
 	"github.com/opsway-io/backend/internal/connectors/postgres"
 	"github.com/opsway-io/backend/internal/entities"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 var (
@@ -96,7 +97,9 @@ func (s *RepositoryImpl) Update(ctx context.Context, user *entities.User) error 
 }
 
 func (s *RepositoryImpl) Delete(ctx context.Context, id uint) error {
-	result := s.db.WithContext(ctx).Delete(&entities.User{}, id)
+	result := s.db.WithContext(ctx).Select(clause.Associations).Delete(&entities.User{
+		ID: id,
+	})
 	if result.Error != nil {
 		return result.Error
 	}
