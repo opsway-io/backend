@@ -13,11 +13,11 @@ authentication:
   refresh_expires_in: 720h 
 
 postgres:
-  dsn: "host=localhost user=postgres password=pass dbname=opsway port=5432 sslmode=disable" 
+  dsn: "host=postgres user=postgres password=pass dbname=opsway port=5432 sslmode=disable"
   debug: true
 
 clickhouse:
-  dsn: clickhouse+native://default:@localhost:9000/opsway
+  dsn: clickhouse+native://default:@ch_server:9000/opsway
   debug: true
 
 redis:
@@ -32,7 +32,7 @@ notification:
     sender_email: "no-reply@opsway.io"
 
 object_storage:
-  endpoint_url: "http://localhost:9001"
+  endpoint_url: "http://storage:9001"
   access_key: "guest"
   secret_key: "supersecret"
   region: "eu-central-1"
