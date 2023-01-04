@@ -2,9 +2,11 @@ package monitor
 
 import (
 	"context"
+	"errors"
 
 	"github.com/go-redis/redis/v8"
 	"github.com/opsway-io/backend/internal/entities"
+	"github.com/opsway-io/boomerang"
 	"gorm.io/gorm"
 )
 
@@ -62,5 +64,14 @@ func (s *ServiceImpl) Delete(ctx context.Context, id uint) error {
 		return err
 	}
 
-	return s.schedule.Remove(ctx, id)
+	err = s.schedule.Remove(ctx, id)
+	if err != nil {
+		if errors.Is(err, boomerang.ErrTaskDoesNotExist) {
+			return nil
+		}
+
+		return err
+	}
+
+	return nil
 }
