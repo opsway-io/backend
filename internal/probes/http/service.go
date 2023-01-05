@@ -3,6 +3,7 @@ package http
 import (
 	"context"
 	"crypto/tls"
+	"fmt"
 	"io"
 	"io/ioutil"
 	"net"
@@ -118,7 +119,7 @@ func (s *ServiceImpl) newHttpClient(timeout time.Duration) *xhttp.Client {
 					Timeout: s.config.DNSTimeout,
 				}
 
-				return d.DialContext(ctx, s.config.DNSProtocol, s.config.DNSAddress)
+				return d.DialContext(ctx, s.config.DNSProtocol, fmt.Sprintf("%s:%d", s.config.DNSAddress, s.config.DNSPort))
 			},
 		},
 	}
