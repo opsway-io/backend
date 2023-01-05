@@ -14,6 +14,8 @@ func NewValidator() *Validator {
 
 	v.RegisterValidation("teamRole", TeamRoleValidator)
 	v.RegisterValidation("monitorFrequency", MonitorFrequencyValidator)
+	v.RegisterValidation("monitorMethod", MonitorMethodValidator)
+	v.RegisterValidation("monitorBodyType", BodyTypeValidator)
 
 	return &Validator{
 		validator: v,
@@ -51,6 +53,30 @@ var AllowedMonitorFrequencies = []uint64{
 func MonitorFrequencyValidator(fl validator.FieldLevel) bool {
 	for _, frequency := range AllowedMonitorFrequencies {
 		if frequency == fl.Field().Uint() {
+			return true
+		}
+	}
+
+	return false
+}
+
+var AllowedMonitorMethods = []string{"GET", "POST", "PUT", "DELETE", "HEAD", "OPTIONS", "PATCH"}
+
+func MonitorMethodValidator(fl validator.FieldLevel) bool {
+	for _, method := range AllowedMonitorMethods {
+		if method == fl.Field().String() {
+			return true
+		}
+	}
+
+	return false
+}
+
+var AllowedBodyTypes = []string{"NONE", "RAW", "JSON", "GRAPHQL", "XML"}
+
+func BodyTypeValidator(fl validator.FieldLevel) bool {
+	for _, bodyType := range AllowedBodyTypes {
+		if bodyType == fl.Field().String() {
 			return true
 		}
 	}

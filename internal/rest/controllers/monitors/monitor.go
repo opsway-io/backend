@@ -213,10 +213,10 @@ type PostMonitorRequest struct {
 }
 
 type PostMonitorRequestSettings struct {
-	Method    string            `json:"method" validate:"required,oneof=GET POST PUT PATCH DELETE"`
+	Method    string            `json:"method" validate:"required,monitorMethod"`
 	URL       string            `json:"url" validate:"required,url"`
 	Headers   map[string]string `json:"headers" validate:"required,dive,max=255"`
-	BodyType  string            `json:"bodyType" validate:"required,oneof=NONE RAW JSON GRAPHQL XML"`
+	BodyType  string            `json:"bodyType" validate:"required,monitorBodyType"`
 	Body      string            `json:"body"`
 	Frequency uint64            `json:"frequency" validate:"required,numeric,gte=0,monitorFrequency"`
 }
