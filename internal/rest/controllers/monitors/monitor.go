@@ -218,7 +218,7 @@ type PostMonitorRequestSettings struct {
 	Headers   map[string]string `json:"headers" validate:"required,dive,max=255"`
 	BodyType  string            `json:"bodyType" validate:"required,oneof=NONE RAW JSON GRAPHQL XML"`
 	Body      string            `json:"body"`
-	Frequency uint64            `json:"frequency" validate:"required,numeric,gte=0"`
+	Frequency uint64            `json:"frequency" validate:"required,numeric,gte=0,monitorFrequency"`
 }
 
 func (h *Handlers) PostMonitor(ctx hs.AuthenticatedContext) error {
