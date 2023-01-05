@@ -53,9 +53,19 @@ func (s *ServiceImpl) Create(ctx context.Context, m *entities.Monitor) error {
 }
 
 func (s *ServiceImpl) Update(ctx context.Context, m *entities.Monitor) error {
-	return s.repository.Update(ctx, m)
+	err := s.schedule.Remove(ctx, m.ID)
+	if err != nil {
+		if !errors.Is(err, boomerang.ErrTaskDoesNotExist) {
+			return err
+		}
+	}
 
-	// TODO: remove and reschedule the monitor
+	err = s.repository.Update(ctx, m)
+	if err != nil {
+		return err
+	}
+
+	return s.schedule.Add(ctx, m)
 }
 
 func (s *ServiceImpl) Delete(ctx context.Context, id uint) error {

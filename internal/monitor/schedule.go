@@ -37,6 +37,8 @@ func (s *ScheduleImpl) Add(ctx context.Context, monitor *entities.Monitor) error
 
 	t := boomerang.NewTask(taskKind, fmt.Sprintf("%d", monitor.ID), data)
 
+	fmt.Println("monitor.Settings.Frequency", monitor.Settings.Frequency)
+
 	return s.bschedule.Add(ctx, t, monitor.Settings.Frequency, time.Now())
 }
 

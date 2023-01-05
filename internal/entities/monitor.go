@@ -102,3 +102,11 @@ func (ms *MonitorSettings) GetHeaders() (map[string]string, error) {
 
 	return headers, nil
 }
+
+func (ms *MonitorSettings) GetFrequencyMilliseconds() uint64 {
+	return uint64(ms.Frequency / time.Millisecond)
+}
+
+func (ms *MonitorSettings) SetFrequencyMilliseconds(frequency uint64) {
+	ms.Frequency = time.Duration(frequency) * time.Millisecond
+}

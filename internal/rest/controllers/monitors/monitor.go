@@ -39,7 +39,7 @@ type GetMonitorResponseMonitorSettings struct {
 	Headers   map[string]string `json:"headers"`
 	BodyType  string            `json:"bodyType"`
 	Body      *string           `json:"body"`
-	Frequency time.Duration     `json:"frequency"`
+	Frequency uint64            `json:"frequency"` // milliseconds
 }
 
 func (h *Handlers) GetMonitors(ctx hs.AuthenticatedContext) error {
@@ -88,7 +88,7 @@ func newGetMonitorsResponse(monitors *[]monitor.MonitorWithTotalCount) (*GetMoni
 				Headers:   headers,
 				BodyType:  m.Settings.BodyType,
 				Body:      m.GetBodyStr(),
-				Frequency: m.Settings.Frequency,
+				Frequency: m.Settings.GetFrequencyMilliseconds(),
 			},
 		}
 	}
@@ -124,7 +124,7 @@ type GetMonitorResponseSettings struct {
 	Headers   map[string]string `json:"headers"`
 	BodyType  string            `json:"bodyType"`
 	Body      *string           `json:"body"`
-	Frequency time.Duration     `json:"frequency"`
+	Frequency uint64            `json:"frequency"`
 }
 
 func (h *Handlers) GetMonitor(ctx hs.AuthenticatedContext) error {
@@ -174,7 +174,7 @@ func newGetMonitorResponse(m *entities.Monitor) (*GetMonitorResponse, error) {
 			Headers:   headers,
 			BodyType:  m.Settings.BodyType,
 			Body:      m.GetBodyStr(),
-			Frequency: m.Settings.Frequency,
+			Frequency: m.Settings.GetFrequencyMilliseconds(),
 		},
 	}, nil
 }
@@ -218,7 +218,7 @@ type PostMonitorRequestSettings struct {
 	Headers   map[string]string `json:"headers" validate:"required,dive,max=255"`
 	BodyType  string            `json:"bodyType" validate:"required,oneof=NONE RAW JSON GRAPHQL XML"`
 	Body      string            `json:"body"`
-	Frequency time.Duration     `json:"frequency" validate:"required,numeric,gte=0"`
+	Frequency uint64            `json:"frequency" validate:"required,numeric,gte=0"`
 }
 
 func (h *Handlers) PostMonitor(ctx hs.AuthenticatedContext) error {
@@ -229,18 +229,19 @@ func (h *Handlers) PostMonitor(ctx hs.AuthenticatedContext) error {
 		return echo.ErrBadRequest
 	}
 
-	m := &entities.Monitor{
-		TeamID: req.TeamID,
-		Name:   req.Name,
-		Tags:   req.Tags,
-		Settings: entities.MonitorSettings{
-			Method:    req.Settings.Method,
-			URL:       req.Settings.URL,
-			Frequency: req.Settings.Frequency,
-			BodyType:  req.Settings.BodyType,
-		},
+	s := entities.MonitorSettings{
+		Method:   req.Settings.Method,
+		URL:      req.Settings.URL,
+		BodyType: req.Settings.BodyType,
 	}
+	s.SetFrequencyMilliseconds(req.Settings.Frequency)
 
+	m := &entities.Monitor{
+		TeamID:   req.TeamID,
+		Name:     req.Name,
+		Tags:     req.Tags,
+		Settings: s,
+	}
 	m.SetBodyStr(req.Settings.Body)
 	m.SetHeaders(req.Settings.Headers)
 
