@@ -7,6 +7,7 @@ import (
 	"github.com/opsway-io/backend/internal/connectors/clickhouse"
 	"github.com/opsway-io/backend/internal/connectors/postgres"
 	"github.com/opsway-io/backend/internal/connectors/redis"
+	"github.com/opsway-io/backend/internal/probes/http"
 	"github.com/opsway-io/backend/internal/rest"
 	"github.com/opsway-io/backend/internal/rest/controllers/authentication"
 	"github.com/opsway-io/backend/internal/storage"
@@ -27,6 +28,7 @@ type Config struct {
 	OAuth          *authentication.OAuthConfig           `mapstructure:"oauth"`
 	ObjectStorage  storage.ObjectStorageRepositoryConfig `mapstructure:"object_storage"`
 	Prober         ProberConfig                          `mapstructure:"prober"`
+	HTTPProbe      http.Config                           `mapstructure:"http_probe"`
 }
 
 var validate = validator.New()

@@ -62,10 +62,12 @@ func runProber(cmd *cobra.Command, args []string) {
 
 	httpResultService := check.NewService(ch)
 
+	prober := http.NewService(conf.HTTPProbe)
+
 	l.Info("Waiting for tasks...")
 
 	if err := schedule.On(ctx, func(ctx context.Context, monitor *entities.Monitor) {
-		handleTask(ctx, l, monitor, httpResultService)
+		handleTask(ctx, l, prober, monitor, httpResultService)
 	}); err != nil {
 		l.WithError(err).Fatal("failed to start schedule")
 	}
@@ -73,8 +75,8 @@ func runProber(cmd *cobra.Command, args []string) {
 	l.Info("Goodbye!")
 }
 
-func handleTask(ctx context.Context, l *logrus.Logger, m *entities.Monitor, c check.Service) {
-	res, err := http.Probe(
+func handleTask(ctx context.Context, l *logrus.Logger, prober http.Service, m *entities.Monitor, c check.Service) {
+	res, err := prober.Probe(
 		ctx,
 		m.Settings.Method,
 		m.Settings.URL,
@@ -119,5 +121,4 @@ func handleTask(ctx context.Context, l *logrus.Logger, m *entities.Monitor, c ch
 	if err != nil {
 		l.WithError(err).Error("failed add result to clickhouse")
 	}
-
 }
