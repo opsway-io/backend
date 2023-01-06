@@ -5,11 +5,11 @@ import (
 )
 
 type Check struct {
-	ID         uint
+	ID         uint64
 	StatusCode uint64 `gorm:"index; not null"`
 	Timing     string
 	TLS        string
-	MonitorID  uint      `gorm:"index;not null"`
+	MonitorID  uint64    `gorm:"index;not null"`
 	CreatedAt  time.Time `gorm:"index"`
 }
 

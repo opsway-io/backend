@@ -114,7 +114,7 @@ func handleTask(ctx context.Context, l *logrus.Logger, prober http.Service, m *e
 		StatusCode: uint64(res.Response.StatusCode),
 		Timing:     string(timings),
 		TLS:        string(tls),
-		MonitorID:  m.ID,
+		MonitorID:  uint64(m.ID),
 	}
 
 	err = c.Create(ctx, &result)
