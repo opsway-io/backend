@@ -2,7 +2,6 @@ package cmd
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"time"
 
@@ -96,29 +95,38 @@ func handleTask(ctx context.Context, l *logrus.Logger, prober http.Service, m *e
 		"total":      fmt.Sprintf("%v", res.Timing.Phases.Total),
 	}).Info("probe successful")
 
-	timings, err := json.Marshal(res.Timing.Phases)
-	if err != nil {
-		l.WithError(err).Error("failed to marshal timings")
+	newCheck := mapResultToCheck(m.ID, res)
 
-		return
-	}
-
-	tls, err := json.Marshal(res.TLS)
-	if err != nil {
-		l.WithError(err).Error("failed to marshal tls")
-
-		return
-	}
-
-	result := check.Check{
-		StatusCode: uint64(res.Response.StatusCode),
-		Timing:     string(timings),
-		TLS:        string(tls),
-		MonitorID:  uint64(m.ID),
-	}
-
-	err = c.Create(ctx, &result)
+	err = c.Create(ctx, newCheck)
 	if err != nil {
 		l.WithError(err).Error("failed add result to clickhouse")
 	}
+}
+
+func mapResultToCheck(monitorId uint, res *http.Result) *check.Check {
+	c := &check.Check{
+		MonitorID:  uint64(monitorId),
+		StatusCode: uint64(res.Response.StatusCode),
+		Timing: check.Timing{
+			DNSLookup:        res.Timing.Phases.DNSLookup,
+			TCPConnection:    res.Timing.Phases.TCPConnection,
+			TLSHandshake:     res.Timing.Phases.TLSHandshake,
+			ServerProcessing: res.Timing.Phases.ServerProcessing,
+			ContentTransfer:  res.Timing.Phases.ContentTransfer,
+			Total:            res.Timing.Phases.Total,
+		},
+	}
+
+	if res.TLS != nil {
+		c.TLS = &check.TLS{
+			Version:   res.TLS.Version,
+			Cipher:    res.TLS.Cipher,
+			Issuer:    res.TLS.Certificate.Issuer.Organization,
+			Subject:   res.TLS.Certificate.Subject.CommonName,
+			NotBefore: res.TLS.Certificate.NotBefore,
+			NotAfter:  res.TLS.Certificate.NotAfter,
+		}
+	}
+
+	return c
 }
