@@ -5,7 +5,7 @@ import (
 )
 
 type Check struct {
-	ID         uint64
+	ID         uint64    `gorm:"primarykey"`
 	MonitorID  uint64    `gorm:"index;not null"`
 	StatusCode uint64    `gorm:"index; not null"`
 	Timing     Timing    `gorm:"embedded;embeddedPrefix:timing_"`

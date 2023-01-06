@@ -27,7 +27,12 @@ func (r *RepositoryImpl) Get(ctx context.Context, monitorID uint) (*[]Check, err
 	var checks []Check
 	err := r.db.WithContext(
 		ctx,
-	).Where("monitor_id = ?", monitorID).Find(&checks).Error
+	).Where(
+		"monitor_id = ?",
+		monitorID,
+	).Order(
+		"created_at desc",
+	).Find(&checks).Error
 
 	return &checks, err
 }
