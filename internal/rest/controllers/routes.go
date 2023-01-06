@@ -6,6 +6,7 @@ import (
 	"github.com/opsway-io/backend/internal/check"
 	"github.com/opsway-io/backend/internal/monitor"
 	"github.com/opsway-io/backend/internal/rest/controllers/authentication"
+	"github.com/opsway-io/backend/internal/rest/controllers/healthz"
 	"github.com/opsway-io/backend/internal/rest/controllers/monitors"
 	"github.com/opsway-io/backend/internal/rest/controllers/teams"
 	"github.com/opsway-io/backend/internal/rest/controllers/users"
@@ -24,6 +25,10 @@ func Register(
 	monitorService monitor.Service,
 	checkService check.Service,
 ) {
+	// Healthz
+
+	healthz.Register(e, logger)
+
 	// Authentication
 
 	authentication.Register(e, logger, oAuthConfig, authenticationService, teamService, userService)
