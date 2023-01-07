@@ -2,10 +2,12 @@ package check
 
 import (
 	"time"
+
+	"github.com/gofrs/uuid"
 )
 
 type Check struct {
-	ID         uint64    `gorm:"primarykey"`
+	ID         uuid.UUID `gorm:"primary_key;type:UUID;default:generateUUIDv4()"`
 	MonitorID  uint64    `gorm:"index;not null"`
 	StatusCode uint64    `gorm:"index; not null"`
 	Timing     Timing    `gorm:"embedded;embeddedPrefix:timing_"`

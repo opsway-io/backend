@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/gofrs/uuid"
 	"github.com/labstack/echo/v4"
 	"github.com/opsway-io/backend/internal/check"
 	"github.com/opsway-io/backend/internal/monitor"
@@ -23,7 +24,7 @@ type GetMonitorChecksResponse struct {
 }
 
 type GetMonitorChecksResponseCheck struct {
-	ID         uint64                         `json:"id"`
+	ID         uuid.UUID                      `json:"id"`
 	StatusCode uint64                         `json:"statusCode"`
 	Timing     GetMonitorChecksResponseTiming `json:"timing"`
 	TLS        GetMonitorChecksResponseTLS    `json:"tls"`
@@ -61,7 +62,7 @@ func (h *Handlers) GetMonitorChecks(ctx hs.AuthenticatedContext) error {
 		if errors.Is(err, monitor.ErrNotFound) {
 			ctx.Log.WithError(err).Debug("monitor not found")
 
-			return echo.ErrNotFound
+			return echo.ErrForbidden
 		}
 
 		ctx.Log.WithError(err).Error("failed to get monitor")
@@ -85,31 +86,84 @@ func (h *Handlers) newGetMonitorChecksResponse(checks *[]check.Check) GetMonitor
 	checkRes := make([]GetMonitorChecksResponseCheck, len(*checks))
 
 	for i, c := range *checks {
-		checkRes[i] = GetMonitorChecksResponseCheck{
-			ID:         c.ID,
-			StatusCode: c.StatusCode,
-			Timing: GetMonitorChecksResponseTiming{
-				DNSLookup:        c.Timing.DNSLookup,
-				TCPConnection:    c.Timing.TCPConnection,
-				TLSHandshake:     c.Timing.TLSHandshake,
-				ServerProcessing: c.Timing.ServerProcessing,
-				ContentTransfer:  c.Timing.ContentTransfer,
-				Total:            c.Timing.Total,
-			},
-			TLS: GetMonitorChecksResponseTLS{
-				Version:   c.TLS.Version,
-				Cipher:    c.TLS.Cipher,
-				Issuer:    c.TLS.Issuer,
-				Subject:   c.TLS.Subject,
-				NotBefore: c.TLS.NotBefore,
-				NotAfter:  c.TLS.NotAfter,
-			},
-			CreatedAt: c.CreatedAt.String(),
-		}
+		checkRes[i] = h.newGetMonitorCheckResponse(c)
 	}
 
 	return GetMonitorChecksResponse{
 		TotalCount: 0, // TODO
 		Checks:     checkRes,
 	}
+}
+
+func (h *Handlers) newGetMonitorCheckResponse(check check.Check) GetMonitorChecksResponseCheck {
+	return GetMonitorChecksResponseCheck{
+		ID:         check.ID,
+		StatusCode: check.StatusCode,
+		Timing: GetMonitorChecksResponseTiming{
+			DNSLookup:        check.Timing.DNSLookup,
+			TCPConnection:    check.Timing.TCPConnection,
+			TLSHandshake:     check.Timing.TLSHandshake,
+			ServerProcessing: check.Timing.ServerProcessing,
+			ContentTransfer:  check.Timing.ContentTransfer,
+			Total:            check.Timing.Total,
+		},
+		TLS: GetMonitorChecksResponseTLS{
+			Version:   check.TLS.Version,
+			Cipher:    check.TLS.Cipher,
+			Issuer:    check.TLS.Issuer,
+			Subject:   check.TLS.Subject,
+			NotBefore: check.TLS.NotBefore,
+			NotAfter:  check.TLS.NotAfter,
+		},
+		CreatedAt: check.CreatedAt.String(),
+	}
+}
+
+type GetMonitorCheckRequest struct {
+	TeamID    uint      `param:"teamId" validate:"required,numeric,gte=0"`
+	MonitorID uint      `param:"monitorId" validate:"required,numeric,gte=0"`
+	CheckID   uuid.UUID `param:"checkId" validate:"required"`
+}
+
+type GetMonitorCheckResponse struct {
+	GetMonitorChecksResponseCheck
+}
+
+func (h *Handlers) GetMonitorCheck(ctx hs.AuthenticatedContext) error {
+	req, err := helpers.Bind[GetMonitorCheckRequest](ctx)
+	if err != nil {
+		ctx.Log.WithError(err).Debug("failed to bind GetMonitorsRequest")
+
+		return echo.ErrBadRequest
+	}
+
+	_, err = h.MonitorService.GetMonitorByIDAndTeamID(ctx.Request().Context(), req.MonitorID, req.TeamID)
+	if err != nil {
+		if errors.Is(err, monitor.ErrNotFound) {
+			ctx.Log.WithError(err).Debug("monitor not found")
+
+			return echo.ErrForbidden
+		}
+
+		ctx.Log.WithError(err).Error("failed to get monitor")
+
+		return echo.ErrInternalServerError
+	}
+
+	result, err := h.CheckService.GetMonitorCheckByIDAndMonitorID(ctx.Request().Context(), req.MonitorID, req.CheckID)
+	if err != nil {
+		if errors.Is(err, check.ErrNotFound) {
+			ctx.Log.WithError(err).Debug("check not found")
+
+			return echo.ErrNotFound
+		}
+
+		ctx.Log.WithError(err).Error("failed to get monitor check")
+
+		return echo.ErrInternalServerError
+	}
+
+	resp := h.newGetMonitorCheckResponse(*result)
+
+	return ctx.JSON(http.StatusOK, resp)
 }

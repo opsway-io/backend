@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 
+	"github.com/gofrs/uuid"
 	"gorm.io/gorm"
 )
 
@@ -11,6 +12,7 @@ var ErrNotFound = errors.New("probe result not found")
 
 type Repository interface {
 	Get(ctx context.Context, monitorID uint) (*[]Check, error)
+	GetByIDAndMonitorID(ctx context.Context, monitorID uint, checkID uuid.UUID) (*Check, error)
 	GetAggMetrics(ctx context.Context, monitorID uint) (*[]AggMetric, error)
 	Create(ctx context.Context, maintenance *Check) error
 }
@@ -35,6 +37,26 @@ func (r *RepositoryImpl) Get(ctx context.Context, monitorID uint) (*[]Check, err
 	).Find(&checks).Error
 
 	return &checks, err
+}
+
+func (r *RepositoryImpl) GetByIDAndMonitorID(ctx context.Context, monitorID uint, checkID uuid.UUID) (*Check, error) {
+	var check Check
+	err := r.db.WithContext(
+		ctx,
+	).Where(
+		"monitor_id = ? AND id = ?",
+		monitorID,
+		checkID,
+	).First(&check).Error
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, ErrNotFound
+		}
+
+		return nil, err
+	}
+
+	return &check, nil
 }
 
 type AggMetric struct {

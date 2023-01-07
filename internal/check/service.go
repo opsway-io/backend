@@ -3,11 +3,13 @@ package check
 import (
 	"context"
 
+	"github.com/gofrs/uuid"
 	"gorm.io/gorm"
 )
 
 type Service interface {
 	GetMonitorChecksByID(ctx context.Context, monitorID uint) (*[]Check, error)
+	GetMonitorCheckByIDAndMonitorID(ctx context.Context, monitorID uint, checkID uuid.UUID) (*Check, error)
 	GetMonitorMetricsByID(ctx context.Context, monitorID uint) (*[]AggMetric, error)
 	Create(ctx context.Context, c *Check) error
 }
@@ -24,6 +26,10 @@ func NewService(db *gorm.DB) Service {
 
 func (s *ServiceImpl) GetMonitorChecksByID(ctx context.Context, monitorID uint) (*[]Check, error) {
 	return s.repository.Get(ctx, monitorID)
+}
+
+func (s *ServiceImpl) GetMonitorCheckByIDAndMonitorID(ctx context.Context, monitorID uint, checkID uuid.UUID) (*Check, error) {
+	return s.repository.GetByIDAndMonitorID(ctx, monitorID, checkID)
 }
 
 func (s *ServiceImpl) GetMonitorMetricsByID(ctx context.Context, monitorID uint) (*[]AggMetric, error) {
