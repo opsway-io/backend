@@ -8,6 +8,8 @@ import (
 
 type Check struct {
 	ID         uuid.UUID `gorm:"primary_key;type:UUID;default:generateUUIDv4()"`
+	Method     string    `gorm:"index;not null"`
+	URL        string    `gorm:"index;not null"`
 	MonitorID  uint64    `gorm:"index;not null"`
 	StatusCode uint64    `gorm:"index; not null"`
 	Timing     Timing    `gorm:"embedded;embeddedPrefix:timing_"`

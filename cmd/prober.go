@@ -95,7 +95,7 @@ func handleTask(ctx context.Context, l *logrus.Logger, prober http.Service, m *e
 		"total":      fmt.Sprintf("%v", res.Timing.Phases.Total),
 	}).Info("probe successful")
 
-	newCheck := mapResultToCheck(m.ID, res)
+	newCheck := mapResultToCheck(m, res)
 
 	err = c.Create(ctx, newCheck)
 	if err != nil {
@@ -103,10 +103,12 @@ func handleTask(ctx context.Context, l *logrus.Logger, prober http.Service, m *e
 	}
 }
 
-func mapResultToCheck(monitorId uint, res *http.Result) *check.Check {
+func mapResultToCheck(m *entities.Monitor, res *http.Result) *check.Check {
 	c := &check.Check{
-		MonitorID:  uint64(monitorId),
+		MonitorID:  uint64(m.ID),
 		StatusCode: uint64(res.Response.StatusCode),
+		Method:     m.Settings.Method,
+		URL:        m.Settings.URL,
 		Timing: check.Timing{
 			DNSLookup:        res.Timing.Phases.DNSLookup,
 			TCPConnection:    res.Timing.Phases.TCPConnection,

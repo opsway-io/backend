@@ -26,6 +26,8 @@ type GetMonitorChecksResponse struct {
 type GetMonitorChecksResponseCheck struct {
 	ID         uuid.UUID                      `json:"id"`
 	StatusCode uint64                         `json:"statusCode"`
+	Method     string                         `json:"method"`
+	URL        string                         `json:"url"`
 	Timing     GetMonitorChecksResponseTiming `json:"timing"`
 	TLS        GetMonitorChecksResponseTLS    `json:"tls"`
 	CreatedAt  string                         `json:"createdAt"`
@@ -99,6 +101,8 @@ func (h *Handlers) newGetMonitorCheckResponse(check check.Check) GetMonitorCheck
 	return GetMonitorChecksResponseCheck{
 		ID:         check.ID,
 		StatusCode: check.StatusCode,
+		Method:     check.Method,
+		URL:        check.URL,
 		Timing: GetMonitorChecksResponseTiming{
 			DNSLookup:        check.Timing.DNSLookup,
 			TCPConnection:    check.Timing.TCPConnection,
