@@ -7,6 +7,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/credentials v1.13.6
 	github.com/aws/aws-sdk-go-v2/feature/s3/manager v1.11.45
 	github.com/aws/aws-sdk-go-v2/service/s3 v1.29.6
+	github.com/aymerick/raymond v2.0.2+incompatible
 	github.com/brianvoe/gofakeit v3.18.0+incompatible
 	github.com/creasty/defaults v1.6.0
 	github.com/go-playground/validator v9.31.0+incompatible
