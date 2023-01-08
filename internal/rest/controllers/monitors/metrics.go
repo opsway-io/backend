@@ -8,37 +8,6 @@ import (
 	"github.com/opsway-io/backend/internal/rest/helpers"
 )
 
-/*
-Something like this for metrics response:
-
-{
-    "uptime_percentage": 99.9,
-    "average_response_time_ms": 20,
-    "last_check_timestamp": 1672428631,
-    "tls": {
-        "version": "1.2",
-        "cipher": "ECDHE-RSA-AES128-GCM-SHA256",
-        "certificate": {
-            "issuer": "Lets encrypt",
-            "subject": "example.com",
-            "not_before": 1672428631,
-            "not_after": 1672428631
-        }
-    },
-    "timing": [
-        {
-            "dns_lookup": 20,
-            "tcp_connection": 20,
-            "tls_handshake": 20,
-            "server_processing": 20,
-            "content_transfer": 20,
-            "total": 20
-        }
-		...
-    ]
-}
-*/
-
 type GetMonitorMetricsRequest struct {
 	TeamID    uint `param:"teamId" validate:"required,numeric,gte=0"`
 	MonitorID uint `param:"monitorId" validate:"required,numeric,gte=0"`
