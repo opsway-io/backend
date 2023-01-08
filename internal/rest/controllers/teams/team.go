@@ -84,3 +84,72 @@ func (h *Handlers) PutTeam(ctx hs.AuthenticatedContext) error {
 
 	return ctx.NoContent(http.StatusNoContent)
 }
+
+type DeleteTeamRequest struct {
+	TeamID uint `param:"teamId" validate:"required,numeric,gt=0"`
+}
+
+func (h *Handlers) DeleteTeam(ctx hs.AuthenticatedContext) error {
+	req, err := helpers.Bind[DeleteTeamRequest](ctx)
+	if err != nil {
+		ctx.Log.WithError(err).Debug("failed to bind DeleteTeamRequest")
+
+		return echo.ErrBadRequest
+	}
+
+	if err = h.TeamService.Delete(ctx.Request().Context(), req.TeamID); err != nil {
+		ctx.Log.WithError(err).Debug("failed to delete team")
+
+		return echo.ErrInternalServerError
+	}
+
+	return ctx.NoContent(http.StatusNoContent)
+}
+
+type PostTeamRequest struct {
+	Name        string  `json:"name" validate:"required,max=255"`
+	DisplayName *string `json:"displayName" validate:"max=255"`
+}
+
+type PostTeamResponse struct {
+	ID          uint      `json:"id"`
+	Name        string    `json:"name"`
+	DisplayName *string   `json:"displayName"`
+	AvatarURL   *string   `json:"avatarUrl"`
+	CreatedAt   time.Time `json:"createdAt"`
+	UpdatedAt   time.Time `json:"updatedAt"`
+}
+
+func (h *Handlers) PostTeam(ctx hs.AuthenticatedContext) error {
+	req, err := helpers.Bind[PostTeamRequest](ctx)
+	if err != nil {
+		ctx.Log.WithError(err).Debug("failed to bind PostTeamRequest")
+
+		return echo.ErrBadRequest
+	}
+
+	t := entities.Team{
+		Name:        req.Name,
+		DisplayName: req.DisplayName,
+	}
+
+	if err := h.TeamService.Create(ctx.Request().Context(), &t); err != nil {
+		ctx.Log.WithError(err).Debug("failed to create team")
+
+		return echo.ErrInternalServerError
+	}
+
+	res := PostTeamResponse{
+		ID:          t.ID,
+		Name:        t.Name,
+		DisplayName: t.DisplayName,
+		CreatedAt:   t.CreatedAt,
+		UpdatedAt:   t.UpdatedAt,
+	}
+
+	if t.HasAvatar {
+		res.AvatarURL = pointer.StringPtr(h.TeamService.GetAvatarURLByID(t.ID))
+	}
+
+	return ctx.JSON(http.StatusCreated, res)
+}

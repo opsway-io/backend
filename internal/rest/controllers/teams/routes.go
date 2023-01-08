@@ -35,6 +35,12 @@ func Register(
 
 	AuthHandler := handlers.AuthenticatedHandlerFactory(logger)
 
+	e.POST(
+		"/teams",
+		AuthHandler(h.PostTeam),
+		AuthGuard(),
+	)
+
 	teamsGroup := e.Group(
 		"/teams/:teamId",
 		AuthGuard(),
@@ -43,10 +49,15 @@ func Register(
 
 	teamsGroup.GET("", AuthHandler(h.GetTeam))
 	teamsGroup.PUT("", AuthHandler(h.PutTeam), AllowedRoles(mw.UserRoleOwner, mw.UserRoleAdmin))
+	teamsGroup.DELETE("", AuthHandler(h.DeleteTeam), AllowedRoles(mw.UserRoleOwner))
 
 	teamsGroup.GET("/users", AuthHandler(h.GetTeamUsers))
 	teamsGroup.DELETE("/users/:userId", AuthHandler(h.DeleteTeamUser), AllowedRoles(mw.UserRoleOwner, mw.UserRoleAdmin))
 	teamsGroup.PUT("/users/:userId", AuthHandler(h.PutTeamUser), AllowedRoles(mw.UserRoleOwner, mw.UserRoleAdmin))
+
+	teamsGroup.POST("/users/invites", AuthHandler(h.PostTeamUsersInvite), AllowedRoles(mw.UserRoleOwner, mw.UserRoleAdmin))
+	teamsGroup.GET("/users/invites/url", AuthHandler(h.GetTeamUsersInviteURL), AllowedRoles(mw.UserRoleOwner, mw.UserRoleAdmin))
+	teamsGroup.POST("/users/invites/accept", AuthHandler(h.PostTeamUsersInviteAccept))
 
 	teamsGroup.PUT("/avatar", AuthHandler(h.PutTeamAvatar), AllowedRoles(mw.UserRoleOwner, mw.UserRoleAdmin))
 	teamsGroup.DELETE("/avatar", AuthHandler(h.DeleteTeamAvatar), AllowedRoles(mw.UserRoleOwner, mw.UserRoleAdmin))
