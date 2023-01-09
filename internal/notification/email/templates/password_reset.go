@@ -37,5 +37,7 @@ To reset your password, please click the button below.
 
 Best regards,
 Opsway team
-	`)
+	`,
+		t.PasswordResetLink,
+	)
 }
