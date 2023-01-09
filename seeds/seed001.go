@@ -19,7 +19,6 @@ func Seed001(db *gorm.DB) {
 	// Monitors
 	for i := 0; i < 30; i++ {
 		m := &entities.Monitor{
-			ID:   uint(i + 1),
 			Name: gofakeit.Word(),
 			Settings: entities.MonitorSettings{
 				Method:    "GET",
@@ -28,25 +27,22 @@ func Seed001(db *gorm.DB) {
 			},
 			TeamID: t.ID,
 		}
-		db.FirstOrCreate(m)
+		db.Create(m)
 	}
 
 	// Users
 	defaultUsers := []entities.User{
 		{
-			ID:          1,
 			Name:        "Douglas Adams",
 			DisplayName: pointer.String("I Am Admin"),
 			Email:       "admin@opsway.io",
 		},
 		{
-			ID:          2,
 			Name:        "John Doe",
 			DisplayName: pointer.String("John"),
 			Email:       "john@opsway.io",
 		},
 		{
-			ID:          3,
 			Name:        "Jane Doe",
 			DisplayName: pointer.String("Jane"),
 			Email:       "jane@opsway.io",
@@ -70,7 +66,6 @@ func Seed001(db *gorm.DB) {
 
 	for i := 0; i < 30; i++ {
 		u := entities.User{
-			ID:          uint(i + len(defaultUsers) + 1),
 			Name:        gofakeit.Name(),
 			DisplayName: pointer.String(gofakeit.Username()),
 			Email:       gofakeit.Email(),
