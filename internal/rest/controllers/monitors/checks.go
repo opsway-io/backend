@@ -119,7 +119,7 @@ func (h *Handlers) newGetMonitorCheckResponse(check check.Check) GetMonitorCheck
 			NotBefore: check.TLS.NotBefore,
 			NotAfter:  check.TLS.NotAfter,
 		},
-		CreatedAt: check.CreatedAt.String(),
+		CreatedAt: check.CreatedAt.Format(time.UnixDate),
 	}
 }
 
