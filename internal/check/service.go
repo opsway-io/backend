@@ -9,7 +9,7 @@ import (
 
 type Service interface {
 	GetMonitorChecksByID(ctx context.Context, monitorID uint) (*[]Check, error)
-	GetMonitorCheckByIDAndMonitorID(ctx context.Context, monitorID uint, checkID uuid.UUID) (*Check, error)
+	GetMonitorCheckByIDAndMonitorID(ctx context.Context, monitorID uint, checkID uuid.UUID, offset *int, limit *int) (*Check, error)
 	GetMonitorMetricsByID(ctx context.Context, monitorID uint) (*[]AggMetric, error)
 	Create(ctx context.Context, c *Check) error
 }
@@ -28,8 +28,8 @@ func (s *ServiceImpl) GetMonitorChecksByID(ctx context.Context, monitorID uint) 
 	return s.repository.Get(ctx, monitorID)
 }
 
-func (s *ServiceImpl) GetMonitorCheckByIDAndMonitorID(ctx context.Context, monitorID uint, checkID uuid.UUID) (*Check, error) {
-	return s.repository.GetByIDAndMonitorID(ctx, monitorID, checkID)
+func (s *ServiceImpl) GetMonitorCheckByIDAndMonitorID(ctx context.Context, monitorID uint, checkID uuid.UUID, offset *int, limit *int) (*Check, error) {
+	return s.repository.GetByIDAndMonitorID(ctx, monitorID, checkID, offset, limit)
 }
 
 func (s *ServiceImpl) GetMonitorMetricsByID(ctx context.Context, monitorID uint) (*[]AggMetric, error) {

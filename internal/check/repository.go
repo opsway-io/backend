@@ -5,6 +5,7 @@ import (
 	"errors"
 
 	"github.com/gofrs/uuid"
+	"github.com/opsway-io/backend/internal/connectors/clickhouse"
 	"gorm.io/gorm"
 )
 
@@ -12,7 +13,7 @@ var ErrNotFound = errors.New("probe result not found")
 
 type Repository interface {
 	Get(ctx context.Context, monitorID uint) (*[]Check, error)
-	GetByIDAndMonitorID(ctx context.Context, monitorID uint, checkID uuid.UUID) (*Check, error)
+	GetByIDAndMonitorID(ctx context.Context, monitorID uint, checkID uuid.UUID, offset *int, limit *int) (*Check, error)
 	GetAggMetrics(ctx context.Context, monitorID uint) (*[]AggMetric, error)
 	Create(ctx context.Context, maintenance *Check) error
 }
@@ -39,7 +40,7 @@ func (r *RepositoryImpl) Get(ctx context.Context, monitorID uint) (*[]Check, err
 	return &checks, err
 }
 
-func (r *RepositoryImpl) GetByIDAndMonitorID(ctx context.Context, monitorID uint, checkID uuid.UUID) (*Check, error) {
+func (r *RepositoryImpl) GetByIDAndMonitorID(ctx context.Context, monitorID uint, checkID uuid.UUID, offset *int, limit *int) (*Check, error) {
 	var check Check
 	err := r.db.WithContext(
 		ctx,
@@ -47,7 +48,11 @@ func (r *RepositoryImpl) GetByIDAndMonitorID(ctx context.Context, monitorID uint
 		"monitor_id = ? AND id = ?",
 		monitorID,
 		checkID,
-	).First(&check).Error
+	).Scopes(
+		clickhouse.Paginated(offset, limit),
+	).First(
+		&check,
+	).Error
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, ErrNotFound

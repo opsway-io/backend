@@ -127,6 +127,8 @@ type GetMonitorCheckRequest struct {
 	TeamID    uint      `param:"teamId" validate:"required,numeric,gte=0"`
 	MonitorID uint      `param:"monitorId" validate:"required,numeric,gte=0"`
 	CheckID   uuid.UUID `param:"checkId" validate:"required"`
+	Offset    *int      `query:"offset" validate:"omitempty,numeric,gte=0"`
+	Limit     *int      `query:"limit" validate:"omitempty,numeric,gte=0"`
 }
 
 type GetMonitorCheckResponse struct {
@@ -154,7 +156,7 @@ func (h *Handlers) GetMonitorCheck(ctx hs.AuthenticatedContext) error {
 		return echo.ErrInternalServerError
 	}
 
-	result, err := h.CheckService.GetMonitorCheckByIDAndMonitorID(ctx.Request().Context(), req.MonitorID, req.CheckID)
+	result, err := h.CheckService.GetMonitorCheckByIDAndMonitorID(ctx.Request().Context(), req.MonitorID, req.CheckID, req.Offset, req.Limit)
 	if err != nil {
 		if errors.Is(err, check.ErrNotFound) {
 			ctx.Log.WithError(err).Debug("check not found")
