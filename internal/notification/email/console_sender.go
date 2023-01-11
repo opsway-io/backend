@@ -1,6 +1,7 @@
 package email
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/opsway-io/backend/internal/notification/email/templates"
@@ -14,7 +15,7 @@ func NewConsoleSender() Sender {
 }
 
 //nolint:forbidigo
-func (s *ConsoleSender) Send(name string, to string, template templates.Template) error {
+func (s *ConsoleSender) Send(ctx context.Context, name string, to string, template templates.Template) error {
 	fmt.Println("------------------------------------------------------------")
 	fmt.Printf("To: %s <%s>\n", name, to)
 	fmt.Printf("Subject: %s\n", template.Subject())

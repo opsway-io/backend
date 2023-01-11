@@ -24,7 +24,7 @@ func (h *Handlers) PutUserPassword(ctx hs.AuthenticatedContext) error {
 		return echo.ErrBadRequest
 	}
 
-	if err := h.UserService.ChangePassword(
+	if err := h.UserService.ChangePasswordWithOldPassword(
 		ctx.Request().Context(),
 		req.UserID,
 		req.OldPassword,

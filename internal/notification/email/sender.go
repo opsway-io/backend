@@ -1,6 +1,8 @@
 package email
 
 import (
+	"context"
+
 	"github.com/opsway-io/backend/internal/notification/email/templates"
 )
 
@@ -12,5 +14,5 @@ type Config struct {
 }
 
 type Sender interface {
-	Send(name string, to string, template templates.Template) error
+	Send(ctx context.Context, name string, to string, template templates.Template) error
 }

@@ -77,7 +77,16 @@ func runAPI(cmd *cobra.Command, args []string) {
 		check.Check{},
 	)
 
-	emailSender := email.NewSendgridSender(conf.Email)
+	var emailSender email.Sender
+	if conf.Email.Debug {
+		l.Info("Using console email sender")
+
+		emailSender = email.NewConsoleSender()
+	} else {
+		l.Info("Using Sendgrid email sender")
+
+		emailSender = email.NewSendgridSender(conf.Email)
+	}
 
 	storageRepository := storage.NewObjectStorageRepository(ctx, conf.ObjectStorage)
 	storageService := storage.NewService(storageRepository)

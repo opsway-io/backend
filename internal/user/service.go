@@ -25,12 +25,12 @@ type Service interface {
 	GetUserAndTeamsByUserID(ctx context.Context, userId uint) (*entities.User, error)
 	GetUserAndTeamsByEmailAddress(ctx context.Context, email string) (*entities.User, error)
 
-	ScrapeUserAvatarFromURL(ctx context.Context, userID uint, URL string) error
+	SetAvatarFromURL(ctx context.Context, userID uint, URL string) error
 	GetAvatarURLByID(userID uint) (URL string)
 	UploadAvatar(ctx context.Context, userID uint, file io.Reader) error
 	DeleteAvatar(ctx context.Context, userID uint) error
 
-	ChangePassword(ctx context.Context, userID uint, oldPassword string, newPassword string) error
+	ChangePasswordWithOldPassword(ctx context.Context, userID uint, oldPassword string, newPassword string) error
 	ChangePasswordWithResetToken(ctx context.Context, userID uint, token string, newPassword string) (err error)
 	RequestPasswordReset(ctx context.Context, userId uint) error
 }
@@ -60,7 +60,23 @@ func (s *ServiceImpl) GetUserAndTeamsByEmailAddress(ctx context.Context, email s
 }
 
 func (s *ServiceImpl) Create(ctx context.Context, user *entities.User) error {
-	return s.repository.Create(ctx, user)
+	err := s.repository.Create(ctx, user)
+	if err != nil {
+		return errors.Wrap(err, "failed to create user")
+	}
+
+	if err := s.email.Send(
+		ctx,
+		user.Name,
+		user.Email,
+		&templates.NewUserWelcomeTemplate{
+			Name: user.Name,
+		},
+	); err != nil {
+		return errors.Wrap(err, "failed to send welcome email")
+	}
+
+	return nil
 }
 
 func (s *ServiceImpl) Update(ctx context.Context, user *entities.User) error {
@@ -71,7 +87,7 @@ func (s *ServiceImpl) Delete(ctx context.Context, id uint) error {
 	return s.repository.Delete(ctx, id)
 }
 
-func (s *ServiceImpl) ScrapeUserAvatarFromURL(ctx context.Context, userID uint, URL string) error {
+func (s *ServiceImpl) SetAvatarFromURL(ctx context.Context, userID uint, URL string) error {
 	resp, err := http.Get(URL)
 	if err != nil {
 		return errors.Wrap(err, "failed to get avatar from URL")
@@ -139,7 +155,7 @@ func (s *ServiceImpl) DeleteAvatar(ctx context.Context, userID uint) error {
 	return nil
 }
 
-func (s *ServiceImpl) ChangePassword(ctx context.Context, userID uint, oldPassword string, newPassword string) error {
+func (s *ServiceImpl) ChangePasswordWithOldPassword(ctx context.Context, userID uint, oldPassword string, newPassword string) error {
 	user, err := s.repository.GetUserByID(ctx, userID)
 	if err != nil {
 		if errors.Is(err, ErrNotFound) {
@@ -188,7 +204,8 @@ func (s *ServiceImpl) RequestPasswordReset(ctx context.Context, userId uint) err
 		return errors.Wrap(err, "failed to set token")
 	}
 
-	s.email.Send(
+	if err := s.email.Send(
+		ctx,
 		user.Name,
 		user.Email,
 		&templates.PasswordResetTemplate{
@@ -199,7 +216,9 @@ func (s *ServiceImpl) RequestPasswordReset(ctx context.Context, userId uint) err
 				token.String(),
 			),
 		},
-	)
+	); err != nil {
+		return errors.Wrap(err, "failed to send password reset email")
+	}
 
 	return nil
 }

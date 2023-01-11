@@ -120,7 +120,7 @@ func getOrCreateUser(c echo.Context, userService user.Service, gothUser goth.Use
 	}
 
 	if gothUser.AvatarURL != "" {
-		if err := userService.ScrapeUserAvatarFromURL(c.Request().Context(), u.ID, gothUser.AvatarURL); err != nil {
+		if err := userService.SetAvatarFromURL(c.Request().Context(), u.ID, gothUser.AvatarURL); err != nil {
 			return nil, err
 		}
 	}

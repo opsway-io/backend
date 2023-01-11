@@ -25,11 +25,10 @@ redis:
   port: 6379
   db: 0
 
-notification:
-  email:
-    debug: true
-    sender_name: "opsway"
-    sender_email: "no-reply@opsway.io"
+email:
+  sender_name: "opsway"
+  sender_email: "no-reply@opsway.io"
+  sendgrid_api_key: ""
 
 object_storage:
   endpoint_url: "http://localhost:9001"
@@ -40,3 +39,4 @@ object_storage:
 
 prober:
   concurrency: 1
+  
