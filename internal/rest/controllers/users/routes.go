@@ -32,7 +32,11 @@ func Register(
 	AuthGuard := mw.AuthGuardFactory(logger, authenticationService)
 	CurrentUserGuard := mw.CurrentUSerGuardFactory(logger)
 
+	BaseHandler := handlers.BaseHandlerFactory(logger)
 	AuthHandler := handlers.AuthenticatedHandlerFactory(logger)
+
+	e.POST("/users/:userId/password/reset", BaseHandler(h.PostUserPasswordReset))
+	e.POST("/users/:userId/password/reset/new", BaseHandler(h.PostUserPasswordResetNewPassword))
 
 	usersGroup := e.Group(
 		"/users/:userId",

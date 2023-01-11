@@ -5,8 +5,12 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"time"
 
+	"github.com/gofrs/uuid"
 	"github.com/opsway-io/backend/internal/entities"
+	"github.com/opsway-io/backend/internal/notification/email"
+	"github.com/opsway-io/backend/internal/notification/email/templates"
 	"github.com/opsway-io/backend/internal/storage"
 	"github.com/pkg/errors"
 )
@@ -14,27 +18,36 @@ import (
 var ErrInvalidPassword = errors.New("invalid password")
 
 type Service interface {
-	GetUserAndTeamsByUserID(ctx context.Context, userId uint) (*entities.User, error)
-	GetUserAndTeamsByEmailAddress(ctx context.Context, email string) (*entities.User, error)
 	Create(ctx context.Context, user *entities.User) error
 	Update(ctx context.Context, user *entities.User) error
 	Delete(ctx context.Context, id uint) error
+
+	GetUserAndTeamsByUserID(ctx context.Context, userId uint) (*entities.User, error)
+	GetUserAndTeamsByEmailAddress(ctx context.Context, email string) (*entities.User, error)
+
 	ScrapeUserAvatarFromURL(ctx context.Context, userID uint, URL string) error
 	GetAvatarURLByID(userID uint) (URL string)
 	UploadAvatar(ctx context.Context, userID uint, file io.Reader) error
 	DeleteAvatar(ctx context.Context, userID uint) error
+
 	ChangePassword(ctx context.Context, userID uint, oldPassword string, newPassword string) error
+	ChangePasswordWithResetToken(ctx context.Context, userID uint, token string, newPassword string) (err error)
+	RequestPasswordReset(ctx context.Context, userId uint) error
 }
 
 type ServiceImpl struct {
 	repository Repository
 	storage    storage.Service
+	cache      Cache
+	email      email.Sender
 }
 
-func NewService(repository Repository, storage storage.Service) Service {
+func NewService(repository Repository, cache Cache, storage storage.Service, email email.Sender) Service {
 	return &ServiceImpl{
 		repository: repository,
+		cache:      cache,
 		storage:    storage,
+		email:      email,
 	}
 }
 
@@ -138,6 +151,81 @@ func (s *ServiceImpl) ChangePassword(ctx context.Context, userID uint, oldPasswo
 
 	if !user.CheckPassword(oldPassword) {
 		return ErrInvalidPassword
+	}
+
+	if err := user.SetPassword(newPassword); err != nil {
+		return errors.Wrap(err, "failed to set new password")
+	}
+
+	if err := s.repository.Update(ctx, user); err != nil {
+		return errors.Wrap(err, "failed to update user")
+	}
+
+	return nil
+}
+
+func (s *ServiceImpl) RequestPasswordReset(ctx context.Context, userId uint) error {
+	user, err := s.repository.GetUserByID(ctx, userId)
+	if err != nil {
+		if errors.Is(err, ErrNotFound) {
+			return err
+		}
+
+		return errors.Wrap(err, "failed to get user")
+	}
+
+	token, err := uuid.NewV4()
+	if err != nil {
+		return errors.Wrap(err, "failed to generate token")
+	}
+
+	if err = s.cache.SetPasswordResetToken(
+		ctx,
+		user.ID,
+		token.String(),
+		time.Duration(24)*time.Hour, // TODO: move to config
+	); err != nil {
+		return errors.Wrap(err, "failed to set token")
+	}
+
+	s.email.Send(
+		user.Name,
+		user.Email,
+		&templates.PasswordResetTemplate{
+			Name: user.Name,
+			PasswordResetLink: fmt.Sprintf(
+				"%s/reset-password?token=%s",
+				"https://my.opsway.io", // TODO: move to config
+				token.String(),
+			),
+		},
+	)
+
+	return nil
+}
+
+func (s *ServiceImpl) ChangePasswordWithResetToken(ctx context.Context, userID uint, token string, newPassword string) error {
+	tokenUserID, err := s.cache.VerifyAndDeletePasswordResetToken(ctx, token)
+	if err != nil {
+		if errors.Is(err, ErrNotFound) {
+			return err
+		}
+
+		return errors.Wrap(err, "failed to get user ID by token")
+
+	}
+
+	if userID != tokenUserID {
+		return ErrNotFound
+	}
+
+	user, err := s.repository.GetUserByID(ctx, userID)
+	if err != nil {
+		if errors.Is(err, ErrNotFound) {
+			return err
+		}
+
+		return errors.Wrap(err, "failed to get user")
 	}
 
 	if err := user.SetPassword(newPassword); err != nil {

@@ -10,6 +10,7 @@ import (
 	"github.com/opsway-io/backend/internal/connectors/redis"
 	"github.com/opsway-io/backend/internal/entities"
 	"github.com/opsway-io/backend/internal/monitor"
+	"github.com/opsway-io/backend/internal/notification/email"
 	"github.com/opsway-io/backend/internal/rest"
 	"github.com/opsway-io/backend/internal/storage"
 	"github.com/opsway-io/backend/internal/team"
@@ -76,13 +77,16 @@ func runAPI(cmd *cobra.Command, args []string) {
 		check.Check{},
 	)
 
+	emailSender := email.NewSendgridSender(conf.Email)
+
 	storageRepository := storage.NewObjectStorageRepository(ctx, conf.ObjectStorage)
 	storageService := storage.NewService(storageRepository)
 
 	authenticationService := authentication.NewService(conf.Authentication, redisClient)
 
 	userRepository := user.NewRepository(db)
-	userService := user.NewService(userRepository, storageService)
+	userCache := user.NewCache(redisClient)
+	userService := user.NewService(userRepository, userCache, storageService, emailSender)
 
 	teamRepository := team.NewRepository(db)
 	teamService := team.NewService(teamRepository, storageService)
