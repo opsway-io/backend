@@ -33,8 +33,8 @@ func (s *SendgridSender) Send(ctx context.Context, name string, to string, templ
 		return err
 	}
 
-	if response.StatusCode != http.StatusOK {
-		return fmt.Errorf("sendgrid returned non-200 status code %d", response.StatusCode)
+	if response.StatusCode >= http.StatusBadRequest || response.StatusCode < http.StatusOK {
+		return fmt.Errorf("sendgrid returned non-2xx status code %d", response.StatusCode)
 	}
 
 	return nil

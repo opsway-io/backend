@@ -28,7 +28,7 @@ redis:
 email:
   sender_name: "opsway"
   sender_email: "no-reply@opsway.io"
-  sendgrid_api_key: ""
+  sendgrid_api_key: "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"
 
 object_storage:
   endpoint_url: "http://localhost:9001"
