@@ -65,15 +65,25 @@ func (r *RepositoryImpl) GetByIDAndMonitorID(ctx context.Context, monitorID uint
 }
 
 type AggMetric struct {
-	Start  string
-	Timing float64
+	Start      string
+	DNS        float64
+	TCP        float64
+	TLS        float64
+	Processing float64
+	Transfer   float64
 }
 
 func (r *RepositoryImpl) GetAggMetrics(ctx context.Context, monitorID uint) (*[]AggMetric, error) {
 	var metrics []AggMetric
 	err := r.db.WithContext(
 		ctx,
-	).Table("checks").Select("tumbleStart(wndw) as start, avg(timing_total)/1000000 as timing").
+	).Table("checks").Select(`
+		tumbleStart(wndw) as start, 
+		avg(timing_dns_lookup)/1000000 as dns, 
+		avg(timing_tcp_connection)/1000000 as tcp,
+		avg(timing_tls_handshake)/1000000 as tls,
+		avg(timing_server_processing)/1000000 as processing,
+		avg(timing_content_transfer)/1000000 as transfer`).
 		Where("monitor_id = ?", monitorID).
 		Group("tumble(toDateTime(created_at), INTERVAL 1 HOUR) as wndw").
 		Where("created_at BETWEEN DATE_SUB(NOW(), INTERVAL 24 HOUR) AND NOW()").

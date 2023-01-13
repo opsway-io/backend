@@ -5,7 +5,6 @@ import (
 	"time"
 
 	"github.com/labstack/echo/v4"
-	"github.com/opsway-io/backend/internal/check"
 	hs "github.com/opsway-io/backend/internal/rest/handlers"
 	"github.com/opsway-io/backend/internal/rest/helpers"
 )
@@ -20,6 +19,10 @@ type GetMonitorMetricsRespone struct {
 }
 
 type GetMonitorMetricsResponseMetric struct {
+	Name string           `json:"name"`
+	Data []MonitorMetrics `json:"timing"`
+}
+type MonitorMetrics struct {
 	Start  string        `json:"start"`
 	Timing time.Duration `json:"timing"`
 }
@@ -39,18 +42,23 @@ func (h *Handlers) GetMonitorMetrics(ctx hs.AuthenticatedContext) error {
 		return echo.ErrInternalServerError
 	}
 
-	metricResp := make([]GetMonitorMetricsResponseMetric, len(*metrics))
+	metricMap := map[string][]MonitorMetrics{}
 
-	for i, c := range *metrics {
-		metricResp[i] = h.newGetMonitorMetricResponse(c)
+	for _, c := range *metrics {
+		metricMap["dns"] = append(metricMap["dns"], MonitorMetrics{Start: c.Start, Timing: time.Duration(c.DNS)})
+		metricMap["tcp"] = append(metricMap["tcp"], MonitorMetrics{Start: c.Start, Timing: time.Duration(c.TCP)})
+		metricMap["tls"] = append(metricMap["tls"], MonitorMetrics{Start: c.Start, Timing: time.Duration(c.TLS)})
+		metricMap["processing"] = append(metricMap["processing"], MonitorMetrics{Start: c.Start, Timing: time.Duration(c.DNS)})
+		metricMap["transfer"] = append(metricMap["transfer"], MonitorMetrics{Start: c.Start, Timing: time.Duration(c.Transfer)})
+	}
+
+	metricResp := make([]GetMonitorMetricsResponseMetric, len(metricMap))
+
+	i := 0
+	for name, data := range metricMap {
+		metricResp[i] = GetMonitorMetricsResponseMetric{Name: name, Data: data}
+		i += 1
 	}
 
 	return ctx.JSON(http.StatusOK, GetMonitorMetricsRespone{Metrics: metricResp})
-}
-
-func (h *Handlers) newGetMonitorMetricResponse(metric check.AggMetric) GetMonitorMetricsResponseMetric {
-	return GetMonitorMetricsResponseMetric{
-		Start:  metric.Start,
-		Timing: time.Duration(metric.Timing),
-	}
 }
