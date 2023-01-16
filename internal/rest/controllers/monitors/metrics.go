@@ -43,20 +43,20 @@ func (h *Handlers) GetMonitorMetrics(ctx hs.AuthenticatedContext) error {
 	}
 
 	metricMap := map[string][]MonitorMetrics{}
-
+	metricKeys := []string{"DNS", "TCP", "TLS", "Processing", "Transfer"}
 	for _, c := range *metrics {
-		metricMap["dns"] = append(metricMap["dns"], MonitorMetrics{Start: c.Start, Timing: time.Duration(c.DNS)})
-		metricMap["tcp"] = append(metricMap["tcp"], MonitorMetrics{Start: c.Start, Timing: time.Duration(c.TCP)})
-		metricMap["tls"] = append(metricMap["tls"], MonitorMetrics{Start: c.Start, Timing: time.Duration(c.TLS)})
-		metricMap["processing"] = append(metricMap["processing"], MonitorMetrics{Start: c.Start, Timing: time.Duration(c.DNS)})
-		metricMap["transfer"] = append(metricMap["transfer"], MonitorMetrics{Start: c.Start, Timing: time.Duration(c.Transfer)})
+		metricMap["DNS"] = append(metricMap["DNS"], MonitorMetrics{Start: c.Start, Timing: time.Duration(c.DNS)})
+		metricMap["TCP"] = append(metricMap["TCP"], MonitorMetrics{Start: c.Start, Timing: time.Duration(c.TCP)})
+		metricMap["TLS"] = append(metricMap["TLS"], MonitorMetrics{Start: c.Start, Timing: time.Duration(c.TLS)})
+		metricMap["Processing"] = append(metricMap["Processing"], MonitorMetrics{Start: c.Start, Timing: time.Duration(c.DNS)})
+		metricMap["Transfer"] = append(metricMap["Transfer"], MonitorMetrics{Start: c.Start, Timing: time.Duration(c.Transfer)})
 	}
 
 	metricResp := make([]GetMonitorMetricsResponseMetric, len(metricMap))
 
 	i := 0
-	for name, data := range metricMap {
-		metricResp[i] = GetMonitorMetricsResponseMetric{Name: name, Data: data}
+	for _, key := range metricKeys {
+		metricResp[i] = GetMonitorMetricsResponseMetric{Name: key, Data: metricMap[key]}
 		i += 1
 	}
 
