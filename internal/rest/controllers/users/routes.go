@@ -52,4 +52,6 @@ func Register(
 
 	usersGroup.PUT("/avatar", AuthHandler(h.PutUserAvatar))
 	usersGroup.DELETE("/avatar", AuthHandler(h.DeleteUserAvatar))
+
+	usersGroup.GET("/teams", AuthHandler(h.GetUserTeams))
 }

@@ -14,6 +14,7 @@ type Service interface {
 	GetByID(ctx context.Context, teamId uint) (*entities.Team, error)
 	GetUsersByID(ctx context.Context, teamId uint, offset *int, limit *int, query *string) (*[]TeamUser, error)
 	GetUserRole(ctx context.Context, teamID, userID uint) (*entities.TeamRole, error)
+	GetTeamsAndRoleByUserID(ctx context.Context, userID uint) (*[]TeamAndRole, error)
 	RemoveUser(ctx context.Context, teamID, userID uint) error
 	Create(ctx context.Context, team *entities.Team) error
 	UpdateDisplayName(ctx context.Context, teamID uint, displayName string) error
@@ -112,6 +113,10 @@ func (s *ServiceImpl) UpdateUserRole(ctx context.Context, teamID, userID uint, r
 	// TODO: make sure team still has at least one owner
 
 	return s.repository.UpdateUserRole(ctx, teamID, userID, role)
+}
+
+func (s *ServiceImpl) GetTeamsAndRoleByUserID(ctx context.Context, userID uint) (*[]TeamAndRole, error) {
+	return s.repository.GetTeamsAndRoleByUserID(ctx, userID)
 }
 
 func (s *ServiceImpl) getAvatarKey(teamID uint) string {

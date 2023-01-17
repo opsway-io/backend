@@ -20,6 +20,7 @@ type Repository interface {
 	GetByID(ctx context.Context, teamId uint) (*entities.Team, error)
 	GetUsersByID(ctx context.Context, teamId uint, offset *int, limit *int, query *string) (*[]TeamUser, error)
 	GetUserRole(ctx context.Context, teamID, userID uint) (*entities.TeamRole, error)
+	GetTeamsAndRoleByUserID(ctx context.Context, userID uint) (*[]TeamAndRole, error)
 	UpdateUserRole(ctx context.Context, teamID, userID uint, role entities.TeamRole) error
 	UpdateDisplayName(ctx context.Context, teamID uint, displayName string) error
 	Create(ctx context.Context, team *entities.Team) error
@@ -171,4 +172,22 @@ func (s *RepositoryImpl) Update(ctx context.Context, team *entities.Team) error 
 	}
 
 	return nil
+}
+
+type TeamAndRole struct {
+	entities.Team
+	Role entities.TeamRole
+}
+
+func (s *RepositoryImpl) GetTeamsAndRoleByUserID(ctx context.Context, userID uint) (*[]TeamAndRole, error) {
+	var teams []TeamAndRole
+
+	s.db.WithContext(ctx).
+		Select("t.*, tu.role").
+		Table("team_users as tu").
+		Joins("INNER JOIN teams as t ON t.id = tu.team_id").
+		Where("tu.user_id = ?", userID).
+		Find(&teams)
+
+	return &teams, nil
 }
