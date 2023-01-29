@@ -11,18 +11,23 @@ import (
 )
 
 type Service interface {
+	CreateWithOwnerUserID(ctx context.Context, team *entities.Team, ownerUserID uint) error
+
 	GetByID(ctx context.Context, teamId uint) (*entities.Team, error)
+
+	GetTeamsAndRoleByUserID(ctx context.Context, userID uint) (*[]TeamAndRole, error)
 	GetUsersByID(ctx context.Context, teamId uint, offset *int, limit *int, query *string) (*[]TeamUser, error)
 	GetUserRole(ctx context.Context, teamID, userID uint) (*entities.TeamRole, error)
-	GetTeamsAndRoleByUserID(ctx context.Context, userID uint) (*[]TeamAndRole, error)
-	RemoveUser(ctx context.Context, teamID, userID uint) error
-	Create(ctx context.Context, team *entities.Team) error
-	UpdateDisplayName(ctx context.Context, teamID uint, displayName string) error
 	UpdateUserRole(ctx context.Context, teamID, userID uint, role entities.TeamRole) error
+
+	RemoveUser(ctx context.Context, teamID, userID uint) error
+	UpdateDisplayName(ctx context.Context, teamID uint, displayName string) error
+
 	Delete(ctx context.Context, id uint) error
 	UploadAvatar(ctx context.Context, teamID uint, file io.Reader) error
 	DeleteAvatar(ctx context.Context, teamID uint) error
 	GetAvatarURLByID(teamID uint) (URL string)
+
 	IsNameAvailable(ctx context.Context, name string) (bool, error)
 }
 
@@ -42,8 +47,8 @@ func (s *ServiceImpl) GetByID(ctx context.Context, id uint) (*entities.Team, err
 	return s.repository.GetByID(ctx, id)
 }
 
-func (s *ServiceImpl) Create(ctx context.Context, team *entities.Team) error {
-	return s.repository.Create(ctx, team)
+func (s *ServiceImpl) CreateWithOwnerUserID(ctx context.Context, team *entities.Team, ownerUserID uint) error {
+	return s.repository.CreateWithOwnerUserID(ctx, team, ownerUserID)
 }
 
 func (s *ServiceImpl) UpdateDisplayName(ctx context.Context, teamID uint, displayName string) error {

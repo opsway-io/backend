@@ -23,7 +23,7 @@ type Repository interface {
 	GetTeamsAndRoleByUserID(ctx context.Context, userID uint) (*[]TeamAndRole, error)
 	UpdateUserRole(ctx context.Context, teamID, userID uint, role entities.TeamRole) error
 	UpdateDisplayName(ctx context.Context, teamID uint, displayName string) error
-	Create(ctx context.Context, team *entities.Team) error
+	CreateWithOwnerUserID(ctx context.Context, team *entities.Team, ownerUserID uint) error
 	Delete(ctx context.Context, id uint) error
 	Update(ctx context.Context, team *entities.Team) error
 	RemoveUser(ctx context.Context, teamID, userID uint) error
@@ -75,16 +75,24 @@ func (s *RepositoryImpl) GetUsersByID(ctx context.Context, teamId uint, offset *
 	return &users, nil
 }
 
-func (s *RepositoryImpl) Create(ctx context.Context, team *entities.Team) error {
-	if err := s.db.WithContext(ctx).Create(team).Error; err != nil {
-		if errors.As(err, &postgres.ErrDuplicateEntry) {
-			return ErrNameAlreadyExists
+func (s *RepositoryImpl) CreateWithOwnerUserID(ctx context.Context, team *entities.Team, ownerUserID uint) error {
+	return s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		if err := tx.Create(team).Error; err != nil {
+			return err
 		}
 
-		return err
-	}
+		teamUser := entities.TeamUser{
+			TeamID: team.ID,
+			UserID: ownerUserID,
+			Role:   entities.TeamRoleOwner,
+		}
 
-	return nil
+		if err := tx.Create(&teamUser).Error; err != nil {
+			return err
+		}
+
+		return nil
+	})
 }
 
 func (s *RepositoryImpl) UpdateDisplayName(ctx context.Context, teamID uint, displayName string) error {

@@ -133,7 +133,7 @@ func (h *Handlers) PostTeam(ctx hs.AuthenticatedContext) error {
 		DisplayName: req.DisplayName,
 	}
 
-	if err := h.TeamService.Create(ctx.Request().Context(), &t); err != nil {
+	if err := h.TeamService.CreateWithOwnerUserID(ctx.Request().Context(), &t, ctx.UserID); err != nil {
 		ctx.Log.WithError(err).Debug("failed to create team")
 
 		return echo.ErrInternalServerError
