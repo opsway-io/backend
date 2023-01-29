@@ -5,6 +5,7 @@ import (
 
 	"github.com/labstack/echo/v4"
 	"github.com/opsway-io/backend/internal/authentication"
+	"github.com/opsway-io/backend/internal/entities"
 	"github.com/sirupsen/logrus"
 )
 
@@ -12,9 +13,10 @@ type AuthenticatedHandlerFunc func(ctx AuthenticatedContext) error
 
 type AuthenticatedContext struct {
 	echo.Context
-	Log    *logrus.Entry
-	Claims authentication.Claims
-	UserID uint
+	Log      *logrus.Entry
+	Claims   authentication.Claims
+	UserID   uint
+	TeamRole *entities.TeamRole
 }
 
 func AuthenticatedHandlerFactory(logger *logrus.Entry) func(handler AuthenticatedHandlerFunc) func(ctx echo.Context) error {
@@ -34,11 +36,14 @@ func AuthenticatedHandlerFactory(logger *logrus.Entry) func(handler Authenticate
 				return echo.ErrUnauthorized
 			}
 
+			teamRole, _ := ctx.Get("team_role").(*entities.TeamRole)
+
 			return handler(AuthenticatedContext{
-				Context: ctx,
-				Claims:  *claims,
-				Log:     logger,
-				UserID:  uint(userId),
+				Context:  ctx,
+				Claims:   *claims,
+				Log:      logger,
+				UserID:   uint(userId),
+				TeamRole: teamRole,
 			})
 		}
 	}

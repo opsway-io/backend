@@ -26,7 +26,7 @@ func (cv *Validator) Validate(i interface{}) error {
 	return errors.Wrap(cv.validator.Struct(i), "validation failed")
 }
 
-var AllowedRoles = []string{"admin", "member", "owner"}
+var AllowedRoles = []string{"MEMBER", "ADMIN", "OWNER"}
 
 func TeamRoleValidator(fl validator.FieldLevel) bool {
 	for _, role := range AllowedRoles {

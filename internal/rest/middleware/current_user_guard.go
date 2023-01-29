@@ -7,7 +7,7 @@ import (
 )
 
 // Allows only the current user to access the route
-func CurrentUSerGuardFactory(logger *logrus.Entry) func() func(next echo.HandlerFunc) echo.HandlerFunc {
+func CurrentUserGuardFactory(logger *logrus.Entry) func() func(next echo.HandlerFunc) echo.HandlerFunc {
 	l := logger.WithField("middleware", "current_user_guard")
 
 	return func() func(next echo.HandlerFunc) echo.HandlerFunc {

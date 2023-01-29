@@ -115,7 +115,7 @@ func (h *Handlers) DeleteTeamUser(ctx hs.AuthenticatedContext) error {
 type PutTeamUserRequest struct {
 	TeamID uint              `param:"teamId" validate:"required,numeric,gt=0"`
 	UserID uint              `param:"userId" validate:"required,numeric,gt=0"`
-	Role   entities.TeamRole `json:"role" validate:"required,role"`
+	Role   entities.TeamRole `json:"role" validate:"required,teamRole"`
 }
 
 func (h *Handlers) PutTeamUser(ctx hs.AuthenticatedContext) error {
@@ -124,6 +124,12 @@ func (h *Handlers) PutTeamUser(ctx hs.AuthenticatedContext) error {
 		ctx.Log.WithError(err).Debug("failed to bind PutTeamUserRequest")
 
 		return echo.ErrBadRequest
+	}
+
+	if req.Role == entities.TeamRoleOwner && ctx.TeamRole != nil && *ctx.TeamRole != entities.TeamRoleOwner {
+		ctx.Log.Debug("Non-team owner not allowed to make other users owner")
+
+		return echo.ErrForbidden
 	}
 
 	if err = h.TeamService.UpdateUserRole(

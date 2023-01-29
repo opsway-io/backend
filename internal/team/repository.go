@@ -110,18 +110,32 @@ func (s *RepositoryImpl) UpdateDisplayName(ctx context.Context, teamID uint, dis
 }
 
 func (s *RepositoryImpl) UpdateUserRole(ctx context.Context, teamID, userID uint, role entities.TeamRole) error {
-	result := s.db.WithContext(ctx).Model(&entities.TeamUser{}).Where(entities.TeamUser{
-		TeamID: teamID,
-		UserID: userID,
-	}).Update("role", role)
-	if result.Error != nil {
-		return result.Error
-	}
-	if result.RowsAffected == 0 {
-		return ErrUserNotFound
-	}
+	err := s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		// If role is owner, remove all other owners
+		if role == entities.TeamRoleOwner {
+			if err := tx.Model(&entities.TeamUser{}).Where(entities.TeamUser{
+				TeamID: teamID,
+				Role:   entities.TeamRoleOwner,
+			}).Update("role", entities.TeamRoleAdmin).Error; err != nil {
+				return err
+			}
+		}
 
-	return nil
+		result := s.db.WithContext(ctx).Model(&entities.TeamUser{}).Where(entities.TeamUser{
+			TeamID: teamID,
+			UserID: userID,
+		}).Update("role", role)
+		if result.Error != nil {
+			return result.Error
+		}
+		if result.RowsAffected == 0 {
+			return ErrUserNotFound
+		}
+
+		return nil
+	})
+
+	return err
 }
 
 func (s *RepositoryImpl) Delete(ctx context.Context, id uint) error {

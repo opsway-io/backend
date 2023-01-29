@@ -28,7 +28,7 @@ func RoleGuardFactory(logger *logrus.Entry, teamService team.Service) func(allow
 	return func(allowedRoles ...UserRole) func(next echo.HandlerFunc) echo.HandlerFunc {
 		return func(next echo.HandlerFunc) echo.HandlerFunc {
 			return func(c echo.Context) error {
-				teamRole, ok := c.Get("team_role").(entities.TeamRole)
+				teamRole, ok := c.Get("team_role").(*entities.TeamRole)
 				if !ok {
 					l.Debug("missing team_role, are you missing a team guard?")
 
@@ -36,7 +36,7 @@ func RoleGuardFactory(logger *logrus.Entry, teamService team.Service) func(allow
 				}
 
 				for _, allowedRole := range allowedRoles {
-					if string(teamRole) == string(allowedRole) {
+					if string(*teamRole) == string(allowedRole) {
 						l.Debug("role guard passed")
 
 						c.Set("team_role", teamRole)

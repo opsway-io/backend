@@ -30,7 +30,7 @@ func Register(
 	}
 
 	AuthGuard := mw.AuthGuardFactory(logger, authenticationService)
-	CurrentUserGuard := mw.CurrentUSerGuardFactory(logger)
+	CurrentUserGuard := mw.CurrentUserGuardFactory(logger)
 
 	BaseHandler := handlers.BaseHandlerFactory(logger)
 	AuthHandler := handlers.AuthenticatedHandlerFactory(logger)
