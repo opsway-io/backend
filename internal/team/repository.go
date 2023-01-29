@@ -14,6 +14,7 @@ var (
 	ErrNotFound          = errors.New("team not found")
 	ErrUserNotFound      = errors.New("team user not found")
 	ErrNameAlreadyExists = errors.New("team name already exists")
+	ErrCannotRemoveOwner = errors.New("cannot remove owner")
 )
 
 type Repository interface {
@@ -171,18 +172,31 @@ func (s *RepositoryImpl) GetUserRole(ctx context.Context, teamID, userID uint) (
 }
 
 func (s *RepositoryImpl) RemoveUser(ctx context.Context, teamID, userID uint) error {
-	result := s.db.WithContext(ctx).Delete(&entities.TeamUser{}, entities.TeamUser{
-		TeamID: teamID,
-		UserID: userID,
-	})
-	if result.Error != nil {
-		return result.Error
-	}
-	if result.RowsAffected == 0 {
-		return ErrUserNotFound
-	}
+	return s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		var teamUser entities.TeamUser
+		if err := tx.Where(
+			entities.TeamUser{
+				TeamID: teamID,
+				UserID: userID,
+			},
+		).First(&teamUser).Error; err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return ErrUserNotFound
+			}
 
-	return nil
+			return err
+		}
+
+		if teamUser.Role == entities.TeamRoleOwner {
+			return ErrCannotRemoveOwner
+		}
+
+		if err := tx.Delete(&teamUser).Error; err != nil {
+			return err
+		}
+
+		return nil
+	})
 }
 
 func (s *RepositoryImpl) Update(ctx context.Context, team *entities.Team) error {

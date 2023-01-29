@@ -98,13 +98,15 @@ func (h *Handlers) DeleteTeamUser(ctx hs.AuthenticatedContext) error {
 		req.TeamID,
 		req.UserID,
 	); err != nil {
-		if errors.Is(err, team.ErrUserNotFound) {
-			ctx.Log.WithError(err).Debug("failed to delete team user")
+		ctx.Log.WithError(err).Debug("failed to delete team user")
 
+		if errors.Is(err, team.ErrUserNotFound) {
 			return echo.ErrNotFound
 		}
 
-		ctx.Log.WithError(err).Debug("failed to delete team user")
+		if errors.Is(err, team.ErrCannotRemoveOwner) {
+			return echo.ErrForbidden
+		}
 
 		return echo.ErrInternalServerError
 	}
