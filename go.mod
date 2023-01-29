@@ -3,6 +3,7 @@ module github.com/opsway-io/backend
 go 1.19
 
 require (
+	github.com/aws/aws-sdk-go v1.44.189
 	github.com/aws/aws-sdk-go-v2 v1.17.3
 	github.com/aws/aws-sdk-go-v2/credentials v1.13.6
 	github.com/aws/aws-sdk-go-v2/feature/s3/manager v1.11.45

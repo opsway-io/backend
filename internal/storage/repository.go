@@ -2,8 +2,11 @@ package storage
 
 import (
 	"context"
+	"errors"
 	"io"
 )
+
+var ErrNotFound = errors.New("not found")
 
 type Repository interface {
 	GetPublicFileURL(bucket string, key string) (url string)

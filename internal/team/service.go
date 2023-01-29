@@ -56,6 +56,12 @@ func (s *ServiceImpl) UpdateDisplayName(ctx context.Context, teamID uint, displa
 }
 
 func (s *ServiceImpl) Delete(ctx context.Context, id uint) error {
+	if err := s.DeleteAvatar(ctx, id); err != nil {
+		if !errors.Is(err, storage.ErrNotFound) {
+			return errors.Wrap(err, "failed to delete avatar")
+		}
+	}
+
 	return s.repository.Delete(ctx, id)
 }
 
@@ -68,8 +74,6 @@ func (s *ServiceImpl) GetUserRole(ctx context.Context, teamID, userID uint) (*en
 }
 
 func (s *ServiceImpl) RemoveUser(ctx context.Context, teamID, userID uint) error {
-	// TODO: make sure team still has at least one owner
-
 	return s.repository.RemoveUser(ctx, teamID, userID)
 }
 

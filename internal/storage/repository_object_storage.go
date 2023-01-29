@@ -2,6 +2,7 @@ package storage
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 
@@ -9,6 +10,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go-v2/feature/s3/manager"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
+	"github.com/aws/aws-sdk-go-v2/service/s3/types"
 )
 
 type ObjectStorageRepositoryConfig struct {
@@ -72,6 +74,17 @@ func (r *ObjectStorageRepository) DeleteFile(ctx context.Context, bucket string,
 		Bucket: aws.String(bucket),
 		Key:    aws.String(key),
 	})
+	if err != nil {
+		if errors.Is(err, &types.NoSuchBucket{}) {
+			return ErrNotFound
+		}
 
-	return err
+		if errors.Is(err, &types.NoSuchKey{}) {
+			return ErrNotFound
+		}
+
+		return err
+	}
+
+	return nil
 }
