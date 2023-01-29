@@ -27,6 +27,7 @@ type Repository interface {
 	Delete(ctx context.Context, id uint) error
 	Update(ctx context.Context, team *entities.Team) error
 	RemoveUser(ctx context.Context, teamID, userID uint) error
+	IsNameAvailable(ctx context.Context, name string) (bool, error)
 }
 
 type RepositoryImpl struct {
@@ -190,4 +191,13 @@ func (s *RepositoryImpl) GetTeamsAndRoleByUserID(ctx context.Context, userID uin
 		Find(&teams)
 
 	return &teams, nil
+}
+
+func (s *RepositoryImpl) IsNameAvailable(ctx context.Context, name string) (bool, error) {
+	var count int64
+	if err := s.db.WithContext(ctx).Model(&entities.Team{}).Where("name = ?", name).Count(&count).Error; err != nil {
+		return false, err
+	}
+
+	return count == 0, nil
 }

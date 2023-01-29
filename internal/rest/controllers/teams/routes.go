@@ -35,11 +35,8 @@ func Register(
 
 	AuthHandler := handlers.AuthenticatedHandlerFactory(logger)
 
-	e.POST(
-		"/teams",
-		AuthHandler(h.PostTeam),
-		AuthGuard(),
-	)
+	e.POST("/teams", AuthHandler(h.PostTeam), AuthGuard())
+	e.POST("/teams/available", AuthHandler(h.PostTeamAvailable), AuthGuard())
 
 	teamsGroup := e.Group(
 		"/teams/:teamId",

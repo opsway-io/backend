@@ -23,6 +23,7 @@ type Service interface {
 	UploadAvatar(ctx context.Context, teamID uint, file io.Reader) error
 	DeleteAvatar(ctx context.Context, teamID uint) error
 	GetAvatarURLByID(teamID uint) (URL string)
+	IsNameAvailable(ctx context.Context, name string) (bool, error)
 }
 
 type ServiceImpl struct {
@@ -117,6 +118,10 @@ func (s *ServiceImpl) UpdateUserRole(ctx context.Context, teamID, userID uint, r
 
 func (s *ServiceImpl) GetTeamsAndRoleByUserID(ctx context.Context, userID uint) (*[]TeamAndRole, error) {
 	return s.repository.GetTeamsAndRoleByUserID(ctx, userID)
+}
+
+func (s *ServiceImpl) IsNameAvailable(ctx context.Context, name string) (bool, error) {
+	return s.repository.IsNameAvailable(ctx, name)
 }
 
 func (s *ServiceImpl) getAvatarKey(teamID uint) string {
