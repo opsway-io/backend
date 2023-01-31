@@ -12,7 +12,6 @@ type Monitor struct {
 	ID        uint
 	Name      string          `gorm:"index;not null"`
 	Tags      pq.StringArray  `gorm:"type:text[]"`
-	Enabled   bool            `gorm:"not null"`
 	Settings  MonitorSettings `gorm:"not null;constraint:OnDelete:CASCADE"`
 	Incidents []Incident      `gorm:"constraint:OnDelete:CASCADE"`
 	TeamID    uint            `gorm:"index;not null"`
