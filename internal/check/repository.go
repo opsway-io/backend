@@ -86,7 +86,7 @@ func (r *RepositoryImpl) GetAggMetrics(ctx context.Context, monitorID uint) (*[]
 		avg(timing_content_transfer)/1000000 as transfer`).
 		Where("monitor_id = ?", monitorID).
 		Group("tumble(toDateTime(created_at), INTERVAL 1 HOUR) as wndw").
-		Where("created_at BETWEEN DATE_SUB(NOW(), INTERVAL 1 MOUNT) AND NOW()").
+		Where("created_at BETWEEN DATE_SUB(NOW(), INTERVAL 1 MONTH) AND NOW()").
 		Order("start ASC").
 		Find(&metrics).Error
 
