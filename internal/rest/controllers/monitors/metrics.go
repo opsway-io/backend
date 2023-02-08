@@ -41,6 +41,9 @@ func (h *Handlers) GetMonitorMetrics(ctx hs.AuthenticatedContext) error {
 
 		return echo.ErrInternalServerError
 	}
+	if len(*metrics) == 0 {
+		return echo.ErrNotFound
+	}
 
 	metricMap := map[string][]MonitorMetrics{}
 	metricKeys := []string{"DNS", "TCP", "TLS", "Processing", "Transfer"}
