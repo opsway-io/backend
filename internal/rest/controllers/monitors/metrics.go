@@ -41,12 +41,8 @@ func (h *Handlers) GetMonitorMetrics(ctx hs.AuthenticatedContext) error {
 
 		return echo.ErrInternalServerError
 	}
-	if len(*metrics) == 0 {
-		return echo.ErrNotFound
-	}
 
 	metricMap := map[string][]MonitorMetrics{}
-	metricKeys := []string{"DNS", "TCP", "TLS", "Processing", "Transfer"}
 	for _, c := range *metrics {
 		metricMap["DNS"] = append(metricMap["DNS"], MonitorMetrics{Start: c.Start, Timing: time.Duration(c.DNS)})
 		metricMap["TCP"] = append(metricMap["TCP"], MonitorMetrics{Start: c.Start, Timing: time.Duration(c.TCP)})
@@ -58,8 +54,8 @@ func (h *Handlers) GetMonitorMetrics(ctx hs.AuthenticatedContext) error {
 	metricResp := make([]GetMonitorMetricsResponseMetric, len(metricMap))
 
 	i := 0
-	for _, key := range metricKeys {
-		metricResp[i] = GetMonitorMetricsResponseMetric{Name: key, Data: metricMap[key]}
+	for key, values := range metricMap {
+		metricResp[i] = GetMonitorMetricsResponseMetric{Name: key, Data: values}
 		i += 1
 	}
 
