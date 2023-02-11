@@ -47,7 +47,7 @@ func (s *ServiceImpl) Generate(ctx context.Context, user *entities.User) (access
 }
 
 func (s *ServiceImpl) Refresh(ctx context.Context, refreshToken string) (newAccessToken string, newRefreshToken string, err error) {
-	valid, claims, err := s.verifyAndDeleteRefreshToken(ctx, refreshToken)
+	valid, claims, err := s.verifyRefreshToken(ctx, refreshToken)
 	if err != nil {
 		return "", "", errors.Wrap(err, "failed to verify token")
 	}
@@ -75,7 +75,7 @@ func (s *ServiceImpl) Verify(ctx context.Context, accessToken string) (bool, *Cl
 	return true, claims, nil
 }
 
-func (s *ServiceImpl) verifyAndDeleteRefreshToken(ctx context.Context, refreshToken string) (bool, *RefreshClaims, error) {
+func (s *ServiceImpl) verifyRefreshToken(ctx context.Context, refreshToken string) (bool, *RefreshClaims, error) {
 	claims := &RefreshClaims{}
 	token, err := jwt.ParseWithClaims(refreshToken, claims, func(token *jwt.Token) (interface{}, error) {
 		return []byte(s.Config.Secret), nil
@@ -92,7 +92,7 @@ func (s *ServiceImpl) verifyAndDeleteRefreshToken(ctx context.Context, refreshTo
 		return false, nil, nil
 	}
 
-	ok, err := s.Repository.CheckAndDeleteRefreshToken(ctx, claims.Id, refreshToken)
+	ok, err := s.Repository.UseRefreshToken(ctx, refreshToken)
 	if err != nil {
 		return false, nil, errors.Wrap(err, "failed to check refresh token")
 	}
@@ -115,10 +115,6 @@ func (s *ServiceImpl) generateTokenPair(ctx context.Context, subject string) (st
 	refreshTokenString, err := s.signClaims(refreshTokenClaims)
 	if err != nil {
 		return "", "", errors.Wrap(err, "failed to generate token")
-	}
-
-	if err := s.Repository.CreateRefreshToken(ctx, refreshTokenClaims.Id, refreshTokenString, s.Config.RefreshExpiresIn); err != nil {
-		return "", "", errors.Wrap(err, "failed to create refresh token")
 	}
 
 	return accessTokenString, refreshTokenString, nil

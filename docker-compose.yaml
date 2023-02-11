@@ -47,7 +47,7 @@ services:
     restart: unless-stopped
     ports:
       - '6379:6379'
-    command: redis-server
+    command: redis-server --protected-mode no
   ch_server:
     image: clickhouse/clickhouse-server
     restart: unless-stopped
