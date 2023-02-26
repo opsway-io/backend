@@ -47,7 +47,7 @@ func (h *Handlers) GetMonitorMetrics(ctx hs.AuthenticatedContext) error {
 		metricMap["DNS"] = append(metricMap["DNS"], MonitorMetrics{Start: c.Start, Timing: time.Duration(c.DNS)})
 		metricMap["TCP"] = append(metricMap["TCP"], MonitorMetrics{Start: c.Start, Timing: time.Duration(c.TCP)})
 		metricMap["TLS"] = append(metricMap["TLS"], MonitorMetrics{Start: c.Start, Timing: time.Duration(c.TLS)})
-		metricMap["Processing"] = append(metricMap["Processing"], MonitorMetrics{Start: c.Start, Timing: time.Duration(c.DNS)})
+		metricMap["Processing"] = append(metricMap["Processing"], MonitorMetrics{Start: c.Start, Timing: time.Duration(c.Processing)})
 		metricMap["Transfer"] = append(metricMap["Transfer"], MonitorMetrics{Start: c.Start, Timing: time.Duration(c.Transfer)})
 	}
 
