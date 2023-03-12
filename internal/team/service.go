@@ -29,6 +29,8 @@ type Service interface {
 	GetAvatarURLByID(teamID uint) (URL string)
 
 	IsNameAvailable(ctx context.Context, name string) (bool, error)
+
+	InviteByEmail(ctx context.Context, teamID uint, email string, role entities.TeamRole) error
 }
 
 type ServiceImpl struct {
@@ -131,6 +133,11 @@ func (s *ServiceImpl) GetTeamsAndRoleByUserID(ctx context.Context, userID uint) 
 
 func (s *ServiceImpl) IsNameAvailable(ctx context.Context, name string) (bool, error) {
 	return s.repository.IsNameAvailable(ctx, name)
+}
+
+func (s *ServiceImpl) InviteByEmail(ctx context.Context, teamID uint, email string, role entities.TeamRole) error {
+	// TODO: send email
+	return nil
 }
 
 func (s *ServiceImpl) getAvatarKey(teamID uint) string {

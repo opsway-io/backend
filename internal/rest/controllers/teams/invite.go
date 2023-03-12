@@ -4,63 +4,30 @@ import (
 	"net/http"
 
 	"github.com/labstack/echo/v4"
+	"github.com/opsway-io/backend/internal/entities"
 	hs "github.com/opsway-io/backend/internal/rest/handlers"
 	"github.com/opsway-io/backend/internal/rest/helpers"
 )
 
 type PostTeamUsersInviteRequest struct {
-	TeamID uint   `param:"teamId" validate:"required,numeric,gt=0"`
-	Emails string `json:"emails" validate:"required,email"`
+	TeamID uint              `param:"teamId" validate:"required,numeric,gt=0"`
+	Email  string            `json:"email" validate:"required,email"`
+	Role   entities.TeamRole `json:"role" validate:"required,teamRole"`
 }
 
 func (h *Handlers) PostTeamUsersInvite(c hs.AuthenticatedContext) error {
-	_, err := helpers.Bind[PostTeamUsersInviteRequest](c)
+	req, err := helpers.Bind[PostTeamUsersInviteRequest](c)
 	if err != nil {
 		c.Log.WithError(err).Debug("failed to bind PostTeamUsersInviteRequest")
 
 		return echo.ErrBadRequest
 	}
 
-	// TODO
+	if err := h.TeamService.InviteByEmail(c.Request().Context(), req.TeamID, req.Email, req.Role); err != nil {
+		c.Log.WithError(err).Debug("failed to invite user to team")
 
-	return c.NoContent(http.StatusNotImplemented)
-}
-
-type GetTeamUsersInviteURLRequest struct {
-	TeamID uint `param:"teamId" validate:"required,numeric,gt=0"`
-}
-
-type GetTeamUsersInviteURLResponse struct {
-	URL string `json:"url"`
-}
-
-func (h *Handlers) GetTeamUsersInviteURL(c hs.AuthenticatedContext) error {
-	_, err := helpers.Bind[GetTeamUsersInviteURLRequest](c)
-	if err != nil {
-		c.Log.WithError(err).Debug("failed to bind GetTeamUsersInviteURLRequest")
-
-		return echo.ErrBadRequest
+		return echo.ErrInternalServerError
 	}
 
-	// TODO
-
-	return c.NoContent(http.StatusNotImplemented)
-}
-
-type PostTeamUsersInviteAcceptRequest struct {
-	TeamID          uint   `param:"teamId" validate:"required,numeric,gt=0"`
-	InvitationToken string `param:"invitationToken" validate:"required"`
-}
-
-func (h *Handlers) PostTeamUsersInviteAccept(c hs.AuthenticatedContext) error {
-	_, err := helpers.Bind[PostTeamUsersInviteAcceptRequest](c)
-	if err != nil {
-		c.Log.WithError(err).Debug("failed to bind PostTeamUsersInviteAcceptRequest")
-
-		return echo.ErrBadRequest
-	}
-
-	// TODO
-
-	return c.NoContent(http.StatusNotImplemented)
+	return c.NoContent(http.StatusNoContent)
 }
