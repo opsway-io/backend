@@ -42,39 +42,39 @@ type PostLoginResponseTeam struct {
 	AvatarURL   *string `json:"avatarUrl"`
 }
 
-func (h *Handlers) PostLogin(ctx hs.BaseContext) error {
-	req, err := helpers.Bind[PostLoginRequest](ctx)
+func (h *Handlers) PostLogin(c hs.BaseContext) error {
+	req, err := helpers.Bind[PostLoginRequest](c)
 	if err != nil {
-		ctx.Log.WithError(err).Debug("failed to bind PostLoginRequest")
+		c.Log.WithError(err).Debug("failed to bind PostLoginRequest")
 
 		return echo.ErrBadRequest
 	}
 
-	user, err := h.UserService.GetUserAndTeamsByEmailAddress(ctx.Request().Context(), req.Email)
+	user, err := h.UserService.GetUserAndTeamsByEmailAddress(c.Request().Context(), req.Email)
 	if err != nil {
-		ctx.Log.WithError(err).Debug("failed to get user")
+		c.Log.WithError(err).Debug("failed to get user")
 
 		return echo.ErrUnauthorized
 	}
 
-	ctx.Log = ctx.Log.WithField("user_id", user.ID)
+	c.Log = c.Log.WithField("user_id", user.ID)
 
 	if ok := user.CheckPassword(req.Password); !ok {
-		ctx.Log.Debug("password invalid")
+		c.Log.Debug("password invalid")
 
 		return echo.ErrUnauthorized
 	}
 
-	accessToken, refreshToken, err := h.AuthenticationService.Generate(ctx.Request().Context(), user)
+	accessToken, refreshToken, err := h.AuthenticationService.Generate(c.Request().Context(), user)
 	if err != nil {
-		ctx.Log.WithError(err).Debug("failed to generate access and refresh token for user")
+		c.Log.WithError(err).Debug("failed to generate access and refresh token for user")
 
 		return echo.ErrInternalServerError
 	}
 
-	ctx.Log.Info("user authenticated")
+	c.Log.Info("user authenticated")
 
-	return ctx.JSON(http.StatusOK, newPostLoginResponse(user, accessToken, refreshToken, h.UserService, h.TeamService))
+	return c.JSON(http.StatusOK, newPostLoginResponse(user, accessToken, refreshToken, h.UserService, h.TeamService))
 }
 
 func newPostLoginResponse(user *entities.User, accessToken, refreshToken string, userService user.Service, teamService team.Service) PostLoginResponse {
@@ -121,24 +121,24 @@ type PostRefreshTokenResponse struct {
 	RefreshToken string `json:"refreshToken"`
 }
 
-func (h *Handlers) PostRefreshToken(ctx hs.BaseContext) error {
-	req, err := helpers.Bind[PostRefreshTokenRequest](ctx)
+func (h *Handlers) PostRefreshToken(c hs.BaseContext) error {
+	req, err := helpers.Bind[PostRefreshTokenRequest](c)
 	if err != nil {
-		ctx.Log.WithError(err).Debug("failed to bind PostRefreshTokenRequest")
+		c.Log.WithError(err).Debug("failed to bind PostRefreshTokenRequest")
 
 		return echo.ErrBadRequest
 	}
 
-	accessToken, refreshToken, err := h.AuthenticationService.Refresh(ctx.Request().Context(), req.RefreshToken)
+	accessToken, refreshToken, err := h.AuthenticationService.Refresh(c.Request().Context(), req.RefreshToken)
 	if err != nil {
-		ctx.Log.WithError(err).Debug("failed to refresh access and refresh token")
+		c.Log.WithError(err).Debug("failed to refresh access and refresh token")
 
 		return echo.ErrUnauthorized
 	}
 
-	ctx.Log.Info("access and refresh token refreshed")
+	c.Log.Info("access and refresh token refreshed")
 
-	return ctx.JSON(http.StatusOK, PostRefreshTokenResponse{
+	return c.JSON(http.StatusOK, PostRefreshTokenResponse{
 		AccessToken:  accessToken,
 		RefreshToken: refreshToken,
 	})

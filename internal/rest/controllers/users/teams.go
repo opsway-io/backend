@@ -27,28 +27,28 @@ type GetUserTeamsRequestTeam struct {
 	Role        entities.TeamRole `json:"role"`
 }
 
-func (h *Handlers) GetUserTeams(ctx hs.AuthenticatedContext) error {
-	req, err := helpers.Bind[GetUserTeamsRequest](ctx)
+func (h *Handlers) GetUserTeams(c hs.AuthenticatedContext) error {
+	req, err := helpers.Bind[GetUserTeamsRequest](c)
 	if err != nil {
-		ctx.Log.WithError(err).Debug("failed to bind GetUserTeamsRequest")
+		c.Log.WithError(err).Debug("failed to bind GetUserTeamsRequest")
 
 		return echo.ErrBadRequest
 	}
 
-	teams, err := h.TeamService.GetTeamsAndRoleByUserID(ctx.Request().Context(), req.UserID)
+	teams, err := h.TeamService.GetTeamsAndRoleByUserID(c.Request().Context(), req.UserID)
 	if err != nil {
 		if errors.Is(err, team.ErrNotFound) {
-			ctx.Log.WithError(err).Debug("teams not found")
+			c.Log.WithError(err).Debug("teams not found")
 
 			return echo.ErrNotFound
 		}
 
-		ctx.Log.WithError(err).Error("failed to get teams")
+		c.Log.WithError(err).Error("failed to get teams")
 
 		return echo.ErrInternalServerError
 	}
 
-	return ctx.JSON(http.StatusOK, newGetUserTeamsResponse(teams, h.TeamService))
+	return c.JSON(http.StatusOK, newGetUserTeamsResponse(teams, h.TeamService))
 }
 
 func newGetUserTeamsResponse(teams *[]team.TeamAndRole, teamService team.Service) GetUserTeamsResponse {

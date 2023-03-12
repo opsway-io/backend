@@ -25,22 +25,22 @@ type GetTeamResponse struct {
 	UpdatedAt   time.Time `json:"updatedAt"`
 }
 
-func (h *Handlers) GetTeam(ctx hs.AuthenticatedContext) error {
-	req, err := helpers.Bind[GetTeamRequest](ctx)
+func (h *Handlers) GetTeam(c hs.AuthenticatedContext) error {
+	req, err := helpers.Bind[GetTeamRequest](c)
 	if err != nil {
-		ctx.Log.WithError(err).Debug("failed to bind GetTeamRequest")
+		c.Log.WithError(err).Debug("failed to bind GetTeamRequest")
 
 		return echo.ErrBadRequest
 	}
 
-	team, err := h.TeamService.GetByID(ctx.Request().Context(), req.TeamID)
+	team, err := h.TeamService.GetByID(c.Request().Context(), req.TeamID)
 	if err != nil {
-		ctx.Log.WithError(err).Debug("failed to get team")
+		c.Log.WithError(err).Debug("failed to get team")
 
 		return echo.ErrInternalServerError
 	}
 
-	return ctx.JSON(http.StatusOK, newGetTeamResponse(team, h.TeamService))
+	return c.JSON(http.StatusOK, newGetTeamResponse(team, h.TeamService))
 }
 
 func newGetTeamResponse(t *entities.Team, teamService team.Service) GetTeamResponse {
@@ -64,46 +64,46 @@ type PutTeamRequest struct {
 	DisplayName string `json:"displayName" validate:"max=255"`
 }
 
-func (h *Handlers) PutTeam(ctx hs.AuthenticatedContext) error {
-	req, err := helpers.Bind[PutTeamRequest](ctx)
+func (h *Handlers) PutTeam(c hs.AuthenticatedContext) error {
+	req, err := helpers.Bind[PutTeamRequest](c)
 	if err != nil {
-		ctx.Log.WithError(err).Debug("failed to bind PutTeamRequest")
+		c.Log.WithError(err).Debug("failed to bind PutTeamRequest")
 
 		return echo.ErrBadRequest
 	}
 
 	if err = h.TeamService.UpdateDisplayName(
-		ctx.Request().Context(),
+		c.Request().Context(),
 		req.TeamID,
 		req.DisplayName,
 	); err != nil {
-		ctx.Log.WithError(err).Debug("failed to update team")
+		c.Log.WithError(err).Debug("failed to update team")
 
 		return echo.ErrInternalServerError
 	}
 
-	return ctx.NoContent(http.StatusNoContent)
+	return c.NoContent(http.StatusNoContent)
 }
 
 type DeleteTeamRequest struct {
 	TeamID uint `param:"teamId" validate:"required,numeric,gt=0"`
 }
 
-func (h *Handlers) DeleteTeam(ctx hs.AuthenticatedContext) error {
-	req, err := helpers.Bind[DeleteTeamRequest](ctx)
+func (h *Handlers) DeleteTeam(c hs.AuthenticatedContext) error {
+	req, err := helpers.Bind[DeleteTeamRequest](c)
 	if err != nil {
-		ctx.Log.WithError(err).Debug("failed to bind DeleteTeamRequest")
+		c.Log.WithError(err).Debug("failed to bind DeleteTeamRequest")
 
 		return echo.ErrBadRequest
 	}
 
-	if err = h.TeamService.Delete(ctx.Request().Context(), req.TeamID); err != nil {
-		ctx.Log.WithError(err).Debug("failed to delete team")
+	if err = h.TeamService.Delete(c.Request().Context(), req.TeamID); err != nil {
+		c.Log.WithError(err).Debug("failed to delete team")
 
 		return echo.ErrInternalServerError
 	}
 
-	return ctx.NoContent(http.StatusNoContent)
+	return c.NoContent(http.StatusNoContent)
 }
 
 type PostTeamRequest struct {
@@ -120,10 +120,10 @@ type PostTeamResponse struct {
 	UpdatedAt   time.Time `json:"updatedAt"`
 }
 
-func (h *Handlers) PostTeam(ctx hs.AuthenticatedContext) error {
-	req, err := helpers.Bind[PostTeamRequest](ctx)
+func (h *Handlers) PostTeam(c hs.AuthenticatedContext) error {
+	req, err := helpers.Bind[PostTeamRequest](c)
 	if err != nil {
-		ctx.Log.WithError(err).Debug("failed to bind PostTeamRequest")
+		c.Log.WithError(err).Debug("failed to bind PostTeamRequest")
 
 		return echo.ErrBadRequest
 	}
@@ -133,8 +133,8 @@ func (h *Handlers) PostTeam(ctx hs.AuthenticatedContext) error {
 		DisplayName: req.DisplayName,
 	}
 
-	if err := h.TeamService.CreateWithOwnerUserID(ctx.Request().Context(), &t, ctx.UserID); err != nil {
-		ctx.Log.WithError(err).Debug("failed to create team")
+	if err := h.TeamService.CreateWithOwnerUserID(c.Request().Context(), &t, c.UserID); err != nil {
+		c.Log.WithError(err).Debug("failed to create team")
 
 		return echo.ErrInternalServerError
 	}
@@ -151,5 +151,5 @@ func (h *Handlers) PostTeam(ctx hs.AuthenticatedContext) error {
 		res.AvatarURL = pointer.StringPtr(h.TeamService.GetAvatarURLByID(t.ID))
 	}
 
-	return ctx.JSON(http.StatusCreated, res)
+	return c.JSON(http.StatusCreated, res)
 }

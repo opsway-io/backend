@@ -42,29 +42,29 @@ type GetMonitorResponseMonitorSettings struct {
 	Frequency uint64            `json:"frequency"` // milliseconds
 }
 
-func (h *Handlers) GetMonitors(ctx hs.AuthenticatedContext) error {
-	req, err := helpers.Bind[GetMonitorsRequest](ctx)
+func (h *Handlers) GetMonitors(c hs.AuthenticatedContext) error {
+	req, err := helpers.Bind[GetMonitorsRequest](c)
 	if err != nil {
-		ctx.Log.WithError(err).Debug("failed to bind GetMonitorsRequest")
+		c.Log.WithError(err).Debug("failed to bind GetMonitorsRequest")
 
 		return echo.ErrBadRequest
 	}
 
-	monitors, err := h.MonitorService.GetMonitorsAndSettingsByTeamID(ctx.Request().Context(), req.TeamID, req.Offset, req.Limit, req.Query)
+	monitors, err := h.MonitorService.GetMonitorsAndSettingsByTeamID(c.Request().Context(), req.TeamID, req.Offset, req.Limit, req.Query)
 	if err != nil {
-		ctx.Log.WithError(err).Error("failed to get monitors")
+		c.Log.WithError(err).Error("failed to get monitors")
 
 		return echo.ErrInternalServerError
 	}
 
 	resp, err := newGetMonitorsResponse(monitors)
 	if err != nil {
-		ctx.Log.WithError(err).Error("failed to create GetMonitorsResponse")
+		c.Log.WithError(err).Error("failed to create GetMonitorsResponse")
 
 		return echo.ErrInternalServerError
 	}
 
-	return ctx.JSON(http.StatusOK, resp)
+	return c.JSON(http.StatusOK, resp)
 }
 
 func newGetMonitorsResponse(monitors *[]monitor.MonitorWithTotalCount) (*GetMonitorsResponse, error) {
@@ -127,33 +127,33 @@ type GetMonitorResponseSettings struct {
 	Frequency uint64            `json:"frequency"`
 }
 
-func (h *Handlers) GetMonitor(ctx hs.AuthenticatedContext) error {
-	req, err := helpers.Bind[GetMonitorRequest](ctx)
+func (h *Handlers) GetMonitor(c hs.AuthenticatedContext) error {
+	req, err := helpers.Bind[GetMonitorRequest](c)
 	if err != nil {
-		ctx.Log.WithError(err).Debug("failed to bind GetMonitorRequest")
+		c.Log.WithError(err).Debug("failed to bind GetMonitorRequest")
 
 		return echo.ErrBadRequest
 	}
 
-	m, err := h.MonitorService.GetMonitorAndSettingsByTeamIDAndID(ctx.Request().Context(), req.TeamID, req.MonitorID)
+	m, err := h.MonitorService.GetMonitorAndSettingsByTeamIDAndID(c.Request().Context(), req.TeamID, req.MonitorID)
 	if err != nil {
 		if errors.Is(err, monitor.ErrNotFound) {
 			return echo.ErrNotFound
 		}
 
-		ctx.Log.WithError(err).Error("failed to get monitor")
+		c.Log.WithError(err).Error("failed to get monitor")
 
 		return echo.ErrInternalServerError
 	}
 
 	resp, err := newGetMonitorResponse(m)
 	if err != nil {
-		ctx.Log.WithError(err).Error("failed to create GetMonitorResponse")
+		c.Log.WithError(err).Error("failed to create GetMonitorResponse")
 
 		return echo.ErrInternalServerError
 	}
 
-	return ctx.JSON(http.StatusOK, resp)
+	return c.JSON(http.StatusOK, resp)
 }
 
 func newGetMonitorResponse(m *entities.Monitor) (*GetMonitorResponse, error) {
@@ -184,25 +184,25 @@ type DeleteMonitorRequest struct {
 	MonitorID uint `param:"monitorId" validate:"required,numeric,gte=0"`
 }
 
-func (h *Handlers) DeleteMonitor(ctx hs.AuthenticatedContext) error {
-	req, err := helpers.Bind[DeleteMonitorRequest](ctx)
+func (h *Handlers) DeleteMonitor(c hs.AuthenticatedContext) error {
+	req, err := helpers.Bind[DeleteMonitorRequest](c)
 	if err != nil {
-		ctx.Log.WithError(err).Debug("failed to bind DeleteMonitorRequest")
+		c.Log.WithError(err).Debug("failed to bind DeleteMonitorRequest")
 
 		return echo.ErrBadRequest
 	}
 
-	if err := h.MonitorService.Delete(ctx.Request().Context(), req.MonitorID); err != nil {
+	if err := h.MonitorService.Delete(c.Request().Context(), req.MonitorID); err != nil {
 		if errors.Is(err, monitor.ErrNotFound) {
 			return echo.ErrNotFound
 		}
 
-		ctx.Log.WithError(err).Error("failed to delete monitor")
+		c.Log.WithError(err).Error("failed to delete monitor")
 
 		return echo.ErrInternalServerError
 	}
 
-	return ctx.NoContent(http.StatusNoContent)
+	return c.NoContent(http.StatusNoContent)
 }
 
 type PostMonitorRequest struct {
@@ -221,10 +221,10 @@ type PostMonitorRequestSettings struct {
 	Frequency uint64            `json:"frequency" validate:"required,numeric,gte=0,monitorFrequency"`
 }
 
-func (h *Handlers) PostMonitor(ctx hs.AuthenticatedContext) error {
-	req, err := helpers.Bind[PostMonitorRequest](ctx)
+func (h *Handlers) PostMonitor(c hs.AuthenticatedContext) error {
+	req, err := helpers.Bind[PostMonitorRequest](c)
 	if err != nil {
-		ctx.Log.WithError(err).Debug("failed to bind PostMonitorRequest")
+		c.Log.WithError(err).Debug("failed to bind PostMonitorRequest")
 
 		return echo.ErrBadRequest
 	}
@@ -245,11 +245,11 @@ func (h *Handlers) PostMonitor(ctx hs.AuthenticatedContext) error {
 	m.SetBodyStr(req.Settings.Body)
 	m.SetHeaders(req.Settings.Headers)
 
-	if err := h.MonitorService.Create(ctx.Request().Context(), m); err != nil {
-		ctx.Log.WithError(err).Error("failed to create monitor")
+	if err := h.MonitorService.Create(c.Request().Context(), m); err != nil {
+		c.Log.WithError(err).Error("failed to create monitor")
 
 		return echo.ErrInternalServerError
 	}
 
-	return ctx.NoContent(http.StatusCreated)
+	return c.NoContent(http.StatusCreated)
 }

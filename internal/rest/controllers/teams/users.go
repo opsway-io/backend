@@ -34,22 +34,22 @@ type GetTeamUsersResponseUser struct {
 	Role        entities.TeamRole `json:"role"`
 }
 
-func (h *Handlers) GetTeamUsers(ctx hs.AuthenticatedContext) error {
-	req, err := helpers.Bind[GetTeamUsersRequest](ctx)
+func (h *Handlers) GetTeamUsers(c hs.AuthenticatedContext) error {
+	req, err := helpers.Bind[GetTeamUsersRequest](c)
 	if err != nil {
-		ctx.Log.WithError(err).Debug("failed to bind GetTeamUsersRequest")
+		c.Log.WithError(err).Debug("failed to bind GetTeamUsersRequest")
 
 		return echo.ErrBadRequest
 	}
 
-	users, err := h.TeamService.GetUsersByID(ctx.Request().Context(), req.TeamID, req.Offset, req.Limit, req.Query)
+	users, err := h.TeamService.GetUsersByID(c.Request().Context(), req.TeamID, req.Offset, req.Limit, req.Query)
 	if err != nil {
-		ctx.Log.WithError(err).Debug("failed to get users")
+		c.Log.WithError(err).Debug("failed to get users")
 
 		return echo.ErrInternalServerError
 	}
 
-	return ctx.JSON(http.StatusOK, newGetTeamUsersResponse(users, h.UserService))
+	return c.JSON(http.StatusOK, newGetTeamUsersResponse(users, h.UserService))
 }
 
 func newGetTeamUsersResponse(users *[]team.TeamUser, userService user.Service) GetTeamUsersResponse {
@@ -85,20 +85,20 @@ type DeleteTeamUserRequest struct {
 	UserID uint `param:"userId" validate:"required,numeric,gt=0"`
 }
 
-func (h *Handlers) DeleteTeamUser(ctx hs.AuthenticatedContext) error {
-	req, err := helpers.Bind[DeleteTeamUserRequest](ctx)
+func (h *Handlers) DeleteTeamUser(c hs.AuthenticatedContext) error {
+	req, err := helpers.Bind[DeleteTeamUserRequest](c)
 	if err != nil {
-		ctx.Log.WithError(err).Debug("failed to bind DeleteTeamUserRequest")
+		c.Log.WithError(err).Debug("failed to bind DeleteTeamUserRequest")
 
 		return echo.ErrBadRequest
 	}
 
 	if err = h.TeamService.RemoveUser(
-		ctx.Request().Context(),
+		c.Request().Context(),
 		req.TeamID,
 		req.UserID,
 	); err != nil {
-		ctx.Log.WithError(err).Debug("failed to delete team user")
+		c.Log.WithError(err).Debug("failed to delete team user")
 
 		if errors.Is(err, team.ErrUserNotFound) {
 			return echo.ErrNotFound
@@ -111,7 +111,7 @@ func (h *Handlers) DeleteTeamUser(ctx hs.AuthenticatedContext) error {
 		return echo.ErrInternalServerError
 	}
 
-	return ctx.NoContent(http.StatusNoContent)
+	return c.NoContent(http.StatusNoContent)
 }
 
 type PutTeamUserRequest struct {
@@ -120,36 +120,36 @@ type PutTeamUserRequest struct {
 	Role   entities.TeamRole `json:"role" validate:"required,teamRole"`
 }
 
-func (h *Handlers) PutTeamUser(ctx hs.AuthenticatedContext) error {
-	req, err := helpers.Bind[PutTeamUserRequest](ctx)
+func (h *Handlers) PutTeamUser(c hs.AuthenticatedContext) error {
+	req, err := helpers.Bind[PutTeamUserRequest](c)
 	if err != nil {
-		ctx.Log.WithError(err).Debug("failed to bind PutTeamUserRequest")
+		c.Log.WithError(err).Debug("failed to bind PutTeamUserRequest")
 
 		return echo.ErrBadRequest
 	}
 
-	if req.Role == entities.TeamRoleOwner && ctx.TeamRole != nil && *ctx.TeamRole != entities.TeamRoleOwner {
-		ctx.Log.Debug("Non-team owner not allowed to make other users owner")
+	if req.Role == entities.TeamRoleOwner && c.TeamRole != nil && *c.TeamRole != entities.TeamRoleOwner {
+		c.Log.Debug("Non-team owner not allowed to make other users owner")
 
 		return echo.ErrForbidden
 	}
 
 	if err = h.TeamService.UpdateUserRole(
-		ctx.Request().Context(),
+		c.Request().Context(),
 		req.TeamID,
 		req.UserID,
 		req.Role,
 	); err != nil {
 		if errors.Is(err, team.ErrUserNotFound) {
-			ctx.Log.WithError(err).Debug("failed to update team user")
+			c.Log.WithError(err).Debug("failed to update team user")
 
 			return echo.ErrNotFound
 		}
 
-		ctx.Log.WithError(err).Debug("failed to update team user")
+		c.Log.WithError(err).Debug("failed to update team user")
 
 		return echo.ErrInternalServerError
 	}
 
-	return ctx.NoContent(http.StatusNoContent)
+	return c.NoContent(http.StatusNoContent)
 }

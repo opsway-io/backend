@@ -36,28 +36,28 @@ type GetUserResponseTeam struct {
 	AvatarURL   *string `json:"avatarUrl"`
 }
 
-func (h *Handlers) GetUser(ctx hs.AuthenticatedContext) error {
-	req, err := helpers.Bind[GetUserRequest](ctx)
+func (h *Handlers) GetUser(c hs.AuthenticatedContext) error {
+	req, err := helpers.Bind[GetUserRequest](c)
 	if err != nil {
-		ctx.Log.WithError(err).Debug("failed to bind GetUserRequest")
+		c.Log.WithError(err).Debug("failed to bind GetUserRequest")
 
 		return echo.ErrBadRequest
 	}
 
-	u, err := h.UserService.GetUserAndTeamsByUserID(ctx.Request().Context(), req.UserID)
+	u, err := h.UserService.GetUserAndTeamsByUserID(c.Request().Context(), req.UserID)
 	if err != nil {
 		if errors.Is(err, user.ErrNotFound) {
-			ctx.Log.WithError(err).Debug("user not found")
+			c.Log.WithError(err).Debug("user not found")
 
 			return echo.ErrNotFound
 		}
 
-		ctx.Log.WithError(err).Error("failed to get user")
+		c.Log.WithError(err).Error("failed to get user")
 
 		return echo.ErrInternalServerError
 	}
 
-	return ctx.JSON(http.StatusOK, newGetUserResponse(u, h.UserService, h.TeamService))
+	return c.JSON(http.StatusOK, newGetUserResponse(u, h.UserService, h.TeamService))
 }
 
 func newGetUserResponse(u *entities.User, userService user.Service, teamService team.Service) GetUserResponse {
@@ -99,10 +99,10 @@ type PutUserRequest struct {
 	Email       string `json:"email" validate:"required,email"`
 }
 
-func (h *Handlers) PutUser(ctx hs.AuthenticatedContext) error {
-	req, err := helpers.Bind[PutUserRequest](ctx)
+func (h *Handlers) PutUser(c hs.AuthenticatedContext) error {
+	req, err := helpers.Bind[PutUserRequest](c)
 	if err != nil {
-		ctx.Log.WithError(err).Debug("failed to bind PutUserRequest")
+		c.Log.WithError(err).Debug("failed to bind PutUserRequest")
 
 		return echo.ErrBadRequest
 	}
@@ -114,40 +114,40 @@ func (h *Handlers) PutUser(ctx hs.AuthenticatedContext) error {
 	}
 	u.SetEmail(req.Email)
 
-	if err := h.UserService.Update(ctx.Request().Context(), u); err != nil {
+	if err := h.UserService.Update(c.Request().Context(), u); err != nil {
 		if errors.Is(err, user.ErrNotFound) {
-			ctx.Log.WithError(err).Debug("user not found")
+			c.Log.WithError(err).Debug("user not found")
 
 			return echo.ErrNotFound
 		}
 
-		ctx.Log.WithError(err).Error("failed to update user")
+		c.Log.WithError(err).Error("failed to update user")
 
 		return echo.ErrInternalServerError
 	}
 
-	return ctx.NoContent(http.StatusNoContent)
+	return c.NoContent(http.StatusNoContent)
 }
 
-func (h *Handlers) DeleteUser(ctx hs.AuthenticatedContext) error {
-	req, err := helpers.Bind[GetUserRequest](ctx)
+func (h *Handlers) DeleteUser(c hs.AuthenticatedContext) error {
+	req, err := helpers.Bind[GetUserRequest](c)
 	if err != nil {
-		ctx.Log.WithError(err).Debug("failed to bind GetUserRequest")
+		c.Log.WithError(err).Debug("failed to bind GetUserRequest")
 
 		return echo.ErrBadRequest
 	}
 
-	if err := h.UserService.Delete(ctx.Request().Context(), req.UserID); err != nil {
+	if err := h.UserService.Delete(c.Request().Context(), req.UserID); err != nil {
 		if errors.Is(err, user.ErrNotFound) {
-			ctx.Log.WithError(err).Debug("user not found")
+			c.Log.WithError(err).Debug("user not found")
 
 			return echo.ErrNotFound
 		}
 
-		ctx.Log.WithError(err).Error("failed to delete user")
+		c.Log.WithError(err).Error("failed to delete user")
 
 		return echo.ErrInternalServerError
 	}
 
-	return ctx.NoContent(http.StatusNoContent)
+	return c.NoContent(http.StatusNoContent)
 }

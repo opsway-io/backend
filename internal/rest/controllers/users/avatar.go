@@ -14,71 +14,71 @@ type PutUserAvatarRequest struct {
 	UserID uint `param:"userId" validate:"required,numeric,gt=0"`
 }
 
-func (h *Handlers) PutUserAvatar(ctx hs.AuthenticatedContext) error {
-	req, err := helpers.Bind[PutUserAvatarRequest](ctx)
+func (h *Handlers) PutUserAvatar(c hs.AuthenticatedContext) error {
+	req, err := helpers.Bind[PutUserAvatarRequest](c)
 	if err != nil {
-		ctx.Log.WithError(err).Debug("failed to bind PutUserAvatarRequest")
+		c.Log.WithError(err).Debug("failed to bind PutUserAvatarRequest")
 
 		return echo.ErrBadRequest
 	}
 
-	file, err := ctx.FormFile("file")
+	file, err := c.FormFile("file")
 	if err != nil {
-		ctx.Log.WithError(err).Debug("failed to get file from form")
+		c.Log.WithError(err).Debug("failed to get file from form")
 
 		return echo.ErrBadRequest
 	}
 
 	src, err := file.Open()
 	if err != nil {
-		ctx.Log.WithError(err).Debug("failed to open file")
+		c.Log.WithError(err).Debug("failed to open file")
 
 		return echo.ErrBadRequest
 	}
 	defer src.Close()
 
 	if err := h.UserService.UploadAvatar(
-		ctx.Request().Context(),
+		c.Request().Context(),
 		req.UserID,
 		src,
 	); err != nil {
 		if errors.Is(err, user.ErrNotFound) {
-			ctx.Log.WithError(err).Debug("user not found")
+			c.Log.WithError(err).Debug("user not found")
 
 			return echo.ErrNotFound
 		}
 
-		ctx.Log.WithError(err).Error("failed to set user avatar")
+		c.Log.WithError(err).Error("failed to set user avatar")
 
 		return echo.ErrInternalServerError
 	}
 
-	return ctx.NoContent(http.StatusNoContent)
+	return c.NoContent(http.StatusNoContent)
 }
 
 type DeleteUserAvatarRequest struct {
 	UserID uint `param:"userId" validate:"required,numeric,gt=0"`
 }
 
-func (h *Handlers) DeleteUserAvatar(ctx hs.AuthenticatedContext) error {
-	req, err := helpers.Bind[DeleteUserAvatarRequest](ctx)
+func (h *Handlers) DeleteUserAvatar(c hs.AuthenticatedContext) error {
+	req, err := helpers.Bind[DeleteUserAvatarRequest](c)
 	if err != nil {
-		ctx.Log.WithError(err).Debug("failed to bind DeleteUserAvatarRequest")
+		c.Log.WithError(err).Debug("failed to bind DeleteUserAvatarRequest")
 
 		return echo.ErrBadRequest
 	}
 
-	if err := h.UserService.DeleteAvatar(ctx.Request().Context(), req.UserID); err != nil {
+	if err := h.UserService.DeleteAvatar(c.Request().Context(), req.UserID); err != nil {
 		if errors.Is(err, user.ErrNotFound) {
-			ctx.Log.WithError(err).Debug("user not found")
+			c.Log.WithError(err).Debug("user not found")
 
 			return echo.ErrNotFound
 		}
 
-		ctx.Log.WithError(err).Error("failed to delete user avatar")
+		c.Log.WithError(err).Error("failed to delete user avatar")
 
 		return echo.ErrInternalServerError
 	}
 
-	return ctx.NoContent(http.StatusNoContent)
+	return c.NoContent(http.StatusNoContent)
 }

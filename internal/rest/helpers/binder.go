@@ -6,9 +6,9 @@ import (
 	"github.com/pkg/errors"
 )
 
-func Bind[V interface{}](ctx echo.Context) (*V, error) {
+func Bind[V interface{}](c echo.Context) (*V, error) {
 	var data V
-	if err := ctx.Bind(&data); err != nil {
+	if err := c.Bind(&data); err != nil {
 		return nil, errors.Wrap(err, "failed to bind request")
 	}
 
@@ -16,7 +16,7 @@ func Bind[V interface{}](ctx echo.Context) (*V, error) {
 		return nil, errors.Wrap(err, "failed to set defaults")
 	}
 
-	if err := ctx.Validate(&data); err != nil {
+	if err := c.Validate(&data); err != nil {
 		return nil, errors.Wrap(err, "request failed validation")
 	}
 

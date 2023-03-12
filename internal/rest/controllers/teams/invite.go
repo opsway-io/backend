@@ -13,17 +13,17 @@ type PostTeamUsersInviteRequest struct {
 	Emails string `json:"emails" validate:"required,email"`
 }
 
-func (h *Handlers) PostTeamUsersInvite(ctx hs.AuthenticatedContext) error {
-	_, err := helpers.Bind[PostTeamUsersInviteRequest](ctx)
+func (h *Handlers) PostTeamUsersInvite(c hs.AuthenticatedContext) error {
+	_, err := helpers.Bind[PostTeamUsersInviteRequest](c)
 	if err != nil {
-		ctx.Log.WithError(err).Debug("failed to bind PostTeamUsersInviteRequest")
+		c.Log.WithError(err).Debug("failed to bind PostTeamUsersInviteRequest")
 
 		return echo.ErrBadRequest
 	}
 
 	// TODO
 
-	return ctx.NoContent(http.StatusNotImplemented)
+	return c.NoContent(http.StatusNotImplemented)
 }
 
 type GetTeamUsersInviteURLRequest struct {
@@ -34,17 +34,17 @@ type GetTeamUsersInviteURLResponse struct {
 	URL string `json:"url"`
 }
 
-func (h *Handlers) GetTeamUsersInviteURL(ctx hs.AuthenticatedContext) error {
-	_, err := helpers.Bind[GetTeamUsersInviteURLRequest](ctx)
+func (h *Handlers) GetTeamUsersInviteURL(c hs.AuthenticatedContext) error {
+	_, err := helpers.Bind[GetTeamUsersInviteURLRequest](c)
 	if err != nil {
-		ctx.Log.WithError(err).Debug("failed to bind GetTeamUsersInviteURLRequest")
+		c.Log.WithError(err).Debug("failed to bind GetTeamUsersInviteURLRequest")
 
 		return echo.ErrBadRequest
 	}
 
 	// TODO
 
-	return ctx.NoContent(http.StatusNotImplemented)
+	return c.NoContent(http.StatusNotImplemented)
 }
 
 type PostTeamUsersInviteAcceptRequest struct {
@@ -52,15 +52,15 @@ type PostTeamUsersInviteAcceptRequest struct {
 	InvitationToken string `param:"invitationToken" validate:"required"`
 }
 
-func (h *Handlers) PostTeamUsersInviteAccept(ctx hs.AuthenticatedContext) error {
-	_, err := helpers.Bind[PostTeamUsersInviteAcceptRequest](ctx)
+func (h *Handlers) PostTeamUsersInviteAccept(c hs.AuthenticatedContext) error {
+	_, err := helpers.Bind[PostTeamUsersInviteAcceptRequest](c)
 	if err != nil {
-		ctx.Log.WithError(err).Debug("failed to bind PostTeamUsersInviteAcceptRequest")
+		c.Log.WithError(err).Debug("failed to bind PostTeamUsersInviteAcceptRequest")
 
 		return echo.ErrBadRequest
 	}
 
 	// TODO
 
-	return ctx.NoContent(http.StatusNotImplemented)
+	return c.NoContent(http.StatusNotImplemented)
 }

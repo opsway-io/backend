@@ -27,17 +27,17 @@ type MonitorMetrics struct {
 	Timing time.Duration `json:"timing"`
 }
 
-func (h *Handlers) GetMonitorMetrics(ctx hs.AuthenticatedContext) error {
-	req, err := helpers.Bind[GetMonitorMetricsRequest](ctx)
+func (h *Handlers) GetMonitorMetrics(c hs.AuthenticatedContext) error {
+	req, err := helpers.Bind[GetMonitorMetricsRequest](c)
 	if err != nil {
-		ctx.Log.WithError(err).Debug("failed to bind GetMonitorsRequest")
+		c.Log.WithError(err).Debug("failed to bind GetMonitorsRequest")
 
 		return echo.ErrBadRequest
 	}
 
-	metrics, err := h.CheckService.GetMonitorMetricsByID(ctx.Request().Context(), req.MonitorID)
+	metrics, err := h.CheckService.GetMonitorMetricsByID(c.Request().Context(), req.MonitorID)
 	if err != nil {
-		ctx.Log.WithError(err).Error("failed to get monitors")
+		c.Log.WithError(err).Error("failed to get monitors")
 
 		return echo.ErrInternalServerError
 	}
@@ -59,5 +59,5 @@ func (h *Handlers) GetMonitorMetrics(ctx hs.AuthenticatedContext) error {
 		i += 1
 	}
 
-	return ctx.JSON(http.StatusOK, GetMonitorMetricsRespone{Metrics: metricResp})
+	return c.JSON(http.StatusOK, GetMonitorMetricsRespone{Metrics: metricResp})
 }

@@ -19,8 +19,7 @@ type GetMonitorChecksRequest struct {
 }
 
 type GetMonitorChecksResponse struct {
-	TotalCount uint                            `json:"totalCount"`
-	Checks     []GetMonitorChecksResponseCheck `json:"checks"`
+	Checks []GetMonitorChecksResponseCheck `json:"checks"`
 }
 
 type GetMonitorChecksResponseCheck struct {
@@ -51,37 +50,37 @@ type GetMonitorChecksResponseTLS struct {
 	NotAfter  time.Time `json:"notAfter"`
 }
 
-func (h *Handlers) GetMonitorChecks(ctx hs.AuthenticatedContext) error {
-	req, err := helpers.Bind[GetMonitorChecksRequest](ctx)
+func (h *Handlers) GetMonitorChecks(c hs.AuthenticatedContext) error {
+	req, err := helpers.Bind[GetMonitorChecksRequest](c)
 	if err != nil {
-		ctx.Log.WithError(err).Debug("failed to bind GetMonitorsRequest")
+		c.Log.WithError(err).Debug("failed to bind GetMonitorsRequest")
 
 		return echo.ErrBadRequest
 	}
 
-	_, err = h.MonitorService.GetMonitorByIDAndTeamID(ctx.Request().Context(), req.MonitorID, req.TeamID)
+	_, err = h.MonitorService.GetMonitorByIDAndTeamID(c.Request().Context(), req.MonitorID, req.TeamID)
 	if err != nil {
 		if errors.Is(err, monitor.ErrNotFound) {
-			ctx.Log.WithError(err).Debug("monitor not found")
+			c.Log.WithError(err).Debug("monitor not found")
 
 			return echo.ErrForbidden
 		}
 
-		ctx.Log.WithError(err).Error("failed to get monitor")
+		c.Log.WithError(err).Error("failed to get monitor")
 
 		return echo.ErrInternalServerError
 	}
 
-	results, err := h.CheckService.GetMonitorChecksByID(ctx.Request().Context(), req.MonitorID)
+	results, err := h.CheckService.GetMonitorChecksByID(c.Request().Context(), req.MonitorID)
 	if err != nil {
-		ctx.Log.WithError(err).Error("failed to get monitors")
+		c.Log.WithError(err).Error("failed to get monitors")
 
 		return echo.ErrInternalServerError
 	}
 
 	resp := h.newGetMonitorChecksResponse(results)
 
-	return ctx.JSON(http.StatusOK, resp)
+	return c.JSON(http.StatusOK, resp)
 }
 
 func (h *Handlers) newGetMonitorChecksResponse(checks *[]check.Check) GetMonitorChecksResponse {
@@ -92,8 +91,7 @@ func (h *Handlers) newGetMonitorChecksResponse(checks *[]check.Check) GetMonitor
 	}
 
 	return GetMonitorChecksResponse{
-		TotalCount: 0, // TODO
-		Checks:     checkRes,
+		Checks: checkRes,
 	}
 }
 
@@ -135,41 +133,41 @@ type GetMonitorCheckResponse struct {
 	GetMonitorChecksResponseCheck
 }
 
-func (h *Handlers) GetMonitorCheck(ctx hs.AuthenticatedContext) error {
-	req, err := helpers.Bind[GetMonitorCheckRequest](ctx)
+func (h *Handlers) GetMonitorCheck(c hs.AuthenticatedContext) error {
+	req, err := helpers.Bind[GetMonitorCheckRequest](c)
 	if err != nil {
-		ctx.Log.WithError(err).Debug("failed to bind GetMonitorsRequest")
+		c.Log.WithError(err).Debug("failed to bind GetMonitorsRequest")
 
 		return echo.ErrBadRequest
 	}
 
-	_, err = h.MonitorService.GetMonitorByIDAndTeamID(ctx.Request().Context(), req.MonitorID, req.TeamID)
+	_, err = h.MonitorService.GetMonitorByIDAndTeamID(c.Request().Context(), req.MonitorID, req.TeamID)
 	if err != nil {
 		if errors.Is(err, monitor.ErrNotFound) {
-			ctx.Log.WithError(err).Debug("monitor not found")
+			c.Log.WithError(err).Debug("monitor not found")
 
 			return echo.ErrForbidden
 		}
 
-		ctx.Log.WithError(err).Error("failed to get monitor")
+		c.Log.WithError(err).Error("failed to get monitor")
 
 		return echo.ErrInternalServerError
 	}
 
-	result, err := h.CheckService.GetMonitorCheckByIDAndMonitorID(ctx.Request().Context(), req.MonitorID, req.CheckID, req.Offset, req.Limit)
+	result, err := h.CheckService.GetMonitorCheckByIDAndMonitorID(c.Request().Context(), req.MonitorID, req.CheckID, req.Offset, req.Limit)
 	if err != nil {
 		if errors.Is(err, check.ErrNotFound) {
-			ctx.Log.WithError(err).Debug("check not found")
+			c.Log.WithError(err).Debug("check not found")
 
 			return echo.ErrNotFound
 		}
 
-		ctx.Log.WithError(err).Error("failed to get monitor check")
+		c.Log.WithError(err).Error("failed to get monitor check")
 
 		return echo.ErrInternalServerError
 	}
 
 	resp := h.newGetMonitorCheckResponse(*result)
 
-	return ctx.JSON(http.StatusOK, resp)
+	return c.JSON(http.StatusOK, resp)
 }

@@ -9,7 +9,7 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-type AuthenticatedHandlerFunc func(ctx AuthenticatedContext) error
+type AuthenticatedHandlerFunc func(c AuthenticatedContext) error
 
 type AuthenticatedContext struct {
 	echo.Context
@@ -19,10 +19,10 @@ type AuthenticatedContext struct {
 	TeamRole *entities.TeamRole
 }
 
-func AuthenticatedHandlerFactory(logger *logrus.Entry) func(handler AuthenticatedHandlerFunc) func(ctx echo.Context) error {
-	return func(handler AuthenticatedHandlerFunc) func(ctx echo.Context) error {
-		return func(ctx echo.Context) error {
-			claims, ok := ctx.Get("jwt_claims").(*authentication.Claims)
+func AuthenticatedHandlerFactory(logger *logrus.Entry) func(handler AuthenticatedHandlerFunc) func(c echo.Context) error {
+	return func(handler AuthenticatedHandlerFunc) func(c echo.Context) error {
+		return func(c echo.Context) error {
+			claims, ok := c.Get("jwt_claims").(*authentication.Claims)
 			if !ok {
 				logger.Debug("missing jwt_claims")
 
@@ -36,10 +36,10 @@ func AuthenticatedHandlerFactory(logger *logrus.Entry) func(handler Authenticate
 				return echo.ErrUnauthorized
 			}
 
-			teamRole, _ := ctx.Get("team_role").(*entities.TeamRole)
+			teamRole, _ := c.Get("team_role").(*entities.TeamRole)
 
 			return handler(AuthenticatedContext{
-				Context:  ctx,
+				Context:  c,
 				Claims:   *claims,
 				Log:      logger,
 				UserID:   uint(userId),

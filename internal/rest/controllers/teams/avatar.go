@@ -12,62 +12,62 @@ type PutTeamAvatarRequest struct {
 	TeamID uint `param:"teamId" validate:"required,numeric,gt=0"`
 }
 
-func (h *Handlers) PutTeamAvatar(ctx hs.AuthenticatedContext) error {
-	req, err := helpers.Bind[PutTeamAvatarRequest](ctx)
+func (h *Handlers) PutTeamAvatar(c hs.AuthenticatedContext) error {
+	req, err := helpers.Bind[PutTeamAvatarRequest](c)
 	if err != nil {
-		ctx.Log.WithError(err).Debug("failed to bind PutTeamAvatarRequest")
+		c.Log.WithError(err).Debug("failed to bind PutTeamAvatarRequest")
 
 		return echo.ErrBadRequest
 	}
 
-	file, err := ctx.FormFile("file")
+	file, err := c.FormFile("file")
 	if err != nil {
-		ctx.Log.WithError(err).Debug("failed to get file from form")
+		c.Log.WithError(err).Debug("failed to get file from form")
 
 		return echo.ErrBadRequest
 	}
 
 	src, err := file.Open()
 	if err != nil {
-		ctx.Log.WithError(err).Debug("failed to open file")
+		c.Log.WithError(err).Debug("failed to open file")
 
 		return echo.ErrBadRequest
 	}
 	defer src.Close()
 
 	if err = h.TeamService.UploadAvatar(
-		ctx.Request().Context(),
+		c.Request().Context(),
 		req.TeamID,
 		src,
 	); err != nil {
-		ctx.Log.WithError(err).Debug("failed to update team")
+		c.Log.WithError(err).Debug("failed to update team")
 
 		return echo.ErrInternalServerError
 	}
 
-	return ctx.NoContent(http.StatusNoContent)
+	return c.NoContent(http.StatusNoContent)
 }
 
 type DeleteTeamAvatarRequest struct {
 	TeamID uint `param:"teamId" validate:"required,numeric,gt=0"`
 }
 
-func (h *Handlers) DeleteTeamAvatar(ctx hs.AuthenticatedContext) error {
-	req, err := helpers.Bind[DeleteTeamAvatarRequest](ctx)
+func (h *Handlers) DeleteTeamAvatar(c hs.AuthenticatedContext) error {
+	req, err := helpers.Bind[DeleteTeamAvatarRequest](c)
 	if err != nil {
-		ctx.Log.WithError(err).Debug("failed to bind DeleteTeamAvatarRequest")
+		c.Log.WithError(err).Debug("failed to bind DeleteTeamAvatarRequest")
 
 		return echo.ErrBadRequest
 	}
 
 	if err = h.TeamService.DeleteAvatar(
-		ctx.Request().Context(),
+		c.Request().Context(),
 		req.TeamID,
 	); err != nil {
-		ctx.Log.WithError(err).Debug("failed to delete team avatar")
+		c.Log.WithError(err).Debug("failed to delete team avatar")
 
 		return echo.ErrInternalServerError
 	}
 
-	return ctx.NoContent(http.StatusNoContent)
+	return c.NoContent(http.StatusNoContent)
 }
