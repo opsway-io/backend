@@ -9,6 +9,8 @@ import (
 
 	"github.com/gofrs/uuid"
 	"github.com/opsway-io/backend/internal/entities"
+	"github.com/opsway-io/backend/internal/event"
+	"github.com/opsway-io/backend/internal/event/events"
 	"github.com/opsway-io/backend/internal/notification/email"
 	"github.com/opsway-io/backend/internal/notification/email/templates"
 	"github.com/opsway-io/backend/internal/storage"
@@ -40,14 +42,16 @@ type ServiceImpl struct {
 	storage    storage.Service
 	cache      Cache
 	email      email.Sender
+	event      event.Service
 }
 
-func NewService(repository Repository, cache Cache, storage storage.Service, email email.Sender) Service {
+func NewService(repository Repository, cache Cache, storage storage.Service, email email.Sender, event event.Service) Service {
 	return &ServiceImpl{
 		repository: repository,
 		cache:      cache,
 		storage:    storage,
 		email:      email,
+		event:      event,
 	}
 }
 
@@ -74,6 +78,10 @@ func (s *ServiceImpl) Create(ctx context.Context, user *entities.User) error {
 		},
 	); err != nil {
 		return errors.Wrap(err, "failed to send welcome email")
+	}
+
+	if err := s.event.Publish(events.NewUserCreatedEvent(user)); err != nil {
+		return errors.Wrap(err, "failed to publish user created event")
 	}
 
 	return nil

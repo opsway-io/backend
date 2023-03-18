@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/go-redis/redis/v8"
 	"github.com/opsway-io/backend/internal/entities"
 	"github.com/opsway-io/boomerang"
+	"github.com/redis/go-redis/v9"
 	"github.com/vmihailenco/msgpack"
 )
 

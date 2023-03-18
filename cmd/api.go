@@ -9,6 +9,7 @@ import (
 	"github.com/opsway-io/backend/internal/connectors/postgres"
 	"github.com/opsway-io/backend/internal/connectors/redis"
 	"github.com/opsway-io/backend/internal/entities"
+	"github.com/opsway-io/backend/internal/event"
 	"github.com/opsway-io/backend/internal/monitor"
 	"github.com/opsway-io/backend/internal/notification/email"
 	"github.com/opsway-io/backend/internal/rest"
@@ -88,6 +89,11 @@ func runAPI(cmd *cobra.Command, args []string) {
 		emailSender = email.NewSendgridSender(conf.Email)
 	}
 
+	eventService, err := event.NewService(redisClient)
+	if err != nil {
+		l.WithError(err).Fatal("Failed to create event service")
+	}
+
 	storageRepository := storage.NewObjectStorageRepository(ctx, conf.ObjectStorage)
 	storageService := storage.NewService(storageRepository)
 
@@ -95,7 +101,7 @@ func runAPI(cmd *cobra.Command, args []string) {
 
 	userRepository := user.NewRepository(db)
 	userCache := user.NewCache(redisClient)
-	userService := user.NewService(userRepository, userCache, storageService, emailSender)
+	userService := user.NewService(userRepository, userCache, storageService, emailSender, eventService)
 
 	teamRepository := team.NewRepository(db)
 	teamService := team.NewService(teamRepository, storageService)

@@ -4,9 +4,9 @@ import (
 	"context"
 	"errors"
 
-	"github.com/go-redis/redis/v8"
 	"github.com/opsway-io/backend/internal/entities"
 	"github.com/opsway-io/boomerang"
+	"github.com/redis/go-redis/v9"
 	"gorm.io/gorm"
 )
 
