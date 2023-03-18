@@ -15,6 +15,9 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
+
+	// Automatically set GOMAXPROCS to match Linux container CPU quota.
+	_ "go.uber.org/automaxprocs"
 )
 
 var cfgFile string
