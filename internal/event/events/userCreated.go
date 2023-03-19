@@ -5,7 +5,6 @@ import "github.com/opsway-io/backend/internal/entities"
 const UserCreated = "user.created"
 
 type UserCreatedData struct {
-	BaseEvent
 	entities.User
 }
 

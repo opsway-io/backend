@@ -1,8 +1,9 @@
 package entities
 
 import (
-	"encoding/json"
 	"time"
+
+	json "github.com/json-iterator/go"
 
 	"github.com/lib/pq"
 	"github.com/opsway-io/backend/internal/connectors/postgres"
