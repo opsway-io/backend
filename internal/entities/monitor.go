@@ -9,8 +9,16 @@ import (
 	"github.com/opsway-io/backend/internal/connectors/postgres"
 )
 
+type MonitorState int
+
+const (
+	MonitorStateInactive MonitorState = 0
+	MonitorStateActive   MonitorState = 1
+)
+
 type Monitor struct {
 	ID        uint
+	State     MonitorState    `gorm:"not null;default:0"`
 	Name      string          `gorm:"index;not null"`
 	Tags      pq.StringArray  `gorm:"type:text[]"`
 	Settings  MonitorSettings `gorm:"not null;constraint:OnDelete:CASCADE"`
@@ -22,6 +30,17 @@ type Monitor struct {
 
 func (Monitor) TableName() string {
 	return "monitors"
+}
+
+func (m *Monitor) StateString() string {
+	switch m.State {
+	case MonitorStateInactive:
+		return "INACTIVE"
+	case MonitorStateActive:
+		return "ACTIVE"
+	default:
+		return "UNKNOWN"
+	}
 }
 
 func (m *Monitor) SetBodyStr(body string) {

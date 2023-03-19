@@ -44,6 +44,8 @@ func (s *ServiceImpl) GetMonitorsAndSettingsByTeamID(ctx context.Context, teamID
 }
 
 func (s *ServiceImpl) Create(ctx context.Context, m *entities.Monitor) error {
+	m.State = entities.MonitorStateActive
+
 	err := s.repository.Create(ctx, m)
 	if err != nil {
 		return err

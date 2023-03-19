@@ -111,6 +111,7 @@ type GetMonitorRequest struct {
 
 type GetMonitorResponse struct {
 	ID        uint                       `json:"id"`
+	State     string                     `json:"state"`
 	Name      string                     `json:"name"`
 	Tags      []string                   `json:"tags"`
 	Settings  GetMonitorResponseSettings `json:"settings"`
@@ -164,6 +165,7 @@ func newGetMonitorResponse(m *entities.Monitor) (*GetMonitorResponse, error) {
 
 	return &GetMonitorResponse{
 		ID:        m.ID,
+		State:     m.StateString(),
 		Name:      m.Name,
 		Tags:      m.Tags,
 		CreatedAt: m.CreatedAt,
