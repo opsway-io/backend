@@ -16,6 +16,7 @@ func NewValidator() *Validator {
 	v.RegisterValidation("monitorFrequency", MonitorFrequencyValidator)
 	v.RegisterValidation("monitorMethod", MonitorMethodValidator)
 	v.RegisterValidation("monitorBodyType", BodyTypeValidator)
+	v.RegisterValidation("monitorState", MonitorStateValidator)
 
 	return &Validator{
 		validator: v,
@@ -77,6 +78,18 @@ var AllowedBodyTypes = []string{"NONE", "RAW", "JSON", "GRAPHQL", "XML"}
 func BodyTypeValidator(fl validator.FieldLevel) bool {
 	for _, bodyType := range AllowedBodyTypes {
 		if bodyType == fl.Field().String() {
+			return true
+		}
+	}
+
+	return false
+}
+
+var AllowedMonitorStates = []string{"ACTIVE", "INACTIVE"}
+
+func MonitorStateValidator(fl validator.FieldLevel) bool {
+	for _, state := range AllowedMonitorStates {
+		if state == fl.Field().String() {
 			return true
 		}
 	}

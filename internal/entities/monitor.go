@@ -32,7 +32,7 @@ func (Monitor) TableName() string {
 	return "monitors"
 }
 
-func (m *Monitor) StateString() string {
+func (m *Monitor) GetStateString() string {
 	switch m.State {
 	case MonitorStateInactive:
 		return "INACTIVE"
@@ -41,6 +41,17 @@ func (m *Monitor) StateString() string {
 	default:
 		return "UNKNOWN"
 	}
+}
+
+func (m *Monitor) SetStateFromString(state string) error {
+	switch state {
+	case "INACTIVE":
+		m.State = MonitorStateInactive
+	case "ACTIVE":
+		m.State = MonitorStateActive
+	}
+
+	return nil
 }
 
 func (m *Monitor) SetBodyStr(body string) {

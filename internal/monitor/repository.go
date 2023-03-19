@@ -92,7 +92,9 @@ func (r *RepositoryImpl) Create(ctx context.Context, m *entities.Monitor) error 
 }
 
 func (r *RepositoryImpl) Update(ctx context.Context, teamID, monitorID uint, m *entities.Monitor) error {
-	result := r.db.WithContext(ctx).
+	tx := r.db.WithContext(ctx).Begin()
+
+	result := tx.
 		Where(
 			entities.Monitor{
 				ID:     monitorID,
@@ -103,34 +105,52 @@ func (r *RepositoryImpl) Update(ctx context.Context, teamID, monitorID uint, m *
 			"name",
 			"state",
 			"tags",
-			"settings.method",
-			"settings.url",
-			"settings.headers",
-			"settings.body",
-			"settings.body_type",
-			"settings.frequency",
 		).Updates(&entities.Monitor{
 		Name:  m.Name,
 		State: m.State,
 		Tags:  m.Tags,
-		Settings: entities.MonitorSettings{
-			Method:    m.Settings.Method,
-			URL:       m.Settings.URL,
-			Headers:   m.Settings.Headers,
-			Body:      m.Settings.Body,
-			BodyType:  m.Settings.BodyType,
-			Frequency: m.Settings.Frequency,
-		},
 	})
 	if result.Error != nil {
-		if errors.Is(result.Error, gorm.ErrRecordNotFound) {
-			return ErrNotFound
-		}
+		tx.Rollback()
+
+		return result.Error
+	}
+	if result.RowsAffected == 0 {
+		tx.Rollback()
+
+		return ErrNotFound
+	}
+
+	// update settings
+	result = tx.
+		Where(
+			entities.MonitorSettings{
+				MonitorID: int(monitorID),
+			},
+		).
+		Select(
+			"method",
+			"url",
+			"headers",
+			"body",
+			"body_type",
+			"frequency",
+		).Updates(&entities.MonitorSettings{
+		Method:    m.Settings.Method,
+		URL:       m.Settings.URL,
+		Headers:   m.Settings.Headers,
+		Body:      m.Settings.Body,
+		BodyType:  m.Settings.BodyType,
+		Frequency: m.Settings.Frequency,
+	})
+	if result.Error != nil {
+		tx.Rollback()
 
 		return result.Error
 	}
 
-	return nil
+	// Commit transaction
+	return tx.Commit().Error
 }
 
 func (r *RepositoryImpl) Delete(ctx context.Context, teamID, monitorID uint) error {

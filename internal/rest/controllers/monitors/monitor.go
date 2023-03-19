@@ -79,7 +79,7 @@ func newGetMonitorsResponse(monitors *[]monitor.MonitorWithTotalCount) (*GetMoni
 
 		res[i] = GetMonitorResponseMonitor{
 			ID:        m.ID,
-			State:     m.StateString(),
+			State:     m.GetStateString(),
 			Name:      m.Name,
 			Tags:      m.Tags,
 			CreatedAt: m.CreatedAt,
@@ -137,7 +137,6 @@ func (h *Handlers) GetMonitor(c hs.AuthenticatedContext) error {
 
 		return echo.ErrBadRequest
 	}
-
 	m, err := h.MonitorService.GetMonitorAndSettingsByTeamIDAndID(c.Request().Context(), req.TeamID, req.MonitorID)
 	if err != nil {
 		if errors.Is(err, monitor.ErrNotFound) {
@@ -167,7 +166,7 @@ func newGetMonitorResponse(m *entities.Monitor) (*GetMonitorResponse, error) {
 
 	return &GetMonitorResponse{
 		ID:        m.ID,
-		State:     m.StateString(),
+		State:     m.GetStateString(),
 		Name:      m.Name,
 		Tags:      m.Tags,
 		CreatedAt: m.CreatedAt,
@@ -268,7 +267,7 @@ type PutMonitorRequest struct {
 	TeamID    uint                      `param:"teamId" validate:"required,numeric,gte=0"`
 	MonitorID uint                      `param:"monitorId" validate:"required,numeric,gte=0"`
 	Name      string                    `json:"name" validate:"required,max=255"`
-	State     string                    `json:"state" validate:"required,oneof=ACTIVE INACTIVE"`
+	State     string                    `json:"state" validate:"required,monitorState"`
 	Tags      []string                  `json:"tags" validate:"required,max=10,dive,max=255"`
 	Settings  PutMonitorRequestSettings `json:"settings" validate:"required,dive"`
 }
@@ -299,21 +298,16 @@ func (h *Handlers) PutMonitor(c hs.AuthenticatedContext) error {
 	}
 	s.SetFrequencyMilliseconds(req.Settings.Frequency)
 
-	state := entities.MonitorStateInactive
-	if req.State == "ACTIVE" {
-		state = entities.MonitorStateActive
-	}
-
 	m := &entities.Monitor{
 		ID:       req.MonitorID,
 		TeamID:   req.TeamID,
-		State:    state,
 		Name:     req.Name,
 		Tags:     req.Tags,
 		Settings: s,
 	}
 	m.SetBodyStr(req.Settings.Body)
 	m.SetHeaders(req.Settings.Headers)
+	m.SetStateFromString(req.State)
 
 	if err := h.MonitorService.Update(
 		ctx,
