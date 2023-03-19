@@ -26,6 +26,7 @@ type GetMonitorsResponse struct {
 
 type GetMonitorResponseMonitor struct {
 	ID        uint                              `json:"id"`
+	State     string                            `json:"state"`
 	Name      string                            `json:"name"`
 	Tags      []string                          `json:"tags"`
 	Settings  GetMonitorResponseMonitorSettings `json:"settings"`
@@ -78,6 +79,7 @@ func newGetMonitorsResponse(monitors *[]monitor.MonitorWithTotalCount) (*GetMoni
 
 		res[i] = GetMonitorResponseMonitor{
 			ID:        m.ID,
+			State:     m.StateString(),
 			Name:      m.Name,
 			Tags:      m.Tags,
 			CreatedAt: m.CreatedAt,
