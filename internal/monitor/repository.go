@@ -16,8 +16,8 @@ type Repository interface {
 	GetMonitorAndSettingsByTeamIDAndID(ctx context.Context, teamID uint, monitorID uint) (*entities.Monitor, error)
 	GetMonitorsAndSettingsByTeamID(ctx context.Context, teamID uint, offset *int, limit *int, query *string) (*[]MonitorWithTotalCount, error)
 	Create(ctx context.Context, monitor *entities.Monitor) error
-	Update(ctx context.Context, monitor *entities.Monitor) error
-	Delete(ctx context.Context, id uint) error
+	Update(ctx context.Context, teamID, monitorID uint, monitor *entities.Monitor) error
+	Delete(ctx context.Context, teamID, monitorID uint) error
 }
 
 type RepositoryImpl struct {
@@ -63,7 +63,9 @@ type MonitorWithTotalCount struct {
 
 func (r *RepositoryImpl) GetMonitorsAndSettingsByTeamID(ctx context.Context, teamID uint, offset *int, limit *int, query *string) (*[]MonitorWithTotalCount, error) {
 	var monitors []MonitorWithTotalCount
-	err := r.db.WithContext(ctx).Scopes(
+	err := r.db.WithContext(
+		ctx,
+	).Scopes(
 		postgres.Paginated(offset, limit),
 		postgres.IncludeTotalCount("total_count"),
 		postgres.Search([]string{"name"}, query),
@@ -71,7 +73,9 @@ func (r *RepositoryImpl) GetMonitorsAndSettingsByTeamID(ctx context.Context, tea
 		"Settings",
 	).Where(entities.Monitor{
 		TeamID: teamID,
-	}).Find(&monitors).Error
+	}).Order(
+		"created_at asc",
+	).Find(&monitors).Error
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, nil
@@ -87,20 +91,54 @@ func (r *RepositoryImpl) Create(ctx context.Context, m *entities.Monitor) error 
 	return r.db.WithContext(ctx).Create(m).Error
 }
 
-func (r *RepositoryImpl) Update(ctx context.Context, m *entities.Monitor) error {
-	result := r.db.WithContext(ctx).Updates(m)
+func (r *RepositoryImpl) Update(ctx context.Context, teamID, monitorID uint, m *entities.Monitor) error {
+	result := r.db.WithContext(ctx).
+		Where(
+			entities.Monitor{
+				ID:     monitorID,
+				TeamID: teamID,
+			},
+		).
+		Select(
+			"name",
+			"state",
+			"tags",
+			"settings.method",
+			"settings.url",
+			"settings.headers",
+			"settings.body",
+			"settings.body_type",
+			"settings.frequency",
+		).Updates(&entities.Monitor{
+		Name:  m.Name,
+		State: m.State,
+		Tags:  m.Tags,
+		Settings: entities.MonitorSettings{
+			Method:    m.Settings.Method,
+			URL:       m.Settings.URL,
+			Headers:   m.Settings.Headers,
+			Body:      m.Settings.Body,
+			BodyType:  m.Settings.BodyType,
+			Frequency: m.Settings.Frequency,
+		},
+	})
 	if result.Error != nil {
+		if errors.Is(result.Error, gorm.ErrRecordNotFound) {
+			return ErrNotFound
+		}
+
 		return result.Error
-	}
-	if result.RowsAffected == 0 {
-		return ErrNotFound
 	}
 
 	return nil
 }
 
-func (r *RepositoryImpl) Delete(ctx context.Context, id uint) error {
-	err := r.db.WithContext(ctx).Delete(&entities.Monitor{}, id).Error
+func (r *RepositoryImpl) Delete(ctx context.Context, teamID, monitorID uint) error {
+	err := r.db.WithContext(ctx).
+		Where(entities.Monitor{
+			ID:     monitorID,
+			TeamID: teamID,
+		}).Delete(&entities.Monitor{}).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return ErrNotFound
 	}

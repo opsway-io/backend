@@ -15,8 +15,8 @@ type Service interface {
 	GetMonitorAndSettingsByTeamIDAndID(ctx context.Context, teamID uint, monitorID uint) (*entities.Monitor, error)
 	GetMonitorsAndSettingsByTeamID(ctx context.Context, teamID uint, offset *int, limit *int, query *string) (*[]MonitorWithTotalCount, error)
 	Create(ctx context.Context, monitor *entities.Monitor) error
-	Update(ctx context.Context, monitor *entities.Monitor) error
-	Delete(ctx context.Context, id uint) error
+	Update(ctx context.Context, teamID, monitorID uint, monitor *entities.Monitor) error
+	Delete(ctx context.Context, teamID, monitorID uint) error
 }
 
 type ServiceImpl struct {
@@ -54,7 +54,7 @@ func (s *ServiceImpl) Create(ctx context.Context, m *entities.Monitor) error {
 	return s.schedule.Add(ctx, m)
 }
 
-func (s *ServiceImpl) Update(ctx context.Context, m *entities.Monitor) error {
+func (s *ServiceImpl) Update(ctx context.Context, teamID, monitorID uint, m *entities.Monitor) error {
 	err := s.schedule.Remove(ctx, m.ID)
 	if err != nil {
 		if !errors.Is(err, boomerang.ErrTaskDoesNotExist) {
@@ -62,21 +62,33 @@ func (s *ServiceImpl) Update(ctx context.Context, m *entities.Monitor) error {
 		}
 	}
 
-	err = s.repository.Update(ctx, m)
-	if err != nil {
+	if err = s.repository.Update(
+		ctx,
+		teamID,
+		monitorID,
+		m,
+	); err != nil {
 		return err
+	}
+
+	if m.State == entities.MonitorStateInactive {
+		return nil
 	}
 
 	return s.schedule.Add(ctx, m)
 }
 
-func (s *ServiceImpl) Delete(ctx context.Context, id uint) error {
-	err := s.repository.Delete(ctx, id)
+func (s *ServiceImpl) Delete(ctx context.Context, teamID, monitorID uint) error {
+	err := s.repository.Delete(ctx, teamID, monitorID)
 	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return ErrNotFound
+		}
+
 		return err
 	}
 
-	err = s.schedule.Remove(ctx, id)
+	err = s.schedule.Remove(ctx, monitorID)
 	if err != nil {
 		if errors.Is(err, boomerang.ErrTaskDoesNotExist) {
 			return nil

@@ -196,7 +196,13 @@ func (h *Handlers) DeleteMonitor(c hs.AuthenticatedContext) error {
 		return echo.ErrBadRequest
 	}
 
-	if err := h.MonitorService.Delete(c.Request().Context(), req.MonitorID); err != nil {
+	ctx := c.Request().Context()
+
+	if err := h.MonitorService.Delete(
+		ctx,
+		req.TeamID,
+		req.MonitorID,
+	); err != nil {
 		if errors.Is(err, monitor.ErrNotFound) {
 			return echo.ErrNotFound
 		}
@@ -256,4 +262,73 @@ func (h *Handlers) PostMonitor(c hs.AuthenticatedContext) error {
 	}
 
 	return c.NoContent(http.StatusCreated)
+}
+
+type PutMonitorRequest struct {
+	TeamID    uint                      `param:"teamId" validate:"required,numeric,gte=0"`
+	MonitorID uint                      `param:"monitorId" validate:"required,numeric,gte=0"`
+	Name      string                    `json:"name" validate:"required,max=255"`
+	State     string                    `json:"state" validate:"required,oneof=ACTIVE INACTIVE"`
+	Tags      []string                  `json:"tags" validate:"required,max=10,dive,max=255"`
+	Settings  PutMonitorRequestSettings `json:"settings" validate:"required,dive"`
+}
+
+type PutMonitorRequestSettings struct {
+	Method    string            `json:"method" validate:"required,monitorMethod"`
+	URL       string            `json:"url" validate:"required,url"`
+	Headers   map[string]string `json:"headers" validate:"required,dive,max=255"`
+	BodyType  string            `json:"bodyType" validate:"required,monitorBodyType"`
+	Body      string            `json:"body"`
+	Frequency uint64            `json:"frequency" validate:"required,numeric,gte=0,monitorFrequency"`
+}
+
+func (h *Handlers) PutMonitor(c hs.AuthenticatedContext) error {
+	req, err := helpers.Bind[PutMonitorRequest](c)
+	if err != nil {
+		c.Log.WithError(err).Debug("failed to bind PutMonitorRequest")
+
+		return echo.ErrBadRequest
+	}
+
+	ctx := c.Request().Context()
+
+	s := entities.MonitorSettings{
+		Method:   req.Settings.Method,
+		URL:      req.Settings.URL,
+		BodyType: req.Settings.BodyType,
+	}
+	s.SetFrequencyMilliseconds(req.Settings.Frequency)
+
+	state := entities.MonitorStateInactive
+	if req.State == "ACTIVE" {
+		state = entities.MonitorStateActive
+	}
+
+	m := &entities.Monitor{
+		ID:       req.MonitorID,
+		TeamID:   req.TeamID,
+		State:    state,
+		Name:     req.Name,
+		Tags:     req.Tags,
+		Settings: s,
+	}
+	m.SetBodyStr(req.Settings.Body)
+	m.SetHeaders(req.Settings.Headers)
+
+	if err := h.MonitorService.Update(
+		ctx,
+		req.TeamID,
+		req.MonitorID,
+		m,
+	); err != nil {
+		if errors.Is(err, monitor.ErrNotFound) {
+			return echo.ErrNotFound
+		}
+
+		c.Log.WithError(err).Error("failed to update monitor")
+
+		return echo.ErrInternalServerError
+	}
+
+	return c.NoContent(http.StatusNoContent)
 }
