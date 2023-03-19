@@ -8,6 +8,7 @@ import (
 
 type Check struct {
 	ID         uuid.UUID `gorm:"primary_key;type:UUID;default:generateUUIDv4()"`
+	TeamID     uint64    `gorm:"index;not null"`
 	Method     string    `gorm:"index;not null"`
 	URL        string    `gorm:"index;not null"`
 	MonitorID  uint64    `gorm:"index;not null"`

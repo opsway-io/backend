@@ -8,10 +8,12 @@ import (
 )
 
 type Service interface {
-	GetMonitorChecksByID(ctx context.Context, monitorID uint) (*[]Check, error)
-	GetMonitorCheckByIDAndMonitorID(ctx context.Context, monitorID uint, checkID uuid.UUID, offset *int, limit *int) (*Check, error)
-	GetMonitorMetricsByID(ctx context.Context, monitorID uint) (*[]AggMetric, error)
 	Create(ctx context.Context, c *Check) error
+
+	GetByTeamIDAndMonitorIDPaginated(ctx context.Context, teamID, monitorID uint, offset, limit *int) (*[]Check, error)
+	GetByTeamIDAndMonitorIDAndCheckID(ctx context.Context, teamID uint, monitorID uint, checkID uuid.UUID) (*Check, error)
+
+	GetMonitorMetricsByMonitorID(ctx context.Context, monitorID uint) (*[]AggMetric, error)
 }
 
 type ServiceImpl struct {
@@ -24,18 +26,18 @@ func NewService(db *gorm.DB) Service {
 	}
 }
 
-func (s *ServiceImpl) GetMonitorChecksByID(ctx context.Context, monitorID uint) (*[]Check, error) {
-	return s.repository.Get(ctx, monitorID)
-}
-
-func (s *ServiceImpl) GetMonitorCheckByIDAndMonitorID(ctx context.Context, monitorID uint, checkID uuid.UUID, offset *int, limit *int) (*Check, error) {
-	return s.repository.GetByIDAndMonitorID(ctx, monitorID, checkID, offset, limit)
-}
-
-func (s *ServiceImpl) GetMonitorMetricsByID(ctx context.Context, monitorID uint) (*[]AggMetric, error) {
-	return s.repository.GetAggMetrics(ctx, monitorID)
-}
-
 func (s *ServiceImpl) Create(ctx context.Context, c *Check) error {
 	return s.repository.Create(ctx, c)
+}
+
+func (s *ServiceImpl) GetByTeamIDAndMonitorIDPaginated(ctx context.Context, teamID, monitorID uint, offset, limit *int) (*[]Check, error) {
+	return s.repository.GetByTeamIDAndMonitorIDPaginated(ctx, teamID, monitorID, offset, limit)
+}
+
+func (s *ServiceImpl) GetByTeamIDAndMonitorIDAndCheckID(ctx context.Context, teamID uint, monitorID uint, checkID uuid.UUID) (*Check, error) {
+	return s.repository.GetByTeamIDAndMonitorIDAndCheckID(ctx, teamID, monitorID, checkID)
+}
+
+func (s *ServiceImpl) GetMonitorMetricsByMonitorID(ctx context.Context, monitorID uint) (*[]AggMetric, error) {
+	return s.repository.GetMonitorMetricsByMonitorID(ctx, monitorID)
 }

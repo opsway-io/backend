@@ -8,7 +8,6 @@ import (
 	"github.com/gofrs/uuid"
 	"github.com/labstack/echo/v4"
 	"github.com/opsway-io/backend/internal/check"
-	"github.com/opsway-io/backend/internal/monitor"
 	hs "github.com/opsway-io/backend/internal/rest/handlers"
 	"github.com/opsway-io/backend/internal/rest/helpers"
 )
@@ -16,6 +15,8 @@ import (
 type GetMonitorChecksRequest struct {
 	TeamID    uint `param:"teamId" validate:"required,numeric,gte=0"`
 	MonitorID uint `param:"monitorId" validate:"required,numeric,gte=0"`
+	Offset    *int `query:"offset" validate:"omitempty,numeric,gte=0"`
+	Limit     *int `query:"limit" validate:"omitempty,numeric,gte=0,max=255"`
 }
 
 type GetMonitorChecksResponse struct {
@@ -58,20 +59,15 @@ func (h *Handlers) GetMonitorChecks(c hs.AuthenticatedContext) error {
 		return echo.ErrBadRequest
 	}
 
-	_, err = h.MonitorService.GetMonitorByIDAndTeamID(c.Request().Context(), req.MonitorID, req.TeamID)
-	if err != nil {
-		if errors.Is(err, monitor.ErrNotFound) {
-			c.Log.WithError(err).Debug("monitor not found")
+	ctx := c.Request().Context()
 
-			return echo.ErrForbidden
-		}
-
-		c.Log.WithError(err).Error("failed to get monitor")
-
-		return echo.ErrInternalServerError
-	}
-
-	results, err := h.CheckService.GetMonitorChecksByID(c.Request().Context(), req.MonitorID)
+	results, err := h.CheckService.GetByTeamIDAndMonitorIDPaginated(
+		ctx,
+		req.TeamID,
+		req.MonitorID,
+		req.Offset,
+		req.Limit,
+	)
 	if err != nil {
 		c.Log.WithError(err).Error("failed to get monitors")
 
@@ -141,20 +137,14 @@ func (h *Handlers) GetMonitorCheck(c hs.AuthenticatedContext) error {
 		return echo.ErrBadRequest
 	}
 
-	_, err = h.MonitorService.GetMonitorByIDAndTeamID(c.Request().Context(), req.MonitorID, req.TeamID)
-	if err != nil {
-		if errors.Is(err, monitor.ErrNotFound) {
-			c.Log.WithError(err).Debug("monitor not found")
+	ctx := c.Request().Context()
 
-			return echo.ErrForbidden
-		}
-
-		c.Log.WithError(err).Error("failed to get monitor")
-
-		return echo.ErrInternalServerError
-	}
-
-	result, err := h.CheckService.GetMonitorCheckByIDAndMonitorID(c.Request().Context(), req.MonitorID, req.CheckID, req.Offset, req.Limit)
+	result, err := h.CheckService.GetByTeamIDAndMonitorIDAndCheckID(
+		ctx,
+		req.TeamID,
+		req.MonitorID,
+		req.CheckID,
+	)
 	if err != nil {
 		if errors.Is(err, check.ErrNotFound) {
 			c.Log.WithError(err).Debug("check not found")

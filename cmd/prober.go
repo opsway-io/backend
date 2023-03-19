@@ -106,6 +106,7 @@ func handleTask(ctx context.Context, l *logrus.Logger, prober http.Service, m *e
 func mapResultToCheck(m *entities.Monitor, res *http.Result) *check.Check {
 	c := &check.Check{
 		MonitorID:  uint64(m.ID),
+		TeamID:     uint64(m.TeamID),
 		StatusCode: uint64(res.Response.StatusCode),
 		Method:     m.Settings.Method,
 		URL:        m.Settings.URL,

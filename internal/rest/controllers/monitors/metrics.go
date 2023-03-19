@@ -35,7 +35,12 @@ func (h *Handlers) GetMonitorMetrics(c hs.AuthenticatedContext) error {
 		return echo.ErrBadRequest
 	}
 
-	metrics, err := h.CheckService.GetMonitorMetricsByID(c.Request().Context(), req.MonitorID)
+	ctx := c.Request().Context()
+
+	metrics, err := h.CheckService.GetMonitorMetricsByMonitorID(
+		ctx,
+		req.MonitorID,
+	)
 	if err != nil {
 		c.Log.WithError(err).Error("failed to get monitors")
 

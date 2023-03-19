@@ -12,10 +12,10 @@ import (
 var ErrNotFound = errors.New("probe result not found")
 
 type Repository interface {
-	Get(ctx context.Context, monitorID uint) (*[]Check, error)
-	GetByIDAndMonitorID(ctx context.Context, monitorID uint, checkID uuid.UUID, offset *int, limit *int) (*Check, error)
-	GetAggMetrics(ctx context.Context, monitorID uint) (*[]AggMetric, error)
 	Create(ctx context.Context, maintenance *Check) error
+	GetByTeamIDAndMonitorIDAndCheckID(ctx context.Context, teamID uint, monitorID uint, checkID uuid.UUID) (*Check, error)
+	GetByTeamIDAndMonitorIDPaginated(ctx context.Context, teamID, monitorID uint, offset, limit *int) (*[]Check, error)
+	GetMonitorMetricsByMonitorID(ctx context.Context, monitorID uint) (*[]AggMetric, error)
 }
 
 type RepositoryImpl struct {
@@ -26,30 +26,16 @@ func NewRepository(db *gorm.DB) Repository {
 	return &RepositoryImpl{db: db}
 }
 
-func (r *RepositoryImpl) Get(ctx context.Context, monitorID uint) (*[]Check, error) {
-	var checks []Check
-	err := r.db.WithContext(
-		ctx,
-	).Where(
-		"monitor_id = ?",
-		monitorID,
-	).Order(
-		"created_at desc",
-	).Find(&checks).Error
-
-	return &checks, err
-}
-
-func (r *RepositoryImpl) GetByIDAndMonitorID(ctx context.Context, monitorID uint, checkID uuid.UUID, offset *int, limit *int) (*Check, error) {
+func (r *RepositoryImpl) GetByTeamIDAndMonitorIDAndCheckID(ctx context.Context, teamID uint, monitorID uint, checkID uuid.UUID) (*Check, error) {
 	var check Check
 	err := r.db.WithContext(
 		ctx,
 	).Where(
-		"monitor_id = ? AND id = ?",
-		monitorID,
-		checkID,
-	).Scopes(
-		clickhouse.Paginated(offset, limit),
+		Check{
+			ID:        checkID,
+			TeamID:    uint64(teamID),
+			MonitorID: uint64(monitorID),
+		},
 	).First(
 		&check,
 	).Error
@@ -64,6 +50,33 @@ func (r *RepositoryImpl) GetByIDAndMonitorID(ctx context.Context, monitorID uint
 	return &check, nil
 }
 
+func (r *RepositoryImpl) GetByTeamIDAndMonitorIDPaginated(ctx context.Context, teamID, monitorID uint, offset, limit *int) (*[]Check, error) {
+	var checks []Check
+	err := r.db.WithContext(
+		ctx,
+	).Where(
+		Check{
+			TeamID:    uint64(teamID),
+			MonitorID: uint64(monitorID),
+		},
+	).Order(
+		"created_at desc",
+	).Scopes(
+		clickhouse.Paginated(offset, limit),
+	).Find(
+		&checks,
+	).Error
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return &[]Check{}, nil
+		}
+
+		return nil, err
+	}
+
+	return &checks, nil
+}
+
 type AggMetric struct {
 	Start      string
 	DNS        float64
@@ -73,7 +86,7 @@ type AggMetric struct {
 	Transfer   float64
 }
 
-func (r *RepositoryImpl) GetAggMetrics(ctx context.Context, monitorID uint) (*[]AggMetric, error) {
+func (r *RepositoryImpl) GetMonitorMetricsByMonitorID(ctx context.Context, monitorID uint) (*[]AggMetric, error) {
 	var metrics []AggMetric
 	err := r.db.WithContext(
 		ctx,
