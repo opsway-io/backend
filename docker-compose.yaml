@@ -42,12 +42,14 @@ services:
       - './.data/postgres:/var/lib/posgresql/data'
     ports:
       - '5432:5432'
+
   redis:
     image: 'redis/redis-stack-server:latest'
     restart: unless-stopped
     ports:
       - '6379:6379'
     command: redis-server --protected-mode no
+
   ch_server:
     image: clickhouse/clickhouse-server
     restart: unless-stopped
@@ -60,6 +62,8 @@ services:
       - '9000:9000'
     volumes:
       - './.data/clickhouse:/var/lib/clickhouse'
+    healthcheck:
+      test: wget --no-verbose --tries=1 --spider http://localhost:8123/ping || exit 1
 
   ch_client:
     image: clickhouse/clickhouse-client
@@ -86,10 +90,5 @@ services:
     depends_on:
       - storage
     entrypoint: >
-      /bin/sh -c "
-      /usr/bin/mc config host rm local;
-      /usr/bin/mc config host add --quiet --api s3v4 local http://storage:9001 guest supersecret;
-      
-      /usr/bin/mc mb --quiet local/avatars/;
-      /usr/bin/mc anonymous set download local/avatars;
-      "
+      /bin/sh -c " /usr/bin/mc config host rm local; /usr/bin/mc config host add --quiet --api s3v4 local http://storage:9001 guest supersecret;
+      /usr/bin/mc mb --quiet local/avatars/; /usr/bin/mc anonymous set download local/avatars; "
