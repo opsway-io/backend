@@ -35,14 +35,10 @@ func NewRepository(redis *redis.Client) Repository {
 }
 
 func (r *RepositoryImpl) UseRefreshToken(ctx context.Context, token string) (ok bool, err error) {
-	used, err := r.redis.Do(ctx, "BF.ADD", "refresh_tokens", token).Bool()
+	notSeenBefore, err := r.redis.Do(ctx, "BF.ADD", "refresh_tokens", token).Bool()
 	if err != nil {
 		return false, errors.Wrap(err, "failed to check refresh token")
 	}
 
-	if used {
-		return false, nil
-	}
-
-	return true, nil
+	return notSeenBefore, nil
 }
