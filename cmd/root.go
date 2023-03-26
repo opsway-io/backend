@@ -12,6 +12,7 @@ import (
 	"github.com/opsway-io/backend/internal/rest"
 	"github.com/opsway-io/backend/internal/rest/controllers/authentication"
 	"github.com/opsway-io/backend/internal/storage"
+	"github.com/opsway-io/backend/internal/team"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -34,6 +35,7 @@ type Config struct {
 	Prober         ProberConfig                          `mapstructure:"prober"`
 	HTTPProbe      http.Config                           `mapstructure:"http_probe"`
 	Email          email.Config                          `mapstructure:"email"`
+	Team           team.Config                           `mapstructure:"team"`
 }
 
 var validate = validator.New()

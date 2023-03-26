@@ -22,13 +22,18 @@ type Repository interface {
 	GetUsersByID(ctx context.Context, teamId uint, offset *int, limit *int, query *string) (*[]TeamUser, error)
 	GetUserRole(ctx context.Context, teamID, userID uint) (*entities.TeamRole, error)
 	GetTeamsAndRoleByUserID(ctx context.Context, userID uint) (*[]TeamAndRole, error)
+
+	Update(ctx context.Context, team *entities.Team) error
 	UpdateUserRole(ctx context.Context, teamID, userID uint, role entities.TeamRole) error
 	UpdateDisplayName(ctx context.Context, teamID uint, displayName string) error
+
 	CreateWithOwnerUserID(ctx context.Context, team *entities.Team, ownerUserID uint) error
+
 	Delete(ctx context.Context, id uint) error
-	Update(ctx context.Context, team *entities.Team) error
+
 	RemoveUser(ctx context.Context, teamID, userID uint) error
 	IsNameAvailable(ctx context.Context, name string) (bool, error)
+	IsUserOnTeamByEmail(ctx context.Context, teamID uint, email string) (bool, error)
 }
 
 type RepositoryImpl struct {
@@ -236,4 +241,17 @@ func (s *RepositoryImpl) IsNameAvailable(ctx context.Context, name string) (bool
 	}
 
 	return count == 0, nil
+}
+
+func (s *RepositoryImpl) IsUserOnTeamByEmail(ctx context.Context, teamID uint, email string) (bool, error) {
+	var count int64
+	if err := s.db.WithContext(ctx).Model(&entities.TeamUser{}).
+		Select("team_users.*").
+		Joins("INNER JOIN users ON users.id = team_users.user_id").
+		Where("team_users.team_id = ? AND users.email = ?", teamID, email).
+		Count(&count).Error; err != nil {
+		return false, err
+	}
+
+	return count > 0, nil
 }

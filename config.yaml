@@ -37,6 +37,10 @@ object_storage:
   region: "eu-central-1"
   public_url: "http://localhost:9001"
 
+team:
+  invitation_secret: supersecret
+  application_url: http://localhost:5173
+
 prober:
   concurrency: 1
   

@@ -4,11 +4,24 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"time"
 
+	"github.com/golang-jwt/jwt"
 	"github.com/opsway-io/backend/internal/entities"
+	"github.com/opsway-io/backend/internal/notification/email"
+	"github.com/opsway-io/backend/internal/notification/email/templates"
 	"github.com/opsway-io/backend/internal/storage"
 	"github.com/pkg/errors"
 )
+
+var ErrAlreadyOnTeam = errors.New("user is already on team")
+
+type Config struct {
+	AvatarBucket     string        `mapstructure:"avatars" default:"avatars"`
+	InvitationExpiry time.Duration `mapstructure:"invitation_expiry" default:"168h"` // 7 days default
+	InvitationSecret string        `mapstructure:"invitation_secret" required:"true"`
+	ApplicationURL   string        `mapstructure:"application_url" required:"true"`
+}
 
 type Service interface {
 	CreateWithOwnerUserID(ctx context.Context, team *entities.Team, ownerUserID uint) error
@@ -30,18 +43,23 @@ type Service interface {
 
 	IsNameAvailable(ctx context.Context, name string) (bool, error)
 
-	InviteByEmail(ctx context.Context, teamID uint, email string, role entities.TeamRole) error
+	InviteByEmail(ctx context.Context, teamID uint, role entities.TeamRole, email string) error
+	GenerateInviteLink(ctx context.Context, teamID uint, role entities.TeamRole, email string) (string, error)
 }
 
 type ServiceImpl struct {
+	config     Config
 	repository Repository
 	storage    storage.Service
+	email      email.Sender
 }
 
-func NewService(repository Repository, storage storage.Service) Service {
+func NewService(cfg Config, repository Repository, storage storage.Service, email email.Sender) Service {
 	return &ServiceImpl{
+		config:     cfg,
 		repository: repository,
 		storage:    storage,
+		email:      email,
 	}
 }
 
@@ -122,8 +140,6 @@ func (s *ServiceImpl) GetAvatarURLByID(teamID uint) string {
 }
 
 func (s *ServiceImpl) UpdateUserRole(ctx context.Context, teamID, userID uint, role entities.TeamRole) error {
-	// TODO: make sure team still has at least one owner
-
 	return s.repository.UpdateUserRole(ctx, teamID, userID, role)
 }
 
@@ -135,9 +151,58 @@ func (s *ServiceImpl) IsNameAvailable(ctx context.Context, name string) (bool, e
 	return s.repository.IsNameAvailable(ctx, name)
 }
 
-func (s *ServiceImpl) InviteByEmail(ctx context.Context, teamID uint, email string, role entities.TeamRole) error {
-	// TODO: send email
+func (s *ServiceImpl) InviteByEmail(ctx context.Context, teamID uint, role entities.TeamRole, email string) error {
+	// Check if user is already on the team
+	isOnTeam, err := s.repository.IsUserOnTeamByEmail(ctx, teamID, email)
+	if err != nil {
+		return errors.Wrap(err, "failed to check if user is on team")
+	}
+	if isOnTeam {
+		return ErrAlreadyOnTeam
+	}
+
+	// Get team name
+	team, err := s.repository.GetByID(ctx, teamID)
+	if err != nil {
+		return errors.Wrap(err, "failed to get team")
+	}
+
+	// Generate invite link
+	link, err := s.GenerateInviteLink(ctx, teamID, role, email)
+	if err != nil {
+		return errors.Wrap(err, "failed to generate invite link")
+	}
+
+	// Send email
+	if err := s.email.Send(
+		ctx,
+		"",
+		email,
+		&templates.TeamInvitationTemplate{
+			TeamName:       team.Name,
+			ActivationLink: link,
+		},
+	); err != nil {
+		return errors.Wrap(err, "failed to send email")
+	}
+
 	return nil
+}
+
+func (s *ServiceImpl) GenerateInviteLink(ctx context.Context, teamID uint, role entities.TeamRole, email string) (string, error) {
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
+		"exp":     time.Now().Add(s.config.InvitationExpiry).Unix(),
+		"team_id": teamID,
+		"role":    role,
+		"email":   email,
+	})
+
+	tokenString, err := token.SignedString([]byte(s.config.InvitationSecret))
+	if err != nil {
+		return "", errors.Wrap(err, "failed to sign token")
+	}
+
+	return fmt.Sprintf("%s/teams/invite?token=%s", s.config.ApplicationURL, tokenString), nil
 }
 
 func (s *ServiceImpl) getAvatarKey(teamID uint) string {

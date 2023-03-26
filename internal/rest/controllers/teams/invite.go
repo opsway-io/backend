@@ -23,7 +23,7 @@ func (h *Handlers) PostTeamUsersInvite(c hs.AuthenticatedContext) error {
 		return echo.ErrBadRequest
 	}
 
-	if err := h.TeamService.InviteByEmail(c.Request().Context(), req.TeamID, req.Email, req.Role); err != nil {
+	if err := h.TeamService.InviteByEmail(c.Request().Context(), req.TeamID, req.Role, req.Email); err != nil {
 		c.Log.WithError(err).Debug("failed to invite user to team")
 
 		return echo.ErrInternalServerError
