@@ -31,12 +31,7 @@ func (t *PasswordResetTemplate) PlainText() string {
 	return fmt.Sprintf(`
 Hi {{name}},
 Somebody (hopefully you) has requested a password reset on your opsway account.
-If this was not you, you can safely ignore this email.
-To reset your password, please click the button below.
-%s
-
-Best regards,
-Opsway team
+To reset your password, visit this link: %s
 	`,
 		t.PasswordResetLink,
 	)

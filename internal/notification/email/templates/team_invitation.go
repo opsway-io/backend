@@ -29,11 +29,8 @@ func (t *TeamInvitationTemplate) HTML() string {
 
 func (t *TeamInvitationTemplate) PlainText() string {
 	return fmt.Sprintf(`
-Welcome to team %s!
+You have been invited to join team %s!
 
-Please follow this link to activate your account: %s
-
-Best regards,
-Opsway team
-	`, t.TeamName, t.ActivationLink)
+Visit the following link to accept the invite: %s
+`, t.TeamName, t.ActivationLink)
 }
