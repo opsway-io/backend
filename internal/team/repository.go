@@ -246,7 +246,6 @@ func (s *RepositoryImpl) IsNameAvailable(ctx context.Context, name string) (bool
 func (s *RepositoryImpl) IsUserOnTeamByEmail(ctx context.Context, teamID uint, email string) (bool, error) {
 	var count int64
 	if err := s.db.WithContext(ctx).Model(&entities.TeamUser{}).
-		Select("team_users.*").
 		Joins("INNER JOIN users ON users.id = team_users.user_id").
 		Where("team_users.team_id = ? AND users.email = ?", teamID, email).
 		Count(&count).Error; err != nil {

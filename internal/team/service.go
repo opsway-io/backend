@@ -192,9 +192,10 @@ func (s *ServiceImpl) InviteByEmail(ctx context.Context, teamID uint, role entit
 func (s *ServiceImpl) GenerateInviteLink(ctx context.Context, teamID uint, role entities.TeamRole, email string) (string, error) {
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
 		"exp":     time.Now().Add(s.config.InvitationExpiry).Unix(),
+		"type":    "team-invite",
+		"sub":     email,
 		"team_id": teamID,
 		"role":    role,
-		"email":   email,
 	})
 
 	tokenString, err := token.SignedString([]byte(s.config.InvitationSecret))
