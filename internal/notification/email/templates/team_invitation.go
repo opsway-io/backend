@@ -16,12 +16,12 @@ type TeamInvitationTemplate struct {
 }
 
 func (t *TeamInvitationTemplate) Subject() string {
-	return fmt.Sprintf("Welcome to team %s", t.TeamName)
+	return fmt.Sprintf("Invitation to team %s", t.TeamName)
 }
 
 func (t *TeamInvitationTemplate) HTML() string {
 	return t.Render(teamInvitationTemplateSource, map[string]any{
-		"title":           "Welcome on board!",
+		"title":           fmt.Sprintf("Invitation to team %s", t.TeamName),
 		"activation_link": t.ActivationLink,
 		"team_name":       t.TeamName,
 	})
