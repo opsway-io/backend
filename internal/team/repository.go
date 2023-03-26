@@ -31,7 +31,9 @@ type Repository interface {
 
 	Delete(ctx context.Context, id uint) error
 
+	AddUser(ctx context.Context, teamID, userID uint, role entities.TeamRole) error
 	RemoveUser(ctx context.Context, teamID, userID uint) error
+
 	IsNameAvailable(ctx context.Context, name string) (bool, error)
 	IsUserOnTeamByEmail(ctx context.Context, teamID uint, email string) (bool, error)
 }
@@ -174,6 +176,19 @@ func (s *RepositoryImpl) GetUserRole(ctx context.Context, teamID, userID uint) (
 	}
 
 	return &teamUser.Role, nil
+}
+
+func (s *RepositoryImpl) AddUser(ctx context.Context, teamID, userID uint, role entities.TeamRole) error {
+	return s.db.WithContext(ctx).
+		Where(entities.TeamUser{
+			TeamID: teamID,
+			UserID: userID,
+		}).
+		Assign(entities.TeamUser{
+			Role: role,
+		}).
+		FirstOrCreate(&entities.TeamUser{}).
+		Error
 }
 
 func (s *RepositoryImpl) RemoveUser(ctx context.Context, teamID, userID uint) error {

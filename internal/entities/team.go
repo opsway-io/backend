@@ -77,6 +77,33 @@ const (
 	TeamRoleMember TeamRole = "MEMBER"
 )
 
+func (r TeamRole) IsValid() bool {
+	switch r {
+	case TeamRoleOwner, TeamRoleAdmin, TeamRoleMember:
+		return true
+	default:
+		return false
+	}
+}
+
+func TeamRoleFrom(source any) (TeamRole, error) {
+	s, ok := source.(string)
+	if !ok {
+		return "", errors.New("invalid team role type, must be string")
+	}
+
+	switch s {
+	case "OWNER":
+		return TeamRoleOwner, nil
+	case "ADMIN":
+		return TeamRoleAdmin, nil
+	case "MEMBER":
+		return TeamRoleMember, nil
+	default:
+		return "", errors.New("invalid team role")
+	}
+}
+
 type TeamUser struct {
 	UserID    uint     `gorm:"primaryKey;autoIncrement:false"`
 	TeamID    uint     `gorm:"primaryKey;autoIncrement:false"`

@@ -14,7 +14,10 @@ import (
 	"github.com/pkg/errors"
 )
 
-var ErrAlreadyOnTeam = errors.New("user is already on team")
+var (
+	ErrAlreadyOnTeam          = errors.New("user is already on team")
+	ErrInvalidInvitationToken = errors.New("invalid invitation token")
+)
 
 type Config struct {
 	AvatarBucket     string        `mapstructure:"avatars" default:"avatars"`
@@ -45,6 +48,7 @@ type Service interface {
 
 	InviteByEmail(ctx context.Context, teamID uint, role entities.TeamRole, email string) error
 	GenerateInviteLink(ctx context.Context, teamID uint, role entities.TeamRole, email string) (string, error)
+	AcceptInviteByToken(ctx context.Context, token string, user entities.User) error
 }
 
 type ServiceImpl struct {
@@ -204,6 +208,62 @@ func (s *ServiceImpl) GenerateInviteLink(ctx context.Context, teamID uint, role 
 	}
 
 	return fmt.Sprintf("%s/teams/invite?token=%s", s.config.ApplicationURL, tokenString), nil
+}
+
+func (s *ServiceImpl) AcceptInviteByToken(ctx context.Context, tokenString string, user entities.User) error {
+	// Parse and validate token
+	token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
+		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
+			return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
+		}
+
+		return []byte(s.config.InvitationSecret), nil
+	})
+	if err != nil {
+		return errors.Wrap(err, "failed to parse token")
+	}
+
+	claims, ok := token.Claims.(jwt.MapClaims)
+	if !ok {
+		return errors.New("failed to parse token claims")
+	}
+	if !token.Valid {
+		return errors.New("invalid token")
+	}
+
+	// Check token type
+	if claims["type"] != "team-invite" {
+		return errors.New("invalid token type")
+	}
+
+	// Check user email matches token email
+	if claims["sub"] != user.Email {
+		return errors.New("token email does not match user email")
+	}
+
+	// Get role
+	role, err := entities.TeamRoleFrom(claims["role"])
+	if err != nil {
+		return errors.Wrap(err, "failed to get role")
+	}
+
+	// Get team ID
+	teamID, ok := claims["team_id"].(uint)
+	if !ok {
+		return errors.New("failed to get team ID")
+	}
+
+	// Add user to team
+	if err := s.repository.AddUser(
+		ctx,
+		teamID,
+		user.ID,
+		role,
+	); err != nil {
+		return errors.Wrap(err, "failed to add user to team")
+	}
+
+	return nil
 }
 
 func (s *ServiceImpl) getAvatarKey(teamID uint) string {
