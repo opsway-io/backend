@@ -24,6 +24,7 @@ type Service interface {
 	Update(ctx context.Context, user *entities.User) error
 	Delete(ctx context.Context, id uint) error
 
+	GetUserByID(ctx context.Context, id uint) (*entities.User, error)
 	GetUserAndTeamsByUserID(ctx context.Context, userId uint) (*entities.User, error)
 	GetUserAndTeamsByEmailAddress(ctx context.Context, email string) (*entities.User, error)
 
@@ -53,6 +54,10 @@ func NewService(repository Repository, cache Cache, storage storage.Service, ema
 		email:      email,
 		event:      event,
 	}
+}
+
+func (s *ServiceImpl) GetUserByID(ctx context.Context, id uint) (*entities.User, error) {
+	return s.repository.GetUserByID(ctx, id)
 }
 
 func (s *ServiceImpl) GetUserAndTeamsByUserID(ctx context.Context, userId uint) (*entities.User, error) {

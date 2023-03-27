@@ -37,6 +37,7 @@ func Register(
 
 	e.POST("/teams", AuthHandler(h.PostTeam), AuthGuard())
 	e.POST("/teams/available", AuthHandler(h.PostTeamAvailable), AuthGuard())
+	e.POST("/teams/invites/accept", AuthHandler(h.PostTeamInvitesAccept), AuthGuard())
 
 	teamsGroup := e.Group(
 		"/teams/:teamId",
@@ -52,7 +53,7 @@ func Register(
 	teamsGroup.DELETE("/users/:userId", AuthHandler(h.DeleteTeamUser), AllowedRoles(mw.UserRoleOwner, mw.UserRoleAdmin))
 	teamsGroup.PUT("/users/:userId", AuthHandler(h.PutTeamUser), AllowedRoles(mw.UserRoleOwner, mw.UserRoleAdmin))
 
-	teamsGroup.POST("/users/invite", AuthHandler(h.PostTeamUsersInvite), AllowedRoles(mw.UserRoleOwner, mw.UserRoleAdmin))
+	teamsGroup.POST("/users/invites", AuthHandler(h.PostTeamUsersInvites), AllowedRoles(mw.UserRoleOwner, mw.UserRoleAdmin))
 
 	teamsGroup.PUT("/avatar", AuthHandler(h.PutTeamAvatar), AllowedRoles(mw.UserRoleOwner, mw.UserRoleAdmin))
 	teamsGroup.DELETE("/avatar", AuthHandler(h.DeleteTeamAvatar), AllowedRoles(mw.UserRoleOwner, mw.UserRoleAdmin))

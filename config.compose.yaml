@@ -10,7 +10,7 @@ authentication:
   audience: "https://opsway.io"
   issuer: "opsway.io"
   expires_in: 24h
-  refresh_expires_in: 720h 
+  refresh_expires_in: 720h
 
 postgres:
   dsn: "host=postgres user=postgres password=pass dbname=opsway port=5432 sslmode=disable"
@@ -39,3 +39,7 @@ object_storage:
 
 prober:
   concurrency: 1
+
+team:
+  invitation_secret: supersecret
+  application_url: http://localhost:5173

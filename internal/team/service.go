@@ -48,7 +48,7 @@ type Service interface {
 
 	InviteByEmail(ctx context.Context, teamID uint, role entities.TeamRole, email string) error
 	GenerateInviteLink(ctx context.Context, teamID uint, role entities.TeamRole, email string) (string, error)
-	AcceptInviteByToken(ctx context.Context, token string, user entities.User) error
+	AcceptInviteByToken(ctx context.Context, token string, user *entities.User) error
 }
 
 type ServiceImpl struct {
@@ -207,10 +207,10 @@ func (s *ServiceImpl) GenerateInviteLink(ctx context.Context, teamID uint, role 
 		return "", errors.Wrap(err, "failed to sign token")
 	}
 
-	return fmt.Sprintf("%s/teams/invite?token=%s", s.config.ApplicationURL, tokenString), nil
+	return fmt.Sprintf("%s/login/team/invite?token=%s", s.config.ApplicationURL, tokenString), nil
 }
 
-func (s *ServiceImpl) AcceptInviteByToken(ctx context.Context, tokenString string, user entities.User) error {
+func (s *ServiceImpl) AcceptInviteByToken(ctx context.Context, tokenString string, user *entities.User) error {
 	// Parse and validate token
 	token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
 		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
@@ -247,16 +247,15 @@ func (s *ServiceImpl) AcceptInviteByToken(ctx context.Context, tokenString strin
 		return errors.Wrap(err, "failed to get role")
 	}
 
+	fmt.Println(claims)
+
 	// Get team ID
-	teamID, ok := claims["team_id"].(uint)
-	if !ok {
-		return errors.New("failed to get team ID")
-	}
+	teamID := uint(claims["team_id"].(float64))
 
 	// Add user to team
 	if err := s.repository.AddUser(
 		ctx,
-		teamID,
+		uint(teamID),
 		user.ID,
 		role,
 	); err != nil {
