@@ -71,13 +71,13 @@ func (s *RepositoryImpl) GetUsersByID(ctx context.Context, teamId uint, offset *
 	s.db.WithContext(ctx).
 		Select("u.*, tu.role").
 		Table("team_users as tu").
+		Where("tu.team_id = ?", teamId).
 		Joins("INNER JOIN users as u ON u.id = tu.user_id").
 		Scopes(
 			postgres.Paginated(offset, limit),
 			postgres.IncludeTotalCount("total_count"),
 			postgres.Search([]string{"u.name", "u.display_name", "u.email"}, query),
 		).
-		Where("tu.team_id = ?", teamId).
 		Find(&users)
 
 	return &users, nil
