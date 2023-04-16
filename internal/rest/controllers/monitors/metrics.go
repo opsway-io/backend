@@ -47,21 +47,19 @@ func (h *Handlers) GetMonitorMetrics(c hs.AuthenticatedContext) error {
 		return echo.ErrInternalServerError
 	}
 
-	metricMap := map[string][]MonitorMetrics{}
-	for _, c := range *metrics {
-		metricMap["DNS"] = append(metricMap["DNS"], MonitorMetrics{Start: c.Start, Timing: time.Duration(c.DNS)})
-		metricMap["TCP"] = append(metricMap["TCP"], MonitorMetrics{Start: c.Start, Timing: time.Duration(c.TCP)})
-		metricMap["TLS"] = append(metricMap["TLS"], MonitorMetrics{Start: c.Start, Timing: time.Duration(c.TLS)})
-		metricMap["Processing"] = append(metricMap["Processing"], MonitorMetrics{Start: c.Start, Timing: time.Duration(c.Processing)})
-		metricMap["Transfer"] = append(metricMap["Transfer"], MonitorMetrics{Start: c.Start, Timing: time.Duration(c.Transfer)})
+	metrics_list := []string{"DNS", "TCP", "TLS", "Processing", "Transfer"}
+	metricResp := make([]GetMonitorMetricsResponseMetric, len(metrics_list))
+
+	for i, metric := range metrics_list {
+		metricResp[i] = GetMonitorMetricsResponseMetric{Name: metric, Data: []MonitorMetrics{}}
 	}
 
-	metricResp := make([]GetMonitorMetricsResponseMetric, len(metricMap))
-
-	i := 0
-	for key, values := range metricMap {
-		metricResp[i] = GetMonitorMetricsResponseMetric{Name: key, Data: values}
-		i += 1
+	for _, c := range *metrics {
+		metricResp[0].Data = append(metricResp[0].Data, MonitorMetrics{Start: c.Start, Timing: time.Duration(c.DNS)})
+		metricResp[1].Data = append(metricResp[1].Data, MonitorMetrics{Start: c.Start, Timing: time.Duration(c.TCP)})
+		metricResp[2].Data = append(metricResp[2].Data, MonitorMetrics{Start: c.Start, Timing: time.Duration(c.TLS)})
+		metricResp[3].Data = append(metricResp[3].Data, MonitorMetrics{Start: c.Start, Timing: time.Duration(c.Processing)})
+		metricResp[4].Data = append(metricResp[4].Data, MonitorMetrics{Start: c.Start, Timing: time.Duration(c.Transfer)})
 	}
 
 	return c.JSON(http.StatusOK, GetMonitorMetricsRespone{Metrics: metricResp})
