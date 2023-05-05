@@ -50,7 +50,6 @@ func (s *CookieServiceImpl) SetRefreshToken(c echo.Context, value string) error 
 	cookie.Name = RefreshTokenCookieName
 	cookie.Value = value
 	cookie.Expires = time.Now().Add(s.authConfig.RefreshExpiresIn)
-	cookie.MaxAge = int(s.authConfig.RefreshExpiresIn.Seconds())
 	cookie.Domain = s.authConfig.CookieDomain
 	cookie.Path = "/"
 	cookie.SameSite = http.SameSiteLaxMode

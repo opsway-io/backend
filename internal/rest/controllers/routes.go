@@ -29,7 +29,7 @@ func Register(
 	monitorService monitor.Service,
 	checkService check.Service,
 ) {
-	AuthGuard := middleware.AuthGuardFactory(logger, cookieService, authenticationService)
+	AuthGuard := middleware.AuthGuardFactory(logger, authenticationService)
 
 	root := e.Group(
 		"/v1",

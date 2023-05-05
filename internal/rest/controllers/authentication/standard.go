@@ -19,7 +19,9 @@ type PostLoginRequest struct {
 }
 
 type PostLoginResponse struct {
-	User PostLoginResponseUser `json:"user"`
+	User         PostLoginResponseUser `json:"user"`
+	AccessToken  string                `json:"accessToken"`
+	RefreshToken string                `json:"refreshToken"`
 }
 
 type PostLoginResponseUser struct {
@@ -72,13 +74,16 @@ func (h *Handlers) PostLogin(c hs.BaseContext) error {
 
 	c.Log.Info("user authenticated")
 
-	h.CookieService.SetRefreshToken(c, refreshToken)
-	h.CookieService.SetAccessToken(c, accessToken)
-
-	return c.JSON(http.StatusOK, newPostLoginResponse(user, h.UserService, h.TeamService))
+	return c.JSON(http.StatusOK, newPostLoginResponse(
+		user,
+		accessToken,
+		refreshToken,
+		h.UserService,
+		h.TeamService,
+	))
 }
 
-func newPostLoginResponse(user *entities.User, userService user.Service, teamService team.Service) PostLoginResponse {
+func newPostLoginResponse(user *entities.User, accessToken, refreshToken string, userService user.Service, teamService team.Service) PostLoginResponse {
 	teams := make([]PostLoginResponseTeam, len(user.Teams))
 	for i, team := range user.Teams {
 		teams[i] = PostLoginResponseTeam{
@@ -102,6 +107,8 @@ func newPostLoginResponse(user *entities.User, userService user.Service, teamSer
 			CreatedAt:   user.CreatedAt,
 			UpdatedAt:   user.UpdatedAt,
 		},
+		AccessToken:  accessToken,
+		RefreshToken: refreshToken,
 	}
 
 	if user.HasAvatar {
