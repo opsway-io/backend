@@ -4,8 +4,9 @@ import (
 	"github.com/golang-jwt/jwt"
 )
 
-type Claims struct {
+type AccessClaims struct {
 	jwt.StandardClaims
+	Type string `json:"type"`
 }
 
 type RefreshClaims struct {

@@ -44,11 +44,11 @@ services:
       - '5432:5432'
 
   redis:
-    image: 'redis/redis-stack-server:latest'
+    image: 'redis/redis-stack:latest'
     restart: unless-stopped
     ports:
       - '6379:6379'
-    command: redis-server --protected-mode no
+      - '8002:8001'
 
   ch_server:
     image: clickhouse/clickhouse-server

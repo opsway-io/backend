@@ -10,38 +10,53 @@ import (
 	"github.com/opsway-io/backend/internal/rest/controllers/monitors"
 	"github.com/opsway-io/backend/internal/rest/controllers/teams"
 	"github.com/opsway-io/backend/internal/rest/controllers/users"
+	"github.com/opsway-io/backend/internal/rest/helpers"
+	"github.com/opsway-io/backend/internal/rest/middleware"
 	"github.com/opsway-io/backend/internal/team"
 	"github.com/opsway-io/backend/internal/user"
 	"github.com/sirupsen/logrus"
 )
 
 func Register(
-	e *echo.Group,
+	e *echo.Echo,
 	logger *logrus.Entry,
 	oAuthConfig *authentication.OAuthConfig,
+	authConfig *auth.Config,
+	cookieService helpers.CookieService,
 	authenticationService auth.Service,
 	userService user.Service,
 	teamService team.Service,
 	monitorService monitor.Service,
 	checkService check.Service,
 ) {
+	AuthGuard := middleware.AuthGuardFactory(logger, cookieService, authenticationService)
+
+	root := e.Group(
+		"/v1",
+	)
+
+	authRoot := root.Group(
+		"",
+		AuthGuard(),
+	)
+
 	// Healthz
 
-	healthz.Register(e, logger)
+	healthz.Register(root, logger)
 
 	// Authentication
 
-	authentication.Register(e, logger, oAuthConfig, authenticationService, teamService, userService)
+	authentication.Register(root, logger, cookieService, oAuthConfig, authConfig, authenticationService, teamService, userService)
 
 	// Users
 
-	users.Register(e, logger, authenticationService, teamService, userService)
+	users.Register(authRoot, logger, teamService, userService)
 
 	// Teams
 
-	teams.Register(e, logger, authenticationService, teamService, userService)
+	teams.Register(authRoot, logger, teamService, userService)
 
 	// Monitors
 
-	monitors.Register(e, logger, authenticationService, teamService, monitorService, checkService)
+	monitors.Register(authRoot, logger, teamService, monitorService, checkService)
 }

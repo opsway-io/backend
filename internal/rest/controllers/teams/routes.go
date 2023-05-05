@@ -19,29 +19,25 @@ type Handlers struct {
 func Register(
 	e *echo.Group,
 	logger *logrus.Entry,
-	authenticationService authentication.Service,
 	teamService team.Service,
 	userService user.Service,
 ) {
 	h := &Handlers{
-		AuthenticationService: authenticationService,
-		TeamService:           teamService,
-		UserService:           userService,
+		TeamService: teamService,
+		UserService: userService,
 	}
 
-	AuthGuard := mw.AuthGuardFactory(logger, authenticationService)
 	TeamGuard := mw.TeamGuardFactory(logger, teamService)
 	AllowedRoles := mw.RoleGuardFactory(logger, teamService)
 
 	AuthHandler := handlers.AuthenticatedHandlerFactory(logger)
 
-	e.POST("/teams", AuthHandler(h.PostTeam), AuthGuard())
-	e.POST("/teams/available", AuthHandler(h.PostTeamAvailable), AuthGuard())
-	e.POST("/teams/invites/accept", AuthHandler(h.PostTeamInvitesAccept), AuthGuard())
+	e.POST("/teams", AuthHandler(h.PostTeam))
+	e.POST("/teams/available", AuthHandler(h.PostTeamAvailable))
+	e.POST("/teams/invites/accept", AuthHandler(h.PostTeamInvitesAccept))
 
 	teamsGroup := e.Group(
 		"/teams/:teamId",
-		AuthGuard(),
 		TeamGuard(),
 	)
 

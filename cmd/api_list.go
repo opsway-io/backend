@@ -31,8 +31,10 @@ func runGenerate(cmd *cobra.Command, args []string) {
 	e := echo.New()
 
 	controllers.Register(
-		e.Group(""),
+		e,
 		&logrus.Entry{},
+		nil,
+		nil,
 		nil,
 		nil,
 		nil,

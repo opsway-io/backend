@@ -3,9 +3,7 @@ package authentication
 import (
 	"context"
 	"errors"
-	"fmt"
 	"net/http"
-	"time"
 
 	"github.com/labstack/echo/v4"
 	"github.com/markbates/goth"
@@ -28,8 +26,6 @@ type OAuthConfig struct {
 
 	SuccessURL string `mapstructure:"success_url" default:"/login/oauth"`
 	FailureURL string `mapstructure:"failure_url" default:"/login"`
-
-	CookieDomain string `mapstructure:"cookie_domain"`
 }
 
 func (h *Handlers) GetOAuthLogin(c hs.BaseContext) error {
@@ -62,34 +58,8 @@ func (h *Handlers) GetOAuthCallback(c hs.BaseContext) error {
 		return c.Redirect(http.StatusTemporaryRedirect, h.OAuthConfig.FailureURL)
 	}
 
-	c.SetCookie(&http.Cookie{
-		Name:     "refresh_token",
-		Value:    refreshToken,
-		Path:     "/",
-		Domain:   h.OAuthConfig.CookieDomain,
-		SameSite: http.SameSiteLaxMode,
-		Expires:  time.Now().Add(1 * time.Minute),
-	})
-
-	c.SetCookie(&http.Cookie{
-		Name:     "access_token",
-		Value:    accessToken,
-		Domain:   h.OAuthConfig.CookieDomain,
-		Path:     "/",
-		SameSite: http.SameSiteLaxMode,
-		Expires:  time.Now().Add(1 * time.Minute),
-	})
-
-	if len(user.Teams) > 0 {
-		c.SetCookie(&http.Cookie{
-			Name:     "team_id",
-			Value:    fmt.Sprintf("%d", user.Teams[0].ID),
-			Path:     "/",
-			Domain:   h.OAuthConfig.CookieDomain,
-			SameSite: http.SameSiteLaxMode,
-			Expires:  time.Now().Add(1 * time.Minute),
-		})
-	}
+	h.CookieService.SetRefreshToken(c, refreshToken)
+	h.CookieService.SetAccessToken(c, accessToken)
 
 	return c.Redirect(http.StatusTemporaryRedirect, h.OAuthConfig.SuccessURL)
 }

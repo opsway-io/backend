@@ -14,7 +14,7 @@ type AuthenticatedHandlerFunc func(c AuthenticatedContext) error
 type AuthenticatedContext struct {
 	echo.Context
 	Log      *logrus.Entry
-	Claims   authentication.Claims
+	Claims   authentication.AccessClaims
 	UserID   uint
 	TeamRole *entities.TeamRole
 }
@@ -22,7 +22,7 @@ type AuthenticatedContext struct {
 func AuthenticatedHandlerFactory(logger *logrus.Entry) func(handler AuthenticatedHandlerFunc) func(c echo.Context) error {
 	return func(handler AuthenticatedHandlerFunc) func(c echo.Context) error {
 		return func(c echo.Context) error {
-			claims, ok := c.Get("jwt_claims").(*authentication.Claims)
+			claims, ok := c.Get("jwt_claims").(*authentication.AccessClaims)
 			if !ok {
 				logger.Debug("missing jwt_claims")
 

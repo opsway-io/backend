@@ -16,7 +16,7 @@ func TeamGuardFactory(logger *logrus.Entry, teamService team.Service) func() fun
 	return func() func(next echo.HandlerFunc) echo.HandlerFunc {
 		return func(next echo.HandlerFunc) echo.HandlerFunc {
 			return func(c echo.Context) error {
-				claims, ok := c.Get("jwt_claims").(*authentication.Claims)
+				claims, ok := c.Get("jwt_claims").(*authentication.AccessClaims)
 				if !ok {
 					l.Debug("missing jwt_claims")
 

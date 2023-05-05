@@ -1,39 +1,27 @@
 package middleware
 
 import (
-	"strings"
-
 	"github.com/labstack/echo/v4"
 	"github.com/opsway-io/backend/internal/authentication"
+	"github.com/opsway-io/backend/internal/rest/helpers"
 	"github.com/sirupsen/logrus"
 )
 
 // Allows only authenticated users to access the route
-func AuthGuardFactory(logger *logrus.Entry, jwtService authentication.Service) func() func(next echo.HandlerFunc) echo.HandlerFunc {
+func AuthGuardFactory(logger *logrus.Entry, cookieService helpers.CookieService, jwtService authentication.Service) func() func(next echo.HandlerFunc) echo.HandlerFunc {
 	l := logger.WithField("middleware", "auth_guard")
 
 	return func() func(next echo.HandlerFunc) echo.HandlerFunc {
 		return func(next echo.HandlerFunc) echo.HandlerFunc {
 			return func(c echo.Context) error {
-				header := c.Request().Header.Get("Authorization")
-				if header == "" {
-					l.Debug("missing authorization header")
+				cookie, err := cookieService.GetAccessToken(c)
+				if err != nil {
+					l.WithError(err).Debug("failed to get access token cookie")
 
 					return echo.ErrUnauthorized
 				}
 
-				typ, token, ok := strings.Cut(header, " ")
-				if !ok {
-					l.Debug("invalid authorization token type")
-
-					return echo.ErrUnauthorized
-				}
-
-				if typ != "Bearer" {
-					l.Debug("authorization token not Bearer")
-
-					return echo.ErrUnauthorized
-				}
+				token := cookie.Value
 
 				valid, claims, err := jwtService.Verify(c.Request().Context(), token)
 				if err != nil {

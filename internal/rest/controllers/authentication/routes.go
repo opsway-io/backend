@@ -7,29 +7,36 @@ import (
 	"github.com/markbates/goth/providers/google"
 	"github.com/opsway-io/backend/internal/authentication"
 	"github.com/opsway-io/backend/internal/rest/handlers"
+	"github.com/opsway-io/backend/internal/rest/helpers"
 	"github.com/opsway-io/backend/internal/team"
 	"github.com/opsway-io/backend/internal/user"
 	"github.com/sirupsen/logrus"
 )
 
 type Handlers struct {
+	CookieService         helpers.CookieService
 	AuthenticationService authentication.Service
 	TeamService           team.Service
 	UserService           user.Service
 	OAuthConfig           *OAuthConfig
+	AuthConfig            *authentication.Config
 }
 
 func Register(
 	e *echo.Group,
 	logger *logrus.Entry,
+	cookieService helpers.CookieService,
 	oAuthConfig *OAuthConfig,
+	AuthConfig *authentication.Config,
 	authenticationService authentication.Service,
 	teamService team.Service,
 	userService user.Service,
 ) {
 	h := &Handlers{
+		CookieService:         cookieService,
 		OAuthConfig:           oAuthConfig,
 		AuthenticationService: authenticationService,
+		AuthConfig:            AuthConfig,
 		TeamService:           teamService,
 		UserService:           userService,
 	}

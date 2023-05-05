@@ -16,7 +16,7 @@ import (
 type Service interface {
 	Generate(ctx context.Context, user *entities.User) (newAccessToken string, newRefreshToken string, err error)
 	Refresh(ctx context.Context, refreshToken string) (newAccessToken string, newRefreshToken string, err error)
-	Verify(ctx context.Context, accessToken string) (valid bool, claims *Claims, err error)
+	Verify(ctx context.Context, accessToken string) (valid bool, claims *AccessClaims, err error)
 }
 
 type Config struct {
@@ -25,6 +25,7 @@ type Config struct {
 	RefreshExpiresIn time.Duration `mapstructure:"refresh_expires_in"`
 	Issuer           string        `mapstructure:"issuer"`
 	Audience         string        `mapstructure:"audience"`
+	CookieDomain     string        `mapstructure:"cookie_domain"`
 }
 
 type ServiceImpl struct {
@@ -47,7 +48,7 @@ func (s *ServiceImpl) Generate(ctx context.Context, user *entities.User) (access
 	return s.generateTokenPair(ctx, subject)
 }
 
-func (s *ServiceImpl) Refresh(ctx context.Context, refreshToken string) (newAccessToken string, newRefreshToken string, err error) {
+func (s *ServiceImpl) Refresh(ctx context.Context, refreshToken string) (string, string, error) {
 	valid, claims, err := s.verifyRefreshToken(ctx, refreshToken)
 	if err != nil {
 		return "", "", errors.Wrap(err, "failed to verify token")
@@ -60,13 +61,17 @@ func (s *ServiceImpl) Refresh(ctx context.Context, refreshToken string) (newAcce
 	return s.generateTokenPair(ctx, claims.Subject)
 }
 
-func (s *ServiceImpl) Verify(ctx context.Context, accessToken string) (bool, *Claims, error) {
-	claims := &Claims{}
+func (s *ServiceImpl) Verify(ctx context.Context, accessToken string) (bool, *AccessClaims, error) {
+	claims := &AccessClaims{}
 	token, err := jwt.ParseWithClaims(accessToken, claims, func(token *jwt.Token) (interface{}, error) {
 		return []byte(s.Config.Secret), nil
 	})
 	if err != nil {
 		return false, nil, errors.Wrap(err, "failed to parse token")
+	}
+
+	if claims.Type != "access_token" {
+		return false, nil, errors.New("invalid token type")
 	}
 
 	if !token.Valid {
@@ -77,6 +82,8 @@ func (s *ServiceImpl) Verify(ctx context.Context, accessToken string) (bool, *Cl
 }
 
 func (s *ServiceImpl) verifyRefreshToken(ctx context.Context, refreshToken string) (bool, *RefreshClaims, error) {
+	fmt.Println(refreshToken)
+
 	claims := &RefreshClaims{}
 	token, err := jwt.ParseWithClaims(refreshToken, claims, func(token *jwt.Token) (interface{}, error) {
 		return []byte(s.Config.Secret), nil
@@ -99,6 +106,7 @@ func (s *ServiceImpl) verifyRefreshToken(ctx context.Context, refreshToken strin
 	}
 
 	if !ok {
+		fmt.Println("fuck")
 		return false, nil, nil
 	}
 
@@ -127,8 +135,8 @@ func (s *ServiceImpl) signClaims(claims jwt.Claims) (string, error) {
 	return token.SignedString([]byte(s.Config.Secret))
 }
 
-func (s *ServiceImpl) newAccessTokenClaims(subject string) Claims {
-	return Claims{
+func (s *ServiceImpl) newAccessTokenClaims(subject string) AccessClaims {
+	return AccessClaims{
 		StandardClaims: jwt.StandardClaims{
 			Id:        uuid.New().String(),
 			ExpiresAt: time.Now().Add(s.Config.ExpiresIn).Unix(),
@@ -138,6 +146,7 @@ func (s *ServiceImpl) newAccessTokenClaims(subject string) Claims {
 			Subject:   subject,
 			Audience:  s.Config.Audience,
 		},
+		Type: "access_token",
 	}
 }
 

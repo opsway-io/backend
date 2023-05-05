@@ -19,17 +19,14 @@ type Handlers struct {
 func Register(
 	e *echo.Group,
 	logger *logrus.Entry,
-	authenticationService authentication.Service,
 	teamService team.Service,
 	userService user.Service,
 ) {
 	h := &Handlers{
-		AuthenticationService: authenticationService,
-		TeamService:           teamService,
-		UserService:           userService,
+		TeamService: teamService,
+		UserService: userService,
 	}
 
-	AuthGuard := mw.AuthGuardFactory(logger, authenticationService)
 	CurrentUserGuard := mw.CurrentUserGuardFactory(logger)
 
 	BaseHandler := handlers.BaseHandlerFactory(logger)
@@ -40,7 +37,6 @@ func Register(
 
 	usersGroup := e.Group(
 		"/users/:userId",
-		AuthGuard(),
 		CurrentUserGuard(),
 	)
 

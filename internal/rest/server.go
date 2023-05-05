@@ -31,6 +31,7 @@ type Server struct {
 func NewServer(
 	conf Config,
 	oauthConfig *authentication.OAuthConfig,
+	authConfig *auth.Config,
 	logger *logrus.Logger,
 	authenticationService auth.Service,
 	userService user.Service,
@@ -38,6 +39,8 @@ func NewServer(
 	monitorService monitor.Service,
 	checkService check.Service,
 ) (*Server, error) {
+	cookieService := helpers.NewCookieService(authConfig)
+
 	e := echo.New()
 
 	e.HideBanner = true
@@ -56,12 +59,12 @@ func NewServer(
 		}),
 	)
 
-	root := e.Group("/v1")
-
 	controllers.Register(
-		root,
+		e,
 		logger.WithField("module", "rest_controllers"),
 		oauthConfig,
+		authConfig,
+		cookieService,
 		authenticationService,
 		userService,
 		teamService,
