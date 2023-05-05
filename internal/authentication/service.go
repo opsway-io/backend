@@ -26,6 +26,7 @@ type Config struct {
 	Issuer           string        `mapstructure:"issuer"`
 	Audience         string        `mapstructure:"audience"`
 	CookieDomain     string        `mapstructure:"cookie_domain"`
+	CookieSecure     bool          `mapstructure:"cookie_secure" default:"false"`
 }
 
 type ServiceImpl struct {

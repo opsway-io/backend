@@ -12,6 +12,7 @@ authentication:
   expires_in: 24h
   refresh_expires_in: 720h 
   cookie_domain: localhost
+  cookie_secure: false
 
 postgres:
   dsn: "host=localhost user=postgres password=pass dbname=opsway port=5432 sslmode=disable" 

@@ -37,6 +37,8 @@ func (s *CookieServiceImpl) SetAccessToken(c echo.Context, value string) error {
 	cookie.Expires = time.Now().Add(s.authConfig.RefreshExpiresIn)
 	cookie.Domain = s.authConfig.CookieDomain
 	cookie.Path = "/"
+	cookie.SameSite = http.SameSiteLaxMode
+	cookie.Secure = s.authConfig.CookieSecure
 
 	c.SetCookie(cookie)
 
@@ -51,6 +53,8 @@ func (s *CookieServiceImpl) SetRefreshToken(c echo.Context, value string) error 
 	cookie.MaxAge = int(s.authConfig.RefreshExpiresIn.Seconds())
 	cookie.Domain = s.authConfig.CookieDomain
 	cookie.Path = "/"
+	cookie.SameSite = http.SameSiteLaxMode
+	cookie.Secure = s.authConfig.CookieSecure
 
 	c.SetCookie(cookie)
 
