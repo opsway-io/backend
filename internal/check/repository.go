@@ -16,6 +16,7 @@ type Repository interface {
 	GetByTeamIDAndMonitorIDAndCheckID(ctx context.Context, teamID uint, monitorID uint, checkID uuid.UUID) (*Check, error)
 	GetByTeamIDAndMonitorIDPaginated(ctx context.Context, teamID, monitorID uint, offset, limit *int) (*[]Check, error)
 	GetMonitorMetricsByMonitorID(ctx context.Context, monitorID uint) (*[]AggMetric, error)
+	GetMonitorOverviewsByTeamID(ctx context.Context, teamID uint) (*[]MonitorOverviews, error)
 }
 
 type RepositoryImpl struct {
@@ -108,4 +109,31 @@ func (r *RepositoryImpl) GetMonitorMetricsByMonitorID(ctx context.Context, monit
 
 func (r *RepositoryImpl) Create(ctx context.Context, check *Check) error {
 	return r.db.WithContext(ctx).Create(check).Error
+}
+
+type MonitorOverviews struct {
+	MonitorID uint
+	Start     string
+	P99       float32
+	P95       float32
+	Stats     []float64 `gorm:"type:float"`
+}
+
+func (r *RepositoryImpl) GetMonitorOverviewsByTeamID(ctx context.Context, teamID uint) (*[]MonitorOverviews, error) {
+	var overviews []MonitorOverviews
+	err := r.db.WithContext(
+		ctx,
+	).Table("checks").Select(`
+		monitor_id,
+		tumbleStart(wndw) as start, 
+		quantile(0.99)(timing_total)/1000000 as p99, 
+		quantile(0.95)(timing_total)/1000000 as p95,
+		groupArray(24)(timing_total/1000000) as stats`).
+		Where("team_id = ?", teamID).
+		Group("tumble(toDateTime(created_at), INTERVAL 1 HOUR) as wndw, monitor_id").
+		Where("created_at BETWEEN DATE_SUB(NOW(), INTERVAL 1 DAY) AND NOW()").
+		Order("start ASC").
+		Find(&overviews).Error
+
+	return &overviews, err
 }

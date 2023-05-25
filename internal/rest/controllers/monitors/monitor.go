@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/labstack/echo/v4"
+	"github.com/opsway-io/backend/internal/check"
 	"github.com/opsway-io/backend/internal/entities"
 	"github.com/opsway-io/backend/internal/monitor"
 	hs "github.com/opsway-io/backend/internal/rest/handlers"
@@ -32,6 +33,9 @@ type GetMonitorResponseMonitor struct {
 	Settings  GetMonitorResponseMonitorSettings `json:"settings"`
 	CreatedAt time.Time                         `json:"createdAt"`
 	UpdatedAt time.Time                         `json:"updatedAt"`
+	P99       uint                              `json:"p99"`
+	P95       uint                              `json:"p95"`
+	Stats     []float64                         `json:"stats"`
 }
 
 type GetMonitorResponseMonitorSettings struct {
@@ -58,7 +62,14 @@ func (h *Handlers) GetMonitors(c hs.AuthenticatedContext) error {
 		return echo.ErrInternalServerError
 	}
 
-	resp, err := newGetMonitorsResponse(monitors)
+	monitorStats, err := h.CheckService.GetMonitorOverviewsByTeamID(c.Request().Context(), req.TeamID)
+	if err != nil {
+		c.Log.WithError(err).Error("failed to get monitor overviews")
+
+		return echo.ErrInternalServerError
+	}
+
+	resp, err := newGetMonitorsResponse(monitors, monitorStats)
 	if err != nil {
 		c.Log.WithError(err).Error("failed to create GetMonitorsResponse")
 
@@ -68,8 +79,13 @@ func (h *Handlers) GetMonitors(c hs.AuthenticatedContext) error {
 	return c.JSON(http.StatusOK, resp)
 }
 
-func newGetMonitorsResponse(monitors *[]monitor.MonitorWithTotalCount) (*GetMonitorsResponse, error) {
+func newGetMonitorsResponse(monitors *[]monitor.MonitorWithTotalCount, stats *[]check.MonitorOverviews) (*GetMonitorsResponse, error) {
 	res := make([]GetMonitorResponseMonitor, len(*monitors))
+
+	monitorStatsMap := make(map[uint]check.MonitorOverviews, len(*stats))
+	for _, m := range *stats {
+		monitorStatsMap[m.MonitorID] = m
+	}
 
 	for i, m := range *monitors {
 		headers, err := m.Settings.GetHeaders()
@@ -92,6 +108,13 @@ func newGetMonitorsResponse(monitors *[]monitor.MonitorWithTotalCount) (*GetMoni
 				Body:      m.GetBodyStr(),
 				Frequency: m.Settings.GetFrequencyMilliseconds(),
 			},
+		}
+
+		stat, ok := monitorStatsMap[m.ID]
+		if ok {
+			res[i].P99 = uint(stat.P99)
+			res[i].P95 = uint(stat.P95)
+			res[i].Stats = stat.Stats
 		}
 	}
 
