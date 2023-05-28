@@ -1,4 +1,4 @@
-package assertion
+package asserter
 
 import (
 	"errors"
@@ -115,6 +115,8 @@ func (a *ResponseTimeAssertion) assert(result *http.Result, rule Rule) bool {
 		resultValue = result.Timing.Phases.ContentTransfer
 	case "TOTAL":
 		resultValue = result.Timing.Phases.Total
+	default:
+		return false
 	}
 
 	resultInt := durationToMilliseconds(resultValue)
