@@ -67,6 +67,37 @@ func TestHTTPResultAsserter_Assert(t *testing.T) {
 			wantErr: true,
 		},
 		{
+			name: "Response time and status code rules pass",
+			args: args{
+				result: &http.Result{
+					Timing: http.Timing{
+						Phases: http.TimingPhases{
+							Total: 100 * time.Millisecond,
+						},
+					},
+					Response: http.Response{
+						StatusCode: 200,
+					},
+				},
+				rules: []Rule{
+					{
+						Source:   "RESPONSE_TIME",
+						Property: "TOTAL",
+						Operator: "LESS_THAN",
+						Target:   500,
+					},
+					{
+						Source:   "STATUS_CODE",
+						Property: "",
+						Operator: "EQUAL",
+						Target:   200,
+					},
+				},
+			},
+			wantOk:  []bool{true, true},
+			wantErr: false,
+		},
+		{
 			name: "Unknown source fails",
 			args: args{
 				result: &http.Result{},
