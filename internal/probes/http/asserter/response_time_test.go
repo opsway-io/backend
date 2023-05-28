@@ -16,13 +16,11 @@ func TestResponseTimeAssertion_IsRuleValid(t *testing.T) {
 	}
 	tests := []struct {
 		name    string
-		a       *ResponseTimeAssertion
 		args    args
 		wantErr bool
 	}{
 		{
 			name: "valid rule",
-			a:    &ResponseTimeAssertion{},
 			args: args{
 				rule: Rule{
 					Source:   "RESPONSE_TIME",
@@ -35,7 +33,6 @@ func TestResponseTimeAssertion_IsRuleValid(t *testing.T) {
 		},
 		{
 			name: "invalid source",
-			a:    &ResponseTimeAssertion{},
 			args: args{
 				rule: Rule{
 					Source:   "INVALID",
@@ -48,7 +45,6 @@ func TestResponseTimeAssertion_IsRuleValid(t *testing.T) {
 		},
 		{
 			name: "invalid property",
-			a:    &ResponseTimeAssertion{},
 			args: args{
 				rule: Rule{
 					Source:   "RESPONSE_TIME",
@@ -61,7 +57,6 @@ func TestResponseTimeAssertion_IsRuleValid(t *testing.T) {
 		},
 		{
 			name: "invalid operator",
-			a:    &ResponseTimeAssertion{},
 			args: args{
 				rule: Rule{
 					Source:   "RESPONSE_TIME",
@@ -74,7 +69,6 @@ func TestResponseTimeAssertion_IsRuleValid(t *testing.T) {
 		},
 		{
 			name: "invalid target",
-			a:    &ResponseTimeAssertion{},
 			args: args{
 				rule: Rule{
 					Source:   "RESPONSE_TIME",
@@ -88,10 +82,14 @@ func TestResponseTimeAssertion_IsRuleValid(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			a := &ResponseTimeAssertion{}
+			a := NewResponseTimeAsserter()
 			err := a.IsRuleValid(tt.args.rule)
 
-			assert.Equal(t, tt.wantErr, err != nil)
+			if tt.wantErr {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+			}
 		})
 	}
 }
@@ -105,14 +103,12 @@ func TestResponseTimeAssertion_Assert(t *testing.T) {
 	}
 	tests := []struct {
 		name    string
-		a       *ResponseTimeAssertion
 		args    args
 		wantOk  []bool
 		wantErr bool
 	}{
 		{
 			name: "No rules success",
-			a:    &ResponseTimeAssertion{},
 			args: args{
 				result: &http.Result{},
 			},
@@ -121,7 +117,6 @@ func TestResponseTimeAssertion_Assert(t *testing.T) {
 		},
 		{
 			name: "Equal success",
-			a:    &ResponseTimeAssertion{},
 			args: args{
 				result: &http.Result{
 					Timing: http.Timing{
@@ -144,7 +139,6 @@ func TestResponseTimeAssertion_Assert(t *testing.T) {
 		},
 		{
 			name: "Equal failure",
-			a:    &ResponseTimeAssertion{},
 			args: args{
 				result: &http.Result{
 					Timing: http.Timing{
@@ -167,7 +161,6 @@ func TestResponseTimeAssertion_Assert(t *testing.T) {
 		},
 		{
 			name: "NotEqual success",
-			a:    &ResponseTimeAssertion{},
 			args: args{
 				result: &http.Result{
 					Timing: http.Timing{
@@ -190,7 +183,6 @@ func TestResponseTimeAssertion_Assert(t *testing.T) {
 		},
 		{
 			name: "NotEqual failure",
-			a:    &ResponseTimeAssertion{},
 			args: args{
 				result: &http.Result{
 					Timing: http.Timing{
@@ -213,7 +205,6 @@ func TestResponseTimeAssertion_Assert(t *testing.T) {
 		},
 		{
 			name: "GreaterThan success",
-			a:    &ResponseTimeAssertion{},
 			args: args{
 				result: &http.Result{
 					Timing: http.Timing{
@@ -236,7 +227,6 @@ func TestResponseTimeAssertion_Assert(t *testing.T) {
 		},
 		{
 			name: "GreaterThan failure",
-			a:    &ResponseTimeAssertion{},
 			args: args{
 				result: &http.Result{
 					Timing: http.Timing{
@@ -259,7 +249,6 @@ func TestResponseTimeAssertion_Assert(t *testing.T) {
 		},
 		{
 			name: "LessThan success",
-			a:    &ResponseTimeAssertion{},
 			args: args{
 				result: &http.Result{
 					Timing: http.Timing{
@@ -282,7 +271,6 @@ func TestResponseTimeAssertion_Assert(t *testing.T) {
 		},
 		{
 			name: "LessThan failure",
-			a:    &ResponseTimeAssertion{},
 			args: args{
 				result: &http.Result{
 					Timing: http.Timing{
@@ -305,7 +293,6 @@ func TestResponseTimeAssertion_Assert(t *testing.T) {
 		},
 		{
 			name: "Invalid rule",
-			a:    &ResponseTimeAssertion{},
 			args: args{
 				result: &http.Result{},
 				rules: []Rule{
@@ -322,7 +309,6 @@ func TestResponseTimeAssertion_Assert(t *testing.T) {
 		},
 		{
 			name: "Multiple rules success",
-			a:    &ResponseTimeAssertion{},
 			args: args{
 				result: &http.Result{
 					Timing: http.Timing{
@@ -364,8 +350,12 @@ func TestResponseTimeAssertion_Assert(t *testing.T) {
 			a := &ResponseTimeAssertion{}
 			gotOk, err := a.Assert(tt.args.result, tt.args.rules)
 
-			assert.Equal(t, tt.wantErr, err != nil)
 			assert.Equal(t, tt.wantOk, gotOk)
+			if tt.wantErr {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+			}
 		})
 	}
 }
