@@ -55,10 +55,6 @@ func (a *HTTPResultAsserter) Assert(result *http.Result, rules []Rule) (ok []boo
 			return nil, err
 		}
 
-		if err := asserter.IsRuleValid(rule); err != nil {
-			return nil, err
-		}
-
 		ok, err = asserter.Assert(result, []Rule{rule})
 		if err != nil {
 			return nil, err
