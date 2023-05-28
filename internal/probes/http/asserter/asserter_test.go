@@ -113,7 +113,7 @@ func TestHTTPResultAsserter_Assert(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			a := NewHTTPResponseAsserter()
+			a := New()
 			gotOk, err := a.Assert(tt.args.result, tt.args.rules)
 
 			assert.Equal(t, tt.wantErr, err != nil)

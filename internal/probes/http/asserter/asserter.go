@@ -29,7 +29,7 @@ type HTTPResultAsserter struct {
 	asserterMap map[string]Asserter
 }
 
-func NewHTTPResponseAsserter() *HTTPResultAsserter {
+func New() *HTTPResultAsserter {
 	return &HTTPResultAsserter{
 		asserterMap: map[string]Asserter{
 			"RESPONSE_TIME": NewResponseTimeAsserter(),
