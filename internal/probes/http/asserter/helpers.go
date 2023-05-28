@@ -35,3 +35,7 @@ func allErrorsNil(errs []error) bool {
 func durationToMilliseconds(d time.Duration) int {
 	return int(d / time.Millisecond)
 }
+
+func UnixMillisecondsToTime(ms int64) time.Time {
+	return time.Unix(0, ms*int64(time.Millisecond))
+}

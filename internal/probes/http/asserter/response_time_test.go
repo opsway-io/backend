@@ -347,7 +347,7 @@ func TestResponseTimeAssertion_Assert(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			a := &ResponseTimeAssertion{}
+			a := NewResponseTimeAsserter()
 			gotOk, err := a.Assert(tt.args.result, tt.args.rules)
 
 			assert.Equal(t, tt.wantOk, gotOk)

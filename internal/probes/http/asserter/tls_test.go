@@ -2,12 +2,13 @@ package asserter
 
 import (
 	"testing"
+	"time"
 
 	"github.com/opsway-io/backend/internal/probes/http"
 	"github.com/stretchr/testify/assert"
 )
 
-func TestStatusCodeAsserter_IsRuleValid(t *testing.T) {
+func TestTLSAsserter_IsRuleValid(t *testing.T) {
 	t.Parallel()
 
 	type args struct {
@@ -22,9 +23,8 @@ func TestStatusCodeAsserter_IsRuleValid(t *testing.T) {
 			name: "valid rule",
 			args: args{
 				rule: Rule{
-					Source:   "STATUS_CODE",
-					Operator: "EQUAL",
-					Target:   200,
+					Source:   "TLS",
+					Operator: "EXPIRED",
 				},
 			},
 			wantErr: false,
@@ -34,6 +34,7 @@ func TestStatusCodeAsserter_IsRuleValid(t *testing.T) {
 			args: args{
 				rule: Rule{
 					Source:   "INVALID",
+					Property: "",
 					Operator: "EQUAL",
 					Target:   200,
 				},
@@ -43,7 +44,7 @@ func TestStatusCodeAsserter_IsRuleValid(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			a := NewStatusCodeAsserter()
+			a := NewTLSAsserter()
 			err := a.IsRuleValid(tt.args.rule)
 
 			if tt.wantErr {
@@ -55,7 +56,7 @@ func TestStatusCodeAsserter_IsRuleValid(t *testing.T) {
 	}
 }
 
-func TestStatusCodeAsserter_Assert(t *testing.T) {
+func TestTLSAsserter_Assert(t *testing.T) {
 	t.Parallel()
 
 	type args struct {
@@ -69,18 +70,19 @@ func TestStatusCodeAsserter_Assert(t *testing.T) {
 		wantErr bool
 	}{
 		{
-			name: "EQUAL passes",
+			name: "Certificate has not expired passes",
 			args: args{
 				result: &http.Result{
-					Response: http.Response{
-						StatusCode: 200,
+					TLS: &http.TLS{
+						Certificate: http.Certificate{
+							NotAfter: time.Now().Add(time.Hour),
+						},
 					},
 				},
 				rules: []Rule{
 					{
-						Source:   "STATUS_CODE",
-						Operator: "EQUAL",
-						Target:   200,
+						Source:   "TLS",
+						Operator: "NOT_EXPIRED",
 					},
 				},
 			},
@@ -88,18 +90,19 @@ func TestStatusCodeAsserter_Assert(t *testing.T) {
 			wantErr: false,
 		},
 		{
-			name: "EQUAL fails",
+			name: "Certificate has not expired fails",
 			args: args{
 				result: &http.Result{
-					Response: http.Response{
-						StatusCode: 200,
+					TLS: &http.TLS{
+						Certificate: http.Certificate{
+							NotAfter: time.Now().Add(-time.Hour),
+						},
 					},
 				},
 				rules: []Rule{
 					{
-						Source:   "STATUS_CODE",
-						Operator: "EQUAL",
-						Target:   201,
+						Source:   "TLS",
+						Operator: "NOT_EXPIRED",
 					},
 				},
 			},
@@ -107,18 +110,19 @@ func TestStatusCodeAsserter_Assert(t *testing.T) {
 			wantErr: false,
 		},
 		{
-			name: "NOT_EQUAL passes",
+			name: "Certificate has expired passes",
 			args: args{
 				result: &http.Result{
-					Response: http.Response{
-						StatusCode: 200,
+					TLS: &http.TLS{
+						Certificate: http.Certificate{
+							NotAfter: time.Now().Add(-time.Hour),
+						},
 					},
 				},
 				rules: []Rule{
 					{
-						Source:   "STATUS_CODE",
-						Operator: "NOT_EQUAL",
-						Target:   201,
+						Source:   "TLS",
+						Operator: "EXPIRED",
 					},
 				},
 			},
@@ -126,18 +130,19 @@ func TestStatusCodeAsserter_Assert(t *testing.T) {
 			wantErr: false,
 		},
 		{
-			name: "NOT_EQUAL fails",
+			name: "Certificate has expired fails",
 			args: args{
 				result: &http.Result{
-					Response: http.Response{
-						StatusCode: 200,
+					TLS: &http.TLS{
+						Certificate: http.Certificate{
+							NotAfter: time.Now().Add(time.Hour),
+						},
 					},
 				},
 				rules: []Rule{
 					{
-						Source:   "STATUS_CODE",
-						Operator: "NOT_EQUAL",
-						Target:   200,
+						Source:   "TLS",
+						Operator: "EXPIRED",
 					},
 				},
 			},
@@ -145,18 +150,20 @@ func TestStatusCodeAsserter_Assert(t *testing.T) {
 			wantErr: false,
 		},
 		{
-			name: "GREATER_THAN passes",
+			name: "Certificate expires less than passes",
 			args: args{
 				result: &http.Result{
-					Response: http.Response{
-						StatusCode: 201,
+					TLS: &http.TLS{
+						Certificate: http.Certificate{
+							NotAfter: time.Now().Add(time.Minute),
+						},
 					},
 				},
 				rules: []Rule{
 					{
-						Source:   "STATUS_CODE",
-						Operator: "GREATER_THAN",
-						Target:   200,
+						Source:   "TLS",
+						Operator: "EXPIRES_LESS_THAN",
+						Target:   int64(time.Second * 300), // 5 minutes
 					},
 				},
 			},
@@ -164,18 +171,20 @@ func TestStatusCodeAsserter_Assert(t *testing.T) {
 			wantErr: false,
 		},
 		{
-			name: "GREATER_THAN fails",
+			name: "Certificate expires less than fails",
 			args: args{
 				result: &http.Result{
-					Response: http.Response{
-						StatusCode: 200,
+					TLS: &http.TLS{
+						Certificate: http.Certificate{
+							NotAfter: time.Now().Add(time.Minute),
+						},
 					},
 				},
 				rules: []Rule{
 					{
-						Source:   "STATUS_CODE",
-						Operator: "GREATER_THAN",
-						Target:   200,
+						Source:   "TLS",
+						Operator: "EXPIRES_LESS_THAN",
+						Target:   int64(time.Second * 30), // 30 seconds
 					},
 				},
 			},
@@ -183,18 +192,20 @@ func TestStatusCodeAsserter_Assert(t *testing.T) {
 			wantErr: false,
 		},
 		{
-			name: "LESS_THAN passes",
+			name: "Certificate expires greater than passes",
 			args: args{
 				result: &http.Result{
-					Response: http.Response{
-						StatusCode: 199,
+					TLS: &http.TLS{
+						Certificate: http.Certificate{
+							NotAfter: time.Now().Add(time.Minute * 5),
+						},
 					},
 				},
 				rules: []Rule{
 					{
-						Source:   "STATUS_CODE",
-						Operator: "LESS_THAN",
-						Target:   200,
+						Source:   "TLS",
+						Operator: "EXPIRES_GREATER_THAN",
+						Target:   int64(time.Second * 30), // 30 seconds
 					},
 				},
 			},
@@ -202,62 +213,30 @@ func TestStatusCodeAsserter_Assert(t *testing.T) {
 			wantErr: false,
 		},
 		{
-			name: "LESS_THAN fails",
+			name: "Certificate expires greater than fails",
 			args: args{
 				result: &http.Result{
-					Response: http.Response{
-						StatusCode: 200,
+					TLS: &http.TLS{
+						Certificate: http.Certificate{
+							NotAfter: time.Now().Add(time.Minute * 5),
+						},
 					},
 				},
 				rules: []Rule{
 					{
-						Source:   "STATUS_CODE",
-						Operator: "LESS_THAN",
-						Target:   200,
+						Source:   "TLS",
+						Operator: "EXPIRES_GREATER_THAN",
+						Target:   int64(time.Second * 300), // 5 minutes
 					},
 				},
 			},
 			wantOk:  []bool{false},
-			wantErr: false,
-		},
-		{
-			name: "multiple rules",
-			args: args{
-				result: &http.Result{
-					Response: http.Response{
-						StatusCode: 200,
-					},
-				},
-				rules: []Rule{
-					{
-						Source:   "STATUS_CODE",
-						Operator: "EQUAL",
-						Target:   200,
-					},
-					{
-						Source:   "STATUS_CODE",
-						Operator: "NOT_EQUAL",
-						Target:   201,
-					},
-					{
-						Source:   "STATUS_CODE",
-						Operator: "GREATER_THAN",
-						Target:   199,
-					},
-					{
-						Source:   "STATUS_CODE",
-						Operator: "LESS_THAN",
-						Target:   201,
-					},
-				},
-			},
-			wantOk:  []bool{true, true, true, true},
 			wantErr: false,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			a := NewStatusCodeAsserter()
+			a := NewTLSAsserter()
 			gotOk, err := a.Assert(tt.args.result, tt.args.rules)
 
 			assert.Equal(t, tt.wantOk, gotOk)

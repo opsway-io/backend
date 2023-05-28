@@ -88,7 +88,6 @@ func TestHTTPResultAsserter_Assert(t *testing.T) {
 					},
 					{
 						Source:   "STATUS_CODE",
-						Property: "",
 						Operator: "EQUAL",
 						Target:   200,
 					},

@@ -56,7 +56,7 @@ func (a *StatusCodeAsserter) IsRuleValid(rule Rule) error {
 	}
 
 	// The property must be empty
-	if ok := rule.Property == ""; !ok {
+	if ok := rule.Property == nil; !ok {
 		return fmt.Errorf("property must be empty: %s", rule.Property)
 	}
 
