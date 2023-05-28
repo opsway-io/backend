@@ -14,10 +14,6 @@ import (
 		- Is not valid
 		- Expires within
 		- Not expiring within
-		- Has field
-		- Not has field
-		- Has value
-		- Not has value
 */
 
 type TLSAsserter struct{}
