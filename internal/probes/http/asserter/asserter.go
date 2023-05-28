@@ -33,6 +33,11 @@ func NewHTTPResponseAsserter() *HTTPResultAsserter {
 	return &HTTPResultAsserter{
 		asserterMap: map[string]Asserter{
 			"RESPONSE_TIME": NewResponseTimeAsserter(),
+			"STATUS_CODE":   NewStatusCodeAsserter(),
+			"HEADERS":       NewHeadersAsserter(),
+			"TLS":           NewTLSAsserter(),
+			"RAW_BODY":      NewRawBodyAsserter(),
+			"JSON_BODY":     NewJSONBodyAsserter(),
 		},
 	}
 }
@@ -79,10 +84,10 @@ func (a *HTTPResultAsserter) IsRuleValid(rule Rule) error {
 }
 
 func (a *HTTPResultAsserter) getAsserterForSource(source string) (Asserter, error) {
-	switch source {
-	case "RESPONSE_TIME":
-		return NewResponseTimeAsserter(), nil
+	asserter, ok := a.asserterMap[source]
+	if !ok {
+		return nil, fmt.Errorf("unknown source: %s", source)
 	}
 
-	return nil, fmt.Errorf("unknown source: %s", source)
+	return asserter, nil
 }

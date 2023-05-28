@@ -9,7 +9,7 @@ import (
 )
 
 /*
-	Assertions about the response time of a request.
+	Assertions about the response time of HTTP result.
 	The following assertions are supported:
 		- Equal
 		- Not Equal
