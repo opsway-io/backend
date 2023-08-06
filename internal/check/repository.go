@@ -17,6 +17,7 @@ type Repository interface {
 	GetByTeamIDAndMonitorIDPaginated(ctx context.Context, teamID, monitorID uint, offset, limit *int) (*[]Check, error)
 	GetMonitorMetricsByMonitorID(ctx context.Context, monitorID uint) (*[]AggMetric, error)
 	GetMonitorOverviewsByTeamID(ctx context.Context, teamID uint) (*[]MonitorOverviews, error)
+	GetMonitorOverviewStatsByTeamID(ctx context.Context, teamID uint) (*[]MonitorOverviewStats, error)
 }
 
 type RepositoryImpl struct {
@@ -113,9 +114,14 @@ func (r *RepositoryImpl) Create(ctx context.Context, check *Check) error {
 
 type MonitorOverviews struct {
 	MonitorID uint
-	Start     string
+	Latest    string
 	P99       float32
 	P95       float32
+	Stats     []float64 `gorm:"type:float"`
+}
+
+type MonitorOverviewStats struct {
+	MonitorID uint
 	Stats     []float64 `gorm:"type:float"`
 }
 
@@ -125,14 +131,39 @@ func (r *RepositoryImpl) GetMonitorOverviewsByTeamID(ctx context.Context, teamID
 		ctx,
 	).Table("checks").Select(`
 		monitor_id,
-		tumbleStart(wndw) as start, 
+		max(created_at) as latest, 
 		quantile(0.99)(timing_total)/1000000 as p99, 
-		quantile(0.95)(timing_total)/1000000 as p95,
-		groupArrayMovingAvg(timing_total/1000000) as stats`).
+		quantile(0.95)(timing_total)/1000000 as p95`).
 		Where("team_id = ?", teamID).
-		Group("tumble(toDateTime(created_at), INTERVAL 1 HOUR) as wndw, monitor_id").
+		Group("monitor_id").
 		Where("created_at BETWEEN DATE_SUB(NOW(), INTERVAL 1 DAY) AND NOW()").
-		Order("start ASC").
+		Order("latest ASC").
+		Find(&overviews).Error
+
+	return &overviews, err
+}
+func (r *RepositoryImpl) GetMonitorOverviewStatsByTeamID(ctx context.Context, teamID uint) (*[]MonitorOverviewStats, error) {
+	var overviews []MonitorOverviewStats
+	err := r.db.WithContext(
+		ctx,
+	).Raw(`
+		SELECT
+		monitor_id,
+		groupArray(timing) as stats
+		FROM
+		(
+			SELECT
+				monitor_id,
+				avg(timing_total) / 1000000 AS timing,
+				tumbleStart(wndw) AS start
+			FROM checks
+			WHERE (team_id = 1) AND ((created_at >= (NOW() - toIntervalDay(1))) AND (created_at <= NOW()))
+			GROUP BY
+				monitor_id,
+				tumble(toDateTime(created_at), toIntervalHour('1')) AS wndw
+			ORDER BY start ASC
+		)
+		GROUP BY monitor_id`).
 		Find(&overviews).Error
 
 	return &overviews, err

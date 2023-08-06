@@ -44,5 +44,22 @@ func (s *ServiceImpl) GetMonitorMetricsByMonitorID(ctx context.Context, monitorI
 }
 
 func (s *ServiceImpl) GetMonitorOverviewsByTeamID(ctx context.Context, teamID uint) (*[]MonitorOverviews, error) {
-	return s.repository.GetMonitorOverviewsByTeamID(ctx, teamID)
+	overviews, err := s.repository.GetMonitorOverviewsByTeamID(ctx, teamID)
+	if err != nil {
+		return nil, err
+	}
+	stats, err := s.repository.GetMonitorOverviewStatsByTeamID(ctx, teamID)
+	if err != nil {
+		return nil, err
+	}
+
+	statsMap := make(map[uint][]float64)
+	for _, stat := range *stats {
+		statsMap[stat.MonitorID] = stat.Stats
+	}
+	for i, overview := range *overviews {
+		(*overviews)[i].Stats = statsMap[overview.MonitorID]
+	}
+
+	return overviews, err
 }
