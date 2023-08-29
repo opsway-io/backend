@@ -67,6 +67,7 @@ func runAPI(cmd *cobra.Command, args []string) {
 		entities.MaintenanceComment{},
 		entities.Incident{},
 		entities.IncidentComment{},
+		entities.Billing{},
 	)
 
 	ch_db, err := clickhouse.NewClient(ctx, conf.Clickhouse)
