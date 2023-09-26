@@ -23,6 +23,7 @@ type GetUserTeamsRequestTeam struct {
 	ID          uint              `json:"id"`
 	Name        string            `json:"name"`
 	DisplayName *string           `json:"displayName"`
+	PaymentPlan string            `json:"paymentPlan"`
 	AvatarURL   *string           `json:"avatarUrl"`
 	Role        entities.TeamRole `json:"role"`
 }
@@ -59,6 +60,7 @@ func newGetUserTeamsResponse(teams *[]team.TeamAndRole, teamService team.Service
 			ID:          team.ID,
 			Name:        team.Name,
 			DisplayName: team.DisplayName,
+			PaymentPlan: team.PaymentPlan,
 			Role:        team.Role,
 		}
 
