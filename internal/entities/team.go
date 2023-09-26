@@ -32,7 +32,7 @@ type Team struct {
 	ID          uint
 	Name        string  `gorm:"uniqueIndex;not null"`
 	DisplayName *string `gorm:"index"`
-	PaymentPan  string
+	PaymentPan  string  `gorm:"default:FREE"`
 	HasAvatar   bool
 	Users       []User        `gorm:"many2many:team_users"`
 	Monitors    []Monitor     `gorm:"constraint:OnDelete:CASCADE"`
