@@ -20,6 +20,7 @@ type GetTeamResponse struct {
 	ID          uint      `json:"id"`
 	Name        string    `json:"name"`
 	DisplayName *string   `json:"displayName"`
+	PaymentPlan string    `json:"paymentPlan"`
 	AvatarURL   *string   `json:"avatarUrl"`
 	CreatedAt   time.Time `json:"createdAt"`
 	UpdatedAt   time.Time `json:"updatedAt"`

@@ -16,13 +16,6 @@ func Seed001(db *gorm.DB) {
 	}
 	db.FirstOrCreate(&t)
 
-	// Billing
-	b := entities.Billing{
-		PaymentPlan: entities.PaymentPlanFree,
-		TeamID:      t.ID,
-	}
-	db.Create(b)
-
 	// Monitors
 	for i := 0; i < 30; i++ {
 		m := &entities.Monitor{
