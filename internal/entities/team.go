@@ -33,6 +33,7 @@ type Team struct {
 	Name        string  `gorm:"uniqueIndex;not null"`
 	DisplayName *string `gorm:"index"`
 	PaymentPlan string  `gorm:"default:FREE"`
+	StripeKey   *string
 	HasAvatar   bool
 	Users       []User        `gorm:"many2many:team_users"`
 	Monitors    []Monitor     `gorm:"constraint:OnDelete:CASCADE"`

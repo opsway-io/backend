@@ -35,7 +35,6 @@ func Register(
 	e.POST("/teams", AuthHandler(h.PostTeam))
 	e.POST("/teams/available", AuthHandler(h.PostTeamAvailable))
 	e.POST("/teams/invites/accept", AuthHandler(h.PostTeamInvitesAccept))
-
 	teamsGroup := e.Group(
 		"/teams/:teamId",
 		TeamGuard(),

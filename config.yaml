@@ -45,4 +45,8 @@ team:
 
 prober:
   concurrency: 1
+
+stripe:
+  secret_key: "test"
+  endpoint_secret: "test"
   

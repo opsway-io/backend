@@ -6,6 +6,7 @@ import (
 	"github.com/opsway-io/backend/internal/check"
 	"github.com/opsway-io/backend/internal/monitor"
 	"github.com/opsway-io/backend/internal/rest/controllers/authentication"
+	"github.com/opsway-io/backend/internal/rest/controllers/billing"
 	"github.com/opsway-io/backend/internal/rest/controllers/healthz"
 	"github.com/opsway-io/backend/internal/rest/controllers/monitors"
 	"github.com/opsway-io/backend/internal/rest/controllers/teams"
@@ -30,6 +31,7 @@ func Register(
 	checkService check.Service,
 ) {
 	AuthGuard := middleware.AuthGuardFactory(logger, authenticationService)
+	StripeGuard := middleware.StripeGuardFactory(logger)
 
 	root := e.Group(
 		"/v1",
@@ -39,6 +41,15 @@ func Register(
 		"",
 		AuthGuard(),
 	)
+
+	stripeRoot := root.Group(
+		"",
+		StripeGuard(),
+	)
+
+	// Stripe
+
+	billing.Register(stripeRoot, logger, teamService, userService)
 
 	// Healthz
 
