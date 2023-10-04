@@ -45,3 +45,7 @@ prober:
 team:
   invitation_secret: supersecret
   application_url: http://localhost:5173
+
+stripe:
+  secret_key: "test"
+  endpoint_secret: "test"

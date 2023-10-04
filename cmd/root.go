@@ -4,6 +4,7 @@ import (
 	"github.com/go-playground/validator/v10"
 	"github.com/mcuadros/go-defaults"
 	auth "github.com/opsway-io/backend/internal/authentication"
+	"github.com/opsway-io/backend/internal/billing"
 	"github.com/opsway-io/backend/internal/connectors/clickhouse"
 	"github.com/opsway-io/backend/internal/connectors/postgres"
 	"github.com/opsway-io/backend/internal/connectors/redis"
@@ -36,6 +37,7 @@ type Config struct {
 	HTTPProbe      http.Config                           `mapstructure:"http_probe"`
 	Email          email.Config                          `mapstructure:"email"`
 	Team           team.Config                           `mapstructure:"team"`
+	Stripe         billing.Config                        `mapstructure:"stripe"`
 }
 
 var validate = validator.New()

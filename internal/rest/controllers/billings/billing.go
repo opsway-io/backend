@@ -1,29 +1,21 @@
-package billing
+package billings
 
 import (
-	"io/ioutil"
+	"io"
 
 	"github.com/labstack/echo/v4"
 	hs "github.com/opsway-io/backend/internal/rest/handlers"
-	stripe "github.com/stripe/stripe-go/v75"
-	"github.com/stripe/stripe-go/webhook"
 )
 
-// Set your secret key. Remember to switch to your live secret key in production.
-// See your keys here: https://dashboard.stripe.com/apikeys
-
 func (h *Handlers) handleWebhook(c hs.StripeContext) error {
-	stripe.Key = "test"
-
-	b, err := ioutil.ReadAll(c.Request().Body)
+	b, err := io.ReadAll(c.Request().Body)
 	if err != nil {
-		c.Log.WithError(err).Debug("failed to bind PostTeamAvailableRequest")
+		c.Log.WithError(err).Debug("failed to read request body for stripe event")
 
 		return echo.ErrBadRequest
 	}
 
-	endpointSecret := "test"
-	event, err := webhook.ConstructEvent(b, c.Signature, endpointSecret)
+	event, err := h.BillingService.ConstructEvent(b, c.Signature)
 	if err != nil {
 		c.Log.WithError(err).Debug("failed to construct stripe event")
 

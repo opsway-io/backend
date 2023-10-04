@@ -3,10 +3,11 @@ package controllers
 import (
 	"github.com/labstack/echo/v4"
 	auth "github.com/opsway-io/backend/internal/authentication"
+	"github.com/opsway-io/backend/internal/billing"
 	"github.com/opsway-io/backend/internal/check"
 	"github.com/opsway-io/backend/internal/monitor"
 	"github.com/opsway-io/backend/internal/rest/controllers/authentication"
-	"github.com/opsway-io/backend/internal/rest/controllers/billing"
+	"github.com/opsway-io/backend/internal/rest/controllers/billings"
 	"github.com/opsway-io/backend/internal/rest/controllers/healthz"
 	"github.com/opsway-io/backend/internal/rest/controllers/monitors"
 	"github.com/opsway-io/backend/internal/rest/controllers/teams"
@@ -29,6 +30,7 @@ func Register(
 	teamService team.Service,
 	monitorService monitor.Service,
 	checkService check.Service,
+	billingService billing.Service,
 ) {
 	AuthGuard := middleware.AuthGuardFactory(logger, authenticationService)
 	StripeGuard := middleware.StripeGuardFactory(logger)
@@ -42,14 +44,14 @@ func Register(
 		AuthGuard(),
 	)
 
-	stripeRoot := root.Group(
-		"",
+	stripeRoot := e.Group(
+		"/stripe",
 		StripeGuard(),
 	)
 
 	// Stripe
 
-	billing.Register(stripeRoot, logger, teamService, userService)
+	billings.Register(stripeRoot, logger, billingService)
 
 	// Healthz
 

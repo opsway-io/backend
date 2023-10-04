@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/opsway-io/backend/internal/authentication"
+	"github.com/opsway-io/backend/internal/billing"
 	"github.com/opsway-io/backend/internal/check"
 	"github.com/opsway-io/backend/internal/connectors/clickhouse"
 	"github.com/opsway-io/backend/internal/connectors/postgres"
@@ -110,6 +111,8 @@ func runAPI(cmd *cobra.Command, args []string) {
 
 	httpResultService := check.NewService(ch_db)
 
+	billingService := billing.NewService(conf.Stripe)
+
 	srv, err := rest.NewServer(
 		conf.REST,
 		conf.OAuth,
@@ -120,6 +123,7 @@ func runAPI(cmd *cobra.Command, args []string) {
 		teamService,
 		monitorService,
 		httpResultService,
+		billingService,
 	)
 	if err != nil {
 		l.WithError(err).Fatal("Failed to create REST server")

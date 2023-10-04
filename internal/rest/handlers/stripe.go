@@ -17,7 +17,7 @@ func StripeHandlerFactory(logger *logrus.Entry) func(handler StripeHandlerFunc) 
 	return func(handler StripeHandlerFunc) func(c echo.Context) error {
 		return func(c echo.Context) error {
 			signature, ok := c.Get("stripe_signature").(string)
-			logger.Info(ok)
+
 			if !ok {
 				logger.Info("Stripe-Signature")
 

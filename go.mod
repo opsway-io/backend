@@ -33,7 +33,6 @@ require (
 	github.com/spf13/viper v1.14.0
 	github.com/stretchr/testify v1.8.1
 	github.com/stripe/stripe-go v70.15.0+incompatible
-	github.com/stripe/stripe-go/v75 v75.8.0
 	github.com/tj/assert v0.0.3
 	github.com/vmihailenco/msgpack v4.0.4+incompatible
 	go.uber.org/automaxprocs v1.5.2
