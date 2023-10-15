@@ -12,7 +12,7 @@ type PostCreateCheckoutSession struct {
 	PriceID string `param:"priceId" validate:"required"`
 }
 
-func (h *Handlers) PostCheckoutSession(c hs.AuthenticatedContext) error {
+func (h *Handlers) PostCreateCheckoutSession(c hs.AuthenticatedContext) error {
 	req, err := helpers.Bind[PostCreateCheckoutSession](c)
 	if err != nil {
 		c.Log.WithError(err).Debug("failed to bind GetTeamUsersRequest")
