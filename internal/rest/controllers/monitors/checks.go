@@ -29,7 +29,7 @@ type GetMonitorChecksResponseCheck struct {
 	Method     string                         `json:"method"`
 	URL        string                         `json:"url"`
 	Timing     GetMonitorChecksResponseTiming `json:"timing"`
-	TLS        GetMonitorChecksResponseTLS    `json:"tls"`
+	TLS        *GetMonitorChecksResponseTLS   `json:"tls,omitempty"`
 	CreatedAt  string                         `json:"createdAt"`
 }
 
@@ -92,7 +92,7 @@ func (h *Handlers) newGetMonitorChecksResponse(checks *[]check.Check) GetMonitor
 }
 
 func (h *Handlers) newGetMonitorCheckResponse(check check.Check) GetMonitorChecksResponseCheck {
-	return GetMonitorChecksResponseCheck{
+	c := GetMonitorChecksResponseCheck{
 		ID:         check.ID,
 		StatusCode: check.StatusCode,
 		Method:     check.Method,
@@ -105,16 +105,21 @@ func (h *Handlers) newGetMonitorCheckResponse(check check.Check) GetMonitorCheck
 			ContentTransfer:  check.Timing.ContentTransfer,
 			Total:            check.Timing.Total,
 		},
-		TLS: GetMonitorChecksResponseTLS{
+		CreatedAt: check.CreatedAt.Format(time.UnixDate),
+	}
+
+	if check.TLS != nil {
+		c.TLS = &GetMonitorChecksResponseTLS{
 			Version:   check.TLS.Version,
 			Cipher:    check.TLS.Cipher,
 			Issuer:    check.TLS.Issuer,
 			Subject:   check.TLS.Subject,
 			NotBefore: check.TLS.NotBefore,
 			NotAfter:  check.TLS.NotAfter,
-		},
-		CreatedAt: check.CreatedAt.Format(time.UnixDate),
+		}
 	}
+
+	return c
 }
 
 type GetMonitorCheckRequest struct {
