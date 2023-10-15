@@ -67,7 +67,7 @@ func Register(
 
 	// Teams
 
-	teams.Register(authRoot, logger, teamService, userService)
+	teams.Register(authRoot, logger, teamService, userService, billingService)
 
 	// Monitors
 

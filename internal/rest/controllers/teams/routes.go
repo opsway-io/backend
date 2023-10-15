@@ -3,6 +3,7 @@ package teams
 import (
 	"github.com/labstack/echo/v4"
 	"github.com/opsway-io/backend/internal/authentication"
+	"github.com/opsway-io/backend/internal/billing"
 	"github.com/opsway-io/backend/internal/rest/handlers"
 	mw "github.com/opsway-io/backend/internal/rest/middleware"
 	"github.com/opsway-io/backend/internal/team"
@@ -14,6 +15,7 @@ type Handlers struct {
 	AuthenticationService authentication.Service
 	TeamService           team.Service
 	UserService           user.Service
+	BillingService        billing.Service
 }
 
 func Register(
@@ -21,10 +23,12 @@ func Register(
 	logger *logrus.Entry,
 	teamService team.Service,
 	userService user.Service,
+	billingService billing.Service,
 ) {
 	h := &Handlers{
-		TeamService: teamService,
-		UserService: userService,
+		TeamService:    teamService,
+		UserService:    userService,
+		BillingService: billingService,
 	}
 
 	TeamGuard := mw.TeamGuardFactory(logger, teamService)
@@ -52,4 +56,6 @@ func Register(
 
 	teamsGroup.PUT("/avatar", AuthHandler(h.PutTeamAvatar), AllowedRoles(mw.UserRoleOwner, mw.UserRoleAdmin))
 	teamsGroup.DELETE("/avatar", AuthHandler(h.DeleteTeamAvatar), AllowedRoles(mw.UserRoleOwner, mw.UserRoleAdmin))
+
+	teamsGroup.POST("/checkout", AuthHandler(h.PostCheckoutSession))
 }

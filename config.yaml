@@ -47,6 +47,8 @@ prober:
   concurrency: 1
 
 stripe:
-  secret_key: "test"
-  endpoint_secret: "test"
+  publishable_key: "publishable_key"
+  secret_key: "secret_key"
+  webhook_secret: "webhook_secret"
+  domain: http://localhost:5173
   
