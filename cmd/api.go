@@ -57,6 +57,7 @@ func runAPI(cmd *cobra.Command, args []string) {
 	}
 
 	db.SetupJoinTable(&entities.Team{}, "Users", &entities.TeamUser{})
+	db.SetupJoinTable(&entities.ChangelogEntry{}, "Authors", &entities.ChangelogEntryAuthor{})
 
 	db.AutoMigrate(
 		entities.User{},
@@ -68,6 +69,8 @@ func runAPI(cmd *cobra.Command, args []string) {
 		entities.MaintenanceComment{},
 		entities.Incident{},
 		entities.IncidentComment{},
+		entities.Changelog{},
+		entities.ChangelogEntry{},
 	)
 
 	ch_db, err := clickhouse.NewClient(ctx, conf.Clickhouse)

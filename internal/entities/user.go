@@ -10,17 +10,20 @@ import (
 )
 
 type User struct {
-	ID                  uint
-	Name                string  `gorm:"index;not null"`
-	DisplayName         *string `gorm:"index"`
-	Email               string  `gorm:"uniqueIndex"`
-	HasAvatar           bool
-	PasswordHash        *string
+	ID           uint
+	Name         string  `gorm:"index;not null"`
+	DisplayName  *string `gorm:"index"`
+	Email        string  `gorm:"uniqueIndex"`
+	HasAvatar    bool
+	PasswordHash *string
+
 	Teams               []Team               `gorm:"many2many:team_users"`
 	MaintenanceComments []MaintenanceComment `gorm:"constraint:OnDelete:CASCADE"`
 	IncidentComments    []IncidentComment    `gorm:"constraint:OnDelete:CASCADE"`
-	CreatedAt           time.Time            `gorm:"index"`
-	UpdatedAt           time.Time            `gorm:"index"`
+	ChangelogEntries    []ChangelogEntry     `gorm:"many2many:changelog_entry_authors"`
+
+	CreatedAt time.Time `gorm:"index"`
+	UpdatedAt time.Time `gorm:"index"`
 }
 
 func (User) TableName() string {

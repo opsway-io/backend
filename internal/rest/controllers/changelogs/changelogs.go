@@ -42,8 +42,8 @@ func (h *Handlers) PostChangelogs(c hs.AuthenticatedContext) error {
 }
 
 type GetChangelogRequest struct {
-	TeamID      uint   `param:"teamId" validate:"required,numeric,gte=0"`
-	ChangelogID string `param:"changelogId" validate:"required,uuid"`
+	TeamID      uint `param:"teamId" validate:"required,numeric,gte=0"`
+	ChangelogID uint `param:"changelogId" validate:"required,numeric,gte=0"`
 }
 
 type GetChangelogResponse struct {
@@ -58,8 +58,8 @@ func (h *Handlers) GetChangelog(c hs.AuthenticatedContext) error {
 }
 
 type DeleteChangelogRequest struct {
-	TeamID      uint   `param:"teamId" validate:"required,numeric,gte=0"`
-	ChangelogID string `param:"changelogId" validate:"required,uuid"`
+	TeamID      uint `param:"teamId" validate:"required,numeric,gte=0"`
+	ChangelogID uint `param:"changelogId" validate:"required,numeric,gte=0"`
 }
 
 func (h *Handlers) DeleteChangelog(c hs.AuthenticatedContext) error {
@@ -68,8 +68,8 @@ func (h *Handlers) DeleteChangelog(c hs.AuthenticatedContext) error {
 
 type PutChangelogRequest struct {
 	TeamID      uint   `param:"teamId" validate:"required,numeric,gte=0"`
-	ChangelogID string `param:"changelogId" validate:"required,uuid"`
-	Name        string `json:"name"`
+	ChangelogID uint   `param:"changelogId" validate:"required,numeric,gte=0"`
+	Name        string `json:"name" validate:"required,max=255"`
 }
 
 func (h *Handlers) PutChangelog(c hs.AuthenticatedContext) error {
