@@ -1,10 +1,12 @@
 package changelogs
 
 import (
+	"net/http"
 	"time"
 
 	"github.com/labstack/echo/v4"
 	hs "github.com/opsway-io/backend/internal/rest/handlers"
+	"github.com/opsway-io/backend/internal/rest/helpers"
 )
 
 type GetChangelogEntriesRequest struct {
@@ -27,7 +29,16 @@ type GetChangelogEntriesResponseEntry struct {
 }
 
 func (h *Handlers) GetChangelogEntries(c hs.AuthenticatedContext) error {
-	return echo.ErrNotFound // TODO: implement
+	req, err := helpers.Bind[GetChangelogEntriesRequest](c)
+	if err != nil {
+		c.Log.WithError(err).Debug("failed to bind GetChangelogEntriesRequest")
+
+		return echo.ErrBadRequest
+	}
+
+	// TODO: implement
+
+	return c.JSON(http.StatusOK, req)
 }
 
 type PostChangelogEntriesRequest struct {
@@ -36,7 +47,16 @@ type PostChangelogEntriesRequest struct {
 }
 
 func (h *Handlers) PostChangelogEntries(c hs.AuthenticatedContext) error {
-	return echo.ErrNotFound // TODO: implement
+	req, err := helpers.Bind[PostChangelogEntriesRequest](c)
+	if err != nil {
+		c.Log.WithError(err).Debug("failed to bind PostChangelogEntriesRequest")
+
+		return echo.ErrBadRequest
+	}
+
+	// TODO: implement
+
+	return c.JSON(http.StatusOK, req)
 }
 
 type GetChangelogEntryRequest struct {
@@ -53,7 +73,16 @@ type GetChangelogEntryResponse struct {
 }
 
 func (h *Handlers) GetChangelogEntry(c hs.AuthenticatedContext) error {
-	return echo.ErrNotFound // TODO: implement
+	req, err := helpers.Bind[GetChangelogEntryRequest](c)
+	if err != nil {
+		c.Log.WithError(err).Debug("failed to bind GetChangelogEntryRequest")
+
+		return echo.ErrBadRequest
+	}
+
+	// TODO: implement
+
+	return c.JSON(http.StatusOK, req)
 }
 
 type DeleteChangelogEntryRequest struct {
@@ -63,7 +92,16 @@ type DeleteChangelogEntryRequest struct {
 }
 
 func (h *Handlers) DeleteChangelogEntry(c hs.AuthenticatedContext) error {
-	return echo.ErrNotFound // TODO: implement
+	req, err := helpers.Bind[DeleteChangelogEntryRequest](c)
+	if err != nil {
+		c.Log.WithError(err).Debug("failed to bind DeleteChangelogEntryRequest")
+
+		return echo.ErrBadRequest
+	}
+
+	// TODO: implement
+
+	return c.JSON(http.StatusOK, req)
 }
 
 type PutChangelogEntryRequest struct {
@@ -74,5 +112,14 @@ type PutChangelogEntryRequest struct {
 }
 
 func (h *Handlers) PutChangelogEntry(c hs.AuthenticatedContext) error {
-	return echo.ErrNotFound // TODO: implement
+	req, err := helpers.Bind[PutChangelogEntryRequest](c)
+	if err != nil {
+		c.Log.WithError(err).Debug("failed to bind PutChangelogEntryRequest")
+
+		return echo.ErrBadRequest
+	}
+
+	// TODO: implement
+
+	return c.JSON(http.StatusOK, req)
 }

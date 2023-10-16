@@ -8,6 +8,7 @@ import (
 	"github.com/labstack/echo/v4/middleware"
 	auth "github.com/opsway-io/backend/internal/authentication"
 	"github.com/opsway-io/backend/internal/billing"
+	"github.com/opsway-io/backend/internal/changelog"
 	"github.com/opsway-io/backend/internal/check"
 	"github.com/opsway-io/backend/internal/monitor"
 	"github.com/opsway-io/backend/internal/rest/controllers"
@@ -40,6 +41,7 @@ func NewServer(
 	monitorService monitor.Service,
 	checkService check.Service,
 	billingService billing.Service,
+	changelogService changelog.Service,
 ) (*Server, error) {
 	cookieService := helpers.NewCookieService(authConfig)
 
@@ -73,6 +75,7 @@ func NewServer(
 		monitorService,
 		checkService,
 		billingService,
+		changelogService,
 	)
 
 	return &Server{

@@ -3,6 +3,7 @@ package changelogs
 import (
 	"github.com/labstack/echo/v4"
 	"github.com/opsway-io/backend/internal/authentication"
+	"github.com/opsway-io/backend/internal/changelog"
 	"github.com/opsway-io/backend/internal/rest/handlers"
 	mw "github.com/opsway-io/backend/internal/rest/middleware"
 	"github.com/opsway-io/backend/internal/team"
@@ -12,15 +13,18 @@ import (
 type Handlers struct {
 	AuthenticationService authentication.Service
 	TeamService           team.Service
+	ChangelogsService     changelog.Service
 }
 
 func Register(
 	e *echo.Group,
 	logger *logrus.Entry,
 	teamService team.Service,
+	changelogsService changelog.Service,
 ) {
 	h := &Handlers{
-		TeamService: teamService,
+		TeamService:       teamService,
+		ChangelogsService: changelogsService,
 	}
 
 	TeamGuard := mw.TeamGuardFactory(logger, teamService)

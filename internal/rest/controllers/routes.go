@@ -4,6 +4,7 @@ import (
 	"github.com/labstack/echo/v4"
 	auth "github.com/opsway-io/backend/internal/authentication"
 	"github.com/opsway-io/backend/internal/billing"
+	"github.com/opsway-io/backend/internal/changelog"
 	"github.com/opsway-io/backend/internal/check"
 	"github.com/opsway-io/backend/internal/monitor"
 	"github.com/opsway-io/backend/internal/rest/controllers/authentication"
@@ -32,6 +33,7 @@ func Register(
 	monitorService monitor.Service,
 	checkService check.Service,
 	billingService billing.Service,
+	changelogService changelog.Service,
 ) {
 	AuthGuard := middleware.AuthGuardFactory(logger, authenticationService)
 	StripeGuard := middleware.StripeGuardFactory(logger)
@@ -76,5 +78,5 @@ func Register(
 
 	// Changelogs
 
-	changelogs.Register(authRoot, logger, teamService)
+	changelogs.Register(authRoot, logger, teamService, changelogService)
 }
