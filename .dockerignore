@@ -1,5 +1,5 @@
 .gitignore
 docker-compose.yaml
 config.yaml
-data/
+.data/
 docs/
