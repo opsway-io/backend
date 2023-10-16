@@ -8,6 +8,7 @@ import (
 	"github.com/opsway-io/backend/internal/monitor"
 	"github.com/opsway-io/backend/internal/rest/controllers/authentication"
 	"github.com/opsway-io/backend/internal/rest/controllers/billings"
+	"github.com/opsway-io/backend/internal/rest/controllers/changelogs"
 	"github.com/opsway-io/backend/internal/rest/controllers/healthz"
 	"github.com/opsway-io/backend/internal/rest/controllers/monitors"
 	"github.com/opsway-io/backend/internal/rest/controllers/teams"
@@ -72,4 +73,8 @@ func Register(
 	// Monitors
 
 	monitors.Register(authRoot, logger, teamService, monitorService, checkService)
+
+	// Changelogs
+
+	changelogs.Register(authRoot, logger, teamService)
 }
