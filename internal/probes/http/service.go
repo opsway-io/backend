@@ -88,7 +88,7 @@ func (s *ServiceImpl) Probe(ctx context.Context, method, url string, headers map
 	meta := &Result{
 		Response: Response{
 			StatusCode: resp.StatusCode,
-			Headers:    resp.Header,
+			Header:     resp.Header,
 			Body:       bodyBytes,
 		},
 		Timing: Timing{

@@ -24,7 +24,7 @@ func TestStatusCodeAsserter_IsRuleValid(t *testing.T) {
 				rule: Rule{
 					Source:   "STATUS_CODE",
 					Operator: "EQUAL",
-					Target:   200,
+					Target:   "200",
 				},
 			},
 			wantErr: false,
@@ -35,7 +35,7 @@ func TestStatusCodeAsserter_IsRuleValid(t *testing.T) {
 				rule: Rule{
 					Source:   "INVALID",
 					Operator: "EQUAL",
-					Target:   200,
+					Target:   "200",
 				},
 			},
 			wantErr: true,
@@ -80,7 +80,7 @@ func TestStatusCodeAsserter_Assert(t *testing.T) {
 					{
 						Source:   "STATUS_CODE",
 						Operator: "EQUAL",
-						Target:   200,
+						Target:   "200",
 					},
 				},
 			},
@@ -99,7 +99,7 @@ func TestStatusCodeAsserter_Assert(t *testing.T) {
 					{
 						Source:   "STATUS_CODE",
 						Operator: "EQUAL",
-						Target:   201,
+						Target:   "201",
 					},
 				},
 			},
@@ -118,7 +118,7 @@ func TestStatusCodeAsserter_Assert(t *testing.T) {
 					{
 						Source:   "STATUS_CODE",
 						Operator: "NOT_EQUAL",
-						Target:   201,
+						Target:   "201",
 					},
 				},
 			},
@@ -137,7 +137,7 @@ func TestStatusCodeAsserter_Assert(t *testing.T) {
 					{
 						Source:   "STATUS_CODE",
 						Operator: "NOT_EQUAL",
-						Target:   200,
+						Target:   "200",
 					},
 				},
 			},
@@ -156,7 +156,7 @@ func TestStatusCodeAsserter_Assert(t *testing.T) {
 					{
 						Source:   "STATUS_CODE",
 						Operator: "GREATER_THAN",
-						Target:   200,
+						Target:   "200",
 					},
 				},
 			},
@@ -175,7 +175,7 @@ func TestStatusCodeAsserter_Assert(t *testing.T) {
 					{
 						Source:   "STATUS_CODE",
 						Operator: "GREATER_THAN",
-						Target:   200,
+						Target:   "200",
 					},
 				},
 			},
@@ -194,7 +194,7 @@ func TestStatusCodeAsserter_Assert(t *testing.T) {
 					{
 						Source:   "STATUS_CODE",
 						Operator: "LESS_THAN",
-						Target:   200,
+						Target:   "200",
 					},
 				},
 			},
@@ -213,7 +213,7 @@ func TestStatusCodeAsserter_Assert(t *testing.T) {
 					{
 						Source:   "STATUS_CODE",
 						Operator: "LESS_THAN",
-						Target:   200,
+						Target:   "200",
 					},
 				},
 			},
@@ -232,22 +232,22 @@ func TestStatusCodeAsserter_Assert(t *testing.T) {
 					{
 						Source:   "STATUS_CODE",
 						Operator: "EQUAL",
-						Target:   200,
+						Target:   "200",
 					},
 					{
 						Source:   "STATUS_CODE",
 						Operator: "NOT_EQUAL",
-						Target:   201,
+						Target:   "201",
 					},
 					{
 						Source:   "STATUS_CODE",
 						Operator: "GREATER_THAN",
-						Target:   199,
+						Target:   "199",
 					},
 					{
 						Source:   "STATUS_CODE",
 						Operator: "LESS_THAN",
-						Target:   201,
+						Target:   "201",
 					},
 				},
 			},

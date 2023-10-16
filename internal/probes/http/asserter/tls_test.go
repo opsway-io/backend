@@ -1,6 +1,7 @@
 package asserter
 
 import (
+	"fmt"
 	"testing"
 	"time"
 
@@ -36,7 +37,7 @@ func TestTLSAsserter_IsRuleValid(t *testing.T) {
 					Source:   "INVALID",
 					Property: "",
 					Operator: "EQUAL",
-					Target:   200,
+					Target:   "100",
 				},
 			},
 			wantErr: true,
@@ -163,7 +164,7 @@ func TestTLSAsserter_Assert(t *testing.T) {
 					{
 						Source:   "TLS",
 						Operator: "EXPIRES_LESS_THAN",
-						Target:   int64(time.Second * 300), // 5 minutes
+						Target:   fmt.Sprintf("%v", int64(time.Minute*5)),
 					},
 				},
 			},
@@ -184,7 +185,7 @@ func TestTLSAsserter_Assert(t *testing.T) {
 					{
 						Source:   "TLS",
 						Operator: "EXPIRES_LESS_THAN",
-						Target:   int64(time.Second * 30), // 30 seconds
+						Target:   fmt.Sprintf("%v", int64(time.Second*30)),
 					},
 				},
 			},
@@ -205,7 +206,7 @@ func TestTLSAsserter_Assert(t *testing.T) {
 					{
 						Source:   "TLS",
 						Operator: "EXPIRES_GREATER_THAN",
-						Target:   int64(time.Second * 30), // 30 seconds
+						Target:   fmt.Sprintf("%v", int64(time.Second*30)),
 					},
 				},
 			},
@@ -226,7 +227,7 @@ func TestTLSAsserter_Assert(t *testing.T) {
 					{
 						Source:   "TLS",
 						Operator: "EXPIRES_GREATER_THAN",
-						Target:   int64(time.Second * 300), // 5 minutes
+						Target:   fmt.Sprintf("%v", int64(time.Minute*5)),
 					},
 				},
 			},

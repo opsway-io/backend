@@ -1,6 +1,9 @@
 package http
 
-import "time"
+import (
+	"net/http"
+	"time"
+)
 
 type Result struct {
 	Response Response
@@ -10,7 +13,7 @@ type Result struct {
 
 type Response struct {
 	StatusCode int
-	Headers    map[string][]string
+	Header     http.Header
 	Body       []byte
 }
 

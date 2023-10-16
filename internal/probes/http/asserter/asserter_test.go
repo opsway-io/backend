@@ -29,6 +29,22 @@ func TestHTTPResultAsserter_Assert(t *testing.T) {
 			wantErr: false,
 		},
 		{
+			name: "Nil result fails",
+			args: args{
+				result: nil,
+				rules: []Rule{
+					{
+						Source:   "RESPONSE_TIME",
+						Property: "TOTAL",
+						Operator: "EQUAL",
+						Target:   "100",
+					},
+				},
+			},
+			wantOk:  nil,
+			wantErr: true,
+		},
+		{
 			name: "Known source RESPONSE_TIME and valid rule passes",
 			args: args{
 				result: &http.Result{
@@ -43,7 +59,7 @@ func TestHTTPResultAsserter_Assert(t *testing.T) {
 						Source:   "RESPONSE_TIME",
 						Property: "TOTAL",
 						Operator: "EQUAL",
-						Target:   100,
+						Target:   "100",
 					},
 				},
 			},
@@ -59,7 +75,7 @@ func TestHTTPResultAsserter_Assert(t *testing.T) {
 						Source:   "RESPONSE_TIME",
 						Property: "TOTAL",
 						Operator: "INVALID",
-						Target:   100,
+						Target:   "100",
 					},
 				},
 			},
@@ -84,12 +100,12 @@ func TestHTTPResultAsserter_Assert(t *testing.T) {
 						Source:   "RESPONSE_TIME",
 						Property: "TOTAL",
 						Operator: "LESS_THAN",
-						Target:   500,
+						Target:   "500",
 					},
 					{
 						Source:   "STATUS_CODE",
 						Operator: "EQUAL",
-						Target:   200,
+						Target:   "200",
 					},
 				},
 			},

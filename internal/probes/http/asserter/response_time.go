@@ -73,12 +73,8 @@ func (a *ResponseTimeAssertion) IsRuleValid(rule Rule) error {
 		return fmt.Errorf("invalid source: %s", rule.Source)
 	}
 
-	// The property must be one of the response time metrics
-	properyStr, ok := rule.Property.(string)
-	if !ok {
-		return errors.New("property must be a string")
-	}
-	if ok := isStringInSlice(properyStr, allowedResponseTimeProperties); !ok {
+	// Property must be one of the response time properties
+	if ok := isStringInSlice(rule.Property, allowedResponseTimeProperties); !ok {
 		return fmt.Errorf("unknown property: %s", rule.Property)
 	}
 
@@ -87,22 +83,17 @@ func (a *ResponseTimeAssertion) IsRuleValid(rule Rule) error {
 		return fmt.Errorf("unknown operator: %v", rule.Operator)
 	}
 
-	// The target must be an integer
-	if _, ok := rule.Target.(int); !ok {
-		return errors.New("target must be an integer")
+	// The target must be an integer for all operators
+	if ok := isInt(rule.Target); !ok {
+		return errors.New("invalid target")
 	}
 
 	return nil
 }
 
 func (a *ResponseTimeAssertion) assert(result *http.Result, rule Rule) bool {
-	propertyStr, ok := rule.Property.(string)
-	if !ok {
-		return false
-	}
-
 	var resultValue time.Duration
-	switch propertyStr {
+	switch rule.Property {
 	case "DNS_LOOKUP":
 		resultValue = result.Timing.Phases.DNSLookup
 	case "TCP_CONNECTION":
@@ -121,7 +112,7 @@ func (a *ResponseTimeAssertion) assert(result *http.Result, rule Rule) bool {
 
 	resultInt := durationToMilliseconds(resultValue)
 
-	targetInt, ok := rule.Target.(int)
+	targetInt, ok := toInt(rule.Target)
 	if !ok {
 		return false
 	}

@@ -11,13 +11,13 @@ type Rule struct {
 	Source string
 
 	// Input (if any) to the assertion
-	Property any
+	Property string
 
 	// The operator to use for the assertion
 	Operator string
 
 	// The target value (if any) to assert against
-	Target any
+	Target string
 }
 
 type Asserter interface {
@@ -45,6 +45,10 @@ func New() *HTTPResultAsserter {
 func (a *HTTPResultAsserter) Assert(result *http.Result, rules []Rule) (ok []bool, err error) {
 	if len(rules) == 0 {
 		return []bool{}, nil
+	}
+
+	if result == nil {
+		return nil, fmt.Errorf("result is nil")
 	}
 
 	oks := make([]bool, len(rules))

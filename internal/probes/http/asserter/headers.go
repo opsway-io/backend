@@ -1,8 +1,8 @@
 package asserter
 
 import (
-	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/opsway-io/backend/internal/probes/http"
 )
@@ -68,37 +68,30 @@ func (a *HeadersAsserter) IsRuleValid(rule Rule) error {
 		return fmt.Errorf("invalid operator: %s", rule.Operator)
 	}
 
-	// The property must be a string
-	if _, ok := rule.Property.(string); !ok {
-		return fmt.Errorf("property must be a string: %v", rule.Property)
-	}
-
-	// If the operator is "GREATER_THAN" or "LESS_THAN"
-	// the target must be an integer
-	if rule.Operator == "GREATER_THAN" || rule.Operator == "LESS_THAN" {
-		if _, ok := rule.Target.(int); !ok {
-			return errors.New("target must be an int64")
+	// The target must be set for the following operators:
+	//	- CONTAINS
+	//	- NOT_CONTAINS
+	if ok := rule.Operator == "CONTAINS" || rule.Operator == "NOT_CONTAINS"; ok {
+		if ok := rule.Target != ""; !ok {
+			return fmt.Errorf("invalid target: %s", rule.Target)
 		}
 	}
 
-	// If the operator is "EMPTY" or "NOT_EMPTY" the target must be empty
-	if rule.Operator == "EMPTY" || rule.Operator == "NOT_EMPTY" {
-		if ok := rule.Target == "" || rule.Target == nil; !ok {
-			return fmt.Errorf("target must be empty: %s", rule.Target)
+	// The target must be empty for the following operators:
+	//	- EMPTY
+	//	- NOT_EMPTY
+	if ok := rule.Operator == "EMPTY" || rule.Operator == "NOT_EMPTY"; ok {
+		if ok := rule.Target == ""; !ok {
+			return fmt.Errorf("invalid target: %s", rule.Target)
 		}
 	}
 
-	// If the operator is "EQUAL" or "NOT_EQUAL" the target must be a string
-	if rule.Operator == "EQUAL" || rule.Operator == "NOT_EQUAL" {
-		if _, ok := rule.Target.(string); !ok {
-			return errors.New("target must be a string")
-		}
-	}
-
-	// If the operator is "CONTAINS" or "NOT_CONTAINS" the target must be a string
-	if rule.Operator == "CONTAINS" || rule.Operator == "NOT_CONTAINS" {
-		if _, ok := rule.Target.(string); !ok {
-			return errors.New("target must be a string")
+	// The target must be an integer for the following operators:
+	//	- GREATER_THAN
+	//	- LESS_THAN
+	if ok := rule.Operator == "GREATER_THAN" || rule.Operator == "LESS_THAN"; ok {
+		if _, ok := toInt(rule.Target); !ok {
+			return fmt.Errorf("invalid target: %s", rule.Target)
 		}
 	}
 
@@ -106,5 +99,76 @@ func (a *HeadersAsserter) IsRuleValid(rule Rule) error {
 }
 
 func (a *HeadersAsserter) assert(result *http.Result, rule Rule) bool {
-	return false // TODO: implement
+	switch rule.Operator {
+	case "EQUAL":
+		return a.assertEqual(result, rule)
+	case "NOT_EQUAL":
+		return a.assertNotEqual(result, rule)
+	case "EMPTY":
+		return a.assertEmpty(result, rule)
+	case "NOT_EMPTY":
+		return a.assertNotEmpty(result, rule)
+	case "GREATER_THAN":
+		return a.assertGreaterThan(result, rule)
+	case "LESS_THAN":
+		return a.assertLessThan(result, rule)
+	case "CONTAINS":
+		return a.assertContains(result, rule)
+	case "NOT_CONTAINS":
+		return a.assertNotContains(result, rule)
+	default:
+		return false
+	}
+}
+
+func (a *HeadersAsserter) assertEqual(result *http.Result, rule Rule) bool {
+	return result.Response.Header.Get(rule.Property) == rule.Target
+}
+
+func (a *HeadersAsserter) assertNotEqual(result *http.Result, rule Rule) bool {
+	return result.Response.Header.Get(rule.Property) != rule.Target
+}
+
+func (a *HeadersAsserter) assertEmpty(result *http.Result, rule Rule) bool {
+	return result.Response.Header.Get(rule.Property) == ""
+}
+
+func (a *HeadersAsserter) assertNotEmpty(result *http.Result, rule Rule) bool {
+	return result.Response.Header.Get(rule.Property) != ""
+}
+
+func (a *HeadersAsserter) assertGreaterThan(result *http.Result, rule Rule) bool {
+	intTarget, ok := toInt(rule.Target)
+	if !ok {
+		return false
+	}
+
+	intResult, ok := toInt(result.Response.Header.Get(rule.Property))
+	if !ok {
+		return false
+	}
+
+	return intResult > intTarget
+}
+
+func (a *HeadersAsserter) assertLessThan(result *http.Result, rule Rule) bool {
+	intTarget, ok := toInt(rule.Target)
+	if !ok {
+		return false
+	}
+
+	intResult, ok := toInt(result.Response.Header.Get(rule.Property))
+	if !ok {
+		return false
+	}
+
+	return intResult < intTarget
+}
+
+func (a *HeadersAsserter) assertContains(result *http.Result, rule Rule) bool {
+	return strings.Contains(result.Response.Header.Get(rule.Property), rule.Target)
+}
+
+func (a *HeadersAsserter) assertNotContains(result *http.Result, rule Rule) bool {
+	return !strings.Contains(result.Response.Header.Get(rule.Property), rule.Target)
 }

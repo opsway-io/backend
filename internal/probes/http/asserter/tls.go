@@ -62,22 +62,25 @@ func (a *TLSAsserter) IsRuleValid(rule Rule) error {
 	}
 
 	// The property must be empty
-	if ok := rule.Property == nil; !ok {
+	if ok := rule.Property == ""; !ok {
 		return fmt.Errorf("property must be empty: %s", rule.Property)
 	}
 
-	// If the operator is "EXPIRES_LESS_THAN" or "EXPIRES_GREATER_THAN"
-	// the target must be an integer
-	if rule.Operator == "EXPIRES_LESS_THAN" || rule.Operator == "EXPIRES_GREATER_THAN" {
-		if _, ok := rule.Target.(int64); !ok {
-			return errors.New("target must be an int64")
+	// The target must be empty for the following operators:
+	//	- EXPIRED
+	//	- NOT_EXPIRED
+	if ok := rule.Operator == "EXPIRED" || rule.Operator == "NOT_EXPIRED"; ok {
+		if ok := rule.Target == ""; !ok {
+			return fmt.Errorf("target must be empty: %s", rule.Target)
 		}
 	}
 
-	// If the operator is "EXPIRED" or "NOT_EXPIRED" the target must be empty
-	if rule.Operator == "EXPIRED" || rule.Operator == "NOT_EXPIRED" {
-		if ok := rule.Target == "" || rule.Target == nil; !ok {
-			return fmt.Errorf("target must be empty: %s", rule.Target)
+	// The target must be an integer for the following operators:
+	//	- EXPIRES_LESS_THAN
+	//	- EXPIRES_GREATER_THAN
+	if ok := rule.Operator == "EXPIRES_LESS_THAN" || rule.Operator == "EXPIRES_GREATER_THAN"; ok {
+		if ok := isInt(rule.Target); !ok {
+			return errors.New("invalid target")
 		}
 	}
 
@@ -126,7 +129,7 @@ func (a *TLSAsserter) assertExpiresGreaterThan(result *http.Result, rule Rule) b
 }
 
 func (a *TLSAsserter) getTargetDeltaAsTime(rule Rule) (time.Time, bool) {
-	target, ok := rule.Target.(int64)
+	target, ok := toInt(rule.Target)
 	if !ok {
 		return time.Time{}, false
 	}
