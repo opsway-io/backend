@@ -10,6 +10,8 @@ type Result struct {
 
 type Response struct {
 	StatusCode int
+	Headers    map[string][]string
+	Body       []byte
 }
 
 type Timing struct {

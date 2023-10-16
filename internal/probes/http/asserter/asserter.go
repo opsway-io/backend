@@ -16,7 +16,7 @@ type Rule struct {
 	// The operator to use for the assertion
 	Operator string
 
-	// The target value  (if any) to assert against
+	// The target value (if any) to assert against
 	Target any
 }
 
