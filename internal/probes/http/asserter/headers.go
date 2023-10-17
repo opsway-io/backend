@@ -10,7 +10,7 @@ import (
 /*
 	Assertions about the status code of HTTP result.
 
-	The following assertions are supported:
+	The following operators are supported:
 		- Equal
 		- Not Equal
 		- Empty

@@ -11,7 +11,7 @@ import (
 /*
 	Assertions about the TLS certificate of HTTP result.
 
-	The following assertions are supported:
+	The following operators are supported:
 		- Expired
 		- Not Expired
 		- Expires less than

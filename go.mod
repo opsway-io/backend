@@ -35,6 +35,7 @@ require (
 	github.com/stripe/stripe-go v70.15.0+incompatible
 	github.com/tj/assert v0.0.3
 	github.com/vmihailenco/msgpack v4.0.4+incompatible
+	github.com/yalp/jsonpath v0.0.0-20180802001716-5cc68e5049a0
 	go.uber.org/automaxprocs v1.5.2
 	golang.org/x/crypto v0.4.0
 	gorm.io/driver/clickhouse v0.5.0

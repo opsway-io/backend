@@ -10,7 +10,7 @@ import (
 /*
 	Assertions about the status code of a request.
 
-	The following assertions are supported:
+	The following operators are supported:
 		- Equal
 		- Not Equal
 		- Greater than
