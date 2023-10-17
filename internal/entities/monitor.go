@@ -17,15 +17,16 @@ const (
 )
 
 type Monitor struct {
-	ID        uint
-	State     MonitorState    `gorm:"not null;default:0"`
-	Name      string          `gorm:"index;not null"`
-	Tags      pq.StringArray  `gorm:"type:text[]"`
-	Settings  MonitorSettings `gorm:"not null;constraint:OnDelete:CASCADE"`
-	Incidents []Incident      `gorm:"constraint:OnDelete:CASCADE"`
-	TeamID    uint            `gorm:"index;not null"`
-	CreatedAt time.Time       `gorm:"index"`
-	UpdatedAt time.Time       `gorm:"index"`
+	ID         uint
+	State      MonitorState       `gorm:"not null;default:0"`
+	Name       string             `gorm:"index;not null"`
+	Tags       pq.StringArray     `gorm:"type:text[]"`
+	Settings   MonitorSettings    `gorm:"not null;constraint:OnDelete:CASCADE"`
+	Assertions []MonitorAssertion `gorm:"constraint:OnDelete:CASCADE"`
+	Incidents  []Incident         `gorm:"constraint:OnDelete:CASCADE"`
+	TeamID     uint               `gorm:"index;not null"`
+	CreatedAt  time.Time          `gorm:"index"`
+	UpdatedAt  time.Time          `gorm:"index"`
 }
 
 func (Monitor) TableName() string {
@@ -141,4 +142,19 @@ func (ms *MonitorSettings) GetFrequencyMilliseconds() uint64 {
 
 func (ms *MonitorSettings) SetFrequencyMilliseconds(frequency uint64) {
 	ms.Frequency = time.Duration(frequency) * time.Millisecond
+}
+
+type MonitorAssertion struct {
+	ID        uint
+	MonitorID uint   `gorm:"index;not null"`
+	Source    string `gorm:"not null"`
+	Property  string
+	Operator  string `gorm:"not null"`
+	Target    string
+	CreatedAt time.Time `gorm:"index"`
+	UpdatedAt time.Time `gorm:"index"`
+}
+
+func (MonitorAssertion) TableName() string {
+	return "monitor_assertions"
 }
