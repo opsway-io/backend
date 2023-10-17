@@ -71,9 +71,10 @@ func (a *HeadersAsserter) IsRuleValid(rule Rule) error {
 	// The target must be set for the following operators:
 	//	- CONTAINS
 	//	- NOT_CONTAINS
+	// Not for EQUAL and NOT_EQUAL because the target can be empty
 	if ok := rule.Operator == "CONTAINS" || rule.Operator == "NOT_CONTAINS"; ok {
 		if ok := rule.Target != ""; !ok {
-			return fmt.Errorf("invalid target: %s", rule.Target)
+			return fmt.Errorf("target must be set for operator: %s", rule.Operator)
 		}
 	}
 
@@ -82,7 +83,7 @@ func (a *HeadersAsserter) IsRuleValid(rule Rule) error {
 	//	- NOT_EMPTY
 	if ok := rule.Operator == "EMPTY" || rule.Operator == "NOT_EMPTY"; ok {
 		if ok := rule.Target == ""; !ok {
-			return fmt.Errorf("invalid target: %s", rule.Target)
+			return fmt.Errorf("target must be empty for operator: %s", rule.Operator)
 		}
 	}
 
@@ -90,8 +91,8 @@ func (a *HeadersAsserter) IsRuleValid(rule Rule) error {
 	//	- GREATER_THAN
 	//	- LESS_THAN
 	if ok := rule.Operator == "GREATER_THAN" || rule.Operator == "LESS_THAN"; ok {
-		if _, ok := toInt(rule.Target); !ok {
-			return fmt.Errorf("invalid target: %s", rule.Target)
+		if ok := isInt(rule.Target); !ok {
+			return fmt.Errorf("target must be an integer for operator: %s", rule.Operator)
 		}
 	}
 
