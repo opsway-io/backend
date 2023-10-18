@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/gammazero/workerpool"
 	"github.com/opsway-io/backend/internal/check"
 	"github.com/opsway-io/backend/internal/connectors/clickhouse"
 	connectorRedis "github.com/opsway-io/backend/internal/connectors/redis"
@@ -18,7 +19,7 @@ import (
 )
 
 type ProberConfig struct {
-	Concurrency int `mapstructure:"concurrency" default:"1"`
+	Concurrency int `mapstructure:"concurrency" default:"25"`
 }
 
 //nolint:gochecknoglobals
@@ -41,6 +42,8 @@ func runProber(cmd *cobra.Command, args []string) {
 	if err != nil {
 		logrus.WithError(err).Fatal("Failed to load config")
 	}
+
+	wp := workerpool.New(conf.Prober.Concurrency)
 
 	l := getLogger(conf.Log)
 
@@ -69,10 +72,16 @@ func runProber(cmd *cobra.Command, args []string) {
 	l.Info("Waiting for tasks...")
 
 	if err := schedule.On(ctx, func(ctx context.Context, monitor *entities.Monitor) {
-		handleTask(ctx, l, prober, monitor, httpResultService)
+		wp.Submit(func() {
+			handleTask(ctx, l, prober, monitor, httpResultService)
+		})
 	}); err != nil {
 		l.WithError(err).Fatal("failed to start schedule")
 	}
+
+	l.Info("Shutting down...")
+
+	wp.StopWait()
 
 	l.Info("Goodbye!")
 }
