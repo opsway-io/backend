@@ -70,14 +70,13 @@ func (h *Handlers) newGetChangelogsResponse(changelogs []entities.Changelog, tot
 }
 
 type PostChangelogsRequest struct {
-	TeamID uint `param:"teamId" validate:"required,numeric,gte=0"`
-}
-
-type PostChangelogsResponse struct {
-	Name string `json:"name"`
+	TeamID uint   `param:"teamId" validate:"required,numeric,gte=0"`
+	Name   string `json:"name" validate:"required,max=255,min=1"`
 }
 
 func (h *Handlers) PostChangelogs(c hs.AuthenticatedContext) error {
+	ctx := c.Request().Context()
+
 	req, err := helpers.Bind[PostChangelogsRequest](c)
 	if err != nil {
 		c.Log.WithError(err).Debug("failed to bind PostChangelogsRequest")
@@ -85,9 +84,13 @@ func (h *Handlers) PostChangelogs(c hs.AuthenticatedContext) error {
 		return echo.ErrBadRequest
 	}
 
-	// TODO: implement
+	if _, err := h.ChangelogsService.Create(ctx, req.TeamID, req.Name); err != nil {
+		c.Log.WithError(err).Error("failed to create changelog")
 
-	return c.JSON(http.StatusOK, req)
+		return echo.ErrInternalServerError
+	}
+
+	return c.NoContent(http.StatusCreated)
 }
 
 type GetChangelogRequest struct {
