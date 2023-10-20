@@ -8,12 +8,12 @@ import (
 	"github.com/opsway-io/backend/internal/check"
 	"github.com/opsway-io/backend/internal/monitor"
 	"github.com/opsway-io/backend/internal/rest/controllers/authentication"
-	"github.com/opsway-io/backend/internal/rest/controllers/billings"
 	"github.com/opsway-io/backend/internal/rest/controllers/changelogs"
 	"github.com/opsway-io/backend/internal/rest/controllers/healthz"
 	"github.com/opsway-io/backend/internal/rest/controllers/monitors"
 	"github.com/opsway-io/backend/internal/rest/controllers/teams"
 	"github.com/opsway-io/backend/internal/rest/controllers/users"
+	"github.com/opsway-io/backend/internal/rest/controllers/webhooks"
 	"github.com/opsway-io/backend/internal/rest/helpers"
 	"github.com/opsway-io/backend/internal/rest/middleware"
 	"github.com/opsway-io/backend/internal/team"
@@ -36,7 +36,6 @@ func Register(
 	changelogService changelog.Service,
 ) {
 	AuthGuard := middleware.AuthGuardFactory(logger, authenticationService)
-	StripeGuard := middleware.StripeGuardFactory(logger)
 
 	root := e.Group(
 		"/v1",
@@ -47,14 +46,9 @@ func Register(
 		AuthGuard(),
 	)
 
-	stripeRoot := e.Group(
-		"/stripe",
-		StripeGuard(),
-	)
+	// Webhooks
 
-	// Stripe
-
-	billings.Register(stripeRoot, logger, billingService)
+	webhooks.Register(root, logger, billingService)
 
 	// Healthz
 
