@@ -106,6 +106,8 @@ type GetChangelogResponse struct {
 }
 
 func (h *Handlers) GetChangelog(c hs.AuthenticatedContext) error {
+	ctx := c.Request().Context()
+
 	req, err := helpers.Bind[GetChangelogRequest](c)
 	if err != nil {
 		c.Log.WithError(err).Debug("failed to bind GetChangelogRequest")
@@ -113,9 +115,25 @@ func (h *Handlers) GetChangelog(c hs.AuthenticatedContext) error {
 		return echo.ErrBadRequest
 	}
 
-	// TODO: implement
+	changelog, err := h.ChangelogsService.Get(ctx, req.TeamID, req.ChangelogID)
+	if err != nil {
+		c.Log.WithError(err).Error("failed to get changelog")
 
-	return c.JSON(http.StatusOK, req)
+		return echo.ErrInternalServerError
+	}
+
+	resp := h.newGetChangelogResponse(changelog)
+
+	return c.JSON(http.StatusOK, resp)
+}
+
+func (h *Handlers) newGetChangelogResponse(changelog entities.Changelog) GetChangelogResponse {
+	return GetChangelogResponse{
+		ID:        changelog.ID,
+		Name:      changelog.Name,
+		CreatedAt: changelog.CreatedAt,
+		UpdatedAt: changelog.UpdatedAt,
+	}
 }
 
 type DeleteChangelogRequest struct {
@@ -124,6 +142,8 @@ type DeleteChangelogRequest struct {
 }
 
 func (h *Handlers) DeleteChangelog(c hs.AuthenticatedContext) error {
+	ctx := c.Request().Context()
+
 	req, err := helpers.Bind[DeleteChangelogRequest](c)
 	if err != nil {
 		c.Log.WithError(err).Debug("failed to bind DeleteChangelogRequest")
@@ -131,9 +151,13 @@ func (h *Handlers) DeleteChangelog(c hs.AuthenticatedContext) error {
 		return echo.ErrBadRequest
 	}
 
-	// TODO: implement
+	if err := h.ChangelogsService.Delete(ctx, req.TeamID, req.ChangelogID); err != nil {
+		c.Log.WithError(err).Error("failed to delete changelog")
 
-	return c.JSON(http.StatusOK, req)
+		return echo.ErrInternalServerError
+	}
+
+	return c.NoContent(http.StatusNoContent)
 }
 
 type PutChangelogRequest struct {

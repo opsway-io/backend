@@ -10,16 +10,16 @@ import (
 
 type Repository interface {
 	GetAll(ctx context.Context, teamID uint, offset *int, limit *int, query *string) (changelogs []entities.Changelog, totalCount int, err error)
-	// Get(ctx context.Context, teamID, changelogID uint) (entities.Changelog, error)
-	// Delete(ctx context.Context, teamID, changelogID uint) error
-	Create(ctx context.Context, teamID uint, name string) (entities.Changelog, error)
-	// Update(ctx context.Context, teamID, changelogID uint, name string) (entities.Changelog, error)
+	Get(ctx context.Context, teamID, changelogID uint) (entities.Changelog, error)
+	Delete(ctx context.Context, teamID, changelogID uint) (err error)
+	Create(ctx context.Context, teamID uint, name string) (changelog entities.Changelog, err error)
+	// Update(ctx context.Context, teamID, changelogID uint, name string) (changelog entities.Changelog, err error)
 
 	GetEntriesWithAuthors(ctx context.Context, teamID, changelogID uint, offset *int, limit *int, query *string) (entries []entities.ChangelogEntry, total_count int, err error)
-	// GetEntryWithAuthors(ctx context.Context, teamID, changelogID, entryID uint) (entities.ChangelogEntry, error)
-	// DeleteEntry(ctx context.Context, teamID, changelogID, entryID uint) error
-	// CreateEntry(ctx context.Context, teamID, changelogID uint, title, content string, authorIDs []uint) (entities.ChangelogEntry, error)
-	// UpdateEntry(ctx context.Context, teamID, changelogID, entryID uint, title, content string, authorIDs []uint) (entities.ChangelogEntry, error)
+	// GetEntryWithAuthors(ctx context.Context, teamID, changelogID, entryID uint) (entries entities.ChangelogEntry, err error)
+	// DeleteEntry(ctx context.Context, teamID, changelogID, entryID uint) (err error)
+	// CreateEntry(ctx context.Context, teamID, changelogID uint, title, content string, authorIDs []uint) (entry entities.ChangelogEntry, err error)
+	// UpdateEntry(ctx context.Context, teamID, changelogID, entryID uint, title, content string, authorIDs []uint) (entry entities.ChangelogEntry, err error)
 }
 
 type RepositoryImpl struct {
@@ -58,6 +58,40 @@ func (r *RepositoryImpl) GetAll(ctx context.Context, teamID uint, offset *int, l
 	}
 
 	return changelogs, int(totalCount), nil
+}
+
+func (r *RepositoryImpl) Get(ctx context.Context, teamID, changelogID uint) (entities.Changelog, error) {
+	var changelog entities.Changelog
+
+	result := r.db.WithContext(
+		ctx,
+	).Where(
+		"team_id = ? AND id = ?", teamID, changelogID,
+	).First(
+		&changelog,
+	)
+
+	if result.Error != nil {
+		return entities.Changelog{}, result.Error
+	}
+
+	return changelog, nil
+}
+
+func (r *RepositoryImpl) Delete(ctx context.Context, teamID, changelogID uint) error {
+	result := r.db.WithContext(
+		ctx,
+	).Where(
+		"team_id = ? AND id = ?", teamID, changelogID,
+	).Delete(
+		&entities.Changelog{},
+	)
+
+	if result.Error != nil {
+		return result.Error
+	}
+
+	return nil
 }
 
 func (r *RepositoryImpl) Create(ctx context.Context, teamID uint, name string) (entities.Changelog, error) {
