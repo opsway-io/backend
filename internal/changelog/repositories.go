@@ -13,7 +13,7 @@ type Repository interface {
 	Get(ctx context.Context, teamID, changelogID uint) (entities.Changelog, error)
 	Delete(ctx context.Context, teamID, changelogID uint) (err error)
 	Create(ctx context.Context, teamID uint, name string) (changelog entities.Changelog, err error)
-	// Update(ctx context.Context, teamID, changelogID uint, name string) (changelog entities.Changelog, err error)
+	Update(ctx context.Context, teamID, changelogID uint, name string) (changelog entities.Changelog, err error)
 
 	GetEntriesWithAuthors(ctx context.Context, teamID, changelogID uint, offset *int, limit *int, query *string) (entries []entities.ChangelogEntry, total_count int, err error)
 	// GetEntryWithAuthors(ctx context.Context, teamID, changelogID, entryID uint) (entries entities.ChangelogEntry, err error)
@@ -103,6 +103,26 @@ func (r *RepositoryImpl) Create(ctx context.Context, teamID uint, name string) (
 	result := r.db.WithContext(
 		ctx,
 	).Create(
+		&changelog,
+	)
+
+	if result.Error != nil {
+		return entities.Changelog{}, result.Error
+	}
+
+	return changelog, nil
+}
+
+func (r *RepositoryImpl) Update(ctx context.Context, teamID, changelogID uint, name string) (entities.Changelog, error) {
+	changelog := entities.Changelog{
+		Name: name,
+	}
+
+	result := r.db.WithContext(
+		ctx,
+	).Where(
+		"team_id = ? AND id = ?", teamID, changelogID,
+	).Updates(
 		&changelog,
 	)
 

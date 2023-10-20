@@ -167,6 +167,8 @@ type PutChangelogRequest struct {
 }
 
 func (h *Handlers) PutChangelog(c hs.AuthenticatedContext) error {
+	ctx := c.Request().Context()
+
 	req, err := helpers.Bind[PutChangelogRequest](c)
 	if err != nil {
 		c.Log.WithError(err).Debug("failed to bind PutChangelogRequest")
@@ -174,7 +176,11 @@ func (h *Handlers) PutChangelog(c hs.AuthenticatedContext) error {
 		return echo.ErrBadRequest
 	}
 
-	// TODO: implement
+	if _, err := h.ChangelogsService.Update(ctx, req.TeamID, req.ChangelogID, req.Name); err != nil {
+		c.Log.WithError(err).Error("failed to update changelog")
+
+		return echo.ErrInternalServerError
+	}
 
 	return c.JSON(http.StatusOK, req)
 }

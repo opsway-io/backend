@@ -104,10 +104,13 @@ func (r *RepositoryImpl) Update(ctx context.Context, teamID, monitorID uint, m *
 		Select(
 			"name",
 			"state",
-		).Updates(&entities.Monitor{
-		Name:  m.Name,
-		State: m.State,
-	})
+		).Updates(
+		&entities.Monitor{
+			Name:  m.Name,
+			State: m.State,
+		},
+	)
+
 	if result.Error != nil {
 		tx.Rollback()
 
