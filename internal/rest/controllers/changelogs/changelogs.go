@@ -5,14 +5,16 @@ import (
 	"time"
 
 	"github.com/labstack/echo/v4"
+	"github.com/opsway-io/backend/internal/entities"
 	hs "github.com/opsway-io/backend/internal/rest/handlers"
 	"github.com/opsway-io/backend/internal/rest/helpers"
 )
 
 type GetChangelogsRequest struct {
-	TeamID uint `param:"teamId" validate:"required,numeric,gte=0"`
-	Offset *int `query:"offset" validate:"numeric,gte=0" default:"0"`
-	Limit  *int `query:"limit" validate:"numeric,gt=0" default:"10"`
+	TeamID uint    `param:"teamId" validate:"required,numeric,gte=0"`
+	Offset *int    `query:"offset" validate:"numeric,gte=0" default:"0"`
+	Limit  *int    `query:"limit" validate:"numeric,gt=0" default:"10"`
+	Query  *string `query:"query" validate:"max=255"`
 }
 
 type GetChangelogsResponse struct {
@@ -21,13 +23,15 @@ type GetChangelogsResponse struct {
 }
 
 type GetChangelogsResponseChangelog struct {
-	ID        string    `json:"id"`
+	ID        uint      `json:"id"`
 	Name      string    `json:"name"`
 	CreatedAt time.Time `json:"createdAt"`
 	UpdatedAt time.Time `json:"updatedAt"`
 }
 
 func (h *Handlers) GetChangelogs(c hs.AuthenticatedContext) error {
+	ctx := c.Request().Context()
+
 	req, err := helpers.Bind[GetChangelogsRequest](c)
 	if err != nil {
 		c.Log.WithError(err).Debug("failed to bind GetChangelogsRequest")
@@ -35,9 +39,34 @@ func (h *Handlers) GetChangelogs(c hs.AuthenticatedContext) error {
 		return echo.ErrBadRequest
 	}
 
-	// TODO: implement
+	changelogs, totalCount, err := h.ChangelogsService.GetAll(ctx, req.TeamID, req.Offset, req.Limit, req.Query)
+	if err != nil {
+		c.Log.WithError(err).Error("failed to get changelogs")
 
-	return c.JSON(http.StatusOK, req)
+		return echo.ErrInternalServerError
+	}
+
+	resp := h.newGetChangelogsResponse(changelogs, totalCount)
+
+	return c.JSON(http.StatusOK, resp)
+}
+
+func (h *Handlers) newGetChangelogsResponse(changelogs []entities.Changelog, totalCount int) GetChangelogsResponse {
+	response := make([]GetChangelogsResponseChangelog, len(changelogs))
+
+	for i, changelog := range changelogs {
+		response[i] = GetChangelogsResponseChangelog{
+			ID:        changelog.ID,
+			Name:      changelog.Name,
+			CreatedAt: changelog.CreatedAt,
+			UpdatedAt: changelog.UpdatedAt,
+		}
+	}
+
+	return GetChangelogsResponse{
+		Changelogs: response,
+		TotalCount: totalCount,
+	}
 }
 
 type PostChangelogsRequest struct {
@@ -67,7 +96,7 @@ type GetChangelogRequest struct {
 }
 
 type GetChangelogResponse struct {
-	ID        string    `json:"id"`
+	ID        uint      `json:"id"`
 	Name      string    `json:"name"`
 	CreatedAt time.Time `json:"createdAt"`
 	UpdatedAt time.Time `json:"updatedAt"`
