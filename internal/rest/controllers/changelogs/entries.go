@@ -5,15 +5,17 @@ import (
 	"time"
 
 	"github.com/labstack/echo/v4"
+	"github.com/opsway-io/backend/internal/entities"
 	hs "github.com/opsway-io/backend/internal/rest/handlers"
 	"github.com/opsway-io/backend/internal/rest/helpers"
 )
 
 type GetChangelogEntriesRequest struct {
-	TeamID      uint `param:"teamId" validate:"required,numeric,gte=0"`
-	ChangelogID uint `param:"changelogId" validate:"required,numeric,gte=0"`
-	Offset      *int `query:"offset" validate:"numeric,gte=0" default:"0"`
-	Limit       *int `query:"limit" validate:"numeric,gt=0" default:"10"`
+	TeamID      uint    `param:"teamId" validate:"required,numeric,gte=0"`
+	ChangelogID uint    `param:"changelogId" validate:"required,numeric,gte=0"`
+	Offset      *int    `query:"offset" validate:"numeric,gte=0" default:"0"`
+	Limit       *int    `query:"limit" validate:"numeric,gt=0" default:"10"`
+	Query       *string `query:"query" validate:"max=255"`
 }
 
 type GetChangelogEntriesResponse struct {
@@ -22,13 +24,15 @@ type GetChangelogEntriesResponse struct {
 }
 
 type GetChangelogEntriesResponseEntry struct {
-	ID        string    `json:"id"`
+	ID        uint      `json:"id"`
 	Title     string    `json:"title"`
 	CreatedAt time.Time `json:"createdAt"`
 	UpdatedAt time.Time `json:"updatedAt"`
 }
 
 func (h *Handlers) GetChangelogEntries(c hs.AuthenticatedContext) error {
+	ctx := c.Request().Context()
+
 	req, err := helpers.Bind[GetChangelogEntriesRequest](c)
 	if err != nil {
 		c.Log.WithError(err).Debug("failed to bind GetChangelogEntriesRequest")
@@ -36,9 +40,34 @@ func (h *Handlers) GetChangelogEntries(c hs.AuthenticatedContext) error {
 		return echo.ErrBadRequest
 	}
 
-	// TODO: implement
+	entries, totalCount, err := h.ChangelogsService.GetEntriesWithAuthors(ctx, req.TeamID, req.ChangelogID, req.Offset, req.Limit, req.Query)
+	if err != nil {
+		c.Log.WithError(err).Error("failed to get changelog entries")
 
-	return c.JSON(http.StatusOK, req)
+		return echo.ErrInternalServerError
+	}
+
+	resp := h.newGetChangelogEntriesResponse(entries, totalCount)
+
+	return c.JSON(http.StatusOK, resp)
+}
+
+func (h *Handlers) newGetChangelogEntriesResponse(entries []entities.ChangelogEntry, totalCount int) GetChangelogEntriesResponse {
+	response := make([]GetChangelogEntriesResponseEntry, len(entries))
+
+	for i, entry := range entries {
+		response[i] = GetChangelogEntriesResponseEntry{
+			ID:        entry.ID,
+			Title:     entry.Title,
+			CreatedAt: entry.CreatedAt,
+			UpdatedAt: entry.UpdatedAt,
+		}
+	}
+
+	return GetChangelogEntriesResponse{
+		Entries:    response,
+		TotalCount: totalCount,
+	}
 }
 
 type PostChangelogEntriesRequest struct {
@@ -66,7 +95,7 @@ type GetChangelogEntryRequest struct {
 }
 
 type GetChangelogEntryResponse struct {
-	ID        string    `json:"id"`
+	ID        uint      `json:"id"`
 	Title     string    `json:"title"`
 	CreatedAt time.Time `json:"createdAt"`
 	UpdatedAt time.Time `json:"updatedAt"`

@@ -14,7 +14,7 @@ type Service interface {
 	// Create(ctx context.Context, teamID uint, name string) (entities.Changelog, error)
 	// Update(ctx context.Context, teamID, changelogID uint, name string) (entities.Changelog, error)
 
-	// GetEntriesWithAuthors(ctx context.Context, teamID, changelogID uint, offset, limit int) ([]entities.ChangelogEntry, int, error)
+	GetEntriesWithAuthors(ctx context.Context, teamID, changelogID uint, offset *int, limit *int, query *string) (entries []entities.ChangelogEntry, total_count int, err error)
 	// GetEntryWithAuthors(ctx context.Context, teamID, changelogID, entryID uint) (entities.ChangelogEntry, error)
 	// DeleteEntry(ctx context.Context, teamID, changelogID, entryID uint) error
 	// CreateEntry(ctx context.Context, teamID, changelogID uint, title, content string, authorIDs []uint) (entities.ChangelogEntry, error)
@@ -33,4 +33,8 @@ func NewService(db *gorm.DB) Service {
 
 func (s *ServiceImpl) GetAll(ctx context.Context, teamID uint, offset *int, limit *int, query *string) ([]entities.Changelog, int, error) {
 	return s.repo.GetAll(ctx, teamID, offset, limit, query)
+}
+
+func (s *ServiceImpl) GetEntriesWithAuthors(ctx context.Context, teamID, changelogID uint, offset *int, limit *int, query *string) ([]entities.ChangelogEntry, int, error) {
+	return s.repo.GetEntriesWithAuthors(ctx, teamID, changelogID, offset, limit, query)
 }
