@@ -16,10 +16,6 @@ import (
 	The following operators are supported:
 		- Equals
 		- Not equals
-		- Has key
-		- Not has key
-		- Has value
-		- Not has value
 		- Is empty
 		- Is not empty
 		- Greater than
@@ -33,10 +29,6 @@ import (
 var allowedJSONBodyOperators = []string{
 	"EQUALS",
 	"NOT_EQUALS",
-	"HAS_KEY",
-	"NOT_HAS_KEY",
-	"HAS_VALUE",
-	"NOT_HAS_VALUE",
 	"IS_EMPTY",
 	"IS_NOT_EMPTY",
 	"GREATER_THAN",
