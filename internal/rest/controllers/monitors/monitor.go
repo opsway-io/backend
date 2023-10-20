@@ -29,7 +29,6 @@ type GetMonitorResponseMonitor struct {
 	ID        uint                              `json:"id"`
 	State     string                            `json:"state"`
 	Name      string                            `json:"name"`
-	Tags      []string                          `json:"tags"`
 	Settings  GetMonitorResponseMonitorSettings `json:"settings"`
 	CreatedAt time.Time                         `json:"createdAt"`
 	UpdatedAt time.Time                         `json:"updatedAt"`
@@ -97,7 +96,6 @@ func newGetMonitorsResponse(monitors *[]monitor.MonitorWithTotalCount, stats *[]
 			ID:        m.ID,
 			State:     m.GetStateString(),
 			Name:      m.Name,
-			Tags:      m.Tags,
 			CreatedAt: m.CreatedAt,
 			UpdatedAt: m.UpdatedAt,
 			Settings: GetMonitorResponseMonitorSettings{
@@ -138,7 +136,6 @@ type GetMonitorResponse struct {
 	ID        uint                       `json:"id"`
 	State     string                     `json:"state"`
 	Name      string                     `json:"name"`
-	Tags      []string                   `json:"tags"`
 	Settings  GetMonitorResponseSettings `json:"settings"`
 	CreatedAt time.Time                  `json:"createdAt"`
 	UpdatedAt time.Time                  `json:"updatedAt"`
@@ -191,7 +188,6 @@ func newGetMonitorResponse(m *entities.Monitor) (*GetMonitorResponse, error) {
 		ID:        m.ID,
 		State:     m.GetStateString(),
 		Name:      m.Name,
-		Tags:      m.Tags,
 		CreatedAt: m.CreatedAt,
 		UpdatedAt: m.UpdatedAt,
 		Settings: GetMonitorResponseSettings{
@@ -240,7 +236,6 @@ func (h *Handlers) DeleteMonitor(c hs.AuthenticatedContext) error {
 type PostMonitorRequest struct {
 	TeamID   uint                       `param:"teamId" validate:"required,numeric,gte=0"`
 	Name     string                     `json:"name" validate:"required,max=255"`
-	Tags     []string                   `json:"tags" validate:"required,max=10,dive,max=255"`
 	Settings PostMonitorRequestSettings `json:"settings" validate:"required,dive"`
 }
 
@@ -271,7 +266,6 @@ func (h *Handlers) PostMonitor(c hs.AuthenticatedContext) error {
 	m := &entities.Monitor{
 		TeamID:   req.TeamID,
 		Name:     req.Name,
-		Tags:     req.Tags,
 		Settings: s,
 	}
 	m.SetBodyStr(req.Settings.Body)
@@ -291,7 +285,6 @@ type PutMonitorRequest struct {
 	MonitorID uint                      `param:"monitorId" validate:"required,numeric,gte=0"`
 	Name      string                    `json:"name" validate:"required,max=255"`
 	State     string                    `json:"state" validate:"required,monitorState"`
-	Tags      []string                  `json:"tags" validate:"required,max=10,dive,max=255"`
 	Settings  PutMonitorRequestSettings `json:"settings" validate:"required,dive"`
 }
 
@@ -325,7 +318,6 @@ func (h *Handlers) PutMonitor(c hs.AuthenticatedContext) error {
 		ID:       req.MonitorID,
 		TeamID:   req.TeamID,
 		Name:     req.Name,
-		Tags:     req.Tags,
 		Settings: s,
 	}
 	m.SetBodyStr(req.Settings.Body)
