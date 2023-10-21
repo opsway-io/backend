@@ -68,7 +68,7 @@ func (m *Monitor) GetBodyStr() *string {
 	return &body
 }
 
-func (m *Monitor) SetHeaders(headers map[string]string) error {
+func (m *Monitor) SetHeaders(headers []struct{}) error {
 	byts, err := json.Marshal(headers)
 	if err != nil {
 		return err
