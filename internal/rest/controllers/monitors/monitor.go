@@ -38,12 +38,12 @@ type GetMonitorResponseMonitor struct {
 }
 
 type GetMonitorResponseMonitorSettings struct {
-	Method    string            `json:"method"`
-	URL       string            `json:"url"`
-	Headers   map[string]string `json:"headers"`
-	BodyType  string            `json:"bodyType"`
-	Body      *string           `json:"body"`
-	Frequency uint64            `json:"frequency"` // milliseconds
+	Method           string            `json:"method"`
+	URL              string            `json:"url"`
+	Headers          map[string]string `json:"headers"`
+	BodyType         string            `json:"bodyType"`
+	Body             *string           `json:"body"`
+	FrequencySeconds uint64            `json:"frequencySeconds"`
 }
 
 func (h *Handlers) GetMonitors(c hs.AuthenticatedContext) error {
@@ -99,12 +99,12 @@ func newGetMonitorsResponse(monitors *[]monitor.MonitorWithTotalCount, stats *[]
 			CreatedAt: m.CreatedAt,
 			UpdatedAt: m.UpdatedAt,
 			Settings: GetMonitorResponseMonitorSettings{
-				Method:    m.Settings.Method,
-				URL:       m.Settings.URL,
-				Headers:   headers,
-				BodyType:  m.Settings.BodyType,
-				Body:      m.GetBodyStr(),
-				Frequency: m.Settings.GetFrequencyMilliseconds(),
+				Method:           m.Settings.Method,
+				URL:              m.Settings.URL,
+				Headers:          headers,
+				BodyType:         m.Settings.BodyType,
+				Body:             m.GetBodyStr(),
+				FrequencySeconds: m.Settings.GetFrequencySeconds(),
 			},
 		}
 
@@ -142,12 +142,12 @@ type GetMonitorResponse struct {
 }
 
 type GetMonitorResponseSettings struct {
-	Method    string            `json:"method"`
-	URL       string            `json:"url"`
-	Headers   map[string]string `json:"headers"`
-	BodyType  string            `json:"bodyType"`
-	Body      *string           `json:"body"`
-	Frequency uint64            `json:"frequency"`
+	Method           string            `json:"method"`
+	URL              string            `json:"url"`
+	Headers          map[string]string `json:"headers"`
+	BodyType         string            `json:"bodyType"`
+	Body             *string           `json:"body"`
+	FrequencySeconds uint64            `json:"frequencySeconds"`
 }
 
 func (h *Handlers) GetMonitor(c hs.AuthenticatedContext) error {
@@ -191,12 +191,12 @@ func newGetMonitorResponse(m *entities.Monitor) (*GetMonitorResponse, error) {
 		CreatedAt: m.CreatedAt,
 		UpdatedAt: m.UpdatedAt,
 		Settings: GetMonitorResponseSettings{
-			Method:    m.Settings.Method,
-			URL:       m.Settings.URL,
-			Headers:   headers,
-			BodyType:  m.Settings.BodyType,
-			Body:      m.GetBodyStr(),
-			Frequency: m.Settings.GetFrequencyMilliseconds(),
+			Method:           m.Settings.Method,
+			URL:              m.Settings.URL,
+			Headers:          headers,
+			BodyType:         m.Settings.BodyType,
+			Body:             m.GetBodyStr(),
+			FrequencySeconds: m.Settings.GetFrequencySeconds(),
 		},
 	}, nil
 }
@@ -240,12 +240,12 @@ type PostMonitorRequest struct {
 }
 
 type PostMonitorRequestSettings struct {
-	Method    string            `json:"method" validate:"required,monitorMethod"`
-	URL       string            `json:"url" validate:"required,url"`
-	Headers   map[string]string `json:"headers" validate:"required,dive,max=255"`
-	BodyType  string            `json:"bodyType" validate:"required,monitorBodyType"`
-	Body      string            `json:"body"`
-	Frequency uint64            `json:"frequency" validate:"required,numeric,gte=0,monitorFrequency"`
+	Method           string            `json:"method" validate:"required,monitorMethod"`
+	URL              string            `json:"url" validate:"required,url"`
+	Headers          map[string]string `json:"headers" validate:"required,dive,max=255"`
+	BodyType         string            `json:"bodyType" validate:"required,monitorBodyType"`
+	Body             string            `json:"body"`
+	FrequencySeconds uint64            `json:"frequencySeconds" validate:"required,numeric,gte=0,monitorFrequency"`
 }
 
 func (h *Handlers) PostMonitor(c hs.AuthenticatedContext) error {
@@ -261,7 +261,7 @@ func (h *Handlers) PostMonitor(c hs.AuthenticatedContext) error {
 		URL:      req.Settings.URL,
 		BodyType: req.Settings.BodyType,
 	}
-	s.SetFrequencyMilliseconds(req.Settings.Frequency)
+	s.SetFrequencySeconds(req.Settings.FrequencySeconds)
 
 	m := &entities.Monitor{
 		TeamID:   req.TeamID,
@@ -289,12 +289,12 @@ type PutMonitorRequest struct {
 }
 
 type PutMonitorRequestSettings struct {
-	Method    string            `json:"method" validate:"required,monitorMethod"`
-	URL       string            `json:"url" validate:"required,url"`
-	Headers   map[string]string `json:"headers" validate:"required,dive,max=255"`
-	BodyType  string            `json:"bodyType" validate:"required,monitorBodyType"`
-	Body      string            `json:"body"`
-	Frequency uint64            `json:"frequency" validate:"required,numeric,gte=0,monitorFrequency"`
+	Method           string            `json:"method" validate:"required,monitorMethod"`
+	URL              string            `json:"url" validate:"required,url"`
+	Headers          map[string]string `json:"headers" validate:"required,dive,max=255"`
+	BodyType         string            `json:"bodyType" validate:"required,monitorBodyType"`
+	Body             string            `json:"body"`
+	FrequencySeconds uint64            `json:"frequencySeconds" validate:"required,numeric,gte=0,monitorFrequency"`
 }
 
 func (h *Handlers) PutMonitor(c hs.AuthenticatedContext) error {
@@ -312,7 +312,7 @@ func (h *Handlers) PutMonitor(c hs.AuthenticatedContext) error {
 		URL:      req.Settings.URL,
 		BodyType: req.Settings.BodyType,
 	}
-	s.SetFrequencyMilliseconds(req.Settings.Frequency)
+	s.SetFrequencySeconds(req.Settings.FrequencySeconds)
 
 	m := &entities.Monitor{
 		ID:       req.MonitorID,

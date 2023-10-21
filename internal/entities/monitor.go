@@ -134,12 +134,12 @@ func (ms *MonitorSettings) GetHeaders() (map[string]string, error) {
 	return headers, nil
 }
 
-func (ms *MonitorSettings) GetFrequencyMilliseconds() uint64 {
-	return uint64(ms.Frequency / time.Millisecond)
+func (ms *MonitorSettings) GetFrequencySeconds() uint64 {
+	return uint64(ms.Frequency / time.Second)
 }
 
-func (ms *MonitorSettings) SetFrequencyMilliseconds(frequency uint64) {
-	ms.Frequency = time.Duration(frequency) * time.Millisecond
+func (ms *MonitorSettings) SetFrequencySeconds(frequency uint64) {
+	ms.Frequency = time.Duration(frequency) * time.Second
 }
 
 type MonitorAssertion struct {
