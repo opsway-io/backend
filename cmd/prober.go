@@ -5,19 +5,21 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/gammazero/workerpool"
 	"github.com/opsway-io/backend/internal/check"
 	"github.com/opsway-io/backend/internal/connectors/clickhouse"
 	connectorRedis "github.com/opsway-io/backend/internal/connectors/redis"
 	"github.com/opsway-io/backend/internal/entities"
 	"github.com/opsway-io/backend/internal/monitor"
 	"github.com/opsway-io/backend/internal/probes/http"
+	"github.com/opsway-io/backend/internal/probes/http/asserter"
 	"github.com/sirupsen/logrus"
 
 	"github.com/spf13/cobra"
 )
 
 type ProberConfig struct {
-	Concurrency int `mapstructure:"concurrency" default:"1"`
+	Concurrency int `mapstructure:"concurrency" default:"25"`
 }
 
 //nolint:gochecknoglobals
@@ -25,6 +27,8 @@ var proberCmd = &cobra.Command{
 	Use: "prober",
 	Run: runProber,
 }
+
+var asserterInst = asserter.New()
 
 //nolint:gochecknoinits
 func init() {
@@ -38,6 +42,8 @@ func runProber(cmd *cobra.Command, args []string) {
 	if err != nil {
 		logrus.WithError(err).Fatal("Failed to load config")
 	}
+
+	wp := workerpool.New(conf.Prober.Concurrency)
 
 	l := getLogger(conf.Log)
 
@@ -66,15 +72,25 @@ func runProber(cmd *cobra.Command, args []string) {
 	l.Info("Waiting for tasks...")
 
 	if err := schedule.On(ctx, func(ctx context.Context, monitor *entities.Monitor) {
-		handleTask(ctx, l, prober, monitor, httpResultService)
+		wp.Submit(func() {
+			handleTask(ctx, l, prober, monitor, httpResultService)
+		})
 	}); err != nil {
 		l.WithError(err).Fatal("failed to start schedule")
 	}
 
+	l.Info("Shutting down...")
+
+	wp.StopWait()
+
 	l.Info("Goodbye!")
 }
 
-func handleTask(ctx context.Context, l *logrus.Logger, prober http.Service, m *entities.Monitor, c check.Service) {
+func handleTask(ctx context.Context, logger *logrus.Logger, prober http.Service, m *entities.Monitor, c check.Service) {
+	l := logger.WithFields(logrus.Fields{
+		"monitor_id": m.ID,
+	})
+
 	res, err := prober.Probe(
 		ctx,
 		m.Settings.Method,
@@ -89,11 +105,10 @@ func handleTask(ctx context.Context, l *logrus.Logger, prober http.Service, m *e
 		return
 	}
 
-	l.WithFields(logrus.Fields{
-		"monitor_id": m.ID,
+	l = l.WithFields(logrus.Fields{
 		"status":     res.Response.StatusCode,
-		"total":      fmt.Sprintf("%v", res.Timing.Phases.Total),
-	}).Info("probe successful")
+		"total_time": fmt.Sprintf("%v", res.Timing.Phases.Total),
+	})
 
 	newCheck := mapResultToCheck(m, res)
 
@@ -101,6 +116,65 @@ func handleTask(ctx context.Context, l *logrus.Logger, prober http.Service, m *e
 	if err != nil {
 		l.WithError(err).Error("failed add result to clickhouse")
 	}
+
+	fails, err := assertResult(res, m.Assertions)
+	if err != nil {
+		l.WithError(err).Error("failed to assert result")
+	}
+
+	failedCount := len(fails)
+	passedCount := len(m.Assertions) - failedCount
+
+	l = l.WithFields(logrus.Fields{
+		"assertions_passed": passedCount,
+		"assertions_failed": failedCount,
+	})
+
+	if failedCount > 0 {
+		l.Info("some assertions failed, triggering incident")
+
+		if err = triggerIncident(m, res, fails); err != nil {
+			l.WithError(err).Error("failed to trigger incident")
+		}
+	} else {
+		l.Info("all assertions passed")
+	}
+}
+
+func assertResult(httpResult *http.Result, assertions []entities.MonitorAssertion) (fails []entities.MonitorAssertion, err error) {
+	if len(assertions) == 0 {
+		return []entities.MonitorAssertion{}, nil
+	}
+
+	rules := mapMonitorAssertionsToAssertionRules(assertions)
+
+	assertResult, err := asserterInst.Assert(httpResult, rules)
+	if err != nil {
+		return nil, err
+	}
+
+	for i, ok := range assertResult {
+		if !ok {
+			fails = append(fails, assertions[i])
+		}
+	}
+
+	return fails, nil
+}
+
+func mapMonitorAssertionsToAssertionRules(ma []entities.MonitorAssertion) []asserter.Rule {
+	rules := make([]asserter.Rule, len(ma))
+
+	for i, assertion := range ma {
+		rules[i] = asserter.Rule{
+			Source:   assertion.Source,
+			Operator: assertion.Operator,
+			Property: assertion.Target,
+			Target:   assertion.Property,
+		}
+	}
+
+	return rules
 }
 
 func mapResultToCheck(m *entities.Monitor, res *http.Result) *check.Check {
@@ -132,4 +206,8 @@ func mapResultToCheck(m *entities.Monitor, res *http.Result) *check.Check {
 	}
 
 	return c
+}
+
+func triggerIncident(m *entities.Monitor, hr *http.Result, fa []entities.MonitorAssertion) error {
+	return nil // TODO: implement
 }

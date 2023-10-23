@@ -5,7 +5,6 @@ import (
 	"crypto/tls"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net"
 	"net/http"
 	xhttp "net/http"
@@ -17,11 +16,15 @@ import (
 )
 
 type Config struct {
-	UserAgent   string        `mapstructure:"user_agent" default:"opsway 1.0.0"`
+	UserAgent string `mapstructure:"user_agent" default:"opsway 1.0.0"`
+
 	DNSTimeout  time.Duration `mapstructure:"dns_timeout" default:"5s"`
 	DNSPort     int           `mapstructure:"dns_port" default:"53"`
 	DNSAddress  string        `mapstructure:"dns_address" default:"8.8.8.8"`
 	DNSProtocol string        `mapstructure:"dns_protocol" default:"udp"`
+
+	// Max number of bytes to be read from response body, defaults to 1MB
+	MaxBodyBytesReadSize int64 `mapstructure:"max_body_bytes_read_size" default:"1048576"`
 }
 
 type Service interface {
@@ -39,39 +42,54 @@ func NewService(config Config) Service {
 }
 
 func (s *ServiceImpl) Probe(ctx context.Context, method, url string, headers map[string]string, body io.Reader, timeout time.Duration) (*Result, error) {
+	// Initialize the request
 	req, err := xhttp.NewRequestWithContext(ctx, method, url, body)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to create request")
 	}
 
+	// Set headers
 	if headers != nil {
 		for k, v := range headers {
 			req.Header.Set(k, v)
 		}
 	}
 
+	// Set user agent
 	req.Header.Set("User-Agent", s.config.UserAgent)
 
+	// Instrument the request with httpstat
 	var result httpstat.Result
 	httpStatCtx := httpstat.WithHTTPStat(ctx, &result)
 	req = req.WithContext(httpStatCtx)
 
 	client := s.newHttpClient(timeout)
 
+	// Send the request
 	resp, err := client.Do(req)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to send request")
 	}
 
-	if _, err := io.Copy(ioutil.Discard, resp.Body); err != nil {
+	// Read the response body
+	limitedReader := &io.LimitedReader{R: resp.Body, N: s.config.MaxBodyBytesReadSize}
+	bodyBytes, err := io.ReadAll(limitedReader)
+	if err != nil {
 		return nil, errors.Wrap(err, "failed to read response body")
 	}
+
+	// Close the response body to avoid leaking resources
 	resp.Body.Close()
+
+	// End the httpstat timer
 	result.End(time.Now())
 
+	// Create the result
 	meta := &Result{
 		Response: Response{
 			StatusCode: resp.StatusCode,
+			Header:     resp.Header,
+			Body:       bodyBytes,
 		},
 		Timing: Timing{
 			Phases: TimingPhases{
@@ -85,6 +103,7 @@ func (s *ServiceImpl) Probe(ctx context.Context, method, url string, headers map
 		},
 	}
 
+	// Add TLS information if available
 	if resp.TLS != nil {
 		meta.TLS = &TLS{
 			Version: TLSVersionName(resp.TLS.Version),
@@ -111,6 +130,7 @@ func (s *ServiceImpl) Probe(ctx context.Context, method, url string, headers map
 }
 
 func (s *ServiceImpl) newHttpClient(timeout time.Duration) *xhttp.Client {
+	// Create a custom dialer to set a custom DNS resolver
 	dialer := &net.Dialer{
 		Resolver: &net.Resolver{
 			PreferGo: true,

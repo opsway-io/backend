@@ -5,7 +5,6 @@ import (
 
 	json "github.com/json-iterator/go"
 
-	"github.com/lib/pq"
 	"github.com/opsway-io/backend/internal/connectors/postgres"
 )
 
@@ -17,15 +16,15 @@ const (
 )
 
 type Monitor struct {
-	ID        uint
-	State     MonitorState    `gorm:"not null;default:0"`
-	Name      string          `gorm:"index;not null"`
-	Tags      pq.StringArray  `gorm:"type:text[]"`
-	Settings  MonitorSettings `gorm:"not null;constraint:OnDelete:CASCADE"`
-	Incidents []Incident      `gorm:"constraint:OnDelete:CASCADE"`
-	TeamID    uint            `gorm:"index;not null"`
-	CreatedAt time.Time       `gorm:"index"`
-	UpdatedAt time.Time       `gorm:"index"`
+	ID         uint
+	State      MonitorState       `gorm:"not null;default:0"`
+	Name       string             `gorm:"index;not null"`
+	Settings   MonitorSettings    `gorm:"not null;constraint:OnDelete:CASCADE"`
+	Assertions []MonitorAssertion `gorm:"constraint:OnDelete:CASCADE"`
+	Incidents  []Incident         `gorm:"constraint:OnDelete:CASCADE"`
+	TeamID     uint               `gorm:"index;not null"`
+	CreatedAt  time.Time          `gorm:"index"`
+	UpdatedAt  time.Time          `gorm:"index"`
 }
 
 func (Monitor) TableName() string {
@@ -69,7 +68,7 @@ func (m *Monitor) GetBodyStr() *string {
 	return &body
 }
 
-func (m *Monitor) SetHeaders(headers map[string]string) error {
+func (m *Monitor) SetHeaders(headers []struct{}) error {
 	byts, err := json.Marshal(headers)
 	if err != nil {
 		return err
@@ -135,10 +134,25 @@ func (ms *MonitorSettings) GetHeaders() (map[string]string, error) {
 	return headers, nil
 }
 
-func (ms *MonitorSettings) GetFrequencyMilliseconds() uint64 {
-	return uint64(ms.Frequency / time.Millisecond)
+func (ms *MonitorSettings) GetFrequencySeconds() uint64 {
+	return uint64(ms.Frequency / time.Second)
 }
 
-func (ms *MonitorSettings) SetFrequencyMilliseconds(frequency uint64) {
-	ms.Frequency = time.Duration(frequency) * time.Millisecond
+func (ms *MonitorSettings) SetFrequencySeconds(frequency uint64) {
+	ms.Frequency = time.Duration(frequency) * time.Second
+}
+
+type MonitorAssertion struct {
+	ID        uint
+	MonitorID uint   `gorm:"index;not null"`
+	Source    string `gorm:"not null"`
+	Property  string
+	Operator  string `gorm:"not null"`
+	Target    string
+	CreatedAt time.Time `gorm:"index"`
+	UpdatedAt time.Time `gorm:"index"`
+}
+
+func (MonitorAssertion) TableName() string {
+	return "monitor_assertions"
 }

@@ -1,6 +1,9 @@
 package asserter
 
-import "time"
+import (
+	"strconv"
+	"time"
+)
 
 func isRulesValid(asserter Asserter, rules []Rule) []error {
 	errs := make([]error, len(rules))
@@ -20,6 +23,16 @@ func isStringInSlice(str string, slice []string) bool {
 	}
 
 	return false
+}
+
+func isInt(str string) bool {
+	_, err := strconv.Atoi(str)
+	return err == nil
+}
+
+func toInt(str string) (int, bool) {
+	i, err := strconv.Atoi(str)
+	return i, err == nil
 }
 
 func allErrorsNil(errs []error) bool {

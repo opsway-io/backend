@@ -12,6 +12,7 @@ require (
 	github.com/aymerick/raymond v2.0.2+incompatible
 	github.com/brianvoe/gofakeit v3.18.0+incompatible
 	github.com/creasty/defaults v1.6.0
+	github.com/gammazero/workerpool v1.1.3
 	github.com/go-playground/validator v9.31.0+incompatible
 	github.com/go-playground/validator/v10 v10.11.1
 	github.com/gofrs/uuid v4.0.0+incompatible
@@ -35,6 +36,7 @@ require (
 	github.com/stripe/stripe-go v70.15.0+incompatible
 	github.com/tj/assert v0.0.3
 	github.com/vmihailenco/msgpack v4.0.4+incompatible
+	github.com/yalp/jsonpath v0.0.0-20180802001716-5cc68e5049a0
 	go.uber.org/automaxprocs v1.5.2
 	golang.org/x/crypto v0.4.0
 	gorm.io/driver/clickhouse v0.5.0
@@ -63,6 +65,7 @@ require (
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/dgryski/go-rendezvous v0.0.0-20200823014737-9f7001d12a5f // indirect
 	github.com/fsnotify/fsnotify v1.6.0 // indirect
+	github.com/gammazero/deque v0.2.0 // indirect
 	github.com/go-faster/city v1.0.1 // indirect
 	github.com/go-faster/errors v0.6.1 // indirect
 	github.com/go-playground/locales v0.14.0 // indirect

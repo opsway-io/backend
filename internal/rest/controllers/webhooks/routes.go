@@ -1,10 +1,11 @@
-package billings
+package webhooks
 
 import (
 	"github.com/labstack/echo/v4"
 	"github.com/opsway-io/backend/internal/authentication"
 	"github.com/opsway-io/backend/internal/billing"
 	"github.com/opsway-io/backend/internal/rest/handlers"
+	"github.com/opsway-io/backend/internal/rest/middleware"
 	"github.com/sirupsen/logrus"
 )
 
@@ -22,8 +23,14 @@ func Register(
 		BillingService: billingService,
 	}
 
+	root := e.Group(
+		"/webhooks",
+	)
+
+	// Stripe
+
+	StripeGuard := middleware.StripeGuardFactory(logger)
 	StripeHandler := handlers.StripeHandlerFactory(logger)
 
-	e.POST("/webhook", StripeHandler(h.handleWebhook))
-
+	root.POST("/stripe", StripeHandler(h.handleWebhook), StripeGuard())
 }

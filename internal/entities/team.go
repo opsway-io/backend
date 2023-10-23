@@ -35,12 +35,15 @@ type Team struct {
 	PaymentPlan string  `gorm:"default:FREE"`
 	StripeKey   *string
 	HasAvatar   bool
+
 	Users       []User        `gorm:"many2many:team_users"`
 	Monitors    []Monitor     `gorm:"constraint:OnDelete:CASCADE"`
 	Maintenance []Maintenance `gorm:"constraint:OnDelete:CASCADE"`
 	Incidents   []Incident    `gorm:"constraint:OnDelete:CASCADE"`
-	CreatedAt   time.Time     `gorm:"index"`
-	UpdatedAt   time.Time     `gorm:"index"`
+	Changelogs  []Changelog   `gorm:"constraint:OnDelete:CASCADE"`
+
+	CreatedAt time.Time `gorm:"index"`
+	UpdatedAt time.Time `gorm:"index"`
 }
 
 func (Team) TableName() string {

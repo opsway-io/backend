@@ -1,3 +1,4 @@
+
 .vscode/
 .idea/
 .data/
@@ -11,3 +12,4 @@ data/
 *.dylib
 *.test
 *.out
+main

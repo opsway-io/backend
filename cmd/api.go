@@ -5,6 +5,7 @@ import (
 
 	"github.com/opsway-io/backend/internal/authentication"
 	"github.com/opsway-io/backend/internal/billing"
+	"github.com/opsway-io/backend/internal/changelog"
 	"github.com/opsway-io/backend/internal/check"
 	"github.com/opsway-io/backend/internal/connectors/clickhouse"
 	"github.com/opsway-io/backend/internal/connectors/postgres"
@@ -57,17 +58,21 @@ func runAPI(cmd *cobra.Command, args []string) {
 	}
 
 	db.SetupJoinTable(&entities.Team{}, "Users", &entities.TeamUser{})
+	db.SetupJoinTable(&entities.ChangelogEntry{}, "Authors", &entities.ChangelogEntryAuthor{})
 
 	db.AutoMigrate(
 		entities.User{},
 		entities.Team{},
 		entities.Monitor{},
 		entities.MonitorSettings{},
+		entities.MonitorAssertion{},
 		entities.Maintenance{},
 		entities.MaintenanceSettings{},
 		entities.MaintenanceComment{},
 		entities.Incident{},
 		entities.IncidentComment{},
+		entities.Changelog{},
+		entities.ChangelogEntry{},
 	)
 
 	ch_db, err := clickhouse.NewClient(ctx, conf.Clickhouse)
@@ -113,6 +118,8 @@ func runAPI(cmd *cobra.Command, args []string) {
 
 	billingService := billing.NewService(conf.Stripe)
 
+	changelogService := changelog.NewService(db)
+
 	srv, err := rest.NewServer(
 		conf.REST,
 		conf.OAuth,
@@ -124,6 +131,7 @@ func runAPI(cmd *cobra.Command, args []string) {
 		monitorService,
 		httpResultService,
 		billingService,
+		changelogService,
 	)
 	if err != nil {
 		l.WithError(err).Fatal("Failed to create REST server")

@@ -40,15 +40,15 @@ func TeamRoleValidator(fl validator.FieldLevel) bool {
 }
 
 var AllowedMonitorFrequencies = []uint64{
-	30000,    // 30 seconds
-	60000,    // 1 minute
-	300000,   // 5 minutes
-	600000,   // 10 minutes
-	900000,   // 15 minutes
-	1800000,  // 30 minutes
-	3600000,  // 1 hour
-	43200000, // 12 hours
-	86400000, // 1 day
+	30,    // 30 seconds
+	60,    // 1 minute
+	300,   // 5 minutes
+	600,   // 10 minutes
+	900,   // 15 minutes
+	1800,  // 30 minutes
+	3600,  // 1 hour
+	43200, // 12 hours
+	86400, // 1 day
 }
 
 func MonitorFrequencyValidator(fl validator.FieldLevel) bool {

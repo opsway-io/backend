@@ -10,7 +10,7 @@ import (
 /*
 	Assertions about the status code of a request.
 
-	The following assertions are supported:
+	The following operators are supported:
 		- Equal
 		- Not Equal
 		- Greater than
@@ -56,7 +56,7 @@ func (a *StatusCodeAsserter) IsRuleValid(rule Rule) error {
 	}
 
 	// The property must be empty
-	if ok := rule.Property == nil; !ok {
+	if ok := rule.Property == ""; !ok {
 		return fmt.Errorf("property must be empty: %s", rule.Property)
 	}
 
@@ -66,15 +66,15 @@ func (a *StatusCodeAsserter) IsRuleValid(rule Rule) error {
 	}
 
 	// The target must be an integer
-	if _, ok := rule.Target.(int); !ok {
-		return errors.New("target must be an integer")
+	if ok := isInt(rule.Target); !ok {
+		return errors.New("invalid target")
 	}
 
 	return nil
 }
 
 func (a *StatusCodeAsserter) assert(result *http.Result, rule Rule) bool {
-	targetInt, ok := rule.Target.(int)
+	targetInt, ok := toInt(rule.Target)
 	if !ok {
 		return false
 	}
