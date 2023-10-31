@@ -115,6 +115,11 @@ func (s *ServiceImpl) Probe(ctx context.Context, method, url string, headers map
 			cert := resp.TLS.PeerCertificates[0]
 			hostname := req.URL.Hostname()
 
+			trustedCA := true // TODO: check if the CA is trusted
+
+			notExpired := s.certificateNotExpired(cert)
+			hostValid := s.certificateHostValid(cert, hostname)
+
 			meta.TLS.Certificate = Certificate{
 				Issuer: CertificateIssuer{
 					Organization: strings.Join(cert.Issuer.Organization, ""),
@@ -122,15 +127,11 @@ func (s *ServiceImpl) Probe(ctx context.Context, method, url string, headers map
 				Subject: CertificateSubject{
 					CommonName: cert.Subject.CommonName,
 				},
-				NotBefore: cert.NotBefore,
-				NotAfter:  cert.NotAfter,
-				NotExpired: s.certificateNotExpired(
-					cert,
-				),
-				HostValid: s.certificateHostValid(
-					cert,
-					hostname,
-				),
+				NotBefore:  cert.NotBefore,
+				NotAfter:   cert.NotAfter,
+				NotExpired: notExpired,
+				HostValid:  hostValid,
+				TrustedCA:  trustedCA,
 			}
 		}
 	}

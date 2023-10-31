@@ -42,6 +42,7 @@ type Certificate struct {
 	NotAfter   time.Time
 	NotExpired bool
 	HostValid  bool
+	TrustedCA  bool
 }
 
 type CertificateSubject struct {
