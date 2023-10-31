@@ -36,10 +36,12 @@ type TLS struct {
 }
 
 type Certificate struct {
-	Issuer    CertificateIssuer
-	Subject   CertificateSubject
-	NotBefore time.Time
-	NotAfter  time.Time
+	Issuer     CertificateIssuer
+	Subject    CertificateSubject
+	NotBefore  time.Time
+	NotAfter   time.Time
+	NotExpired bool
+	HostValid  bool
 }
 
 type CertificateSubject struct {

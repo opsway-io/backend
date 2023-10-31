@@ -3,6 +3,7 @@ package http
 import (
 	"context"
 	"crypto/tls"
+	"crypto/x509"
 	"fmt"
 	"io"
 	"net"
@@ -112,6 +113,7 @@ func (s *ServiceImpl) Probe(ctx context.Context, method, url string, headers map
 
 		if resp.TLS.PeerCertificates != nil && len(resp.TLS.PeerCertificates) > 0 {
 			cert := resp.TLS.PeerCertificates[0]
+			hostname := req.URL.Hostname()
 
 			meta.TLS.Certificate = Certificate{
 				Issuer: CertificateIssuer{
@@ -122,6 +124,13 @@ func (s *ServiceImpl) Probe(ctx context.Context, method, url string, headers map
 				},
 				NotBefore: cert.NotBefore,
 				NotAfter:  cert.NotAfter,
+				NotExpired: s.certificateNotExpired(
+					cert,
+				),
+				HostValid: s.certificateHostValid(
+					cert,
+					hostname,
+				),
 			}
 		}
 	}
@@ -152,6 +161,22 @@ func (s *ServiceImpl) newHttpClient(timeout time.Duration) *xhttp.Client {
 		Timeout: timeout,
 		Transport: &http.Transport{
 			DialContext: dialContext,
+			TLSClientConfig: &tls.Config{
+				// We don't want to verify the certificate here
+				// because we want to get the certificate information
+				// even if it's expired or the host is invalid
+				InsecureSkipVerify: true, // nolint:gosec
+			},
 		},
 	}
+}
+
+func (s *ServiceImpl) certificateNotExpired(cert *x509.Certificate) (notExpired bool) {
+	now := time.Now()
+
+	return now.Before(cert.NotAfter) && now.After(cert.NotBefore)
+}
+
+func (s *ServiceImpl) certificateHostValid(cert *x509.Certificate, host string) (hostValid bool) {
+	return cert.VerifyHostname(host) == nil
 }
