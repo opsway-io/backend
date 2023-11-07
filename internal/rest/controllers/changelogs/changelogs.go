@@ -14,7 +14,7 @@ type GetChangelogsRequest struct {
 	TeamID uint    `param:"teamId" validate:"required,numeric,gte=0"`
 	Offset *int    `query:"offset" validate:"numeric,gte=0" default:"0"`
 	Limit  *int    `query:"limit" validate:"numeric,gt=0" default:"10"`
-	Query  *string `query:"query" validate:"max=255"`
+	Query  *string `query:"query" validate:"omitempty,max=255"`
 }
 
 type GetChangelogsResponse struct {
