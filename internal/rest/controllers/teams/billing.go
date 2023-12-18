@@ -14,24 +14,25 @@ func (h *Handlers) PostConfig(c hs.AuthenticatedContext) error {
 
 type PostCreateCheckoutSession struct {
 	PriceLookupKey string `param:"priceLookupKey" validate:"required"`
+	TeamID         uint   `param:"teamId" validate:"required,numeric,gt=0"`
 }
 
 func (h *Handlers) PostCreateCheckoutSession(c hs.AuthenticatedContext) error {
 	req, err := helpers.Bind[PostCreateCheckoutSession](c)
 	if err != nil {
-		c.Log.WithError(err).Debug("failed to bind GetTeamUsersRequest")
+		c.Log.WithError(err).Debug("failed to bind PostCreateCheckoutSession")
 
 		return echo.ErrBadRequest
 	}
-
-	s, err := h.BillingService.CreateCheckoutSession(req.PriceLookupKey)
+	c.Log.Info(req.TeamID)
+	s, err := h.BillingService.CreateCheckoutSession(req.TeamID, req.PriceLookupKey)
 	if err != nil {
 		c.Log.WithError(err).Debug("create stripe checkout session")
 
 		return echo.ErrInternalServerError
 	}
 
-	return c.Redirect(http.StatusSeeOther, s.SuccessURL)
+	return c.Redirect(http.StatusSeeOther, s.URL)
 }
 
 type GetCheckoutSession struct {

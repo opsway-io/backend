@@ -2,12 +2,12 @@ package billing
 
 import (
 	"os"
+	"strconv"
 
 	"github.com/pkg/errors"
 	"github.com/stripe/stripe-go/v76"
 	portalsession "github.com/stripe/stripe-go/v76/billingportal/session"
 	"github.com/stripe/stripe-go/v76/checkout/session"
-	"github.com/stripe/stripe-go/v76/price"
 	"github.com/stripe/stripe-go/v76/webhook"
 )
 
@@ -20,7 +20,7 @@ type Config struct {
 
 type Service interface {
 	PostConfig() StripeConfig
-	CreateCheckoutSession(priceId string) (*stripe.CheckoutSession, error)
+	CreateCheckoutSession(teamID uint, priceId string) (*stripe.CheckoutSession, error)
 	GetCheckoutSession(sessionID string) (*stripe.CheckoutSession, error)
 	CreateCustomerPortal(sessionID string) (*stripe.BillingPortalSession, error)
 	ConstructEvent(payload []byte, header string) (stripe.Event, error)
@@ -51,27 +51,29 @@ func (s *ServiceImpl) PostConfig() StripeConfig {
 	}
 }
 
-func (s *ServiceImpl) CreateCheckoutSession(lookupKey string) (*stripe.CheckoutSession, error) {
-	priceParams := &stripe.PriceListParams{
-		LookupKeys: stripe.StringSlice([]string{
-			lookupKey,
-		}),
-	}
+func (s *ServiceImpl) CreateCheckoutSession(teamID uint, lookupKey string) (*stripe.CheckoutSession, error) {
+	// priceParams := &stripe.PriceListParams{
+	// 	LookupKeys: stripe.StringSlice([]string{
+	// 		lookupKey,
+	// 	}),
+	// }
 
-	i := price.List(priceParams)
-	var price *stripe.Price
-	for i.Next() {
-		p := i.Price()
-		price = p
-	}
+	// i := price.List(priceParams)
+	// var price *stripe.Price
+	// for i.Next() {
+	// 	p := i.Price()
+	// 	price = p
+	// }
 
 	params := &stripe.CheckoutSessionParams{
-		SuccessURL: stripe.String(s.Config.Domain + "/success.html?session_id={CHECKOUT_SESSION_ID}"),
-		CancelURL:  stripe.String(s.Config.Domain + "/canceled.html"),
-		Mode:       stripe.String(string(stripe.CheckoutSessionModeSubscription)),
+		SuccessURL: stripe.String("https://my.opsway.io/team/plan"),
+		// ReturnURL:         stripe.String("https://my.opsway.io/team/plan"),
+		CancelURL:         stripe.String(s.Config.Domain + "/canceled.html"),
+		Mode:              stripe.String(string(stripe.CheckoutSessionModeSubscription)),
+		ClientReferenceID: stripe.String(strconv.FormatUint(uint64(teamID), 10)),
 		LineItems: []*stripe.CheckoutSessionLineItemParams{
 			{
-				Price:    stripe.String(price.ID),
+				Price:    stripe.String(lookupKey),
 				Quantity: stripe.Int64(1),
 			},
 		},
