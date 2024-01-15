@@ -117,13 +117,13 @@ func handleTask(ctx context.Context, logger *logrus.Logger, prober http.Service,
 		l.WithError(err).Error("failed add result to clickhouse")
 	}
 
-	fails, err := assertResult(res, m.Assertions)
+	failed, passed, err := assertResult(res, m.Assertions)
 	if err != nil {
 		l.WithError(err).Error("failed to assert result")
 	}
 
-	failedCount := len(fails)
-	passedCount := len(m.Assertions) - failedCount
+	failedCount := len(*failed)
+	passedCount := len(*passed)
 
 	l = l.WithFields(logrus.Fields{
 		"assertions_passed": passedCount,
@@ -133,7 +133,7 @@ func handleTask(ctx context.Context, logger *logrus.Logger, prober http.Service,
 	if failedCount > 0 {
 		l.Info("some assertions failed, triggering incident")
 
-		if err = triggerIncident(m, res, fails); err != nil {
+		if err = triggerIncident(m, res, failed); err != nil {
 			l.WithError(err).Error("failed to trigger incident")
 		}
 	} else {
@@ -141,25 +141,30 @@ func handleTask(ctx context.Context, logger *logrus.Logger, prober http.Service,
 	}
 }
 
-func assertResult(httpResult *http.Result, assertions []entities.MonitorAssertion) (fails []entities.MonitorAssertion, err error) {
+func assertResult(httpResult *http.Result, assertions []entities.MonitorAssertion) (failed, passed *[]entities.MonitorAssertion, err error) {
 	if len(assertions) == 0 {
-		return []entities.MonitorAssertion{}, nil
+		return nil, nil, nil
 	}
 
 	rules := mapMonitorAssertionsToAssertionRules(assertions)
 
 	assertResult, err := asserterInst.Assert(httpResult, rules)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
+	failed = &[]entities.MonitorAssertion{}
+	passed = &[]entities.MonitorAssertion{}
+
 	for i, ok := range assertResult {
-		if !ok {
-			fails = append(fails, assertions[i])
+		if ok {
+			*passed = append(*passed, assertions[i])
+		} else {
+			*failed = append(*failed, assertions[i])
 		}
 	}
 
-	return fails, nil
+	return failed, passed, nil
 }
 
 func mapMonitorAssertionsToAssertionRules(ma []entities.MonitorAssertion) []asserter.Rule {
@@ -208,6 +213,6 @@ func mapResultToCheck(m *entities.Monitor, res *http.Result) *check.Check {
 	return c
 }
 
-func triggerIncident(m *entities.Monitor, hr *http.Result, fa []entities.MonitorAssertion) error {
+func triggerIncident(m *entities.Monitor, hr *http.Result, failed *[]entities.MonitorAssertion) error {
 	return nil // TODO: implement
 }
