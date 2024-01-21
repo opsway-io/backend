@@ -48,7 +48,7 @@ func Register(
 
 	// Webhooks
 
-	webhooks.Register(root, logger, billingService)
+	webhooks.Register(root, logger, billingService, teamService)
 
 	// Healthz
 
