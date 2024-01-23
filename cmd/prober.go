@@ -120,6 +120,8 @@ func handleTask(ctx context.Context, logger *logrus.Logger, prober http.Service,
 	failed, passed, err := assertResult(res, m.Assertions)
 	if err != nil {
 		l.WithError(err).Error("failed to assert result")
+
+		return
 	}
 
 	failedCount := len(*failed)
