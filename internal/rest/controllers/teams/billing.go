@@ -13,8 +13,8 @@ func (h *Handlers) PostConfig(c hs.AuthenticatedContext) error {
 }
 
 type PostCreateCheckoutSession struct {
-	PriceLookupKey string `json:"priceLookupKey" validate:"required,max=255"`
 	TeamID         uint   `param:"teamId" validate:"required,numeric,gt=0"`
+	PriceLookupKey string `json:"priceLookupKey" validate:"required,max=255"`
 }
 
 func (h *Handlers) PostCreateCheckoutSession(c hs.AuthenticatedContext) error {
@@ -24,6 +24,7 @@ func (h *Handlers) PostCreateCheckoutSession(c hs.AuthenticatedContext) error {
 
 		return echo.ErrBadRequest
 	}
+	c.Log.Error(req.PriceLookupKey)
 	c.Log.Info(req.TeamID)
 
 	team, err := h.TeamService.GetByID(c.Request().Context(), req.TeamID)
