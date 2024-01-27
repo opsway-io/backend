@@ -13,7 +13,7 @@ func (h *Handlers) PostConfig(c hs.AuthenticatedContext) error {
 }
 
 type PostCreateCheckoutSession struct {
-	PriceLookupKey string `param:"priceLookupKey" validate:"required"`
+	PriceLookupKey string `json:"priceLookupKey" validate:"required,max=255"`
 	TeamID         uint   `param:"teamId" validate:"required,numeric,gt=0"`
 }
 
@@ -27,6 +27,12 @@ func (h *Handlers) PostCreateCheckoutSession(c hs.AuthenticatedContext) error {
 	c.Log.Info(req.TeamID)
 
 	team, err := h.TeamService.GetByID(c.Request().Context(), req.TeamID)
+	if err != nil {
+		c.Log.WithError(err).Debug("Team not found")
+
+		return echo.ErrInternalServerError
+	}
+
 	s, err := h.BillingService.CreateCheckoutSession(team, req.PriceLookupKey)
 	if err != nil {
 		c.Log.WithError(err).Debug("create stripe checkout session")
