@@ -120,10 +120,12 @@ func handleTask(ctx context.Context, logger *logrus.Logger, prober http.Service,
 	failed, passed, err := assertResult(res, m.Assertions)
 	if err != nil {
 		l.WithError(err).Error("failed to assert result")
+
+		return
 	}
 
-	failedCount := len(*failed)
-	passedCount := len(*passed)
+	failedCount := len(failed)
+	passedCount := len(passed)
 
 	l = l.WithFields(logrus.Fields{
 		"assertions_passed": passedCount,
@@ -133,7 +135,7 @@ func handleTask(ctx context.Context, logger *logrus.Logger, prober http.Service,
 	if failedCount > 0 {
 		l.Info("some assertions failed, triggering incident")
 
-		if err = triggerIncident(m, res, failed); err != nil {
+		if err = triggerIncident(m, res, &failed); err != nil {
 			l.WithError(err).Error("failed to trigger incident")
 		}
 	} else {
@@ -141,7 +143,7 @@ func handleTask(ctx context.Context, logger *logrus.Logger, prober http.Service,
 	}
 }
 
-func assertResult(httpResult *http.Result, assertions []entities.MonitorAssertion) (failed, passed *[]entities.MonitorAssertion, err error) {
+func assertResult(httpResult *http.Result, assertions []entities.MonitorAssertion) ([]entities.MonitorAssertion, []entities.MonitorAssertion, error) {
 	if len(assertions) == 0 {
 		return nil, nil, nil
 	}
@@ -153,14 +155,14 @@ func assertResult(httpResult *http.Result, assertions []entities.MonitorAssertio
 		return nil, nil, err
 	}
 
-	failed = &[]entities.MonitorAssertion{}
-	passed = &[]entities.MonitorAssertion{}
+	failed := []entities.MonitorAssertion{}
+	passed := []entities.MonitorAssertion{}
 
 	for i, ok := range assertResult {
 		if ok {
-			*passed = append(*passed, assertions[i])
+			passed = append(passed, assertions[i])
 		} else {
-			*failed = append(*failed, assertions[i])
+			failed = append(failed, assertions[i])
 		}
 	}
 
