@@ -41,7 +41,7 @@ func (h *Handlers) PostCreateCheckoutSession(c hs.AuthenticatedContext) error {
 		return echo.ErrInternalServerError
 	}
 
-	return c.Redirect(http.StatusSeeOther, s.URL)
+	return c.JSON(http.StatusOK, s.URL)
 }
 
 type GetCheckoutSession struct {
