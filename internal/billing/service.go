@@ -54,8 +54,7 @@ func (s *ServiceImpl) PostConfig() StripeConfig {
 
 func (s *ServiceImpl) CreateCheckoutSession(team *entities.Team, priceLookupKey string) (*stripe.CheckoutSession, error) {
 	params := &stripe.CheckoutSessionParams{
-		SuccessURL: stripe.String("https://my.opsway.io/team/plan"),
-		// ReturnURL:         stripe.String("https://my.opsway.io/team/plan"),
+		SuccessURL:        stripe.String(s.Config.Domain + "/team/plan"),
 		CancelURL:         stripe.String(s.Config.Domain + "/canceled.html"),
 		Mode:              stripe.String(string(stripe.CheckoutSessionModeSubscription)),
 		ClientReferenceID: stripe.String(strconv.FormatUint(uint64(team.ID), 10)),
