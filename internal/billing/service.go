@@ -82,7 +82,7 @@ func (s *ServiceImpl) GetCheckoutSession(sessionID string) (*stripe.CheckoutSess
 
 func (s *ServiceImpl) GetLineItems(sessionID string) *session.LineItemIter {
 	params := &stripe.CheckoutSessionListLineItemsParams{
-		Session: stripe.String("sessionID"),
+		Session: stripe.String(sessionID),
 	}
 	return session.ListLineItems(params)
 }
