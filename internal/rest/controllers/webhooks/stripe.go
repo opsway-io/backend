@@ -47,12 +47,12 @@ func (h *Handlers) handleWebhook(c hs.StripeContext) error {
 		// 	return echo.ErrBadRequest
 		// }
 
-		lineItem := h.BillingService.GetLineItems(session.ID).LineItem()
-
 		c.Log.Error(session.ClientReferenceID)
 		c.Log.Error(session)
 		c.Log.Error(session.ID)
-		c.Log.Error(lineItem)
+		c.Log.Error(event.Data.Object["customer"].(string))
+		lineItems := h.BillingService.GetLineItems(session.ID).List()
+		c.Log.Error(lineItems)
 
 		teamID, err := strconv.ParseUint(session.ClientReferenceID, 10, 32)
 		if err != nil {
@@ -68,7 +68,7 @@ func (h *Handlers) handleWebhook(c hs.StripeContext) error {
 
 		// TODO if not same plan remove old plan
 
-		if customerTeam.PaymentPlan == lineItem.Price.Product.Name {
+		if customerTeam.PaymentPlan == "TEST" { //lineItems.Price.Product.Name {
 			return c.NoContent(http.StatusOK)
 		}
 
