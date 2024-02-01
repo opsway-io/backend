@@ -23,6 +23,7 @@ type Service interface {
 	PostConfig() StripeConfig
 	CreateCheckoutSession(team *entities.Team, priceLookupKey string) (*stripe.CheckoutSession, error)
 	GetCheckoutSession(sessionID string) (*stripe.CheckoutSession, error)
+	GetLineItems(sessionID string) *session.LineItemIter
 	CreateCustomerPortal(sessionID string) (*stripe.BillingPortalSession, error)
 	ConstructEvent(payload []byte, header string) (stripe.Event, error)
 }
@@ -77,6 +78,13 @@ func (s *ServiceImpl) CreateCheckoutSession(team *entities.Team, priceLookupKey 
 
 func (s *ServiceImpl) GetCheckoutSession(sessionID string) (*stripe.CheckoutSession, error) {
 	return session.Get(sessionID, &stripe.CheckoutSessionParams{})
+}
+
+func (s *ServiceImpl) GetLineItems(sessionID string) *session.LineItemIter {
+	params := &stripe.CheckoutSessionListLineItemsParams{
+		Session: stripe.String("sessionID"),
+	}
+	return session.ListLineItems(params)
 }
 
 func (s *ServiceImpl) CreateCustomerPortal(sessionID string) (*stripe.BillingPortalSession, error) {
