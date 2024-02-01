@@ -9,7 +9,6 @@ import (
 
 	"github.com/labstack/echo/v4"
 	hs "github.com/opsway-io/backend/internal/rest/handlers"
-	"github.com/opsway-io/backend/internal/team"
 	"github.com/stripe/stripe-go/v76"
 )
 
@@ -52,26 +51,31 @@ func (h *Handlers) handleWebhook(c hs.StripeContext) error {
 		lineItems := sessionWithLineItems.LineItems
 		c.Log.Error(session)
 		c.Log.Error(*lineItems)
-		// Fulfill the purchase...
-		customerTeam, err := h.TeamService.GetByStripeID(c.Request().Context(), session.Customer.ID)
-		if err != nil {
-			if err != team.ErrNotFound {
-				return c.NoContent(http.StatusInternalServerError)
-			}
-			teamID, err := strconv.ParseUint(session.ClientReferenceID, 10, 32)
-			if err != nil {
-				c.Log.WithError(err).Debug("Error parsing team id", session.ClientReferenceID)
-				return c.NoContent(http.StatusInternalServerError)
-			}
 
-			customerTeam, err = h.TeamService.GetByID(c.Request().Context(), uint(teamID))
-			if err != nil {
-				c.Log.WithError(err).Debug("Error getting team by id", teamID)
-				return c.NoContent(http.StatusInternalServerError)
-			}
+		teamID, err := strconv.ParseUint(session.ClientReferenceID, 10, 32)
+		if err != nil {
+			c.Log.WithError(err).Debug("Error parsing team id", session.ClientReferenceID)
+			return c.NoContent(http.StatusInternalServerError)
 		}
 
-		h.TeamService.UpdateBilling(c.Request().Context(), customerTeam.ID, session.Customer.ID, lineItems.Data[0].Price.Product.Name)
+		customerTeam, err := h.TeamService.GetByID(c.Request().Context(), uint(teamID))
+		if err != nil {
+			c.Log.WithError(err).Debug("Error getting team by id", teamID)
+			return c.NoContent(http.StatusInternalServerError)
+		}
+
+		// TODO if not same plan remove old plan
+
+		if customerTeam.PaymentPlan == lineItems.Data[0].Price.Product.Name {
+			return c.NoContent(http.StatusOK)
+		}
+
+		customerID := event.Data.Object["customer"].(string)
+		if customerTeam.StripeCustomerID == nil {
+			customerTeam.StripeCustomerID = &customerID
+		}
+
+		h.TeamService.UpdateTeam(c.Request().Context(), customerTeam)
 
 	default:
 		c.Log.WithField("event", event.Type).Debug("Unhandled event type")
