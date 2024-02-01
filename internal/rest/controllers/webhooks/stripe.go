@@ -41,18 +41,18 @@ func (h *Handlers) handleWebhook(c hs.StripeContext) error {
 		params.AddExpand("line_items")
 
 		// Retrieve the session. If you require line items in the response, you may include them by expanding line_items.
-		sessionWithLineItems, err := h.BillingService.GetCheckoutSession(session.ID)
-		if err != nil {
-			c.Log.WithError(err).Debug("Error  getting checkout session")
-			return echo.ErrBadRequest
-		}
+		// sessionWithLineItems, err := h.BillingService.GetCheckoutSession(session.ID)
+		// if err != nil {
+		// 	c.Log.WithError(err).Debug("Error  getting checkout session")
+		// 	return echo.ErrBadRequest
+		// }
+
+		lineItem := h.BillingService.GetLineItems(session.ID).LineItem()
 
 		c.Log.Error(session.ClientReferenceID)
 		c.Log.Error(session)
 		c.Log.Error(session.ID)
-		c.Log.Error(*sessionWithLineItems)
-		lineItems := sessionWithLineItems.LineItems
-		c.Log.Error(lineItems)
+		c.Log.Error(lineItem)
 
 		teamID, err := strconv.ParseUint(session.ClientReferenceID, 10, 32)
 		if err != nil {
@@ -68,7 +68,7 @@ func (h *Handlers) handleWebhook(c hs.StripeContext) error {
 
 		// TODO if not same plan remove old plan
 
-		if customerTeam.PaymentPlan == lineItems.Data[0].Price.Product.Name {
+		if customerTeam.PaymentPlan == lineItem.Price.Product.Name {
 			return c.NoContent(http.StatusOK)
 		}
 
