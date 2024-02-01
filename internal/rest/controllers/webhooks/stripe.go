@@ -1,9 +1,7 @@
 package webhooks
 
 import (
-	"context"
 	"encoding/json"
-	"fmt"
 	"io"
 	"net/http"
 
@@ -14,12 +12,6 @@ import (
 	"github.com/opsway-io/backend/internal/team"
 	"github.com/stripe/stripe-go/v76"
 )
-
-func (h *Handlers) FulfillOrder(context context.Context, lineItems *stripe.LineItemList) {
-	fmt.Println(lineItems)
-
-	// TODO: fill me in
-}
 
 func (h *Handlers) handleWebhook(c hs.StripeContext) error {
 	c.Log.Info("stripe webhook received")
@@ -65,18 +57,21 @@ func (h *Handlers) handleWebhook(c hs.StripeContext) error {
 			if err != team.ErrNotFound {
 				return c.NoContent(http.StatusInternalServerError)
 			}
-			teamID, _ := strconv.ParseUint(session.ClientReferenceID, 10, 32)
-			customerTeam, _ := h.TeamService.GetByID(c.Request().Context(), uint(teamID))
+			teamID, err := strconv.ParseUint(session.ClientReferenceID, 10, 32)
+			if err != nil {
+				c.Log.WithError(err).Debug("Error parsing team id", session.ClientReferenceID)
+				return c.NoContent(http.StatusInternalServerError)
+			}
 
-			h.TeamService.UpdateBilling(c.Request().Context(), customerTeam.ID, session.Customer.ID, lineItems.Data[0].Price.Product.Name)
-			return c.NoContent(http.StatusOK)
+			customerTeam, err = h.TeamService.GetByID(c.Request().Context(), uint(teamID))
+			if err != nil {
+				c.Log.WithError(err).Debug("Error getting team by id", teamID)
+				return c.NoContent(http.StatusInternalServerError)
+			}
 		}
 
 		h.TeamService.UpdateBilling(c.Request().Context(), customerTeam.ID, session.Customer.ID, lineItems.Data[0].Price.Product.Name)
 
-		// h.FulfillOrder(lineItems)
-		// Payment is successful and the subscription is created.
-		// You should provision the subscription and save the customer ID to your database.
 	default:
 		c.Log.WithField("event", event.Type).Debug("Unhandled event type")
 		// unhandled event type
