@@ -39,6 +39,7 @@ type Service interface {
 	UpdateUserRole(ctx context.Context, teamID, userID uint, role entities.TeamRole) error
 
 	UpdateBilling(ctx context.Context, teamID uint, customerID string, plan string) error
+	UpdateTeam(ctx context.Context, team *entities.Team) error
 
 	RemoveUser(ctx context.Context, teamID, userID uint) error
 	UpdateDisplayName(ctx context.Context, teamID uint, displayName string) error
@@ -157,6 +158,10 @@ func (s *ServiceImpl) UpdateUserRole(ctx context.Context, teamID, userID uint, r
 
 func (s *ServiceImpl) UpdateBilling(ctx context.Context, teamID uint, customerID string, plan string) error {
 	return s.repository.UpdateBilling(ctx, teamID, customerID, plan)
+}
+
+func (s *ServiceImpl) UpdateTeam(ctx context.Context, team *entities.Team) error {
+	return s.repository.UpdateTeam(ctx, team)
 }
 
 func (s *ServiceImpl) GetTeamsAndRoleByUserID(ctx context.Context, userID uint) (*[]TeamAndRole, error) {

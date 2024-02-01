@@ -29,6 +29,7 @@ type Repository interface {
 	UpdateDisplayName(ctx context.Context, teamID uint, displayName string) error
 
 	UpdateBilling(ctx context.Context, teamID uint, customerID string, plan string) error
+	UpdateTeam(ctx context.Context, team *entities.Team) error
 
 	CreateWithOwnerUserID(ctx context.Context, team *entities.Team, ownerUserID uint) error
 
@@ -140,6 +141,18 @@ func (s *RepositoryImpl) UpdateBilling(ctx context.Context, teamID uint, custome
 		StripeCustomerID: &customerID,
 		PaymentPlan:      plan,
 	})
+	if result.Error != nil {
+		return result.Error
+	}
+	if result.RowsAffected == 0 {
+		return ErrNotFound
+	}
+
+	return nil
+}
+
+func (s *RepositoryImpl) UpdateTeam(ctx context.Context, team *entities.Team) error {
+	result := s.db.WithContext(ctx).Save(team)
 	if result.Error != nil {
 		return result.Error
 	}
