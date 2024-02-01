@@ -489,6 +489,8 @@ github.com/stripe/stripe-go/v76 v76.2.0 h1:5zhef624MgfewEJ3YmZUfat1SGw+mtkR5HXtM
 github.com/stripe/stripe-go/v76 v76.2.0/go.mod h1:rw1MxjlAKKcZ+3FOXgTHgwiOa2ya6CPq6ykpJ0Q6Po4=
 github.com/stripe/stripe-go/v76 v76.13.0 h1:j1tkBBA2v67yKHg9hj/0c24af8hze1vVVErJC9naT9Q=
 github.com/stripe/stripe-go/v76 v76.13.0/go.mod h1:rw1MxjlAKKcZ+3FOXgTHgwiOa2ya6CPq6ykpJ0Q6Po4=
+github.com/stripe/stripe-go/v76 v76.14.0 h1:G5v9/PzFzlfgivZApCBpzAiFbrfPMMnI7ym/wU1W9cY=
+github.com/stripe/stripe-go/v76 v76.14.0/go.mod h1:rw1MxjlAKKcZ+3FOXgTHgwiOa2ya6CPq6ykpJ0Q6Po4=
 github.com/subosito/gotenv v1.4.1 h1:jyEFiXpy21Wm81FBN71l9VoMMV8H8jG+qIK3GCpY6Qs=
 github.com/subosito/gotenv v1.4.1/go.mod h1:ayKnFf/c6rvx/2iiLrJUk1e6plDbT3edrFNGqEflhK0=
 github.com/tj/assert v0.0.3 h1:Df/BlaZ20mq6kuai7f5z2TvPFiwC3xaWJSDQNiIS3Rk=
