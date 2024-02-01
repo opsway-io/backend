@@ -25,7 +25,6 @@ func (h *Handlers) handleWebhook(c hs.StripeContext) error {
 	event, err := h.BillingService.ConstructEvent(b, c.Signature)
 	if err != nil {
 		c.Log.WithError(err).Info("failed to construct stripe event")
-		c.Log.Info("construct")
 
 		return echo.ErrBadRequest
 	}
@@ -49,8 +48,10 @@ func (h *Handlers) handleWebhook(c hs.StripeContext) error {
 			return echo.ErrBadRequest
 		}
 
-		c.Log.Info(session.ClientReferenceID)
+		c.Log.Error(session.ClientReferenceID)
 		lineItems := sessionWithLineItems.LineItems
+		c.Log.Error(session)
+		c.Log.Error(*lineItems)
 		// Fulfill the purchase...
 		customerTeam, err := h.TeamService.GetByStripeID(c.Request().Context(), session.Customer.ID)
 		if err != nil {
