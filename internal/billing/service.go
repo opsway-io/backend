@@ -23,8 +23,10 @@ type Config struct {
 type Service interface {
 	PostConfig() StripeConfig
 	CreateCheckoutSession(team *entities.Team, priceLookupKey string) (*stripe.CheckoutSession, error)
+	UpdateSubscribtion(team *entities.Team, priceLookupKey string) (*stripe.Subscription, error)
 	GetCheckoutSession(sessionID string) (*stripe.CheckoutSession, error)
 	GetLineItems(sessionID string) *session.LineItemIter
+	GetCustomerSubscribtion(customerID string) *stripe.Subscription
 	GetSubscribtion(subID string) (*stripe.Subscription, error)
 	CreateCustomerPortal(sessionID string) (*stripe.BillingPortalSession, error)
 	ConstructEvent(payload []byte, header string) (stripe.Event, error)
@@ -64,18 +66,39 @@ func (s *ServiceImpl) CreateCheckoutSession(team *entities.Team, priceLookupKey 
 
 		LineItems: []*stripe.CheckoutSessionLineItemParams{
 			{
+
 				Price:    stripe.String(priceLookupKey),
 				Quantity: stripe.Int64(1),
 			},
 		},
 	}
 
-	// Set Customer on session if already a customer
 	if team.StripeCustomerID != nil {
 		params.Customer = stripe.String(*team.StripeCustomerID)
 	}
 
 	return session.New(params)
+}
+
+func (s *ServiceImpl) UpdateSubscribtion(team *entities.Team, priceLookupKey string) (*stripe.Subscription, error) {
+	// Set Customer on session if already a customer
+
+	teamSubscription := s.GetCustomerSubscribtion(*team.StripeCustomerID)
+
+	params := &stripe.SubscriptionParams{
+		Items: []*stripe.SubscriptionItemsParams{
+			{
+				ID:    stripe.String(teamSubscription.Items.Data[0].ID),
+				Price: stripe.String(priceLookupKey),
+			},
+		},
+	}
+	result, err := subscription.Update(teamSubscription.ID, params)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to update subscription")
+	}
+
+	return result, nil
 }
 
 func (s *ServiceImpl) GetCheckoutSession(sessionID string) (*stripe.CheckoutSession, error) {
@@ -87,6 +110,11 @@ func (s *ServiceImpl) GetLineItems(sessionID string) *session.LineItemIter {
 		Session: stripe.String(sessionID),
 	}
 	return session.ListLineItems(params)
+}
+
+func (s *ServiceImpl) GetCustomerSubscribtion(customerID string) *stripe.Subscription {
+	params := &stripe.SubscriptionListParams{Customer: stripe.String(customerID)}
+	return subscription.List(params).Subscription()
 }
 
 func (s *ServiceImpl) GetSubscribtion(subID string) (*stripe.Subscription, error) {

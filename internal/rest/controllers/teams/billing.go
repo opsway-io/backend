@@ -34,6 +34,20 @@ func (h *Handlers) PostCreateCheckoutSession(c hs.AuthenticatedContext) error {
 		return echo.ErrInternalServerError
 	}
 
+	teamSubscription := h.BillingService.GetCustomerSubscribtion(*team.StripeCustomerID)
+	if teamSubscription != nil {
+		// if req.PriceLookupKey == "" {
+		// TODO CANCEL SUBSCRIPTION
+		// }
+		_, err := h.BillingService.UpdateSubscribtion(team, req.PriceLookupKey)
+		if err != nil {
+			c.Log.WithError(err).Debug("update subscription")
+
+			return echo.ErrInternalServerError
+		}
+		return c.JSON(http.StatusOK, "")
+	}
+
 	s, err := h.BillingService.CreateCheckoutSession(team, req.PriceLookupKey)
 	if err != nil {
 		c.Log.WithError(err).Debug("create stripe checkout session")
