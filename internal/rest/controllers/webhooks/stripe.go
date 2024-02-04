@@ -37,23 +37,13 @@ func (h *Handlers) handleWebhook(c hs.StripeContext) error {
 			return echo.ErrBadRequest
 		}
 
-		params := &stripe.CheckoutSessionParams{}
-		params.AddExpand("line_items")
-
-		// Retrieve the session. If you require line items in the response, you may include them by expanding line_items.
-		// sessionWithLineItems, err := h.BillingService.GetCheckoutSession(session.ID)
-		// if err != nil {
-		// 	c.Log.WithError(err).Debug("Error  getting checkout session")
-		// 	return echo.ErrBadRequest
-		// }
-
-		c.Log.Error(session.ClientReferenceID)
-		c.Log.Error(session)
-		c.Log.Error(session.ID)
-		c.Log.Error(event.Data.Object["customer"].(string))
-		lineItems := h.BillingService.GetLineItems(session.ID).LineItem()
-		c.Log.Error(lineItems)
-		c.Log.Error(*lineItems)
+		c.Log.Error(event.Data.Object["subscription"].(string))
+		subscription, err := h.BillingService.GetSubscribtion(event.Data.Object["subscription"].(string))
+		if err != nil {
+			c.Log.WithError(err).Debug("Error getting subscription")
+		}
+		c.Log.Error(subscription.Items.Data[0])
+		c.Log.Error(subscription.Items.Data[0].Price.LookupKey)
 
 		teamID, err := strconv.ParseUint(session.ClientReferenceID, 10, 32)
 		if err != nil {
@@ -69,16 +59,12 @@ func (h *Handlers) handleWebhook(c hs.StripeContext) error {
 			return c.NoContent(http.StatusInternalServerError)
 		}
 
-		// TODO if not same plan remove old plan
-
-		// if customerTeam.PaymentPlan == "TEST" { //lineItems.Price.Product.Name {
-		// 	return c.NoContent(http.StatusOK)
-		// }
-
 		customerID := event.Data.Object["customer"].(string)
 		if customerTeam.StripeCustomerID == nil {
 			customerTeam.StripeCustomerID = &customerID
 		}
+
+		customerTeam.PaymentPlan = subscription.Items.Data[0].Price.LookupKey
 
 		err = h.TeamService.UpdateTeam(c.Request().Context(), customerTeam)
 		if err != nil {
@@ -92,19 +78,31 @@ func (h *Handlers) handleWebhook(c hs.StripeContext) error {
 			c.Log.WithError(err).Debug("Error parsing webhook JSON")
 			return echo.ErrBadRequest
 		}
-		c.Log.Info(subscription.Items.Data[0].Price.LookupKey)
-		// c.Log.Info(subscription.Plan)
-		c.Log.Info("customer.subscription.updated")
+
+		if subscription.Status == "canceled" {
+			team, err := h.TeamService.GetByStripeID(c.Request().Context(), subscription.Customer.ID)
+			if err != nil {
+				c.Log.WithError(err).Debug("Error getting team by stripe id")
+				return c.NoContent(http.StatusInternalServerError)
+			}
+
+			team.PaymentPlan = "FREE"
+			err = h.TeamService.UpdateTeam(c.Request().Context(), team)
+			if err != nil {
+				c.Log.WithError(err).Debug("Error updating team")
+				return c.NoContent(http.StatusInternalServerError)
+			}
+		}
 
 	case "customer.deleted":
-		var subscription stripe.Customer
-		err := json.Unmarshal(event.Data.Raw, &subscription)
+		var customer stripe.Customer
+		err := json.Unmarshal(event.Data.Raw, &customer)
 		if err != nil {
 			c.Log.WithError(err).Debug("Error parsing webhook JSON")
 			return echo.ErrBadRequest
 		}
 
-		team, err := h.TeamService.GetByStripeID(c.Request().Context(), subscription.ID)
+		team, err := h.TeamService.GetByStripeID(c.Request().Context(), customer.ID)
 		if err != nil {
 			c.Log.WithError(err).Debug("Error getting team by stripe id")
 			return c.NoContent(http.StatusInternalServerError)

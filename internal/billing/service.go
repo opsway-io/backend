@@ -9,6 +9,7 @@ import (
 	"github.com/stripe/stripe-go/v76"
 	portalsession "github.com/stripe/stripe-go/v76/billingportal/session"
 	"github.com/stripe/stripe-go/v76/checkout/session"
+	"github.com/stripe/stripe-go/v76/subscription"
 	"github.com/stripe/stripe-go/v76/webhook"
 )
 
@@ -24,6 +25,7 @@ type Service interface {
 	CreateCheckoutSession(team *entities.Team, priceLookupKey string) (*stripe.CheckoutSession, error)
 	GetCheckoutSession(sessionID string) (*stripe.CheckoutSession, error)
 	GetLineItems(sessionID string) *session.LineItemIter
+	GetSubscribtion(subID string) (*stripe.Subscription, error)
 	CreateCustomerPortal(sessionID string) (*stripe.BillingPortalSession, error)
 	ConstructEvent(payload []byte, header string) (stripe.Event, error)
 }
@@ -85,6 +87,12 @@ func (s *ServiceImpl) GetLineItems(sessionID string) *session.LineItemIter {
 		Session: stripe.String(sessionID),
 	}
 	return session.ListLineItems(params)
+}
+
+func (s *ServiceImpl) GetSubscribtion(subID string) (*stripe.Subscription, error) {
+	params := &stripe.SubscriptionParams{}
+	return subscription.Get(subID, params)
+
 }
 
 func (s *ServiceImpl) CreateCustomerPortal(sessionID string) (*stripe.BillingPortalSession, error) {
