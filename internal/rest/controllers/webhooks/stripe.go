@@ -51,7 +51,7 @@ func (h *Handlers) handleWebhook(c hs.StripeContext) error {
 		c.Log.Error(session)
 		c.Log.Error(session.ID)
 		c.Log.Error(event.Data.Object["customer"].(string))
-		lineItems := h.BillingService.GetLineItems(session.ID).List()
+		lineItems := h.BillingService.GetLineItems(session.ID).Current()
 		c.Log.Error(lineItems)
 
 		teamID, err := strconv.ParseUint(session.ClientReferenceID, 10, 32)
