@@ -4,6 +4,7 @@ import (
 	"os"
 	"strconv"
 
+	"github.com/opsway-io/backend/internal/entities"
 	"github.com/pkg/errors"
 	"github.com/stripe/stripe-go/v76"
 	portalsession "github.com/stripe/stripe-go/v76/billingportal/session"
@@ -20,8 +21,9 @@ type Config struct {
 
 type Service interface {
 	PostConfig() StripeConfig
-	CreateCheckoutSession(teamID uint, priceId string) (*stripe.CheckoutSession, error)
+	CreateCheckoutSession(team *entities.Team, priceLookupKey string) (*stripe.CheckoutSession, error)
 	GetCheckoutSession(sessionID string) (*stripe.CheckoutSession, error)
+	GetLineItems(sessionID string) *session.LineItemIter
 	CreateCustomerPortal(sessionID string) (*stripe.BillingPortalSession, error)
 	ConstructEvent(payload []byte, header string) (stripe.Event, error)
 }
@@ -51,39 +53,38 @@ func (s *ServiceImpl) PostConfig() StripeConfig {
 	}
 }
 
-func (s *ServiceImpl) CreateCheckoutSession(teamID uint, lookupKey string) (*stripe.CheckoutSession, error) {
-	// priceParams := &stripe.PriceListParams{
-	// 	LookupKeys: stripe.StringSlice([]string{
-	// 		lookupKey,
-	// 	}),
-	// }
-
-	// i := price.List(priceParams)
-	// var price *stripe.Price
-	// for i.Next() {
-	// 	p := i.Price()
-	// 	price = p
-	// }
-
+func (s *ServiceImpl) CreateCheckoutSession(team *entities.Team, priceLookupKey string) (*stripe.CheckoutSession, error) {
 	params := &stripe.CheckoutSessionParams{
-		SuccessURL: stripe.String("https://my.opsway.io/team/plan"),
-		// ReturnURL:         stripe.String("https://my.opsway.io/team/plan"),
+		SuccessURL:        stripe.String(s.Config.Domain + "/team/plan"),
 		CancelURL:         stripe.String(s.Config.Domain + "/canceled.html"),
 		Mode:              stripe.String(string(stripe.CheckoutSessionModeSubscription)),
-		ClientReferenceID: stripe.String(strconv.FormatUint(uint64(teamID), 10)),
+		ClientReferenceID: stripe.String(strconv.FormatUint(uint64(team.ID), 10)),
+
 		LineItems: []*stripe.CheckoutSessionLineItemParams{
 			{
-				Price:    stripe.String(lookupKey),
+				Price:    stripe.String(priceLookupKey),
 				Quantity: stripe.Int64(1),
 			},
 		},
+	}
+
+	// Set Customer on session if already a customer
+	if team.StripeCustomerID != nil {
+		params.Customer = stripe.String(*team.StripeCustomerID)
 	}
 
 	return session.New(params)
 }
 
 func (s *ServiceImpl) GetCheckoutSession(sessionID string) (*stripe.CheckoutSession, error) {
-	return session.Get(sessionID, nil)
+	return session.Get(sessionID, &stripe.CheckoutSessionParams{})
+}
+
+func (s *ServiceImpl) GetLineItems(sessionID string) *session.LineItemIter {
+	params := &stripe.CheckoutSessionListLineItemsParams{
+		Session: stripe.String(sessionID),
+	}
+	return session.ListLineItems(params)
 }
 
 func (s *ServiceImpl) CreateCustomerPortal(sessionID string) (*stripe.BillingPortalSession, error) {
@@ -102,5 +103,5 @@ func (s *ServiceImpl) CreateCustomerPortal(sessionID string) (*stripe.BillingPor
 }
 
 func (s *ServiceImpl) ConstructEvent(payload []byte, header string) (stripe.Event, error) {
-	return webhook.ConstructEvent(payload, header, s.Config.WebhookSecret)
+	return webhook.ConstructEventWithOptions(payload, header, s.Config.WebhookSecret, webhook.ConstructEventOptions{IgnoreAPIVersionMismatch: true})
 }

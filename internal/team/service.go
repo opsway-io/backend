@@ -31,10 +31,15 @@ type Service interface {
 
 	GetByID(ctx context.Context, teamId uint) (*entities.Team, error)
 
+	GetByStripeID(ctx context.Context, stripeID string) (*entities.Team, error)
+
 	GetTeamsAndRoleByUserID(ctx context.Context, userID uint) (*[]TeamAndRole, error)
 	GetUsersByID(ctx context.Context, teamId uint, offset *int, limit *int, query *string) (*[]TeamUser, error)
 	GetUserRole(ctx context.Context, teamID, userID uint) (*entities.TeamRole, error)
 	UpdateUserRole(ctx context.Context, teamID, userID uint, role entities.TeamRole) error
+
+	UpdateBilling(ctx context.Context, teamID uint, customerID string, plan string) error
+	UpdateTeam(ctx context.Context, team *entities.Team) error
 
 	RemoveUser(ctx context.Context, teamID, userID uint) error
 	UpdateDisplayName(ctx context.Context, teamID uint, displayName string) error
@@ -69,6 +74,10 @@ func NewService(cfg Config, repository Repository, storage storage.Service, emai
 
 func (s *ServiceImpl) GetByID(ctx context.Context, id uint) (*entities.Team, error) {
 	return s.repository.GetByID(ctx, id)
+}
+
+func (s *ServiceImpl) GetByStripeID(ctx context.Context, stripeID string) (*entities.Team, error) {
+	return s.repository.GetByStripeID(ctx, stripeID)
 }
 
 func (s *ServiceImpl) CreateWithOwnerUserID(ctx context.Context, team *entities.Team, ownerUserID uint) error {
@@ -145,6 +154,14 @@ func (s *ServiceImpl) GetAvatarURLByID(teamID uint) string {
 
 func (s *ServiceImpl) UpdateUserRole(ctx context.Context, teamID, userID uint, role entities.TeamRole) error {
 	return s.repository.UpdateUserRole(ctx, teamID, userID, role)
+}
+
+func (s *ServiceImpl) UpdateBilling(ctx context.Context, teamID uint, customerID string, plan string) error {
+	return s.repository.UpdateBilling(ctx, teamID, customerID, plan)
+}
+
+func (s *ServiceImpl) UpdateTeam(ctx context.Context, team *entities.Team) error {
+	return s.repository.UpdateTeam(ctx, team)
 }
 
 func (s *ServiceImpl) GetTeamsAndRoleByUserID(ctx context.Context, userID uint) (*[]TeamAndRole, error) {

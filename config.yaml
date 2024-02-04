@@ -47,8 +47,8 @@ prober:
   concurrency: 1
 
 stripe:
-  publishable_key: "publishable_key"
-  secret_key: "secret_key"
-  webhook_secret: "webhook_secret"
+  publishable_key: pk_test_51NjhPuAAd26uMXu2mDsC5CrJzCokmFCMDEiyZFGanTQAy2exlztxyuLDpg2TXC26LK8j9wqnACLAAwEyWS0AJ4r500U1rDn672
+  secret_key: sk_test_51NjhPuAAd26uMXu2QkGAVDTZDLYGRQB2oxqWkZfH6j4XUOIg2HBOOKB5wRL25vOo0VkpfjnxXnP0aZ8NZqvqex3N00JZU6eD2H
+  webhook_secret: "whsec_4665482442d698095ed89e386c0069beb54a1ba141a371edd4e8e0c5126d7568"
   domain: http://localhost:5173
   

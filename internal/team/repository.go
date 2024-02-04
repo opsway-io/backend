@@ -19,6 +19,7 @@ var (
 
 type Repository interface {
 	GetByID(ctx context.Context, teamId uint) (*entities.Team, error)
+	GetByStripeID(ctx context.Context, stripeID string) (*entities.Team, error)
 	GetUsersByID(ctx context.Context, teamId uint, offset *int, limit *int, query *string) (*[]TeamUser, error)
 	GetUserRole(ctx context.Context, teamID, userID uint) (*entities.TeamRole, error)
 	GetTeamsAndRoleByUserID(ctx context.Context, userID uint) (*[]TeamAndRole, error)
@@ -26,6 +27,9 @@ type Repository interface {
 	Update(ctx context.Context, team *entities.Team) error
 	UpdateUserRole(ctx context.Context, teamID, userID uint, role entities.TeamRole) error
 	UpdateDisplayName(ctx context.Context, teamID uint, displayName string) error
+
+	UpdateBilling(ctx context.Context, teamID uint, customerID string, plan string) error
+	UpdateTeam(ctx context.Context, team *entities.Team) error
 
 	CreateWithOwnerUserID(ctx context.Context, team *entities.Team, ownerUserID uint) error
 
@@ -49,6 +53,19 @@ func NewRepository(db *gorm.DB) Repository {
 func (s *RepositoryImpl) GetByID(ctx context.Context, id uint) (*entities.Team, error) {
 	var team entities.Team
 	if err := s.db.WithContext(ctx).First(&team, id).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, ErrNotFound
+		}
+
+		return nil, err
+	}
+
+	return &team, nil
+}
+
+func (s *RepositoryImpl) GetByStripeID(ctx context.Context, stripeID string) (*entities.Team, error) {
+	var team entities.Team
+	if err := s.db.WithContext(ctx).Where("stripe_customer_id = ?", stripeID).First(&team).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, ErrNotFound
 		}
@@ -107,6 +124,35 @@ func (s *RepositoryImpl) UpdateDisplayName(ctx context.Context, teamID uint, dis
 	result := s.db.WithContext(ctx).Model(&entities.Team{}).Where(entities.Team{
 		ID: teamID,
 	}).Update("display_name", displayName)
+	if result.Error != nil {
+		return result.Error
+	}
+	if result.RowsAffected == 0 {
+		return ErrNotFound
+	}
+
+	return nil
+}
+
+func (s *RepositoryImpl) UpdateBilling(ctx context.Context, teamID uint, customerID string, plan string) error {
+	result := s.db.WithContext(ctx).Model(&entities.Team{}).Where(entities.Team{
+		ID: teamID,
+	}).Updates(entities.Team{
+		StripeCustomerID: &customerID,
+		PaymentPlan:      plan,
+	})
+	if result.Error != nil {
+		return result.Error
+	}
+	if result.RowsAffected == 0 {
+		return ErrNotFound
+	}
+
+	return nil
+}
+
+func (s *RepositoryImpl) UpdateTeam(ctx context.Context, team *entities.Team) error {
+	result := s.db.WithContext(ctx).Save(team)
 	if result.Error != nil {
 		return result.Error
 	}

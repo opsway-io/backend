@@ -29,13 +29,12 @@ var (
 )
 
 type Team struct {
-	ID uint
-
-	Name        string  `gorm:"uniqueIndex;not null"`
-	DisplayName *string `gorm:"index"`
-	PaymentPlan string  `gorm:"default:FREE"`
-	StripeKey   *string
-	HasAvatar   bool
+	ID               uint
+	Name             string  `gorm:"uniqueIndex;not null"`
+	DisplayName      *string `gorm:"index"`
+	PaymentPlan      string  `gorm:"default:FREE"`
+	StripeCustomerID *string `gorm:"index"`
+	HasAvatar        bool
 
 	Users       []User        `gorm:"many2many:team_users"`
 	Monitors    []Monitor     `gorm:"constraint:OnDelete:CASCADE"`

@@ -1,13 +1,19 @@
 package webhooks
 
 import (
+	"encoding/json"
 	"io"
+	"net/http"
+
+	"strconv"
 
 	"github.com/labstack/echo/v4"
 	hs "github.com/opsway-io/backend/internal/rest/handlers"
+	"github.com/stripe/stripe-go/v76"
 )
 
 func (h *Handlers) handleWebhook(c hs.StripeContext) error {
+	c.Log.Info("stripe webhook received")
 	b, err := io.ReadAll(c.Request().Body)
 	if err != nil {
 		c.Log.WithError(err).Debug("failed to read request body for stripe event")
@@ -17,26 +23,66 @@ func (h *Handlers) handleWebhook(c hs.StripeContext) error {
 
 	event, err := h.BillingService.ConstructEvent(b, c.Signature)
 	if err != nil {
-		c.Log.WithError(err).Debug("failed to construct stripe event")
+		c.Log.WithError(err).Info("failed to construct stripe event")
 
 		return echo.ErrBadRequest
 	}
 
 	switch event.Type {
 	case "checkout.session.completed":
-		// Payment is successful and the subscription is created.
-		// You should provision the subscription and save the customer ID to your database.
-	case "invoice.paid":
-		// Continue to provision the subscription as payments continue to be made.
-		// Store the status in your database and check when a user accesses your service.
-		// This approach helps you avoid hitting rate limits.
-	case "invoice.payment_failed":
-		// The payment failed or the customer does not have a valid payment method.
-		// The subscription becomes past_due. Notify your customer and send them to the
-		// customer portal to update their payment information.
+		var session stripe.CheckoutSession
+		err := json.Unmarshal(event.Data.Raw, &session)
+		if err != nil {
+			c.Log.WithError(err).Debug("Error parsing webhook JSON")
+			return echo.ErrBadRequest
+		}
+
+		params := &stripe.CheckoutSessionParams{}
+		params.AddExpand("line_items")
+
+		// Retrieve the session. If you require line items in the response, you may include them by expanding line_items.
+		// sessionWithLineItems, err := h.BillingService.GetCheckoutSession(session.ID)
+		// if err != nil {
+		// 	c.Log.WithError(err).Debug("Error  getting checkout session")
+		// 	return echo.ErrBadRequest
+		// }
+
+		c.Log.Error(session.ClientReferenceID)
+		c.Log.Error(session)
+		c.Log.Error(session.ID)
+		c.Log.Error(event.Data.Object["customer"].(string))
+		lineItems := h.BillingService.GetLineItems(session.ID).List()
+		c.Log.Error(lineItems)
+
+		teamID, err := strconv.ParseUint(session.ClientReferenceID, 10, 32)
+		if err != nil {
+			c.Log.WithError(err).Debug("Error parsing team id", session.ClientReferenceID)
+			return c.NoContent(http.StatusInternalServerError)
+		}
+
+		customerTeam, err := h.TeamService.GetByID(c.Request().Context(), uint(teamID))
+		if err != nil {
+			c.Log.WithError(err).Debug("Error getting team by id", teamID)
+			return c.NoContent(http.StatusInternalServerError)
+		}
+
+		// TODO if not same plan remove old plan
+
+		if customerTeam.PaymentPlan == "TEST" { //lineItems.Price.Product.Name {
+			return c.NoContent(http.StatusOK)
+		}
+
+		customerID := event.Data.Object["customer"].(string)
+		if customerTeam.StripeCustomerID == nil {
+			customerTeam.StripeCustomerID = &customerID
+		}
+
+		h.TeamService.UpdateTeam(c.Request().Context(), customerTeam)
+
 	default:
+		c.Log.WithField("event", event.Type).Debug("Unhandled event type")
 		// unhandled event type
 	}
 
-	return nil
+	return c.NoContent(http.StatusOK)
 }
