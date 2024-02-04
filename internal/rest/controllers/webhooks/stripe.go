@@ -79,19 +79,21 @@ func (h *Handlers) handleWebhook(c hs.StripeContext) error {
 			return echo.ErrBadRequest
 		}
 
-		if subscription.Status == "canceled" {
-			team, err := h.TeamService.GetByStripeID(c.Request().Context(), subscription.Customer.ID)
-			if err != nil {
-				c.Log.WithError(err).Debug("Error getting team by stripe id")
-				return c.NoContent(http.StatusInternalServerError)
-			}
+		team, err := h.TeamService.GetByStripeID(c.Request().Context(), subscription.Customer.ID)
+		if err != nil {
+			c.Log.WithError(err).Debug("Error getting team by stripe id")
+			return c.NoContent(http.StatusInternalServerError)
+		}
+		team.PaymentPlan = subscription.Items.Data[0].Price.LookupKey
 
+		if subscription.Status == "canceled" {
 			team.PaymentPlan = "FREE"
-			err = h.TeamService.UpdateTeam(c.Request().Context(), team)
-			if err != nil {
-				c.Log.WithError(err).Debug("Error updating team")
-				return c.NoContent(http.StatusInternalServerError)
-			}
+		}
+
+		err = h.TeamService.UpdateTeam(c.Request().Context(), team)
+		if err != nil {
+			c.Log.WithError(err).Debug("Error updating team")
+			return c.NoContent(http.StatusInternalServerError)
 		}
 
 	case "customer.deleted":
