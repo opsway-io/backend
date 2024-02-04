@@ -83,7 +83,9 @@ func (s *ServiceImpl) CreateCheckoutSession(team *entities.Team, priceLookupKey 
 func (s *ServiceImpl) UpdateSubscribtion(team *entities.Team, priceLookupKey string) (*stripe.Subscription, error) {
 	// Set Customer on session if already a customer
 
-	teamSubscription := s.GetCustomerSubscribtion(*team.StripeCustomerID).Subscription()
+	sub := s.GetCustomerSubscribtion(*team.StripeCustomerID)
+	sub.Next()
+	teamSubscription := sub.Subscription()
 
 	params := &stripe.SubscriptionParams{
 		Items: []*stripe.SubscriptionItemsParams{
