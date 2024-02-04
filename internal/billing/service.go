@@ -24,6 +24,7 @@ type Service interface {
 	PostConfig() StripeConfig
 	CreateCheckoutSession(team *entities.Team, priceLookupKey string) (*stripe.CheckoutSession, error)
 	UpdateSubscribtion(team *entities.Team, priceLookupKey string) (*stripe.Subscription, error)
+	CancelSubscribtion(team *entities.Team) (*stripe.Subscription, error)
 	GetCheckoutSession(sessionID string) (*stripe.CheckoutSession, error)
 	GetLineItems(sessionID string) *session.LineItemIter
 	GetCustomerSubscribtion(customerID string) *subscription.Iter
@@ -92,6 +93,29 @@ func (s *ServiceImpl) UpdateSubscribtion(team *entities.Team, priceLookupKey str
 			{
 				ID:    stripe.String(teamSubscription.Items.Data[0].ID),
 				Price: stripe.String(priceLookupKey),
+			},
+		},
+	}
+	result, err := subscription.Update(teamSubscription.ID, params)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to update subscription")
+	}
+
+	return result, nil
+}
+
+func (s *ServiceImpl) CancelSubscribtion(team *entities.Team) (*stripe.Subscription, error) {
+	// Set Customer on session if already a customer
+
+	sub := s.GetCustomerSubscribtion(*team.StripeCustomerID)
+	sub.Next()
+	teamSubscription := sub.Subscription()
+
+	params := &stripe.SubscriptionParams{
+		Items: []*stripe.SubscriptionItemsParams{
+			{
+				ID:      stripe.String(teamSubscription.Items.Data[0].ID),
+				Deleted: stripe.Bool(true),
 			},
 		},
 	}
