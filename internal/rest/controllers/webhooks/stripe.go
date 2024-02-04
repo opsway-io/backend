@@ -51,8 +51,8 @@ func (h *Handlers) handleWebhook(c hs.StripeContext) error {
 		c.Log.Error(session)
 		c.Log.Error(session.ID)
 		c.Log.Error(event.Data.Object["customer"].(string))
-		lineItems := h.BillingService.GetLineItems(session.ID).List()
-		c.Log.Error(lineItems)
+		// lineItems := h.BillingService.GetLineItems(session.ID).List()
+		// c.Log.Error(lineItems)
 
 		teamID, err := strconv.ParseUint(session.ClientReferenceID, 10, 32)
 		if err != nil {
@@ -68,16 +68,30 @@ func (h *Handlers) handleWebhook(c hs.StripeContext) error {
 
 		// TODO if not same plan remove old plan
 
-		if customerTeam.PaymentPlan == "TEST" { //lineItems.Price.Product.Name {
-			return c.NoContent(http.StatusOK)
-		}
+		// if customerTeam.PaymentPlan == "TEST" { //lineItems.Price.Product.Name {
+		// 	return c.NoContent(http.StatusOK)
+		// }
 
 		customerID := event.Data.Object["customer"].(string)
 		if customerTeam.StripeCustomerID == nil {
 			customerTeam.StripeCustomerID = &customerID
 		}
 
-		h.TeamService.UpdateTeam(c.Request().Context(), customerTeam)
+		err = h.TeamService.UpdateTeam(c.Request().Context(), customerTeam)
+		if err != nil {
+			c.Log.WithError(err).Debug("Error updating team")
+			return c.NoContent(http.StatusInternalServerError)
+		}
+	case "customer.subscription.updated":
+		var subscription stripe.Subscription
+		err := json.Unmarshal(event.Data.Raw, &subscription)
+		if err != nil {
+			c.Log.WithError(err).Debug("Error parsing webhook JSON")
+			return echo.ErrBadRequest
+		}
+		c.Log.Info(*subscription.Items.Data[0])
+		// c.Log.Info(subscription.Plan)
+		c.Log.Info("customer.subscription.updated")
 
 	default:
 		c.Log.WithField("event", event.Type).Debug("Unhandled event type")
