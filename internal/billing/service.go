@@ -26,7 +26,7 @@ type Service interface {
 	UpdateSubscribtion(team *entities.Team, priceLookupKey string) (*stripe.Subscription, error)
 	GetCheckoutSession(sessionID string) (*stripe.CheckoutSession, error)
 	GetLineItems(sessionID string) *session.LineItemIter
-	GetCustomerSubscribtion(customerID string) *stripe.Subscription
+	GetCustomerSubscribtion(customerID string) *subscription.Iter
 	GetSubscribtion(subID string) (*stripe.Subscription, error)
 	CreateCustomerPortal(sessionID string) (*stripe.BillingPortalSession, error)
 	ConstructEvent(payload []byte, header string) (stripe.Event, error)
@@ -83,7 +83,7 @@ func (s *ServiceImpl) CreateCheckoutSession(team *entities.Team, priceLookupKey 
 func (s *ServiceImpl) UpdateSubscribtion(team *entities.Team, priceLookupKey string) (*stripe.Subscription, error) {
 	// Set Customer on session if already a customer
 
-	teamSubscription := s.GetCustomerSubscribtion(*team.StripeCustomerID)
+	teamSubscription := s.GetCustomerSubscribtion(*team.StripeCustomerID).Subscription()
 
 	params := &stripe.SubscriptionParams{
 		Items: []*stripe.SubscriptionItemsParams{
@@ -112,9 +112,9 @@ func (s *ServiceImpl) GetLineItems(sessionID string) *session.LineItemIter {
 	return session.ListLineItems(params)
 }
 
-func (s *ServiceImpl) GetCustomerSubscribtion(customerID string) *stripe.Subscription {
+func (s *ServiceImpl) GetCustomerSubscribtion(customerID string) *subscription.Iter {
 	params := &stripe.SubscriptionListParams{Customer: stripe.String(customerID)}
-	return subscription.List(params).Subscription()
+	return subscription.List(params)
 }
 
 func (s *ServiceImpl) GetSubscribtion(subID string) (*stripe.Subscription, error) {
