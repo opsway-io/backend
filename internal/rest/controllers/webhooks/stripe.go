@@ -60,6 +60,8 @@ func (h *Handlers) handleWebhook(c hs.StripeContext) error {
 			return c.NoContent(http.StatusInternalServerError)
 		}
 
+		c.Log.Error(c.Request().Context())
+		c.Log.Error(uint(teamID))
 		customerTeam, err := h.TeamService.GetByID(c.Request().Context(), uint(teamID))
 		if err != nil {
 			c.Log.WithError(err).Debug("Error getting team by id", teamID)
