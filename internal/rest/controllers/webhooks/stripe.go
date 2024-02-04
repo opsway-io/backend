@@ -51,8 +51,9 @@ func (h *Handlers) handleWebhook(c hs.StripeContext) error {
 		c.Log.Error(session)
 		c.Log.Error(session.ID)
 		c.Log.Error(event.Data.Object["customer"].(string))
-		// lineItems := h.BillingService.GetLineItems(session.ID).Current()
-		// c.Log.Error(lineItems)
+		lineItems := h.BillingService.GetLineItems(session.ID).LineItem()
+		c.Log.Error(lineItems)
+		c.Log.Error(*lineItems)
 
 		teamID, err := strconv.ParseUint(session.ClientReferenceID, 10, 32)
 		if err != nil {
@@ -91,7 +92,7 @@ func (h *Handlers) handleWebhook(c hs.StripeContext) error {
 			c.Log.WithError(err).Debug("Error parsing webhook JSON")
 			return echo.ErrBadRequest
 		}
-		c.Log.Info(*subscription.Items.Data[0])
+		c.Log.Info(subscription.Items.Data[0].Price.LookupKey)
 		// c.Log.Info(subscription.Plan)
 		c.Log.Info("customer.subscription.updated")
 
