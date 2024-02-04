@@ -13,6 +13,58 @@ import (
 	"github.com/opsway-io/backend/internal/rest/helpers"
 )
 
+/*
+	Shared structs
+*/
+
+type Monitor struct {
+	ID         uint               `json:"id"`
+	State      string             `json:"state" validate:"required,monitorState"`
+	Name       string             `json:"name" validate:"required,max=255"`
+	Settings   MonitorSettings    `json:"settings" validate:"required,dive"`
+	Assertions []MonitorAssertion `json:"assertions" validate:"required,monitorAssertions"`
+	CreatedAt  time.Time          `json:"createdAt"`
+	UpdatedAt  time.Time          `json:"updatedAt"`
+}
+
+type MonitorSettings struct {
+	Method           string                  `json:"method" validate:"required,monitorMethod"`
+	URL              string                  `json:"url" validate:"required,url"`
+	FrequencySeconds uint64                  `json:"frequencySeconds" validate:"required,monitorFrequency"`
+	Headers          []MonitorSettingsHeader `json:"headers" validate:"required,dive,required,max=255"`
+	Body             MonitorSettingsBody     `json:"body" validate:"required,dive"`
+	TLS              MonitorSettingsTLS      `json:"tls" validate:"required,dive"`
+	Locations        []string                `json:"locations" validate:"omitempty,dive,required,max=255"`
+}
+
+type MonitorAssertion struct {
+	Source   string `json:"source"`
+	Property string `json:"property"`
+	Operator string `json:"operator"`
+	Target   string `json:"target"`
+}
+
+type MonitorSettingsHeader struct {
+	Key   string `json:"key" validate:"required,max=255"`
+	Value string `json:"value" validate:"max=255"`
+}
+
+type MonitorSettingsBody struct {
+	Type    string  `json:"type" validate:"required,monitorBodyType"`
+	Content *string `json:"content" validate:"omitempty,max=1048576"` // Max 1 MB
+}
+
+type MonitorSettingsTLS struct {
+	Enabled                 bool  `json:"enabled"`
+	VerifyHostname          *bool `json:"verifyHostname"`
+	CheckExpiration         *bool `json:"checkExpiration"`
+	ExpirationThresholdDays *uint `json:"expirationThresholdDays"`
+}
+
+/*
+	Handlers
+*/
+
 type GetMonitorsRequest struct {
 	TeamID uint    `param:"teamId" validate:"required,numeric,gte=0"`
 	Offset *int    `query:"offset" validate:"numeric,gte=0" default:"0"`
@@ -21,34 +73,20 @@ type GetMonitorsRequest struct {
 }
 
 type GetMonitorsResponse struct {
-	Monitors   []GetMonitorResponseMonitor `json:"monitors"`
-	TotalCount int                         `json:"totalCount"`
+	Monitors   []GetMonitorsResponseMonitor `json:"monitors"`
+	TotalCount int                          `json:"totalCount"`
 }
 
-type GetMonitorResponseMonitor struct {
-	ID        uint                              `json:"id"`
-	State     string                            `json:"state"`
-	Name      string                            `json:"name"`
-	Settings  GetMonitorResponseMonitorSettings `json:"settings"`
-	CreatedAt time.Time                         `json:"createdAt"`
-	UpdatedAt time.Time                         `json:"updatedAt"`
-	P99       uint                              `json:"p99"`
-	P95       uint                              `json:"p95"`
-	Stats     []float64                         `json:"stats"`
+type GetMonitorsResponseMonitor struct {
+	Monitor
+	Stats GetMonitorsResponseMonitorStats `json:"stats"`
 }
 
-type GetMonitorResponseMonitorSettings struct {
-	Method           string                                    `json:"method"`
-	URL              string                                    `json:"url"`
-	Headers          []GetMonitorResponseMonitorSettingsHeader `json:"headers"`
-	BodyType         string                                    `json:"bodyType"`
-	Body             *string                                   `json:"body"`
-	FrequencySeconds uint64                                    `json:"frequencySeconds"`
-}
-
-type GetMonitorResponseMonitorSettingsHeader struct {
-	Key   string `json:"key" validate:"required"`
-	Value string `json:"value" validate:"required"`
+type GetMonitorsResponseMonitorStats struct {
+	UptimePercentage     float64   `json:"uptimePercentage"`
+	AverageResponseTimes []float64 `json:"averageResponseTimes"`
+	P99                  uint      `json:"p99"`
+	P95                  uint      `json:"p95"`
 }
 
 func (h *Handlers) GetMonitors(c hs.AuthenticatedContext) error {
@@ -84,7 +122,7 @@ func (h *Handlers) GetMonitors(c hs.AuthenticatedContext) error {
 }
 
 func newGetMonitorsResponse(monitors *[]monitor.MonitorWithTotalCount, stats *[]check.MonitorOverviews) (*GetMonitorsResponse, error) {
-	res := make([]GetMonitorResponseMonitor, len(*monitors))
+	res := make([]GetMonitorsResponseMonitor, len(*monitors))
 
 	monitorStatsMap := make(map[uint]check.MonitorOverviews, len(*stats))
 	for _, m := range *stats {
@@ -92,32 +130,60 @@ func newGetMonitorsResponse(monitors *[]monitor.MonitorWithTotalCount, stats *[]
 	}
 
 	for i, m := range *monitors {
-		// headers, err := m.Settings.GetHeaders()
-		// if err != nil {
-		// 	return nil, err
-		// }
+		headers := make([]MonitorSettingsHeader, len(m.Settings.Headers))
+		for j, h := range m.Settings.Headers {
+			headers[j] = MonitorSettingsHeader{
+				Key:   h.Key,
+				Value: h.Value,
+			}
+		}
 
-		res[i] = GetMonitorResponseMonitor{
-			ID:        m.ID,
-			State:     m.GetStateString(),
-			Name:      m.Name,
-			CreatedAt: m.CreatedAt,
-			UpdatedAt: m.UpdatedAt,
-			Settings: GetMonitorResponseMonitorSettings{
-				Method: m.Settings.Method,
-				URL:    m.Settings.URL,
-				// Headers:          headers, // TODO: fix
-				BodyType:         m.Settings.BodyType,
-				Body:             m.GetBodyStr(),
-				FrequencySeconds: m.Settings.GetFrequencySeconds(),
+		assertions := make([]MonitorAssertion, len(m.Assertions))
+		for j, a := range m.Assertions {
+			assertions[j] = MonitorAssertion{
+				Source:   a.Source,
+				Operator: a.Operator,
+				Target:   a.Target,
+				Property: a.Property,
+			}
+		}
+
+		res[i] = GetMonitorsResponseMonitor{
+			Monitor: Monitor{
+				ID:        m.ID,
+				State:     m.GetStateString(),
+				Name:      m.Name,
+				CreatedAt: m.CreatedAt,
+				UpdatedAt: m.UpdatedAt,
+				Settings: MonitorSettings{
+					Method:           m.Settings.Method,
+					URL:              m.Settings.URL,
+					FrequencySeconds: m.Settings.GetFrequencySeconds(),
+					Headers:          headers,
+					Body: MonitorSettingsBody{
+						Type:    m.Settings.Body.Type,
+						Content: m.Settings.Body.GetContentString(),
+					},
+					TLS: MonitorSettingsTLS{
+						Enabled:                 m.Settings.TLS.Enabled,
+						VerifyHostname:          m.Settings.TLS.VerifyHostname,
+						CheckExpiration:         m.Settings.TLS.CheckExpiration,
+						ExpirationThresholdDays: m.Settings.TLS.ExpirationThresholdDays,
+					},
+					Locations: []string{}, // TODO: Implement
+				},
+				Assertions: assertions,
 			},
 		}
 
 		stat, ok := monitorStatsMap[m.ID]
 		if ok {
-			res[i].P99 = uint(stat.P99)
-			res[i].P95 = uint(stat.P95)
-			res[i].Stats = stat.Stats
+			res[i].Stats = GetMonitorsResponseMonitorStats{
+				UptimePercentage:     0, // TODO: Implement
+				AverageResponseTimes: stat.Stats,
+				P99:                  uint(stat.P99),
+				P95:                  uint(stat.P95),
+			}
 		}
 	}
 
@@ -138,26 +204,13 @@ type GetMonitorRequest struct {
 }
 
 type GetMonitorResponse struct {
-	ID        uint                       `json:"id"`
-	State     string                     `json:"state"`
-	Name      string                     `json:"name"`
-	Settings  GetMonitorResponseSettings `json:"settings"`
-	CreatedAt time.Time                  `json:"createdAt"`
-	UpdatedAt time.Time                  `json:"updatedAt"`
+	Monitor
+	Stats GetMonitorResponseStats `json:"stats"`
 }
 
-type GetMonitorResponseSettings struct {
-	Method           string                             `json:"method"`
-	URL              string                             `json:"url"`
-	Headers          []GetMonitorResponseSettingsHeader `json:"headers"`
-	BodyType         string                             `json:"bodyType"`
-	Body             *string                            `json:"body"`
-	FrequencySeconds uint64                             `json:"frequencySeconds"`
-}
-
-type GetMonitorResponseSettingsHeader struct {
-	Key   string `json:"key" validate:"required"`
-	Value string `json:"value" validate:"required"`
+type GetMonitorResponseStats struct {
+	UptimePercentage    float64 `json:"uptimePercentage"`
+	AverageResponseTime float64 `json:"averageResponseTime"`
 }
 
 func (h *Handlers) GetMonitor(c hs.AuthenticatedContext) error {
@@ -189,26 +242,57 @@ func (h *Handlers) GetMonitor(c hs.AuthenticatedContext) error {
 }
 
 func newGetMonitorResponse(m *entities.Monitor) (*GetMonitorResponse, error) {
-	// headers, err := m.Settings.GetHeaders()
-	// if err != nil {
-	// 	return nil, err
-	// }
+	headers := make([]MonitorSettingsHeader, len(m.Settings.Headers))
+	for j, h := range m.Settings.Headers {
+		headers[j] = MonitorSettingsHeader{
+			Key:   h.Key,
+			Value: h.Value,
+		}
+	}
 
-	return &GetMonitorResponse{
-		ID:        m.ID,
-		State:     m.GetStateString(),
-		Name:      m.Name,
-		CreatedAt: m.CreatedAt,
-		UpdatedAt: m.UpdatedAt,
-		Settings: GetMonitorResponseSettings{
-			Method: m.Settings.Method,
-			URL:    m.Settings.URL,
-			// Headers:          headers, // TODO: fix
-			BodyType:         m.Settings.BodyType,
-			Body:             m.GetBodyStr(),
-			FrequencySeconds: m.Settings.GetFrequencySeconds(),
+	assertions := make([]MonitorAssertion, len(m.Assertions))
+	for j, a := range m.Assertions {
+		assertions[j] = MonitorAssertion{
+			Source:   a.Source,
+			Operator: a.Operator,
+			Target:   a.Target,
+			Property: a.Property,
+		}
+	}
+
+	resp := GetMonitorResponse{
+		Monitor: Monitor{
+			ID:        m.ID,
+			State:     m.GetStateString(),
+			Name:      m.Name,
+			CreatedAt: m.CreatedAt,
+			UpdatedAt: m.UpdatedAt,
+			Settings: MonitorSettings{
+				Method:           m.Settings.Method,
+				URL:              m.Settings.URL,
+				FrequencySeconds: m.Settings.GetFrequencySeconds(),
+				Headers:          headers,
+				Body: MonitorSettingsBody{
+					Type:    m.Settings.Body.Type,
+					Content: m.Settings.Body.GetContentString(),
+				},
+				TLS: MonitorSettingsTLS{
+					Enabled:                 m.Settings.TLS.Enabled,
+					VerifyHostname:          m.Settings.TLS.VerifyHostname,
+					CheckExpiration:         m.Settings.TLS.CheckExpiration,
+					ExpirationThresholdDays: m.Settings.TLS.ExpirationThresholdDays,
+				},
+				Locations: []string{}, // TODO: Implement
+			},
+			Assertions: assertions,
 		},
-	}, nil
+		Stats: GetMonitorResponseStats{
+			UptimePercentage:    0, // TODO: Implement
+			AverageResponseTime: 0, // TODO: Implement
+		},
+	}
+
+	return &resp, nil
 }
 
 type DeleteMonitorRequest struct {
@@ -244,23 +328,10 @@ func (h *Handlers) DeleteMonitor(c hs.AuthenticatedContext) error {
 }
 
 type PostMonitorRequest struct {
-	TeamID   uint                       `param:"teamId" validate:"required,numeric,gte=0"`
-	Name     string                     `json:"name" validate:"required,max=255"`
-	Settings PostMonitorRequestSettings `json:"settings" validate:"required,dive"`
-}
-
-type PostMonitorRequestSettings struct {
-	Method           string                             `json:"method" validate:"required,monitorMethod"`
-	URL              string                             `json:"url" validate:"required,url"`
-	Headers          []PostMonitorRequestSettingsHeader `json:"headers" validate:"required,dive,max=255"`
-	BodyType         string                             `json:"bodyType" validate:"required,monitorBodyType"`
-	Body             string                             `json:"body"`
-	FrequencySeconds uint64                             `json:"frequencySeconds" validate:"required,numeric,gte=0,monitorFrequency"`
-}
-
-type PostMonitorRequestSettingsHeader struct {
-	Key   string `json:"key" validate:"required"`
-	Value string `json:"value" validate:"required"`
+	TeamID     uint               `param:"teamId" validate:"required,numeric,gte=0"`
+	Name       string             `json:"name" validate:"required,max=255"`
+	Settings   MonitorSettings    `json:"settings" validate:"required,dive"`
+	Assertions []MonitorAssertion `json:"assertions" validate:"required,dive"`
 }
 
 func (h *Handlers) PostMonitor(c hs.AuthenticatedContext) error {
@@ -271,20 +342,48 @@ func (h *Handlers) PostMonitor(c hs.AuthenticatedContext) error {
 		return echo.ErrBadRequest
 	}
 
-	s := entities.MonitorSettings{
-		Method:   req.Settings.Method,
-		URL:      req.Settings.URL,
-		BodyType: req.Settings.BodyType,
+	headers := make([]entities.MonitorSettingsHeader, len(req.Settings.Headers))
+	for j, h := range req.Settings.Headers {
+		headers[j] = entities.MonitorSettingsHeader{
+			Key:   h.Key,
+			Value: h.Value,
+		}
 	}
-	s.SetFrequencySeconds(req.Settings.FrequencySeconds)
+
+	assertions := make([]entities.MonitorAssertion, len(req.Assertions))
+	for j, a := range req.Assertions {
+		assertions[j] = entities.MonitorAssertion{
+			Source:   a.Source,
+			Operator: a.Operator,
+			Target:   a.Target,
+			Property: a.Property,
+		}
+	}
 
 	m := &entities.Monitor{
-		TeamID:   req.TeamID,
-		Name:     req.Name,
-		Settings: s,
+		TeamID: req.TeamID,
+		Name:   req.Name,
+		Settings: entities.MonitorSettings{
+			Method:  req.Settings.Method,
+			URL:     req.Settings.URL,
+			Headers: headers,
+			Body: entities.MonitorSettingsBody{
+				Type: req.Settings.Body.Type,
+			},
+			TLS: entities.MonitorSettingsTLS{
+				Enabled:                 req.Settings.TLS.Enabled,
+				VerifyHostname:          req.Settings.TLS.VerifyHostname,
+				CheckExpiration:         req.Settings.TLS.CheckExpiration,
+				ExpirationThresholdDays: req.Settings.TLS.ExpirationThresholdDays,
+			},
+			// TODO: Implement
+			// Locations: req.Settings.Locations,
+		},
+		Assertions: assertions,
 	}
-	m.SetBodyStr(req.Settings.Body)
-	// m.SetHeaders(req.Settings.Headers) // TODO: fix
+
+	m.Settings.SetFrequencySeconds(req.Settings.FrequencySeconds)
+	m.Settings.Body.SetContentString(req.Settings.Body.Content)
 
 	if err := h.MonitorService.Create(c.Request().Context(), m); err != nil {
 		c.Log.WithError(err).Error("failed to create monitor")
@@ -296,28 +395,17 @@ func (h *Handlers) PostMonitor(c hs.AuthenticatedContext) error {
 }
 
 type PutMonitorRequest struct {
-	TeamID    uint                      `param:"teamId" validate:"required,numeric,gte=0"`
-	MonitorID uint                      `param:"monitorId" validate:"required,numeric,gte=0"`
-	Name      string                    `json:"name" validate:"required,max=255"`
-	State     string                    `json:"state" validate:"required,monitorState"`
-	Settings  PutMonitorRequestSettings `json:"settings" validate:"required,dive"`
-}
-
-type PutMonitorRequestSettings struct {
-	Method           string                            `json:"method" validate:"required,monitorMethod"`
-	URL              string                            `json:"url" validate:"required,url"`
-	Headers          []PutMonitorRequestSettingsHeader `json:"headers" validate:"required,dive,max=255"`
-	BodyType         string                            `json:"bodyType" validate:"required,monitorBodyType"`
-	Body             string                            `json:"body"`
-	FrequencySeconds uint64                            `json:"frequencySeconds" validate:"required,numeric,gte=0,monitorFrequency"`
-}
-
-type PutMonitorRequestSettingsHeader struct {
-	Key   string `json:"key" validate:"required"`
-	Value string `json:"value" validate:"required"`
+	TeamID     uint               `param:"teamId" validate:"required,numeric,gte=0"`
+	MonitorID  uint               `param:"monitorId" validate:"required,numeric,gte=0"`
+	Name       string             `json:"name" validate:"required,max=255"`
+	State      string             `json:"state" validate:"required,monitorState"`
+	Settings   MonitorSettings    `json:"settings" validate:"required,dive"`
+	Assertions []MonitorAssertion `json:"assertions" validate:"required,dive"`
 }
 
 func (h *Handlers) PutMonitor(c hs.AuthenticatedContext) error {
+	ctx := c.Request().Context()
+
 	req, err := helpers.Bind[PutMonitorRequest](c)
 	if err != nil {
 		c.Log.WithError(err).Debug("failed to bind PutMonitorRequest")
@@ -325,24 +413,49 @@ func (h *Handlers) PutMonitor(c hs.AuthenticatedContext) error {
 		return echo.ErrBadRequest
 	}
 
-	ctx := c.Request().Context()
-
-	s := entities.MonitorSettings{
-		Method:   req.Settings.Method,
-		URL:      req.Settings.URL,
-		BodyType: req.Settings.BodyType,
+	headers := make([]entities.MonitorSettingsHeader, len(req.Settings.Headers))
+	for j, h := range req.Settings.Headers {
+		headers[j] = entities.MonitorSettingsHeader{
+			Key:   h.Key,
+			Value: h.Value,
+		}
 	}
-	s.SetFrequencySeconds(req.Settings.FrequencySeconds)
+
+	assertions := make([]entities.MonitorAssertion, len(req.Assertions))
+	for j, a := range req.Assertions {
+		assertions[j] = entities.MonitorAssertion{
+			Source:   a.Source,
+			Operator: a.Operator,
+			Target:   a.Target,
+			Property: a.Property,
+		}
+	}
 
 	m := &entities.Monitor{
-		ID:       req.MonitorID,
-		TeamID:   req.TeamID,
-		Name:     req.Name,
-		Settings: s,
+		TeamID: req.TeamID,
+		Name:   req.Name,
+		Settings: entities.MonitorSettings{
+			Method:  req.Settings.Method,
+			URL:     req.Settings.URL,
+			Headers: headers,
+			Body: entities.MonitorSettingsBody{
+				Type: req.Settings.Body.Type,
+			},
+			TLS: entities.MonitorSettingsTLS{
+				Enabled:                 req.Settings.TLS.Enabled,
+				VerifyHostname:          req.Settings.TLS.VerifyHostname,
+				CheckExpiration:         req.Settings.TLS.CheckExpiration,
+				ExpirationThresholdDays: req.Settings.TLS.ExpirationThresholdDays,
+			},
+			// TODO: Implement
+			// Locations: req.Settings.Locations,
+		},
+		Assertions: assertions,
 	}
-	m.SetBodyStr(req.Settings.Body)
-	// m.SetHeaders(req.Settings.Headers) // TODO: fix
-	m.SetStateFromString(req.State)
+
+	m.SetStateString(req.State)
+	m.Settings.SetFrequencySeconds(req.Settings.FrequencySeconds)
+	m.Settings.Body.SetContentString(req.Settings.Body.Content)
 
 	if err := h.MonitorService.Update(
 		ctx,

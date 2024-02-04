@@ -40,7 +40,7 @@ func (u *User) SetPassword(password string) error {
 		return errors.Wrap(err, "failed to generate password hash")
 	}
 
-	u.PasswordHash = pointer.StringPtr(string(hash))
+	u.PasswordHash = pointer.String(string(hash))
 
 	return nil
 }

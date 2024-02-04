@@ -83,8 +83,6 @@ func (s *ServiceImpl) Verify(ctx context.Context, accessToken string) (bool, *Ac
 }
 
 func (s *ServiceImpl) verifyRefreshToken(ctx context.Context, refreshToken string) (bool, *RefreshClaims, error) {
-	fmt.Println(refreshToken)
-
 	claims := &RefreshClaims{}
 	token, err := jwt.ParseWithClaims(refreshToken, claims, func(token *jwt.Token) (interface{}, error) {
 		return []byte(s.Config.Secret), nil
@@ -107,7 +105,6 @@ func (s *ServiceImpl) verifyRefreshToken(ctx context.Context, refreshToken strin
 	}
 
 	if !ok {
-		fmt.Println("fuck")
 		return false, nil, nil
 	}
 

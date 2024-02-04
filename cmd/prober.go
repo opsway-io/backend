@@ -112,14 +112,17 @@ func handleTask(ctx context.Context, logger *logrus.Logger, prober http.Service,
 
 	newCheck := mapResultToCheck(m, res)
 
-	err = c.Create(ctx, newCheck)
-	if err != nil {
+	if err = c.Create(ctx, newCheck); err != nil {
 		l.WithError(err).Error("failed add result to clickhouse")
+
+		return
 	}
 
 	failed, passed, err := assertResult(res, m.Assertions)
 	if err != nil {
 		l.WithError(err).Error("failed to assert result")
+
+		return
 	}
 
 	failedCount := len(*failed)

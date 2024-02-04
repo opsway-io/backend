@@ -94,6 +94,7 @@ func (r *RepositoryImpl) Create(ctx context.Context, m *entities.Monitor) error 
 func (r *RepositoryImpl) Update(ctx context.Context, teamID, monitorID uint, m *entities.Monitor) error {
 	tx := r.db.WithContext(ctx).Begin()
 
+	// Update monitor
 	result := tx.
 		Where(
 			entities.Monitor{
@@ -101,6 +102,7 @@ func (r *RepositoryImpl) Update(ctx context.Context, teamID, monitorID uint, m *
 				TeamID: teamID,
 			},
 		).
+		// Fields allowed to be updated
 		Select(
 			"name",
 			"state",
@@ -122,28 +124,27 @@ func (r *RepositoryImpl) Update(ctx context.Context, teamID, monitorID uint, m *
 		return ErrNotFound
 	}
 
-	// update settings
+	// Update settings
 	result = tx.
 		Where(
 			entities.MonitorSettings{
 				MonitorID: int(monitorID),
 			},
 		).
+		// Fields allowed to be updated
 		Select(
 			"method",
 			"url",
-			"headers",
-			"body",
-			"body_type",
 			"frequency",
-		).Updates(&entities.MonitorSettings{
-		Method:    m.Settings.Method,
-		URL:       m.Settings.URL,
-		Headers:   m.Settings.Headers,
-		Body:      m.Settings.Body,
-		BodyType:  m.Settings.BodyType,
-		Frequency: m.Settings.Frequency,
-	})
+			"headers",
+			"body_content",
+			"body_type",
+			"tls_enabled",
+			"tls_validate_certificate",
+			"tls_check_expiration",
+			"tls_expiration_threshold_days",
+		).Updates(m.Settings)
+
 	if result.Error != nil {
 		tx.Rollback()
 

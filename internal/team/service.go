@@ -247,10 +247,13 @@ func (s *ServiceImpl) AcceptInviteByToken(ctx context.Context, tokenString strin
 		return errors.Wrap(err, "failed to get role")
 	}
 
-	fmt.Println(claims)
-
 	// Get team ID
-	teamID := uint(claims["team_id"].(float64))
+	teamIDFloat64, ok := claims["team_id"].(float64)
+	if !ok {
+		return errors.New("failed to parse team ID")
+	}
+
+	teamID := uint(teamIDFloat64)
 
 	// Add user to team
 	if err := s.repository.AddUser(

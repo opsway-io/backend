@@ -29,7 +29,8 @@ var (
 )
 
 type Team struct {
-	ID          uint
+	ID uint
+
 	Name        string  `gorm:"uniqueIndex;not null"`
 	DisplayName *string `gorm:"index"`
 	PaymentPlan string  `gorm:"default:FREE"`
@@ -110,9 +111,12 @@ func TeamRoleFrom(source any) (TeamRole, error) {
 }
 
 type TeamUser struct {
-	UserID    uint     `gorm:"primaryKey;autoIncrement:false"`
-	TeamID    uint     `gorm:"primaryKey;autoIncrement:false"`
-	Role      TeamRole `gorm:"index"`
+	UserID uint `gorm:"primaryKey;autoIncrement:false"`
+	TeamID uint `gorm:"primaryKey;autoIncrement:false"`
+
+	Role TeamRole `gorm:"index"`
+
+	UpdatedAt time.Time
 	CreatedAt time.Time
 }
 

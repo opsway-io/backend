@@ -13,6 +13,12 @@ import (
 var seederCmd = &cobra.Command{
 	Use: "seed",
 	Run: runSeeder,
+
+	Args: cobra.MinimumNArgs(1),
+	ValidArgs: []string{
+		"teams_and_users",
+		"monitors",
+	},
 }
 
 //nolint:gochecknoinits
@@ -35,5 +41,24 @@ func runSeeder(cmd *cobra.Command, args []string) {
 		l.WithError(err).Fatal("Failed to create Postgres client")
 	}
 
-	seeds.Seed001(db)
+	seeders := getSeeders(args)
+
+	for _, s := range seeders {
+		s(db)
+	}
+}
+
+func getSeeders(args []string) []seeds.Seeder {
+	var res []seeds.Seeder
+
+	for _, arg := range args {
+		switch arg {
+		case "teams_and_users":
+			res = append(res, seeds.TeamsAndUsers)
+		case "monitors":
+			res = append(res, seeds.Monitors)
+		}
+	}
+
+	return res
 }

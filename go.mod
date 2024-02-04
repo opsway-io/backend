@@ -33,7 +33,7 @@ require (
 	github.com/spf13/cobra v1.6.1
 	github.com/spf13/viper v1.14.0
 	github.com/stretchr/testify v1.8.1
-	github.com/stripe/stripe-go v70.15.0+incompatible
+	github.com/stripe/stripe-go/v76 v76.2.0
 	github.com/tj/assert v0.0.3
 	github.com/vmihailenco/msgpack v4.0.4+incompatible
 	github.com/yalp/jsonpath v0.0.0-20180802001716-5cc68e5049a0
@@ -111,7 +111,6 @@ require (
 	github.com/spf13/cast v1.5.0 // indirect
 	github.com/spf13/jwalterweatherman v1.1.0 // indirect
 	github.com/spf13/pflag v1.0.5 // indirect
-	github.com/stripe/stripe-go/v76 v76.2.0 // indirect
 	github.com/subosito/gotenv v1.4.1 // indirect
 	github.com/valyala/bytebufferpool v1.0.0 // indirect
 	github.com/valyala/fasttemplate v1.2.1 // indirect

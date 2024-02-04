@@ -3,12 +3,14 @@ package entities
 import "time"
 
 type Changelog struct {
-	ID        uint
-	Name      string           `gorm:"index;not null"`
-	TeamID    uint             `gorm:"index;not null"`
-	Entries   []ChangelogEntry `gorm:"constraint:OnDelete:CASCADE"`
-	CreatedAt time.Time        `gorm:"index"`
-	UpdatedAt time.Time        `gorm:"index"`
+	ID     uint
+	TeamID uint `gorm:"index;not null"`
+
+	Name    string           `gorm:"index;not null"`
+	Entries []ChangelogEntry `gorm:"constraint:OnDelete:CASCADE"`
+
+	CreatedAt time.Time `gorm:"index"`
+	UpdatedAt time.Time `gorm:"index"`
 }
 
 func (Changelog) TableName() string {
@@ -17,12 +19,14 @@ func (Changelog) TableName() string {
 
 type ChangelogEntry struct {
 	ID          uint
-	Title       string `gorm:"index;not null"`
-	Content     string
-	ChangelogID uint      `gorm:"index;not null"`
-	Authors     []User    `gorm:"many2many:changelog_entry_authors"`
-	CreatedAt   time.Time `gorm:"index"`
-	UpdatedAt   time.Time `gorm:"index"`
+	ChangelogID uint `gorm:"index;not null"`
+
+	Title   string `gorm:"index;not null"`
+	Content string
+	Authors []User `gorm:"many2many:changelog_entry_authors"`
+
+	CreatedAt time.Time `gorm:"index"`
+	UpdatedAt time.Time `gorm:"index"`
 }
 
 func (ChangelogEntry) TableName() string {

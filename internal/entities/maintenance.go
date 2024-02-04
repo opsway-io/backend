@@ -7,14 +7,16 @@ import (
 )
 
 type Maintenance struct {
-	ID          uint
+	ID     uint
+	TeamID uint `gorm:"index;not null"`
+
 	Title       string `gorm:"index;not null"`
 	Description *string
-	TeamID      uint                 `gorm:"index;not null"`
 	Settings    MaintenanceSettings  `gorm:"constraint:OnDelete:CASCADE"`
 	Comments    []MaintenanceComment `gorm:"constraint:OnDelete:CASCADE"`
-	CreatedAt   time.Time            `gorm:"index"`
-	UpdatedAt   time.Time            `gorm:"index"`
+
+	UpdatedAt time.Time `gorm:"index"`
+	CreatedAt time.Time `gorm:"index"`
 }
 
 func (Maintenance) TableName() string {
@@ -23,12 +25,13 @@ func (Maintenance) TableName() string {
 
 type MaintenanceSettings struct {
 	ID            uint
-	StartAt       time.Time       `gorm:"index;not null"`
-	EndAt         time.Time       `gorm:"index;not null"`
-	Tags          *pq.StringArray `gorm:"type:text[]"`
-	MaintenanceID uint            `gorm:"index;not null"`
-	CreatedAt     time.Time       `gorm:"index"`
-	UpdatedAt     time.Time       `gorm:"index"`
+	MaintenanceID uint `gorm:"index;not null"`
+
+	StartAt time.Time       `gorm:"index;not null"`
+	EndAt   time.Time       `gorm:"index;not null"`
+	Tags    *pq.StringArray `gorm:"type:text[]"`
+
+	UpdatedAt time.Time `gorm:"index"`
 }
 
 func (MaintenanceSettings) TableName() string {
@@ -37,11 +40,13 @@ func (MaintenanceSettings) TableName() string {
 
 type MaintenanceComment struct {
 	ID            uint
-	Content       string
-	UserID        uint      `gorm:"index;not null"`
-	MaintenanceID uint      `gorm:"index;not null"`
-	CreatedAt     time.Time `gorm:"index"`
-	UpdatedAt     time.Time `gorm:"index"`
+	UserID        uint `gorm:"index;not null"`
+	MaintenanceID uint `gorm:"index;not null"`
+
+	Content string
+
+	CreatedAt time.Time `gorm:"index"`
+	UpdatedAt time.Time `gorm:"index"`
 }
 
 func (MaintenanceComment) TableName() string {

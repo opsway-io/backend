@@ -17,6 +17,7 @@ func NewValidator() *Validator {
 	v.RegisterValidation("monitorMethod", MonitorMethodValidator)
 	v.RegisterValidation("monitorBodyType", BodyTypeValidator)
 	v.RegisterValidation("monitorState", MonitorStateValidator)
+	v.RegisterValidation("monitorAssertions", MonitorAssertionsValidator)
 
 	return &Validator{
 		validator: v,
@@ -95,4 +96,8 @@ func MonitorStateValidator(fl validator.FieldLevel) bool {
 	}
 
 	return false
+}
+
+func MonitorAssertionsValidator(fl validator.FieldLevel) bool {
+	return true // TODO: use asserter to validate assertion
 }
