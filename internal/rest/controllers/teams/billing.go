@@ -36,7 +36,7 @@ func (h *Handlers) PostCreateCheckoutSession(c hs.AuthenticatedContext) error {
 
 	teamSubscription := h.BillingService.GetCustomerSubscribtion(*team.StripeCustomerID)
 	if teamSubscription != nil {
-		if req.PriceLookupKey == "" {
+		if req.PriceLookupKey == "FREE" {
 			_, err := h.BillingService.CancelSubscribtion(team)
 			if err != nil {
 				c.Log.WithError(err).Debug("cancel subscription")

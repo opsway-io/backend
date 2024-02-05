@@ -9,6 +9,7 @@ import (
 	"github.com/stripe/stripe-go/v76"
 	portalsession "github.com/stripe/stripe-go/v76/billingportal/session"
 	"github.com/stripe/stripe-go/v76/checkout/session"
+	"github.com/stripe/stripe-go/v76/price"
 	"github.com/stripe/stripe-go/v76/subscription"
 	"github.com/stripe/stripe-go/v76/webhook"
 )
@@ -27,6 +28,7 @@ type Service interface {
 	CancelSubscribtion(team *entities.Team) (*stripe.Subscription, error)
 	GetCheckoutSession(sessionID string) (*stripe.CheckoutSession, error)
 	GetLineItems(sessionID string) *session.LineItemIter
+	GetPrice(priceLookupKey string) (*stripe.Price, error)
 	GetCustomerSubscribtion(customerID string) *subscription.Iter
 	GetSubscribtion(subID string) (*stripe.Subscription, error)
 	CreateCustomerPortal(sessionID string) (*stripe.BillingPortalSession, error)
@@ -59,6 +61,11 @@ func (s *ServiceImpl) PostConfig() StripeConfig {
 }
 
 func (s *ServiceImpl) CreateCheckoutSession(team *entities.Team, priceLookupKey string) (*stripe.CheckoutSession, error) {
+	priceID, err := s.GetPrice(priceLookupKey)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to get price")
+	}
+
 	params := &stripe.CheckoutSessionParams{
 		SuccessURL:        stripe.String(s.Config.Domain + "/team/subscription"),
 		CancelURL:         stripe.String(s.Config.Domain + "/team/subscription"),
@@ -68,7 +75,7 @@ func (s *ServiceImpl) CreateCheckoutSession(team *entities.Team, priceLookupKey 
 		LineItems: []*stripe.CheckoutSessionLineItemParams{
 			{
 
-				Price:    stripe.String(priceLookupKey),
+				Price:    stripe.String(priceID.ID),
 				Quantity: stripe.Int64(1),
 			},
 		},
@@ -84,6 +91,10 @@ func (s *ServiceImpl) CreateCheckoutSession(team *entities.Team, priceLookupKey 
 func (s *ServiceImpl) UpdateSubscribtion(team *entities.Team, priceLookupKey string) (*stripe.Subscription, error) {
 	// Set Customer on session if already a customer
 
+	priceID, err := s.GetPrice(priceLookupKey)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to get price")
+	}
 	sub := s.GetCustomerSubscribtion(*team.StripeCustomerID)
 	sub.Next()
 	teamSubscription := sub.Subscription()
@@ -92,7 +103,7 @@ func (s *ServiceImpl) UpdateSubscribtion(team *entities.Team, priceLookupKey str
 		Items: []*stripe.SubscriptionItemsParams{
 			{
 				ID:    stripe.String(teamSubscription.Items.Data[0].ID),
-				Price: stripe.String(priceLookupKey),
+				Price: stripe.String(priceID.ID),
 			},
 		},
 	}
@@ -136,6 +147,25 @@ func (s *ServiceImpl) GetLineItems(sessionID string) *session.LineItemIter {
 		Session: stripe.String(sessionID),
 	}
 	return session.ListLineItems(params)
+}
+
+func (s *ServiceImpl) GetPrice(priceLookupKey string) (*stripe.Price, error) {
+	params := &stripe.PriceListParams{
+		LookupKeys: stripe.StringSlice([]string{
+			priceLookupKey,
+		}),
+	}
+	i := price.List(params)
+
+	var price *stripe.Price
+	for i.Next() {
+		p := i.Price()
+		price = p
+	}
+	if price == nil {
+		return nil, errors.New("Price not found for lookup key" + priceLookupKey)
+	}
+	return price, nil
 }
 
 func (s *ServiceImpl) GetCustomerSubscribtion(customerID string) *subscription.Iter {
