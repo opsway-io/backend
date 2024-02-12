@@ -1,6 +1,7 @@
 package billing
 
 import (
+	"fmt"
 	"os"
 	"strconv"
 
@@ -119,6 +120,7 @@ func (s *ServiceImpl) CancelSubscribtion(team *entities.Team) (*stripe.Subscript
 	// Set Customer on session if already a customer
 
 	sub := s.GetCustomerSubscribtion(*team.StripeCustomerID)
+	fmt.Println(sub.SubscriptionList())
 	sub.Next()
 	teamSubscription := sub.Subscription()
 

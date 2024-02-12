@@ -1,6 +1,7 @@
 package teams
 
 import (
+	"fmt"
 	"net/http"
 
 	"github.com/labstack/echo/v4"
@@ -34,8 +35,10 @@ func (h *Handlers) PostCreateCheckoutSession(c hs.AuthenticatedContext) error {
 		return echo.ErrInternalServerError
 	}
 
-	teamSubscription := h.BillingService.GetCustomerSubscribtion(*team.StripeCustomerID)
-	if teamSubscription != nil {
+	fmt.Println(team)
+
+	// teamSubscription := h.BillingService.GetCustomerSubscribtion(*team.StripeCustomerID)
+	if team.StripeCustomerID != nil {
 		if req.PriceLookupKey == "FREE" {
 			_, err := h.BillingService.CancelSubscribtion(team)
 			if err != nil {
