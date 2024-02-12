@@ -1,7 +1,6 @@
 package billing
 
 import (
-	"fmt"
 	"os"
 	"strconv"
 
@@ -120,19 +119,12 @@ func (s *ServiceImpl) CancelSubscribtion(team *entities.Team) (*stripe.Subscript
 	// Set Customer on session if already a customer
 
 	sub := s.GetCustomerSubscribtion(*team.StripeCustomerID)
-	fmt.Println(sub.SubscriptionList())
 	sub.Next()
 	teamSubscription := sub.Subscription()
 
-	params := &stripe.SubscriptionParams{
-		Items: []*stripe.SubscriptionItemsParams{
-			{
-				ID:      stripe.String(teamSubscription.Items.Data[0].ID),
-				Deleted: stripe.Bool(true),
-			},
-		},
-	}
-	result, err := subscription.Update(teamSubscription.ID, params)
+	params := &stripe.SubscriptionCancelParams{}
+	result, err := subscription.Cancel(teamSubscription.ID, params)
+
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to update subscription")
 	}
