@@ -74,6 +74,11 @@ func initConfig() {
 		logrus.Info("Using config file: ", viper.ConfigFileUsed())
 	}
 
+	viper.SetConfigName("secrets")
+	if err := viper.MergeInConfig(); err == nil {
+		logrus.Info("Using secret file: ", viper.ConfigFileUsed())
+	}
+
 	viper.AutomaticEnv()
 }
 

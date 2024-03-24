@@ -24,8 +24,6 @@ func (h *Handlers) PostCreateCheckoutSession(c hs.AuthenticatedContext) error {
 
 		return echo.ErrBadRequest
 	}
-	c.Log.Error(req.PriceLookupKey)
-	c.Log.Info(req.TeamID)
 
 	team, err := h.TeamService.GetByID(c.Request().Context(), req.TeamID)
 	if err != nil {
@@ -34,14 +32,51 @@ func (h *Handlers) PostCreateCheckoutSession(c hs.AuthenticatedContext) error {
 		return echo.ErrInternalServerError
 	}
 
-	s, err := h.BillingService.CreateCheckoutSession(team, req.PriceLookupKey)
+	if team.PaymentPlan == req.PriceLookupKey {
+		return c.JSON(http.StatusOK, "")
+	}
+
+	if team.StripeCustomerID == nil {
+		if req.PriceLookupKey == "FREE" {
+			return c.JSON(http.StatusOK, "")
+		}
+		s, err := h.BillingService.CreateCheckoutSession(team, req.PriceLookupKey)
+		if err != nil {
+			c.Log.WithError(err).Debug("create stripe checkout session")
+
+			return echo.ErrInternalServerError
+		}
+		return c.JSON(http.StatusOK, s.URL)
+	}
+
+	if req.PriceLookupKey == "FREE" {
+		_, err := h.BillingService.CancelSubscribtion(team)
+		if err != nil {
+			c.Log.WithError(err).Debug("cancel subscription")
+
+			return echo.ErrInternalServerError
+		}
+		return c.JSON(http.StatusOK, "")
+	}
+
+	if team.PaymentPlan == "FREE" {
+		s, err := h.BillingService.CreateCheckoutSession(team, req.PriceLookupKey)
+		if err != nil {
+			c.Log.WithError(err).Debug("create stripe checkout session")
+
+			return echo.ErrInternalServerError
+		}
+		return c.JSON(http.StatusOK, s.URL)
+	}
+
+	_, err = h.BillingService.UpdateSubscribtion(team, req.PriceLookupKey)
 	if err != nil {
-		c.Log.WithError(err).Debug("create stripe checkout session")
+		c.Log.WithError(err).Debug("update subscription")
 
 		return echo.ErrInternalServerError
 	}
+	return c.JSON(http.StatusOK, "")
 
-	return c.JSON(http.StatusOK, s.URL)
 }
 
 type GetCheckoutSession struct {

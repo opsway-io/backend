@@ -24,6 +24,7 @@ func Register(
 ) {
 	h := &Handlers{
 		BillingService: billingService,
+		TeamService:    teamService,
 	}
 
 	root := e.Group(
