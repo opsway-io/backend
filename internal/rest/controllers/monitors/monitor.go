@@ -474,3 +474,39 @@ func (h *Handlers) PutMonitor(c hs.AuthenticatedContext) error {
 
 	return c.NoContent(http.StatusNoContent)
 }
+
+type PutMonitorStateRequest struct {
+	TeamID    uint   `param:"teamId" validate:"required,numeric,gte=0"`
+	MonitorID uint   `param:"monitorId" validate:"required,numeric,gte=0"`
+	State     string `json:"state" validate:"required,monitorState"`
+}
+
+func (h *Handlers) PutMonitorState(c hs.AuthenticatedContext) error {
+	ctx := c.Request().Context()
+
+	req, err := helpers.Bind[PutMonitorStateRequest](c)
+	if err != nil {
+		c.Log.WithError(err).Debug("failed to bind PutMonitorStateRequest")
+
+		return echo.ErrBadRequest
+	}
+
+	stateEnum := entities.GetMonitorStateEnumFromString(req.State)
+
+	if err := h.MonitorService.SetState(
+		ctx,
+		req.TeamID,
+		req.MonitorID,
+		stateEnum,
+	); err != nil {
+		if errors.Is(err, monitor.ErrNotFound) {
+			return echo.ErrNotFound
+		}
+
+		c.Log.WithError(err).Error("failed to set monitor state")
+
+		return echo.ErrInternalServerError
+	}
+
+	return c.NoContent(http.StatusNoContent)
+}

@@ -16,6 +16,7 @@ var seederCmd = &cobra.Command{
 
 	Args: cobra.MinimumNArgs(1),
 	ValidArgs: []string{
+		"team_opsway",
 		"teams_and_users",
 		"monitors",
 	},
@@ -53,6 +54,8 @@ func getSeeders(args []string) []seeds.Seeder {
 
 	for _, arg := range args {
 		switch arg {
+		case "team_opsway":
+			res = append(res, seeds.TeamOpsway)
 		case "teams_and_users":
 			res = append(res, seeds.TeamsAndUsers)
 		case "monitors":

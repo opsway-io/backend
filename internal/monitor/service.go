@@ -11,9 +11,9 @@ import (
 )
 
 type Service interface {
-	GetMonitorByIDAndTeamID(ctx context.Context, teamID uint, monitorID uint) (*entities.Monitor, error)
 	GetMonitorAndSettingsByTeamIDAndID(ctx context.Context, teamID uint, monitorID uint) (*entities.Monitor, error)
 	GetMonitorsAndSettingsByTeamID(ctx context.Context, teamID uint, offset *int, limit *int, query *string) (*[]MonitorWithTotalCount, error)
+	SetState(ctx context.Context, teamID, monitorID uint, state entities.MonitorState) error
 	Create(ctx context.Context, monitor *entities.Monitor) error
 	Update(ctx context.Context, teamID, monitorID uint, monitor *entities.Monitor) error
 	Delete(ctx context.Context, teamID, monitorID uint) error
@@ -31,16 +31,34 @@ func NewService(db *gorm.DB, redisClient *redis.Client) Service {
 	}
 }
 
-func (s *ServiceImpl) GetMonitorByIDAndTeamID(ctx context.Context, monitorID uint, teamID uint) (*entities.Monitor, error) {
-	return s.repository.GetMonitorByIDAndTeamID(ctx, monitorID, teamID)
-}
-
 func (s *ServiceImpl) GetMonitorAndSettingsByTeamIDAndID(ctx context.Context, teamID uint, monitorID uint) (*entities.Monitor, error) {
 	return s.repository.GetMonitorAndSettingsByTeamIDAndID(ctx, teamID, monitorID)
 }
 
 func (s *ServiceImpl) GetMonitorsAndSettingsByTeamID(ctx context.Context, teamID uint, offset *int, limit *int, query *string) (*[]MonitorWithTotalCount, error) {
 	return s.repository.GetMonitorsAndSettingsByTeamID(ctx, teamID, offset, limit, query)
+}
+
+func (s *ServiceImpl) SetState(ctx context.Context, teamID, monitorID uint, state entities.MonitorState) error {
+	err := s.repository.SetState(ctx, teamID, monitorID, state)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return ErrNotFound
+		}
+
+		return err
+	}
+
+	if state == entities.MonitorStateInactive {
+		return s.schedule.Remove(ctx, monitorID)
+	}
+
+	m, err := s.repository.GetMonitorAndSettingsByTeamIDAndID(ctx, teamID, monitorID)
+	if err != nil {
+		return err
+	}
+
+	return s.schedule.Add(ctx, m)
 }
 
 func (s *ServiceImpl) Create(ctx context.Context, m *entities.Monitor) error {
@@ -55,6 +73,8 @@ func (s *ServiceImpl) Create(ctx context.Context, m *entities.Monitor) error {
 }
 
 func (s *ServiceImpl) Update(ctx context.Context, teamID, monitorID uint, m *entities.Monitor) error {
+	m.ID = monitorID
+
 	err := s.schedule.Remove(ctx, m.ID)
 	if err != nil {
 		if !errors.Is(err, boomerang.ErrTaskDoesNotExist) {

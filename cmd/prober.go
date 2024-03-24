@@ -177,8 +177,8 @@ func mapMonitorAssertionsToAssertionRules(ma []entities.MonitorAssertion) []asse
 		rules[i] = asserter.Rule{
 			Source:   assertion.Source,
 			Operator: assertion.Operator,
-			Property: assertion.Target,
-			Target:   assertion.Property,
+			Property: assertion.Property,
+			Target:   assertion.Target,
 		}
 	}
 

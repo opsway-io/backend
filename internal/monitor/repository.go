@@ -12,9 +12,9 @@ import (
 var ErrNotFound = errors.New("monitor not found")
 
 type Repository interface {
-	GetMonitorByIDAndTeamID(ctx context.Context, teamID uint, monitorID uint) (*entities.Monitor, error)
 	GetMonitorAndSettingsByTeamIDAndID(ctx context.Context, teamID uint, monitorID uint) (*entities.Monitor, error)
 	GetMonitorsAndSettingsByTeamID(ctx context.Context, teamID uint, offset *int, limit *int, query *string) (*[]MonitorWithTotalCount, error)
+	SetState(ctx context.Context, teamID, monitorID uint, state entities.MonitorState) error
 	Create(ctx context.Context, monitor *entities.Monitor) error
 	Update(ctx context.Context, teamID, monitorID uint, monitor *entities.Monitor) error
 	Delete(ctx context.Context, teamID, monitorID uint) error
@@ -30,22 +30,15 @@ func NewRepository(db *gorm.DB) Repository {
 	}
 }
 
-func (r *RepositoryImpl) GetMonitorByIDAndTeamID(ctx context.Context, monitorID uint, teamID uint) (*entities.Monitor, error) {
-	var monitor entities.Monitor
-	err := r.db.WithContext(ctx).Where(entities.Monitor{
-		ID:     monitorID,
-		TeamID: teamID,
-	}).First(&monitor).Error
-	if errors.Is(err, gorm.ErrRecordNotFound) {
-		return nil, ErrNotFound
-	}
-
-	return &monitor, err
-}
-
 func (r *RepositoryImpl) GetMonitorAndSettingsByTeamIDAndID(ctx context.Context, teamID uint, monitorID uint) (*entities.Monitor, error) {
 	var monitor entities.Monitor
-	err := r.db.WithContext(ctx).Preload("Settings").Where(entities.Monitor{
+	err := r.db.WithContext(
+		ctx,
+	).Preload(
+		"Settings",
+	).Preload(
+		"Assertions",
+	).Where(entities.Monitor{
 		ID:     monitorID,
 		TeamID: teamID,
 	}).First(&monitor).Error
@@ -71,6 +64,8 @@ func (r *RepositoryImpl) GetMonitorsAndSettingsByTeamID(ctx context.Context, tea
 		postgres.Search([]string{"name"}, query),
 	).Preload(
 		"Settings",
+	).Preload(
+		"Assertions",
 	).Where(entities.Monitor{
 		TeamID: teamID,
 	}).Order(
@@ -87,6 +82,20 @@ func (r *RepositoryImpl) GetMonitorsAndSettingsByTeamID(ctx context.Context, tea
 	return &monitors, err
 }
 
+func (r *RepositoryImpl) SetState(ctx context.Context, teamID, monitorID uint, state entities.MonitorState) error {
+	err := r.db.WithContext(ctx).Model(
+		&entities.Monitor{},
+	).Where(entities.Monitor{
+		ID:     monitorID,
+		TeamID: teamID,
+	}).Update("state", state).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return ErrNotFound
+	}
+
+	return err
+}
+
 func (r *RepositoryImpl) Create(ctx context.Context, m *entities.Monitor) error {
 	return r.db.WithContext(ctx).Create(m).Error
 }
@@ -94,64 +103,48 @@ func (r *RepositoryImpl) Create(ctx context.Context, m *entities.Monitor) error 
 func (r *RepositoryImpl) Update(ctx context.Context, teamID, monitorID uint, m *entities.Monitor) error {
 	tx := r.db.WithContext(ctx).Begin()
 
-	// Update monitor
-	result := tx.
-		Where(
-			entities.Monitor{
-				ID:     monitorID,
-				TeamID: teamID,
-			},
-		).
-		// Fields allowed to be updated
-		Select(
-			"name",
-			"state",
-		).Updates(
-		&entities.Monitor{
-			Name:  m.Name,
-			State: m.State,
-		},
-	)
-
-	if result.Error != nil {
+	// Update monitor name and state
+	if err := tx.Model(
+		&entities.Monitor{},
+	).Where(entities.Monitor{
+		ID:     monitorID,
+		TeamID: teamID,
+	}).Updates(entities.Monitor{
+		Name:  m.Name,
+		State: m.State,
+	}).Error; err != nil {
 		tx.Rollback()
 
-		return result.Error
+		return err
 	}
-	if result.RowsAffected == 0 {
+
+	// Update monitor settings
+	if err := tx.Model(
+		&entities.MonitorSettings{},
+	).Where(entities.MonitorSettings{
+		MonitorID: monitorID,
+	}).Updates(m.Settings).Error; err != nil {
 		tx.Rollback()
 
-		return ErrNotFound
+		return err
 	}
 
-	// Update settings
-	result = tx.
-		Where(
-			entities.MonitorSettings{
-				MonitorID: int(monitorID),
-			},
-		).
-		// Fields allowed to be updated
-		Select(
-			"method",
-			"url",
-			"frequency",
-			"headers",
-			"body_content",
-			"body_type",
-			"tls_enabled",
-			"tls_validate_certificate",
-			"tls_check_expiration",
-			"tls_expiration_threshold_days",
-		).Updates(m.Settings)
-
-	if result.Error != nil {
+	// Replace assertions
+	if err := tx.Delete(&entities.MonitorAssertion{}, "monitor_id = ?", monitorID).Error; err != nil {
 		tx.Rollback()
 
-		return result.Error
+		return err
 	}
 
-	// Commit transaction
+	for i := range m.Assertions {
+		m.Assertions[i].MonitorID = monitorID
+	}
+	if err := tx.Create(&m.Assertions).Error; err != nil {
+		tx.Rollback()
+
+		return err
+	}
+
 	return tx.Commit().Error
 }
 

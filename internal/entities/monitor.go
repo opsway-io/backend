@@ -15,8 +15,9 @@ type Monitor struct {
 	ID     uint
 	TeamID uint `gorm:"index;not null"`
 
-	State      MonitorState       `gorm:"not null;default:0"`
-	Name       string             `gorm:"index;not null"`
+	State MonitorState `gorm:"not null;default:0"`
+	Name  string       `gorm:"index;not null"`
+
 	Settings   MonitorSettings    `gorm:"not null;constraint:OnDelete:CASCADE"`
 	Assertions []MonitorAssertion `gorm:"constraint:OnDelete:CASCADE"`
 	Incidents  []Incident         `gorm:"constraint:OnDelete:CASCADE"`
@@ -51,9 +52,20 @@ func (m *Monitor) SetStateString(state string) error {
 	return nil
 }
 
+func GetMonitorStateEnumFromString(state string) MonitorState {
+	switch state {
+	case "INACTIVE":
+		return MonitorStateInactive
+	case "ACTIVE":
+		return MonitorStateActive
+	default:
+		return -1
+	}
+}
+
 type MonitorSettings struct {
 	ID        uint
-	MonitorID int `gorm:"index;not null"`
+	MonitorID uint `gorm:"uniqueIndex;not null"`
 
 	Method    string        `gorm:"not null"`
 	URL       string        `gorm:"not null"`
