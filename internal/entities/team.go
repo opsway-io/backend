@@ -28,12 +28,20 @@ var (
 	ErrIllegalTeamNameFormat = errors.New("illegal name format")
 )
 
+type PaymentPlan string
+
+const (
+	PaymentPlanFree       PaymentPlan = "FREE"
+	PaymentPlanTeam       PaymentPlan = "TEAM"
+	PaymentPlanEnterprise PaymentPlan = "ENTERPRISE"
+)
+
 type Team struct {
 	ID               uint
-	Name             string  `gorm:"uniqueIndex;not null"`
-	DisplayName      *string `gorm:"index"`
-	PaymentPlan      string  `gorm:"default:FREE"`
-	StripeCustomerID *string `gorm:"index"`
+	Name             string      `gorm:"uniqueIndex;not null"`
+	DisplayName      *string     `gorm:"index"`
+	PaymentPlan      PaymentPlan `gorm:"default:FREE;not null"`
+	StripeCustomerID *string     `gorm:"index"`
 	HasAvatar        bool
 
 	Users       []User        `gorm:"many2many:team_users"`
