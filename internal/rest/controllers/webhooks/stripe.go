@@ -8,6 +8,7 @@ import (
 	"strconv"
 
 	"github.com/labstack/echo/v4"
+	"github.com/opsway-io/backend/internal/entities"
 	hs "github.com/opsway-io/backend/internal/rest/handlers"
 	"github.com/stripe/stripe-go/v76"
 )
@@ -64,7 +65,7 @@ func (h *Handlers) handleWebhook(c hs.StripeContext) error {
 			customerTeam.StripeCustomerID = &customerID
 		}
 
-		customerTeam.PaymentPlan = subscription.Items.Data[0].Price.LookupKey
+		customerTeam.PaymentPlan = entities.PaymentPlan(subscription.Items.Data[0].Price.LookupKey)
 
 		err = h.TeamService.UpdateTeam(c.Request().Context(), customerTeam)
 		if err != nil {
@@ -84,7 +85,7 @@ func (h *Handlers) handleWebhook(c hs.StripeContext) error {
 			c.Log.WithError(err).Debug("Error getting team by stripe id")
 			return c.NoContent(http.StatusInternalServerError)
 		}
-		team.PaymentPlan = subscription.Items.Data[0].Price.LookupKey
+		team.PaymentPlan = entities.PaymentPlan(subscription.Items.Data[0].Price.LookupKey)
 
 		if subscription.Status == "canceled" {
 			team.PaymentPlan = "FREE"
@@ -109,7 +110,7 @@ func (h *Handlers) handleWebhook(c hs.StripeContext) error {
 			c.Log.WithError(err).Debug("Error getting team by stripe id")
 			return c.NoContent(http.StatusInternalServerError)
 		}
-		team.PaymentPlan = subscription.Items.Data[0].Price.LookupKey
+		team.PaymentPlan = entities.PaymentPlan(subscription.Items.Data[0].Price.LookupKey)
 
 		if subscription.Status == "canceled" {
 			team.PaymentPlan = "FREE"

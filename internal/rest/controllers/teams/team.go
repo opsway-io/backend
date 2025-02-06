@@ -49,7 +49,7 @@ func newGetTeamResponse(t *entities.Team, teamService team.Service) GetTeamRespo
 		ID:          t.ID,
 		Name:        t.Name,
 		DisplayName: t.DisplayName,
-		PaymentPlan: t.PaymentPlan,
+		PaymentPlan: string(t.PaymentPlan),
 		CreatedAt:   t.CreatedAt,
 		UpdatedAt:   t.UpdatedAt,
 	}

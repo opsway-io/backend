@@ -4,6 +4,7 @@ import (
 	"net/http"
 
 	"github.com/labstack/echo/v4"
+	"github.com/opsway-io/backend/internal/entities"
 	hs "github.com/opsway-io/backend/internal/rest/handlers"
 	"github.com/opsway-io/backend/internal/rest/helpers"
 )
@@ -32,7 +33,7 @@ func (h *Handlers) PostCreateCheckoutSession(c hs.AuthenticatedContext) error {
 		return echo.ErrInternalServerError
 	}
 
-	if team.PaymentPlan == req.PriceLookupKey {
+	if team.PaymentPlan == entities.PaymentPlan(req.PriceLookupKey) {
 		return c.JSON(http.StatusOK, "")
 	}
 
@@ -119,4 +120,37 @@ func (h *Handlers) PostCustomerPortal(c hs.AuthenticatedContext) error {
 		return echo.ErrInternalServerError
 	}
 	return c.Redirect(http.StatusSeeOther, ps.URL)
+}
+
+type GetCustomerSession struct {
+	TeamID uint `param:"teamId" validate:"required,numeric,gt=0"`
+}
+
+type GetCustomerSessionResponse struct {
+	SessionID string `json:"sessionId"`
+}
+
+func (h *Handlers) GetCustomerSession(c hs.AuthenticatedContext) error {
+	req, err := helpers.Bind[GetCustomerSession](c)
+	if err != nil {
+		c.Log.WithError(err).Debug("failed to bind GetCustomerSession")
+
+		return echo.ErrBadRequest
+	}
+
+	team, err := h.TeamService.GetByID(c.Request().Context(), req.TeamID)
+	if err != nil {
+		c.Log.WithError(err).Debug("Team not found")
+
+		return echo.ErrInternalServerError
+	}
+
+	s, err := h.BillingService.GetCustomerSession(team)
+	if err != nil {
+		c.Log.WithError(err).Debug("failed to get session")
+
+		return echo.ErrInternalServerError
+	}
+
+	return c.JSON(http.StatusOK, GetCustomerSessionResponse{SessionID: s.ClientSecret})
 }

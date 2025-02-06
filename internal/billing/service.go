@@ -7,8 +7,10 @@ import (
 	"github.com/opsway-io/backend/internal/entities"
 	"github.com/pkg/errors"
 	"github.com/stripe/stripe-go/v76"
+	"github.com/stripe/stripe-go/v76/billingportal/configuration"
 	portalsession "github.com/stripe/stripe-go/v76/billingportal/session"
 	"github.com/stripe/stripe-go/v76/checkout/session"
+	"github.com/stripe/stripe-go/v76/customersession"
 	"github.com/stripe/stripe-go/v76/price"
 	"github.com/stripe/stripe-go/v76/subscription"
 	"github.com/stripe/stripe-go/v76/webhook"
@@ -33,6 +35,8 @@ type Service interface {
 	GetSubscribtion(subID string) (*stripe.Subscription, error)
 	CreateCustomerPortal(sessionID string) (*stripe.BillingPortalSession, error)
 	ConstructEvent(payload []byte, header string) (stripe.Event, error)
+	GetCustomerSession(team *entities.Team) (*stripe.CustomerSession, error)
+	GetBillingPortal(team *entities.Team) (*stripe.BillingPortalConfiguration, error)
 }
 
 type ServiceImpl struct {
@@ -190,4 +194,28 @@ func (s *ServiceImpl) CreateCustomerPortal(sessionID string) (*stripe.BillingPor
 
 func (s *ServiceImpl) ConstructEvent(payload []byte, header string) (stripe.Event, error) {
 	return webhook.ConstructEventWithOptions(payload, header, s.Config.WebhookSecret, webhook.ConstructEventOptions{IgnoreAPIVersionMismatch: true})
+}
+
+func (s *ServiceImpl) GetCustomerSession(team *entities.Team) (*stripe.CustomerSession, error) {
+	params := &stripe.CustomerSessionParams{
+		Customer: stripe.String(*team.StripeCustomerID),
+		Components: &stripe.CustomerSessionComponentsParams{
+			PricingTable: &stripe.CustomerSessionComponentsPricingTableParams{
+				Enabled: stripe.Bool(true),
+			},
+		},
+	}
+	return customersession.New(params)
+}
+
+func (s *ServiceImpl) GetBillingPortal(team *entities.Team) (*stripe.BillingPortalConfiguration, error) {
+
+	params := &stripe.BillingPortalConfigurationParams{
+		Features: &stripe.BillingPortalConfigurationFeaturesParams{
+			InvoiceHistory: &stripe.BillingPortalConfigurationFeaturesInvoiceHistoryParams{
+				Enabled: stripe.Bool(true),
+			},
+		},
+	}
+	return configuration.New(params)
 }

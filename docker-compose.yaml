@@ -51,7 +51,7 @@ services:
       - '8002:8001'
 
   ch_server:
-    image: clickhouse/clickhouse-server
+    image: clickhouse/clickhouse-server:24.8
     restart: unless-stopped
     environment:
       - CLICKHOUSE_USER=default

@@ -60,7 +60,7 @@ func newGetUserTeamsResponse(teams *[]team.TeamAndRole, teamService team.Service
 			ID:          team.ID,
 			Name:        team.Name,
 			DisplayName: team.DisplayName,
-			PaymentPlan: team.PaymentPlan,
+			PaymentPlan: string(team.PaymentPlan),
 			Role:        team.Role,
 		}
 

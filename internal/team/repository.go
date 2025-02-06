@@ -139,7 +139,7 @@ func (s *RepositoryImpl) UpdateBilling(ctx context.Context, teamID uint, custome
 		ID: teamID,
 	}).Updates(entities.Team{
 		StripeCustomerID: &customerID,
-		PaymentPlan:      plan,
+		PaymentPlan:      entities.PaymentPlan(plan),
 	})
 	if result.Error != nil {
 		return result.Error
