@@ -1,6 +1,7 @@
 package teams
 
 import (
+	"fmt"
 	"net/http"
 
 	"github.com/labstack/echo/v4"
@@ -101,25 +102,37 @@ func (h *Handlers) GetCheckoutSession(c hs.AuthenticatedContext) error {
 	return c.JSON(http.StatusOK, s)
 }
 
-type PostCustomerPortal struct {
-	SessionID string `param:"SessionID" validate:"required"`
+type GetCustomerPortalRequest struct {
+	TeamID uint `param:"teamId" validate:"required,numeric,gt=0"`
+}
+
+type GetCustomerPortalResponse struct {
+	URL string `json:"url"`
 }
 
 func (h *Handlers) PostCustomerPortal(c hs.AuthenticatedContext) error {
-	req, err := helpers.Bind[PostCustomerPortal](c)
+	req, err := helpers.Bind[GetCustomerPortalRequest](c)
 	if err != nil {
-		c.Log.WithError(err).Debug("failed to bind PostCustomerPortal")
+		c.Log.WithError(err).Debug("failed to bind GetCustomerPortalRequest")
 
 		return echo.ErrBadRequest
 	}
 
-	ps, err := h.BillingService.CreateCustomerPortal(req.SessionID)
+	team, err := h.TeamService.GetByID(c.Request().Context(), req.TeamID)
+	if err != nil {
+		c.Log.WithError(err).Debug("Team not found")
+
+		return echo.ErrInternalServerError
+	}
+
+	ps, err := h.BillingService.CreateCustomerPortal(team)
 	if err != nil {
 		c.Log.WithError(err).Debug("failed to create customer portal")
 
 		return echo.ErrInternalServerError
 	}
-	return c.Redirect(http.StatusSeeOther, ps.URL)
+
+	return c.JSON(http.StatusOK, GetCustomerPortalResponse{URL: ps.URL})
 }
 
 type GetCustomerSession struct {
@@ -151,6 +164,8 @@ func (h *Handlers) GetCustomerSession(c hs.AuthenticatedContext) error {
 
 		return echo.ErrInternalServerError
 	}
+
+	fmt.Println("TEEEEEEEEEEEEEEEEEEEEEe SESSION")
 
 	return c.JSON(http.StatusOK, GetCustomerSessionResponse{SessionID: s.ClientSecret})
 }

@@ -6,14 +6,15 @@ import (
 
 	"github.com/opsway-io/backend/internal/entities"
 	"github.com/pkg/errors"
-	"github.com/stripe/stripe-go/v76"
-	"github.com/stripe/stripe-go/v76/billingportal/configuration"
-	portalsession "github.com/stripe/stripe-go/v76/billingportal/session"
-	"github.com/stripe/stripe-go/v76/checkout/session"
-	"github.com/stripe/stripe-go/v76/customersession"
-	"github.com/stripe/stripe-go/v76/price"
-	"github.com/stripe/stripe-go/v76/subscription"
-	"github.com/stripe/stripe-go/v76/webhook"
+	"github.com/stripe/stripe-go/v81"
+	"github.com/stripe/stripe-go/v81/billingportal/configuration"
+	portalsession "github.com/stripe/stripe-go/v81/billingportal/session"
+	"github.com/stripe/stripe-go/v81/checkout/session"
+	"github.com/stripe/stripe-go/v81/customersession"
+	"github.com/stripe/stripe-go/v81/price"
+	"github.com/stripe/stripe-go/v81/product"
+	"github.com/stripe/stripe-go/v81/subscription"
+	"github.com/stripe/stripe-go/v81/webhook"
 )
 
 type Config struct {
@@ -33,7 +34,8 @@ type Service interface {
 	GetPrice(priceLookupKey string) (*stripe.Price, error)
 	GetCustomerSubscribtion(customerID string) *subscription.Iter
 	GetSubscribtion(subID string) (*stripe.Subscription, error)
-	CreateCustomerPortal(sessionID string) (*stripe.BillingPortalSession, error)
+	GetProduct(productID string) (*stripe.Product, error)
+	CreateCustomerPortal(team *entities.Team) (*stripe.BillingPortalSession, error)
 	ConstructEvent(payload []byte, header string) (stripe.Event, error)
 	GetCustomerSession(team *entities.Team) (*stripe.CustomerSession, error)
 	GetBillingPortal(team *entities.Team) (*stripe.BillingPortalConfiguration, error)
@@ -176,17 +178,15 @@ func (s *ServiceImpl) GetSubscribtion(subID string) (*stripe.Subscription, error
 	return subscription.Get(subID, params)
 
 }
+func (s *ServiceImpl) GetProduct(productID string) (*stripe.Product, error) {
+	params := &stripe.ProductParams{}
+	return product.Get(productID, params)
 
-func (s *ServiceImpl) CreateCustomerPortal(sessionID string) (*stripe.BillingPortalSession, error) {
-	// For demonstration purposes, we're using the Checkout session to retrieve the customer ID.
-	// Typically this is stored alongside the authenticated user in your database.
-	se, err := session.Get(sessionID, nil)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to get session")
-	}
+}
 
+func (s *ServiceImpl) CreateCustomerPortal(team *entities.Team) (*stripe.BillingPortalSession, error) {
 	params := &stripe.BillingPortalSessionParams{
-		Customer:  stripe.String(se.Customer.ID),
+		Customer:  stripe.String(*team.StripeCustomerID),
 		ReturnURL: stripe.String(s.Config.Domain),
 	}
 	return portalsession.New(params)

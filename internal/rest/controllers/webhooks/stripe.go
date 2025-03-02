@@ -4,13 +4,14 @@ import (
 	"encoding/json"
 	"io"
 	"net/http"
+	"strings"
 
 	"strconv"
 
 	"github.com/labstack/echo/v4"
 	"github.com/opsway-io/backend/internal/entities"
 	hs "github.com/opsway-io/backend/internal/rest/handlers"
-	"github.com/stripe/stripe-go/v76"
+	"github.com/stripe/stripe-go/v81"
 )
 
 func (h *Handlers) handleWebhook(c hs.StripeContext) error {
@@ -38,13 +39,17 @@ func (h *Handlers) handleWebhook(c hs.StripeContext) error {
 			return echo.ErrBadRequest
 		}
 
-		c.Log.Error(event.Data.Object["subscription"].(string))
-		subscription, err := h.BillingService.GetSubscribtion(event.Data.Object["subscription"].(string))
+		subscription, err := h.BillingService.GetSubscribtion(session.Subscription.ID)
 		if err != nil {
 			c.Log.WithError(err).Debug("Error getting subscription")
+			return c.NoContent(http.StatusInternalServerError)
 		}
-		c.Log.Error(subscription.Items.Data[0])
-		c.Log.Error(subscription.Items.Data[0].Price.LookupKey)
+
+		product, err := h.BillingService.GetProduct(subscription.Items.Data[0].Price.Product.ID)
+		if err != nil {
+			c.Log.WithError(err).Debug("Error getting product")
+			return c.NoContent(http.StatusInternalServerError)
+		}
 
 		teamID, err := strconv.ParseUint(session.ClientReferenceID, 10, 32)
 		if err != nil {
@@ -52,8 +57,6 @@ func (h *Handlers) handleWebhook(c hs.StripeContext) error {
 			return c.NoContent(http.StatusInternalServerError)
 		}
 
-		c.Log.Error(c.Request().Context())
-		c.Log.Error(uint(teamID))
 		customerTeam, err := h.TeamService.GetByID(c.Request().Context(), uint(teamID))
 		if err != nil {
 			c.Log.WithError(err).Debug("Error getting team by id", teamID)
@@ -65,7 +68,10 @@ func (h *Handlers) handleWebhook(c hs.StripeContext) error {
 			customerTeam.StripeCustomerID = &customerID
 		}
 
-		customerTeam.PaymentPlan = entities.PaymentPlan(subscription.Items.Data[0].Price.LookupKey)
+		customerTeam.PaymentPlan = entities.PaymentPlan(strings.ToUpper(product.Name))
+		if customerTeam.StripeCustomerID == nil {
+			customerTeam.StripeCustomerID = &session.Customer.ID
+		}
 
 		err = h.TeamService.UpdateTeam(c.Request().Context(), customerTeam)
 		if err != nil {
@@ -85,7 +91,14 @@ func (h *Handlers) handleWebhook(c hs.StripeContext) error {
 			c.Log.WithError(err).Debug("Error getting team by stripe id")
 			return c.NoContent(http.StatusInternalServerError)
 		}
-		team.PaymentPlan = entities.PaymentPlan(subscription.Items.Data[0].Price.LookupKey)
+
+		product, err := h.BillingService.GetProduct(subscription.Items.Data[0].Price.Product.ID)
+		if err != nil {
+			c.Log.WithError(err).Debug("Error getting product")
+			return c.NoContent(http.StatusInternalServerError)
+		}
+
+		team.PaymentPlan = entities.PaymentPlan(strings.ToUpper(product.Name))
 
 		if subscription.Status == "canceled" {
 			team.PaymentPlan = "FREE"

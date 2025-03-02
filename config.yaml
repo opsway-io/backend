@@ -1,5 +1,5 @@
 log:
-  level: debug
+  level: info
   format: text
 
 rest:
@@ -16,7 +16,7 @@ authentication:
 
 postgres:
   dsn: "host=localhost user=postgres password=pass dbname=opsway port=5432 sslmode=disable" 
-  debug: true
+  debug: false
 
 clickhouse:
   dsn: clickhouse+native://default:@localhost:9000/opsway
