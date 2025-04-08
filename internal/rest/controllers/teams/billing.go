@@ -165,7 +165,36 @@ func (h *Handlers) GetCustomerSession(c hs.AuthenticatedContext) error {
 		return echo.ErrInternalServerError
 	}
 
-	fmt.Println("TEEEEEEEEEEEEEEEEEEEEEe SESSION")
-
 	return c.JSON(http.StatusOK, GetCustomerSessionResponse{SessionID: s.ClientSecret})
+}
+
+type GetProductsResponse struct {
+	Products []Product `json:"products"`
+}
+
+type Product struct {
+	ID       string   `json:"id"`
+	Name     string   `json:"name"`
+	Price    string   `json:"price"`
+	Features []string `json:"marketing_features"`
+}
+
+func (h *Handlers) GetProducts(c hs.AuthenticatedContext) error {
+	p := h.BillingService.GetProducts()
+	products := make([]Product, 0, len(p.ProductList().Data))
+
+	for _, stripeProduct := range p.ProductList().Data {
+		fmt.Println(*stripeProduct)
+		product := Product{
+			ID:       stripeProduct.ID,
+			Name:     stripeProduct.Name,
+			Features: make([]string, 0, len(stripeProduct.MarketingFeatures)),
+		}
+		for _, feature := range stripeProduct.MarketingFeatures {
+			product.Features = append(product.Features, feature.Name)
+		}
+		products = append(products, product)
+	}
+
+	return c.JSON(http.StatusOK, GetProductsResponse{Products: products})
 }

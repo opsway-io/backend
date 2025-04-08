@@ -35,6 +35,7 @@ type Service interface {
 	GetCustomerSubscribtion(customerID string) *subscription.Iter
 	GetSubscribtion(subID string) (*stripe.Subscription, error)
 	GetProduct(productID string) (*stripe.Product, error)
+	GetProducts() *product.Iter
 	CreateCustomerPortal(team *entities.Team) (*stripe.BillingPortalSession, error)
 	ConstructEvent(payload []byte, header string) (stripe.Event, error)
 	GetCustomerSession(team *entities.Team) (*stripe.CustomerSession, error)
@@ -182,6 +183,11 @@ func (s *ServiceImpl) GetProduct(productID string) (*stripe.Product, error) {
 	params := &stripe.ProductParams{}
 	return product.Get(productID, params)
 
+}
+
+func (s *ServiceImpl) GetProducts() *product.Iter {
+	params := &stripe.ProductListParams{}
+	return product.List(params)
 }
 
 func (s *ServiceImpl) CreateCustomerPortal(team *entities.Team) (*stripe.BillingPortalSession, error) {

@@ -63,11 +63,6 @@ func (h *Handlers) handleWebhook(c hs.StripeContext) error {
 			return c.NoContent(http.StatusInternalServerError)
 		}
 
-		customerID := event.Data.Object["customer"].(string)
-		if customerTeam.StripeCustomerID == nil {
-			customerTeam.StripeCustomerID = &customerID
-		}
-
 		customerTeam.PaymentPlan = entities.PaymentPlan(strings.ToUpper(product.Name))
 		if customerTeam.StripeCustomerID == nil {
 			customerTeam.StripeCustomerID = &session.Customer.ID
