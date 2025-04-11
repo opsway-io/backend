@@ -1,7 +1,6 @@
 package teams
 
 import (
-	"fmt"
 	"net/http"
 	"sort"
 
@@ -207,7 +206,6 @@ func (h *Handlers) GetProducts(c hs.AuthenticatedContext) error {
 			continue
 		}
 
-		fmt.Println(price.UnitAmount)
 		product := Product{
 			ID:       stripeProduct.ID,
 			Name:     stripeProduct.Name,
