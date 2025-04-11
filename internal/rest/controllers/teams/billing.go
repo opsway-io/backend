@@ -3,11 +3,13 @@ package teams
 import (
 	"fmt"
 	"net/http"
+	"sort"
 
 	"github.com/labstack/echo/v4"
 	"github.com/opsway-io/backend/internal/entities"
 	hs "github.com/opsway-io/backend/internal/rest/handlers"
 	"github.com/opsway-io/backend/internal/rest/helpers"
+	"github.com/stripe/stripe-go/v81"
 )
 
 func (h *Handlers) PostConfig(c hs.AuthenticatedContext) error {
@@ -175,19 +177,42 @@ type GetProductsResponse struct {
 type Product struct {
 	ID       string   `json:"id"`
 	Name     string   `json:"name"`
-	Price    string   `json:"price"`
+	Price    int64    `json:"price"`
+	Currency string   `json:"currency"`
 	Features []string `json:"marketing_features"`
 }
 
 func (h *Handlers) GetProducts(c hs.AuthenticatedContext) error {
 	p := h.BillingService.GetProducts()
-	products := make([]Product, 0, len(p.ProductList().Data))
+	products := make([]Product, 0)
+
+	prices, err := h.BillingService.GetPrices([]string{"free", "team", "enterprise"})
+	if err != nil {
+		c.Log.WithError(err).Debug("failed to get prices")
+		return echo.ErrInternalServerError
+	}
+	priceMap := make(map[string]*stripe.Price, 0)
+	for _, price := range prices {
+		priceMap[price.ID] = price
+	}
 
 	for _, stripeProduct := range p.ProductList().Data {
-		fmt.Println(*stripeProduct)
+		if stripeProduct.DefaultPrice == nil {
+			c.Log.WithError(err).Debug("failed to get default price")
+			continue
+		}
+		price, ok := priceMap[stripeProduct.DefaultPrice.ID]
+		if !ok {
+			c.Log.WithError(err).Debug("failed to get price")
+			continue
+		}
+
+		fmt.Println(price.UnitAmount)
 		product := Product{
 			ID:       stripeProduct.ID,
 			Name:     stripeProduct.Name,
+			Price:    price.UnitAmount / 100,
+			Currency: string(price.Currency),
 			Features: make([]string, 0, len(stripeProduct.MarketingFeatures)),
 		}
 		for _, feature := range stripeProduct.MarketingFeatures {
@@ -195,6 +220,10 @@ func (h *Handlers) GetProducts(c hs.AuthenticatedContext) error {
 		}
 		products = append(products, product)
 	}
+
+	sort.Slice(products, func(i, j int) bool {
+		return products[i].Price < products[j].Price
+	})
 
 	return c.JSON(http.StatusOK, GetProductsResponse{Products: products})
 }

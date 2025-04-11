@@ -62,4 +62,5 @@ func Register(
 	teamsGroup.GET("/checkout-session", AuthHandler(h.GetCheckoutSession), AllowedRoles(mw.UserRoleOwner, mw.UserRoleAdmin))
 	teamsGroup.POST("/customer-portal", AuthHandler(h.PostCustomerPortal), AllowedRoles(mw.UserRoleOwner, mw.UserRoleAdmin))
 	teamsGroup.GET("/customer-session", AuthHandler(h.GetCustomerSession), AllowedRoles(mw.UserRoleOwner, mw.UserRoleAdmin))
+	teamsGroup.GET("/products", AuthHandler(h.GetProducts), AllowedRoles(mw.UserRoleOwner, mw.UserRoleAdmin))
 }

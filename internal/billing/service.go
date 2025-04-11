@@ -31,7 +31,7 @@ type Service interface {
 	CancelSubscribtion(team *entities.Team) (*stripe.Subscription, error)
 	GetCheckoutSession(sessionID string) (*stripe.CheckoutSession, error)
 	GetLineItems(sessionID string) *session.LineItemIter
-	GetPrice(priceLookupKey string) (*stripe.Price, error)
+	GetPrices(priceLookupKeys []string) ([]*stripe.Price, error)
 	GetCustomerSubscribtion(customerID string) *subscription.Iter
 	GetSubscribtion(subID string) (*stripe.Subscription, error)
 	GetProduct(productID string) (*stripe.Product, error)
@@ -68,7 +68,7 @@ func (s *ServiceImpl) PostConfig() StripeConfig {
 }
 
 func (s *ServiceImpl) CreateCheckoutSession(team *entities.Team, priceLookupKey string) (*stripe.CheckoutSession, error) {
-	priceID, err := s.GetPrice(priceLookupKey)
+	priceID, err := s.GetPrices([]string{priceLookupKey})
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to get price")
 	}
@@ -82,7 +82,7 @@ func (s *ServiceImpl) CreateCheckoutSession(team *entities.Team, priceLookupKey 
 		LineItems: []*stripe.CheckoutSessionLineItemParams{
 			{
 
-				Price:    stripe.String(priceID.ID),
+				Price:    stripe.String(priceID[0].ID),
 				Quantity: stripe.Int64(1),
 			},
 		},
@@ -98,7 +98,7 @@ func (s *ServiceImpl) CreateCheckoutSession(team *entities.Team, priceLookupKey 
 func (s *ServiceImpl) UpdateSubscribtion(team *entities.Team, priceLookupKey string) (*stripe.Subscription, error) {
 	// Set Customer on session if already a customer
 
-	priceID, err := s.GetPrice(priceLookupKey)
+	priceID, err := s.GetPrices([]string{priceLookupKey})
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to get price")
 	}
@@ -110,7 +110,7 @@ func (s *ServiceImpl) UpdateSubscribtion(team *entities.Team, priceLookupKey str
 		Items: []*stripe.SubscriptionItemsParams{
 			{
 				ID:    stripe.String(teamSubscription.Items.Data[0].ID),
-				Price: stripe.String(priceID.ID),
+				Price: stripe.String(priceID[0].ID),
 			},
 		},
 	}
@@ -150,23 +150,22 @@ func (s *ServiceImpl) GetLineItems(sessionID string) *session.LineItemIter {
 	return session.ListLineItems(params)
 }
 
-func (s *ServiceImpl) GetPrice(priceLookupKey string) (*stripe.Price, error) {
+func (s *ServiceImpl) GetPrices(priceLookupKeys []string) ([]*stripe.Price, error) {
 	params := &stripe.PriceListParams{
-		LookupKeys: stripe.StringSlice([]string{
-			priceLookupKey,
-		}),
+
+		LookupKeys: stripe.StringSlice(
+			priceLookupKeys,
+		),
 	}
 	i := price.List(params)
 
-	var price *stripe.Price
+	prices := make([]*stripe.Price, 0)
 	for i.Next() {
 		p := i.Price()
-		price = p
+		prices = append(prices, p)
 	}
-	if price == nil {
-		return nil, errors.New("Price not found for lookup key" + priceLookupKey)
-	}
-	return price, nil
+
+	return prices, nil
 }
 
 func (s *ServiceImpl) GetCustomerSubscribtion(customerID string) *subscription.Iter {
