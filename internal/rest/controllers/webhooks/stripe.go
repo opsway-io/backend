@@ -64,7 +64,7 @@ func (h *Handlers) handleWebhook(c hs.StripeContext) error {
 		}
 
 		customerTeam.PaymentPlan = entities.PaymentPlan(strings.ToUpper(product.Name))
-		if customerTeam.StripeCustomerID == nil {
+		if customerTeam.StripeCustomerID == nil || *customerTeam.StripeCustomerID == "" {
 			customerTeam.StripeCustomerID = &session.Customer.ID
 		}
 
