@@ -17,6 +17,7 @@ type Repository interface {
 	GetByTeamIDAndMonitorIDPaginated(ctx context.Context, teamID, monitorID uint, offset, limit *int) (*[]Check, error)
 	GetMonitorMetricsByMonitorID(ctx context.Context, monitorID uint) (*[]AggMetric, error)
 	GetMonitorOverviewsByTeamID(ctx context.Context, teamID uint) (*[]MonitorOverviews, error)
+	GetMonitorStatsByMonitorID(ctx context.Context, monitorID uint) (*MonitorStats, error)
 	GetMonitorOverviewStatsByTeamID(ctx context.Context, teamID uint) (*[]MonitorOverviewStats, error)
 }
 
@@ -110,6 +111,24 @@ func (r *RepositoryImpl) GetMonitorMetricsByMonitorID(ctx context.Context, monit
 
 func (r *RepositoryImpl) Create(ctx context.Context, check *Check) error {
 	return r.db.WithContext(ctx).Create(check).Error
+}
+
+type MonitorStats struct {
+	UptimePercentage    float32
+	AverageResponseTime float32
+}
+
+func (r *RepositoryImpl) GetMonitorStatsByMonitorID(ctx context.Context, monitorID uint) (*MonitorStats, error) {
+	var stats MonitorStats
+	err := r.db.WithContext(
+		ctx,
+	).Table("checks").Select(`
+		(count(status_code <= 400) / count(status_code)) * 100 as uptime_percentage,
+		avg(timing_total/1000000) as average_response_time`).
+		Where("monitor_id = ?", monitorID).
+		Scan(&stats).Error
+
+	return &stats, err
 }
 
 type MonitorOverviews struct {

@@ -231,7 +231,14 @@ func (h *Handlers) GetMonitor(c hs.AuthenticatedContext) error {
 		return echo.ErrInternalServerError
 	}
 
-	resp, err := newGetMonitorResponse(m)
+	stats, err := h.CheckService.GetMonitorStatsByMonitorID(c.Request().Context(), m.ID)
+	if err != nil {
+		c.Log.WithError(err).Error("failed to get monitor stats")
+
+		return echo.ErrInternalServerError
+	}
+
+	resp, err := newGetMonitorResponse(m, stats)
 	if err != nil {
 		c.Log.WithError(err).Error("failed to create GetMonitorResponse")
 
@@ -241,7 +248,7 @@ func (h *Handlers) GetMonitor(c hs.AuthenticatedContext) error {
 	return c.JSON(http.StatusOK, resp)
 }
 
-func newGetMonitorResponse(m *entities.Monitor) (*GetMonitorResponse, error) {
+func newGetMonitorResponse(m *entities.Monitor, stats *check.MonitorStats) (*GetMonitorResponse, error) {
 	headers := make([]MonitorSettingsHeader, len(m.Settings.Headers))
 	for j, h := range m.Settings.Headers {
 		headers[j] = MonitorSettingsHeader{
@@ -287,8 +294,8 @@ func newGetMonitorResponse(m *entities.Monitor) (*GetMonitorResponse, error) {
 			Assertions: assertions,
 		},
 		Stats: GetMonitorResponseStats{
-			UptimePercentage:    0, // TODO: Implement
-			AverageResponseTime: 0, // TODO: Implement
+			UptimePercentage:    float64(stats.UptimePercentage),    // TODO: Implement
+			AverageResponseTime: float64(stats.AverageResponseTime), // TODO: Implement
 		},
 	}
 
