@@ -126,6 +126,7 @@ func (r *RepositoryImpl) GetMonitorStatsByMonitorID(ctx context.Context, monitor
 		(count(status_code <= 400) / count(status_code)) * 100 as uptime_percentage,
 		avg(timing_total/1000000) as average_response_time`).
 		Where("monitor_id = ?", monitorID).
+		Where("created_at BETWEEN DATE_SUB(NOW(), INTERVAL 1 DAY) AND NOW()").
 		Scan(&stats).Error
 
 	return &stats, err
