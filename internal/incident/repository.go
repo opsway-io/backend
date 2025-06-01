@@ -13,7 +13,7 @@ var ErrNotFound = errors.New("incident not found")
 type Repository interface {
 	GetByID(ctx context.Context, id uint) (*entities.Incident, error)
 	GetByTeamID(ctx context.Context, teamID uint) (*[]entities.Incident, error)
-	Create(ctx context.Context, incident *entities.Incident) error
+	Create(ctx context.Context, incidents *[]entities.Incident) error
 	Update(ctx context.Context, incident *entities.Incident) error
 	Delete(ctx context.Context, incident *entities.Incident) error
 }
@@ -56,8 +56,8 @@ func (r *RepositoryImpl) GetByTeamID(ctx context.Context, teamID uint) (*[]entit
 	return &incidents, nil
 }
 
-func (r *RepositoryImpl) Create(ctx context.Context, incident *entities.Incident) error {
-	return r.db.WithContext(ctx).Create(incident).Error
+func (r *RepositoryImpl) Create(ctx context.Context, incidents *[]entities.Incident) error {
+	return r.db.WithContext(ctx).Create(incidents).Error
 }
 
 func (r *RepositoryImpl) Update(ctx context.Context, incident *entities.Incident) error {

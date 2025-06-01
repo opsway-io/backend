@@ -8,8 +8,10 @@ import (
 	"github.com/gammazero/workerpool"
 	"github.com/opsway-io/backend/internal/check"
 	"github.com/opsway-io/backend/internal/connectors/clickhouse"
+	"github.com/opsway-io/backend/internal/connectors/postgres"
 	connectorRedis "github.com/opsway-io/backend/internal/connectors/redis"
 	"github.com/opsway-io/backend/internal/entities"
+	"github.com/opsway-io/backend/internal/incident"
 	"github.com/opsway-io/backend/internal/monitor"
 	"github.com/opsway-io/backend/internal/probes/http"
 	"github.com/opsway-io/backend/internal/probes/http/asserter"
@@ -67,13 +69,21 @@ func runProber(cmd *cobra.Command, args []string) {
 
 	httpResultService := check.NewService(ch)
 
+	db, err := postgres.NewClient(ctx, conf.Postgres)
+	if err != nil {
+		l.WithError(err).Fatal("Failed to create Postgres client")
+	}
+
+	incidentRepository := incident.NewRepository(db)
+	incidentService := incident.NewService(incidentRepository)
+
 	prober := http.NewService(conf.HTTPProbe)
 
 	l.Info("Waiting for tasks...")
 
 	if err := schedule.On(ctx, func(ctx context.Context, monitor *entities.Monitor) {
 		wp.Submit(func() {
-			handleTask(ctx, l, prober, monitor, httpResultService)
+			handleTask(ctx, l, prober, monitor, httpResultService, incidentService)
 		})
 	}); err != nil {
 		l.WithError(err).Fatal("failed to start schedule")
@@ -86,7 +96,7 @@ func runProber(cmd *cobra.Command, args []string) {
 	l.Info("Goodbye!")
 }
 
-func handleTask(ctx context.Context, logger *logrus.Logger, prober http.Service, m *entities.Monitor, c check.Service) {
+func handleTask(ctx context.Context, logger *logrus.Logger, prober http.Service, m *entities.Monitor, c check.Service, i incident.Service) {
 	l := logger.WithFields(logrus.Fields{
 		"monitor_id": m.ID,
 	})
@@ -136,7 +146,7 @@ func handleTask(ctx context.Context, logger *logrus.Logger, prober http.Service,
 	if failedCount > 0 {
 		l.Info("some assertions failed, triggering incident")
 
-		if err = triggerIncident(m, res, &failed); err != nil {
+		if err = triggerIncident(ctx, m, res, &failed, i); err != nil {
 			l.WithError(err).Error("failed to trigger incident")
 		}
 	} else {
@@ -216,6 +226,18 @@ func mapResultToCheck(m *entities.Monitor, res *http.Result) *check.Check {
 	return c
 }
 
-func triggerIncident(m *entities.Monitor, hr *http.Result, failed *[]entities.MonitorAssertion) error {
-	return nil // TODO: implement
+func triggerIncident(ctx context.Context, m *entities.Monitor, hr *http.Result, failed *[]entities.MonitorAssertion, i incident.Service) error {
+	incidents := make([]entities.Incident, len(*failed))
+
+	for i, assertion := range *failed {
+
+		incidents[i] = entities.Incident{
+			MonitorID:   assertion.MonitorID,
+			TeamID:      m.TeamID,
+			Title:       assertion.Source,
+			Description: &assertion.Source,
+		}
+	}
+
+	return i.Create(ctx, &incidents)
 }

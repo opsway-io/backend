@@ -9,7 +9,7 @@ import (
 type Service interface {
 	GetByID(ctx context.Context, id uint) (*entities.Incident, error)
 	GetByTeamID(ctx context.Context, teamID uint) (*[]entities.Incident, error)
-	Create(ctx context.Context, incident *entities.Incident) error
+	Create(ctx context.Context, incidents *[]entities.Incident) error
 	Update(ctx context.Context, incident *entities.Incident) error
 	Delete(ctx context.Context, incident *entities.Incident) error
 }
@@ -32,8 +32,8 @@ func (s *ServiceImpl) GetByTeamID(ctx context.Context, teamID uint) (*[]entities
 	return s.repository.GetByTeamID(ctx, teamID)
 }
 
-func (s *ServiceImpl) Create(ctx context.Context, incident *entities.Incident) error {
-	return s.repository.Create(ctx, incident)
+func (s *ServiceImpl) Create(ctx context.Context, incidents *[]entities.Incident) error {
+	return s.repository.Create(ctx, incidents)
 }
 
 func (s *ServiceImpl) Update(ctx context.Context, incident *entities.Incident) error {
