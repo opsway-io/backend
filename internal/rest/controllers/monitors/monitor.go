@@ -401,6 +401,92 @@ func (h *Handlers) PostMonitor(c hs.AuthenticatedContext) error {
 	return c.NoContent(http.StatusCreated)
 }
 
+type GetMonitorIncidents struct {
+	TeamID uint `param:"teamId" validate:"required,numeric,gte=0"`
+}
+
+type GetMonitorIncidentsResponse struct {
+	Monitors []MonitorWithIncidents `json:"monitors"`
+}
+
+type MonitorWithIncidents struct {
+	ID        uint       `json:"id"`
+	TeamID    uint       `json:"teamId"`
+	State     string     `json:"state" validate:"required,monitorState"`
+	Name      string     `json:"name" validate:"required,max=255"`
+	Incidents []Incident `json:"incidents" validate:"required,incidents"`
+	CreatedAt time.Time  `json:"createdAt"`
+	UpdatedAt time.Time  `json:"updatedAt"`
+}
+
+type Incident struct {
+	ID                 uint      `json:"id"`
+	CreatedAt          time.Time `json:"createdAt"`
+	UpdatedAt          time.Time `json:"updatedAt"`
+	MonitorAssertionID uint      `json:"monitorAssertionId"`
+}
+
+func (h *Handlers) GetMonitorIncidents(c hs.AuthenticatedContext) error {
+	req, err := helpers.Bind[GetMonitorIncidents](c)
+	if err != nil {
+		c.Log.WithError(err).Debug("failed to bind GetMonitorIncidents")
+
+		return echo.ErrBadRequest
+	}
+
+	monitors, err := h.MonitorService.GetMonitorsAndIncidentsByTeamID(c.Request().Context(), req.TeamID)
+	if err != nil {
+		c.Log.WithError(err).Error("failed to get monitor incidents")
+		return echo.ErrInternalServerError
+	}
+
+	// manuel filtering should be in query :P
+	filteredMonitors := make([]entities.Monitor, 0, len(*monitors))
+	for _, m := range *monitors {
+		if len(m.Incidents) > 0 {
+			filteredMonitors = append(filteredMonitors, m)
+		}
+	}
+
+	resp, err := newGetMonitorWithIncidentsResponse(&filteredMonitors)
+	if err != nil {
+		c.Log.WithError(err).Error("failed to create GetMonitorIncidentsResponse")
+
+		return echo.ErrInternalServerError
+	}
+
+	return c.JSON(http.StatusOK, resp)
+}
+
+func newGetMonitorWithIncidentsResponse(monitors *[]entities.Monitor) (*GetMonitorIncidentsResponse, error) {
+	res := make([]MonitorWithIncidents, len(*monitors))
+
+	for i, m := range *monitors {
+		monitorWithIncidents := MonitorWithIncidents{
+			ID:        m.ID,
+			TeamID:    m.TeamID,
+			State:     m.GetStateString(),
+			Name:      m.Name,
+			CreatedAt: m.CreatedAt,
+			UpdatedAt: m.UpdatedAt,
+			Incidents: make([]Incident, len(m.Incidents)),
+		}
+		for j, incident := range m.Incidents {
+			monitorWithIncidents.Incidents[j] = Incident{
+				ID:                 incident.ID,
+				CreatedAt:          incident.CreatedAt,
+				UpdatedAt:          incident.UpdatedAt,
+				MonitorAssertionID: incident.MonitorAssertionID,
+			}
+		}
+		res[i] = monitorWithIncidents
+
+	}
+	return &GetMonitorIncidentsResponse{
+		Monitors: res,
+	}, nil
+}
+
 type PutMonitorRequest struct {
 	TeamID     uint               `param:"teamId" validate:"required,numeric,gte=0"`
 	MonitorID  uint               `param:"monitorId" validate:"required,numeric,gte=0"`

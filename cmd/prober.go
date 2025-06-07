@@ -232,12 +232,13 @@ func triggerIncident(ctx context.Context, m *entities.Monitor, hr *http.Result, 
 	for i, assertion := range *failed {
 
 		incidents[i] = entities.Incident{
-			MonitorID:   assertion.MonitorID,
-			TeamID:      m.TeamID,
-			Title:       assertion.Source,
-			Description: &assertion.Source,
+			MonitorID:          assertion.MonitorID,
+			TeamID:             m.TeamID,
+			Title:              assertion.Source,
+			Description:        &assertion.Source,
+			MonitorAssertionID: assertion.ID,
 		}
 	}
 
-	return i.Create(ctx, &incidents)
+	return i.Upsert(ctx, &incidents)
 }

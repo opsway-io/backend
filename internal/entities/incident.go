@@ -5,9 +5,11 @@ import (
 )
 
 type Incident struct {
-	ID        uint
-	TeamID    uint `gorm:"index;not null"`
-	MonitorID uint `gorm:"index;not null"`
+	ID                 uint
+	TeamID             uint `gorm:"index;not null"`
+	MonitorID          uint `gorm:"index;not null"`
+	MonitorAssertionID uint `gorm:"uniqueIndex:unresolved_incident;not null"`
+	Resolved           bool `gorm:"uniqueIndex:unresolved_incident;not null;default:false"`
 
 	Title       string `gorm:"index;not null"`
 	Description *string

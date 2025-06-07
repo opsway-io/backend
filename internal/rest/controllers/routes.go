@@ -6,10 +6,12 @@ import (
 	"github.com/opsway-io/backend/internal/billing"
 	"github.com/opsway-io/backend/internal/changelog"
 	"github.com/opsway-io/backend/internal/check"
+	"github.com/opsway-io/backend/internal/incident"
 	"github.com/opsway-io/backend/internal/monitor"
 	"github.com/opsway-io/backend/internal/rest/controllers/authentication"
 	"github.com/opsway-io/backend/internal/rest/controllers/changelogs"
 	"github.com/opsway-io/backend/internal/rest/controllers/healthz"
+	"github.com/opsway-io/backend/internal/rest/controllers/incidents"
 	"github.com/opsway-io/backend/internal/rest/controllers/monitors"
 	"github.com/opsway-io/backend/internal/rest/controllers/teams"
 	"github.com/opsway-io/backend/internal/rest/controllers/users"
@@ -34,6 +36,7 @@ func Register(
 	checkService check.Service,
 	billingService billing.Service,
 	changelogService changelog.Service,
+	incidentService incident.Service,
 ) {
 	AuthGuard := middleware.AuthGuardFactory(logger, authenticationService)
 
@@ -73,4 +76,7 @@ func Register(
 	// Changelogs
 
 	changelogs.Register(authRoot, logger, teamService, changelogService)
+
+	// Incidents
+	incidents.Register(authRoot, logger, teamService, incidentService)
 }

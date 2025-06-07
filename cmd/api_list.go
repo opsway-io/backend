@@ -43,6 +43,7 @@ func runGenerate(cmd *cobra.Command, args []string) {
 		nil,
 		nil,
 		nil,
+		nil,
 	)
 
 	var routes []Route

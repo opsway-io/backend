@@ -14,6 +14,7 @@ var ErrNotFound = errors.New("monitor not found")
 type Repository interface {
 	GetMonitorAndSettingsByTeamIDAndID(ctx context.Context, teamID uint, monitorID uint) (*entities.Monitor, error)
 	GetMonitorsAndSettingsByTeamID(ctx context.Context, teamID uint, offset *int, limit *int, query *string) (*[]MonitorWithTotalCount, error)
+	GetMonitorsAndIncidentsByTeamID(ctx context.Context, teamID uint) (*[]entities.Monitor, error)
 	SetState(ctx context.Context, teamID, monitorID uint, state entities.MonitorState) error
 	Create(ctx context.Context, monitor *entities.Monitor) error
 	Update(ctx context.Context, teamID, monitorID uint, monitor *entities.Monitor) error
@@ -71,6 +72,25 @@ func (r *RepositoryImpl) GetMonitorsAndSettingsByTeamID(ctx context.Context, tea
 	}).Order(
 		"created_at asc",
 	).Find(&monitors).Error
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, nil
+		}
+
+		return nil, err
+	}
+
+	return &monitors, err
+}
+
+func (r *RepositoryImpl) GetMonitorsAndIncidentsByTeamID(ctx context.Context, teamID uint) (*[]entities.Monitor, error) {
+	var monitors []entities.Monitor
+	err := r.db.WithContext(
+		ctx,
+	).Preload("Incidents", "resolved = ?", false).
+		Where(entities.Monitor{
+			TeamID: teamID,
+		}).Find(&monitors).Error
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, nil
