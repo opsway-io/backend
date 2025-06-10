@@ -5,6 +5,7 @@ import (
 
 	"github.com/labstack/echo/v4"
 	"github.com/opsway-io/backend/internal/entities"
+	"github.com/opsway-io/backend/internal/incident"
 	hs "github.com/opsway-io/backend/internal/rest/handlers"
 	"github.com/opsway-io/backend/internal/rest/helpers"
 )
@@ -59,14 +60,14 @@ func (h *Handlers) newGetIncidentResponse(incidents *[]entities.Incident) *GetIn
 		Incidents: make([]GetIncidentsResponseIncident, len(*incidents)),
 	}
 
-	for i, incident := range *incidents {
+	for i, in := range *incidents {
 		resp.Incidents[i] = GetIncidentsResponseIncident{
-			ID:          incident.ID,
-			TeamID:      incident.TeamID,
-			MonitorID:   incident.MonitorID,
-			Title:       incident.Title,
-			Description: *incident.Description,
-			CreatedAt:   incident.CreatedAt.Format("2006-01-02T15:04:05Z07:00"),
+			ID:          in.ID,
+			TeamID:      in.TeamID,
+			MonitorID:   in.MonitorID,
+			Title:       in.Title,
+			Description: *in.Description,
+			CreatedAt:   in.CreatedAt.Format("2006-01-02T15:04:05Z07:00"),
 		}
 	}
 
@@ -155,6 +156,8 @@ type GetMonitorIncidentsResponseIncident struct {
 	Description string `json:"description"`
 	CreatedAt   string `json:"createdAt"`
 	UpdatedAt   string `json:"updatedAt"`
+	Property    string `json:"property"`
+	Target      string `json:"target"`
 }
 
 func (h *Handlers) GetMonitorIncidents(c hs.AuthenticatedContext) error {
@@ -167,7 +170,7 @@ func (h *Handlers) GetMonitorIncidents(c hs.AuthenticatedContext) error {
 
 	ctx := c.Request().Context()
 
-	incidents, err := h.IncidentService.GetByMonitorIDPaginated(
+	incidents, err := h.IncidentService.GetByMonitorIDWithAssertionPaginated(
 		ctx,
 		req.MonitorID,
 		req.Offset,
@@ -183,20 +186,22 @@ func (h *Handlers) GetMonitorIncidents(c hs.AuthenticatedContext) error {
 	return c.JSON(http.StatusOK, resp)
 }
 
-func (h *Handlers) GetMonitorIncidentsResponse(incidents *[]entities.Incident) *GetMonitorIncidentsResponse {
+func (h *Handlers) GetMonitorIncidentsResponse(incidents *[]incident.IncidentAndAssertion) *GetMonitorIncidentsResponse {
 	resp := &GetMonitorIncidentsResponse{
 		Incidents: make([]GetMonitorIncidentsResponseIncident, len(*incidents)),
 	}
 
-	for i, incident := range *incidents {
+	for i, in := range *incidents {
 		resp.Incidents[i] = GetMonitorIncidentsResponseIncident{
-			ID:          incident.ID,
-			TeamID:      incident.TeamID,
-			MonitorID:   incident.MonitorID,
-			Title:       incident.Title,
-			Description: *incident.Description,
-			CreatedAt:   incident.CreatedAt.Format("2006-01-02T15:04:05Z07:00"),
-			UpdatedAt:   incident.UpdatedAt.Format("2006-01-02T15:04:05Z07:00"),
+			ID:          in.ID,
+			TeamID:      in.TeamID,
+			MonitorID:   in.MonitorID,
+			Title:       in.Title,
+			Description: *in.Description,
+			CreatedAt:   in.CreatedAt.Format("2006-01-02T15:04:05Z07:00"),
+			UpdatedAt:   in.UpdatedAt.Format("2006-01-02T15:04:05Z07:00"),
+			Property:    in.Property,
+			Target:      in.Target,
 		}
 	}
 

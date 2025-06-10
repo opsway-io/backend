@@ -15,7 +15,7 @@ var ErrNotFound = errors.New("incident not found")
 type Repository interface {
 	GetByID(ctx context.Context, id uint) (*entities.Incident, error)
 	GetByTeamIDPaginated(ctx context.Context, teamID uint, offset, limit *int) (*[]entities.Incident, error)
-	GetByMonitorIDPaginated(ctx context.Context, monitorID uint, offset, limit *int) (*[]entities.Incident, error)
+	GetByMonitorIDWithAssertionPaginated(ctx context.Context, monitorID uint, offset, limit *int) (*[]IncidentAndAssertion, error)
 	Upsert(ctx context.Context, incidents *[]entities.Incident) error
 	Create(ctx context.Context, incidents *[]entities.Incident) error
 	Update(ctx context.Context, incident *entities.Incident) error
@@ -64,18 +64,26 @@ func (r *RepositoryImpl) GetByTeamIDPaginated(ctx context.Context, teamID uint, 
 	return &incidents, nil
 }
 
-func (r *RepositoryImpl) GetByMonitorIDPaginated(ctx context.Context, monitorID uint, offset, limit *int) (*[]entities.Incident, error) {
-	var incidents []entities.Incident
+type IncidentAndAssertion struct {
+	entities.Incident
+	Property string `gorm:"column:property"`
+	Target   string `gorm:"column:target"`
+}
+
+func (r *RepositoryImpl) GetByMonitorIDWithAssertionPaginated(ctx context.Context, monitorID uint, offset, limit *int) (*[]IncidentAndAssertion, error) {
+	var incidents []IncidentAndAssertion
 	if err := r.db.WithContext(
 		ctx,
-	).Where(entities.Incident{
+	).Select("incidents.*, ma.property as property, ma.target as target").Where(entities.Incident{
 		MonitorID: monitorID,
 	}).Where(
 		"resolved = ?", false,
+	).Joins(
+		"INNER JOIN monitor_assertions as ma ON ma.id = incidents.monitor_assertion_id",
 	).Order(
 		"created_at desc",
-	).Scopes(
-		postgres.Paginated(offset, limit),
+	// ).Scopes(
+	// 	postgres.Paginated(offset, limit),
 	).Find(&incidents).Error; err != nil {
 		return nil, err
 	}
