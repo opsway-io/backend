@@ -68,13 +68,14 @@ type IncidentAndAssertion struct {
 	entities.Incident
 	Property string `gorm:"column:property"`
 	Target   string `gorm:"column:target"`
+	Operator string `gorm:"column:operator"`
 }
 
 func (r *RepositoryImpl) GetByMonitorIDWithAssertionPaginated(ctx context.Context, monitorID uint, offset, limit *int) (*[]IncidentAndAssertion, error) {
 	var incidents []IncidentAndAssertion
 	if err := r.db.WithContext(
 		ctx,
-	).Select("incidents.*, ma.property as property, ma.target as target").Where(entities.Incident{
+	).Select("incidents.*, ma.property as property, ma.target as target, ma.operator as operator").Where(entities.Incident{
 		MonitorID: monitorID,
 	}).Where(
 		"resolved = ?", false,

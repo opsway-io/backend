@@ -158,6 +158,7 @@ type GetMonitorIncidentsResponseIncident struct {
 	UpdatedAt   string `json:"updatedAt"`
 	Property    string `json:"property"`
 	Target      string `json:"target"`
+	Operator    string `json:"operator"`
 }
 
 func (h *Handlers) GetMonitorIncidents(c hs.AuthenticatedContext) error {
@@ -202,6 +203,7 @@ func (h *Handlers) GetMonitorIncidentsResponse(incidents *[]incident.IncidentAnd
 			UpdatedAt:   in.UpdatedAt.Format("2006-01-02T15:04:05Z07:00"),
 			Property:    in.Property,
 			Target:      in.Target,
+			Operator:    in.Operator,
 		}
 	}
 
