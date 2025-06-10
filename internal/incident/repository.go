@@ -15,6 +15,7 @@ var ErrNotFound = errors.New("incident not found")
 type Repository interface {
 	GetByID(ctx context.Context, id uint) (*entities.Incident, error)
 	GetByTeamIDPaginated(ctx context.Context, teamID uint, offset, limit *int) (*[]entities.Incident, error)
+	GetByMonitorIDPaginated(ctx context.Context, monitorID uint, offset, limit *int) (*[]entities.Incident, error)
 	Upsert(ctx context.Context, incidents *[]entities.Incident) error
 	Create(ctx context.Context, incidents *[]entities.Incident) error
 	Update(ctx context.Context, incident *entities.Incident) error
@@ -52,6 +53,23 @@ func (r *RepositoryImpl) GetByTeamIDPaginated(ctx context.Context, teamID uint, 
 		ctx,
 	).Where(entities.Incident{
 		TeamID: teamID,
+	}).Order(
+		"created_at desc",
+	).Scopes(
+		postgres.Paginated(offset, limit),
+	).Find(&incidents).Error; err != nil {
+		return nil, err
+	}
+
+	return &incidents, nil
+}
+
+func (r *RepositoryImpl) GetByMonitorIDPaginated(ctx context.Context, monitorID uint, offset, limit *int) (*[]entities.Incident, error) {
+	var incidents []entities.Incident
+	if err := r.db.WithContext(
+		ctx,
+	).Where(entities.Incident{
+		MonitorID: monitorID,
 	}).Order(
 		"created_at desc",
 	).Scopes(

@@ -9,6 +9,7 @@ import (
 type Service interface {
 	GetByID(ctx context.Context, id uint) (*entities.Incident, error)
 	GetByTeamIDPaginated(ctx context.Context, teamID uint, offset, limit *int) (*[]entities.Incident, error)
+	GetByMonitorIDPaginated(ctx context.Context, monitorID uint, offset, limit *int) (*[]entities.Incident, error)
 	Upsert(ctx context.Context, incidents *[]entities.Incident) error
 	Create(ctx context.Context, incidents *[]entities.Incident) error
 	Update(ctx context.Context, incident *entities.Incident) error
@@ -31,6 +32,10 @@ func (s *ServiceImpl) GetByID(ctx context.Context, id uint) (*entities.Incident,
 
 func (s *ServiceImpl) GetByTeamIDPaginated(ctx context.Context, teamID uint, offset, limit *int) (*[]entities.Incident, error) {
 	return s.repository.GetByTeamIDPaginated(ctx, teamID, offset, limit)
+}
+
+func (s *ServiceImpl) GetByMonitorIDPaginated(ctx context.Context, monitorID uint, offset, limit *int) (*[]entities.Incident, error) {
+	return s.repository.GetByMonitorIDPaginated(ctx, monitorID, offset, limit)
 }
 
 func (s *ServiceImpl) Upsert(ctx context.Context, incidents *[]entities.Incident) error {

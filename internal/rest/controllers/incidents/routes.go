@@ -37,4 +37,5 @@ func Register(
 
 	monitorsGroup.GET("", AuthHandler(h.GetIncidents))
 	monitorsGroup.GET("/overview", AuthHandler(h.GetIncidents))
+	monitorsGroup.GET("/monitor/:monitorId", AuthHandler(h.GetIncidents))
 }
