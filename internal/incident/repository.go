@@ -70,7 +70,9 @@ func (r *RepositoryImpl) GetByMonitorIDPaginated(ctx context.Context, monitorID 
 		ctx,
 	).Where(entities.Incident{
 		MonitorID: monitorID,
-	}).Order(
+	}).Where(
+		"resolved = ?", false,
+	).Order(
 		"created_at desc",
 	).Scopes(
 		postgres.Paginated(offset, limit),

@@ -154,6 +154,7 @@ type GetMonitorIncidentsResponseIncident struct {
 	Title       string `json:"title"`
 	Description string `json:"description"`
 	CreatedAt   string `json:"createdAt"`
+	UpdatedAt   string `json:"updatedAt"`
 }
 
 func (h *Handlers) GetMonitorIncidents(c hs.AuthenticatedContext) error {
@@ -166,9 +167,9 @@ func (h *Handlers) GetMonitorIncidents(c hs.AuthenticatedContext) error {
 
 	ctx := c.Request().Context()
 
-	incidents, err := h.IncidentService.GetByTeamIDPaginated(
+	incidents, err := h.IncidentService.GetByMonitorIDPaginated(
 		ctx,
-		req.TeamID,
+		req.MonitorID,
 		req.Offset,
 		req.Limit)
 	if err != nil {
@@ -177,7 +178,7 @@ func (h *Handlers) GetMonitorIncidents(c hs.AuthenticatedContext) error {
 		return echo.ErrInternalServerError
 	}
 
-	resp := h.newGetIncidentResponse(incidents)
+	resp := h.GetMonitorIncidentsResponse(incidents)
 
 	return c.JSON(http.StatusOK, resp)
 }
@@ -195,6 +196,7 @@ func (h *Handlers) GetMonitorIncidentsResponse(incidents *[]entities.Incident) *
 			Title:       incident.Title,
 			Description: *incident.Description,
 			CreatedAt:   incident.CreatedAt.Format("2006-01-02T15:04:05Z07:00"),
+			UpdatedAt:   incident.UpdatedAt.Format("2006-01-02T15:04:05Z07:00"),
 		}
 	}
 
