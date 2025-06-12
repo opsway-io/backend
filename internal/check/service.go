@@ -16,6 +16,8 @@ type Service interface {
 	GetMonitorMetricsByMonitorID(ctx context.Context, monitorID uint) (*[]AggMetric, error)
 	GetMonitorStatsByMonitorID(ctx context.Context, monitorID uint) (*MonitorStats, error)
 	GetMonitorOverviewsByTeamID(ctx context.Context, teamID uint) (*[]MonitorOverviews, error)
+
+	GetMonitorIDAndAssertions(ctx context.Context, monitorID uint, assertions []string) (*[]Check, error)
 }
 
 type ServiceImpl struct {
@@ -67,4 +69,8 @@ func (s *ServiceImpl) GetMonitorOverviewsByTeamID(ctx context.Context, teamID ui
 	}
 
 	return overviews, err
+}
+
+func (s *ServiceImpl) GetMonitorIDAndAssertions(ctx context.Context, monitorID uint, assertions []string) (*[]Check, error) {
+	return s.repository.GetMonitorIDAndAssertions(ctx, monitorID, assertions)
 }

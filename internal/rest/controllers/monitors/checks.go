@@ -166,3 +166,55 @@ func (h *Handlers) GetMonitorCheck(c hs.AuthenticatedContext) error {
 
 	return c.JSON(http.StatusOK, resp)
 }
+
+type GeFailedMonitorCheckRequest struct {
+	TeamID             uint `param:"teamId" validate:"required,numeric,gte=0"`
+	MonitorID          uint `param:"monitorId" validate:"required,numeric,gte=0"`
+	MonitorAssertionID uint `param:"monitorAssertionId" validate:"required,numeric,gte=0"`
+	Offset             *int `query:"offset" validate:"omitempty,numeric,gte=0"`
+	Limit              *int `query:"limit" validate:"omitempty,numeric,gte=0"`
+}
+
+type GetFailedMonitorCheckResponse struct {
+	GetMonitorChecksResponseCheck
+}
+
+func (h *Handlers) GetFailedMonitorChecks(c hs.AuthenticatedContext) error {
+	req, err := helpers.Bind[GeFailedMonitorCheckRequest](c)
+	if err != nil {
+		c.Log.WithError(err).Debug("failed to bind GetMonitorsRequest")
+
+		return echo.ErrBadRequest
+	}
+
+	ctx := c.Request().Context()
+
+	monitorAssertion, err := h.MonitorService.GetMonitorAssertionByID(ctx, req.MonitorAssertionID)
+	if err != nil {
+		c.Log.WithError(err).Error("failed to get monitorAssertion")
+		return echo.ErrInternalServerError
+	}
+
+	// map monitorassertion to filter
+
+	result, err := h.CheckService.GetMonitorIDAndAssertions(
+		ctx,
+		monitorAssertion.MonitorID,
+		[]string{"status_code == 200"},
+	)
+	if err != nil {
+		if errors.Is(err, check.ErrNotFound) {
+			c.Log.WithError(err).Debug("check not found")
+
+			return echo.ErrNotFound
+		}
+
+		c.Log.WithError(err).Error("failed to get monitor check")
+
+		return echo.ErrInternalServerError
+	}
+
+	resp := h.newGetMonitorChecksResponse(result)
+
+	return c.JSON(http.StatusOK, resp)
+}

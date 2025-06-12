@@ -52,6 +52,7 @@ func Register(
 	monitorsGroup.PUT("/:monitorId/state", AuthHandler(h.PutMonitorState), AllowedRoles(mw.UserRoleOwner, mw.UserRoleAdmin))
 
 	monitorsGroup.GET("/:monitorId/checks", AuthHandler(h.GetMonitorChecks))
+	monitorsGroup.GET("/:monitorId/checks/failed/:monitorAssertionId", AuthHandler(h.GetFailedMonitorChecks))
 	monitorsGroup.GET("/:monitorId/checks/:checkId", AuthHandler(h.GetMonitorCheck))
 
 	monitorsGroup.GET("/:monitorId/metrics", AuthHandler(h.GetMonitorMetrics))

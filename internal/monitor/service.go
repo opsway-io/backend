@@ -14,6 +14,7 @@ type Service interface {
 	GetMonitorAndSettingsByTeamIDAndID(ctx context.Context, teamID uint, monitorID uint) (*entities.Monitor, error)
 	GetMonitorsAndSettingsByTeamID(ctx context.Context, teamID uint, offset *int, limit *int, query *string) (*[]MonitorWithTotalCount, error)
 	GetMonitorsAndIncidentsByTeamID(ctx context.Context, teamID uint) (*[]entities.Monitor, error)
+	GetMonitorAssertionByID(ctx context.Context, monitorAssertionID uint) (*entities.MonitorAssertion, error)
 	SetState(ctx context.Context, teamID, monitorID uint, state entities.MonitorState) error
 	Create(ctx context.Context, monitor *entities.Monitor) error
 	Update(ctx context.Context, teamID, monitorID uint, monitor *entities.Monitor) error
@@ -42,6 +43,10 @@ func (s *ServiceImpl) GetMonitorsAndSettingsByTeamID(ctx context.Context, teamID
 
 func (s *ServiceImpl) GetMonitorsAndIncidentsByTeamID(ctx context.Context, teamID uint) (*[]entities.Monitor, error) {
 	return s.repository.GetMonitorsAndIncidentsByTeamID(ctx, teamID)
+}
+
+func (s *ServiceImpl) GetMonitorAssertionByID(ctx context.Context, monitorAssertionID uint) (*entities.MonitorAssertion, error) {
+	return s.repository.GetMonitorAssertionByID(ctx, monitorAssertionID)
 }
 
 func (s *ServiceImpl) SetState(ctx context.Context, teamID, monitorID uint, state entities.MonitorState) error {

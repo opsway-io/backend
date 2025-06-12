@@ -19,6 +19,7 @@ type Repository interface {
 	GetMonitorOverviewsByTeamID(ctx context.Context, teamID uint) (*[]MonitorOverviews, error)
 	GetMonitorStatsByMonitorID(ctx context.Context, monitorID uint) (*MonitorStats, error)
 	GetMonitorOverviewStatsByTeamID(ctx context.Context, teamID uint) (*[]MonitorOverviewStats, error)
+	GetMonitorIDAndAssertions(ctx context.Context, monitorID uint, assertions []string) (*[]Check, error)
 }
 
 type RepositoryImpl struct {
@@ -187,4 +188,28 @@ func (r *RepositoryImpl) GetMonitorOverviewStatsByTeamID(ctx context.Context, te
 		Find(&overviews).Error
 
 	return &overviews, err
+}
+
+func (r *RepositoryImpl) GetMonitorIDAndAssertions(ctx context.Context, monitorID uint, assertions []string) (*[]Check, error) {
+	var checks []Check
+	err := r.db.WithContext(
+		ctx,
+	).Where(
+		Check{
+			MonitorID: uint64(monitorID),
+		},
+	).Where(assertions[0]).Order(
+		"created_at desc",
+	).Find(
+		&checks,
+	).Error
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return &[]Check{}, nil
+		}
+
+		return nil, err
+	}
+
+	return &checks, nil
 }

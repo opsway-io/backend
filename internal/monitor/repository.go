@@ -15,6 +15,7 @@ type Repository interface {
 	GetMonitorAndSettingsByTeamIDAndID(ctx context.Context, teamID uint, monitorID uint) (*entities.Monitor, error)
 	GetMonitorsAndSettingsByTeamID(ctx context.Context, teamID uint, offset *int, limit *int, query *string) (*[]MonitorWithTotalCount, error)
 	GetMonitorsAndIncidentsByTeamID(ctx context.Context, teamID uint) (*[]entities.Monitor, error)
+	GetMonitorAssertionByID(ctx context.Context, monitorAssertionID uint) (*entities.MonitorAssertion, error)
 	SetState(ctx context.Context, teamID, monitorID uint, state entities.MonitorState) error
 	Create(ctx context.Context, monitor *entities.Monitor) error
 	Update(ctx context.Context, teamID, monitorID uint, monitor *entities.Monitor) error
@@ -100,6 +101,20 @@ func (r *RepositoryImpl) GetMonitorsAndIncidentsByTeamID(ctx context.Context, te
 	}
 
 	return &monitors, err
+}
+
+func (r *RepositoryImpl) GetMonitorAssertionByID(ctx context.Context, monitorAssertionID uint) (*entities.MonitorAssertion, error) {
+	var monitorAssertion entities.MonitorAssertion
+	err := r.db.WithContext(
+		ctx,
+	).Where(entities.MonitorAssertion{
+		ID: monitorAssertionID,
+	}).First(&monitorAssertion).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, ErrNotFound
+	}
+
+	return &monitorAssertion, err
 }
 
 func (r *RepositoryImpl) SetState(ctx context.Context, teamID, monitorID uint, state entities.MonitorState) error {
