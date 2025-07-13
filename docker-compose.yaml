@@ -51,12 +51,13 @@ services:
       - '8002:8001'
 
   ch_server:
-    image: clickhouse/clickhouse-server:24.8
+    image: clickhouse/clickhouse-server:25.6
     restart: unless-stopped
     environment:
-      - CLICKHOUSE_USER=default
-      - CLICKHOUSE_PASSWORD=
-      - CLICKHOUSE_DB=opsway
+      CLICKHOUSE_USER: "default"
+      CLICKHOUSE_PASSWORD: ""
+      CLICKHOUSE_DB: "opsway"
+      CLICKHOUSE_SKIP_USER_SETUP: 1
     ports:
       - '8123:8123'
       - '9000:9000'
