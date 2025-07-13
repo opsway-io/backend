@@ -209,3 +209,40 @@ func (h *Handlers) GetMonitorIncidentsResponse(incidents *[]incident.IncidentAnd
 
 	return resp
 }
+
+type PatchSolveMonitorIncidentRequset struct {
+	TeamID     uint `param:"teamId" validate:"required,numeric,gte=0"`
+	IncidentID uint `param:"incidentId" validate:"required,numeric,gte=0"`
+	Resolved   bool `json:"resolved" validate:"required"`
+}
+
+func (h *Handlers) PatchSolveMonitorIncident(c hs.AuthenticatedContext) error {
+	req, err := helpers.Bind[PatchSolveMonitorIncidentRequset](c)
+	if err != nil {
+		c.Log.WithError(err).Debug("failed to bind PatchSolveMonitorIncidentRequset")
+
+		return echo.ErrBadRequest
+	}
+
+	ctx := c.Request().Context()
+
+	incident, err := h.IncidentService.GetByID(ctx, req.IncidentID)
+	if err != nil {
+		c.Log.WithError(err).Error("failed to get incident")
+
+		return echo.ErrInternalServerError
+	}
+
+	incident.Resolved = req.Resolved
+
+	err = h.IncidentService.Update(
+		ctx,
+		incident,
+	)
+	if err != nil {
+		c.Log.WithError(err).Error("failed to update incident")
+		return echo.ErrInternalServerError
+	}
+
+	return c.NoContent(http.StatusNoContent)
+}
