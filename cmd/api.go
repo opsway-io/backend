@@ -15,6 +15,7 @@ import (
 	"github.com/opsway-io/backend/internal/incident"
 	"github.com/opsway-io/backend/internal/monitor"
 	"github.com/opsway-io/backend/internal/notification/email"
+	"github.com/opsway-io/backend/internal/report"
 	"github.com/opsway-io/backend/internal/rest"
 	"github.com/opsway-io/backend/internal/storage"
 	"github.com/opsway-io/backend/internal/team"
@@ -124,6 +125,8 @@ func runAPI(cmd *cobra.Command, args []string) {
 	incidentRepository := incident.NewRepository(db)
 	incidentService := incident.NewService(incidentRepository)
 
+	reportsService := report.NewService(db)
+
 	srv, err := rest.NewServer(
 		conf.REST,
 		conf.OAuth,
@@ -137,6 +140,7 @@ func runAPI(cmd *cobra.Command, args []string) {
 		billingService,
 		changelogService,
 		incidentService,
+		reportsService,
 	)
 	if err != nil {
 		l.WithError(err).Fatal("Failed to create REST server")

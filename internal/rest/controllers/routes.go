@@ -8,11 +8,13 @@ import (
 	"github.com/opsway-io/backend/internal/check"
 	"github.com/opsway-io/backend/internal/incident"
 	"github.com/opsway-io/backend/internal/monitor"
+	"github.com/opsway-io/backend/internal/report"
 	"github.com/opsway-io/backend/internal/rest/controllers/authentication"
 	"github.com/opsway-io/backend/internal/rest/controllers/changelogs"
 	"github.com/opsway-io/backend/internal/rest/controllers/healthz"
 	"github.com/opsway-io/backend/internal/rest/controllers/incidents"
 	"github.com/opsway-io/backend/internal/rest/controllers/monitors"
+	"github.com/opsway-io/backend/internal/rest/controllers/reports"
 	"github.com/opsway-io/backend/internal/rest/controllers/teams"
 	"github.com/opsway-io/backend/internal/rest/controllers/users"
 	"github.com/opsway-io/backend/internal/rest/controllers/webhooks"
@@ -37,6 +39,7 @@ func Register(
 	billingService billing.Service,
 	changelogService changelog.Service,
 	incidentService incident.Service,
+	reportsService report.Service,
 ) {
 	AuthGuard := middleware.AuthGuardFactory(logger, authenticationService)
 
@@ -79,4 +82,7 @@ func Register(
 
 	// Incidents
 	incidents.Register(authRoot, logger, teamService, incidentService)
+
+	// Reports
+	reports.Register(authRoot, logger, teamService, reportsService)
 }

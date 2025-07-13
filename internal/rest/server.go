@@ -12,6 +12,7 @@ import (
 	"github.com/opsway-io/backend/internal/check"
 	"github.com/opsway-io/backend/internal/incident"
 	"github.com/opsway-io/backend/internal/monitor"
+	"github.com/opsway-io/backend/internal/report"
 	"github.com/opsway-io/backend/internal/rest/controllers"
 	"github.com/opsway-io/backend/internal/rest/controllers/authentication"
 	"github.com/opsway-io/backend/internal/rest/helpers"
@@ -44,6 +45,7 @@ func NewServer(
 	billingService billing.Service,
 	changelogService changelog.Service,
 	incidentService incident.Service,
+	reportsService report.Service,
 ) (*Server, error) {
 	cookieService := helpers.NewCookieService(authConfig)
 
@@ -79,6 +81,7 @@ func NewServer(
 		billingService,
 		changelogService,
 		incidentService,
+		reportsService,
 	)
 
 	return &Server{
