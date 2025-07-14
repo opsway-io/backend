@@ -20,6 +20,7 @@ type Repository interface {
 	GetMonitorStatsByMonitorID(ctx context.Context, monitorID uint) (*MonitorStats, error)
 	GetMonitorOverviewStatsByTeamID(ctx context.Context, teamID uint) (*[]MonitorOverviewStats, error)
 	GetMonitorIDAndAssertions(ctx context.Context, monitorID uint, assertions []string) (*[]Check, error)
+	GetByTeamIDMonitorsUptime(ctx context.Context, teamID uint, start, end string) (*[]MonitorUptime, error)
 }
 
 type RepositoryImpl struct {
@@ -212,4 +213,34 @@ func (r *RepositoryImpl) GetMonitorIDAndAssertions(ctx context.Context, monitorI
 	}
 
 	return &checks, nil
+}
+
+type MonitorUptime struct {
+	MonitorID        uint
+	Url              string
+	UptimePercentage float32
+	Date             string
+}
+
+func (r *RepositoryImpl) GetByTeamIDMonitorsUptime(ctx context.Context, teamID uint, start, end string) (*[]MonitorUptime, error) {
+	var uptime []MonitorUptime
+	err := r.db.WithContext(
+		ctx,
+	).Table("checks").Select(`
+		monitor_id, 
+		url,
+		count(status_code <= 400) / count(status_code) * 100 as uptime_percentage, 
+		avg(timing_total/1000000) as average_response_time, 
+		toMonth(created_at) as date`).
+		Where("team_id = ?", teamID).
+		// Where("created_at BETWEEN ? AND ?", start, end).
+		Group("monitor_id, url, date").
+		Order("date ASC").
+		Find(&uptime).Error
+
+	if err != nil {
+		return nil, err
+	}
+
+	return &uptime, nil
 }

@@ -4,14 +4,13 @@ import (
 	"net/http"
 
 	"github.com/labstack/echo/v4"
+	"github.com/opsway-io/backend/internal/entities"
 	hs "github.com/opsway-io/backend/internal/rest/handlers"
 	"github.com/opsway-io/backend/internal/rest/helpers"
 )
 
 type GetReportsRequest struct {
 	TeamID uint `param:"teamId" validate:"required,numeric,gte=0"`
-	Offset *int `query:"offset" validate:"omitempty,numeric,gte=0"`
-	Limit  *int `query:"limit" validate:"omitempty,numeric,gte=0,max=255"`
 }
 
 type GetReportsResponse struct {
@@ -19,12 +18,9 @@ type GetReportsResponse struct {
 }
 
 type GetReportsResponseReport struct {
-	ID          uint   `json:"id"`
-	TeamID      uint   `json:"teamId"`
-	MonitorID   uint   `json:"monitorId"`
-	Title       string `json:"title"`
-	Description string `json:"description"`
-	CreatedAt   string `json:"createdAt"`
+	ID        uint   `json:"id"`
+	TeamID    uint   `json:"teamId"`
+	CreatedAt string `json:"createdAt"`
 }
 
 func (h *Handlers) GetReports(c hs.AuthenticatedContext) error {
@@ -46,26 +42,63 @@ func (h *Handlers) GetReports(c hs.AuthenticatedContext) error {
 		return echo.ErrInternalServerError
 	}
 
-	// resp := h.newGetReportResponse(reports)
+	resp := h.newGetReportResponse(reports)
 
-	return c.JSON(http.StatusOK, len(reports))
+	return c.JSON(http.StatusOK, resp)
 }
 
-// func (h *Handlers) newGetReportResponse(reports *[]entities.Report) *GetReportsResponse {
-// 	resp := &GetReportsResponse{
-// 		Reports: make([]GetReportsResponseReport, len(*reports)),
-// 	}
+func (h *Handlers) newGetReportResponse(reports *[]entities.Report) *GetReportsResponse {
+	resp := &GetReportsResponse{
+		Reports: make([]GetReportsResponseReport, len(*reports)),
+	}
 
-// 	for i, in := range *reports {
-// 		resp.Reports[i] = GetReportsResponseReport{
-// 			ID:          in.ID,
-// 			TeamID:      in.TeamID,
-// 			MonitorID:   in.MonitorID,
-// 			Title:       in.Title,
-// 			Description: *in.Description,
-// 			CreatedAt:   in.CreatedAt.Format("2006-01-02T15:04:05Z07:00"),
-// 		}
-// 	}
+	for i, in := range *reports {
+		resp.Reports[i] = GetReportsResponseReport{
+			ID:        in.ID,
+			TeamID:    in.TeamID,
+			CreatedAt: in.CreatedAt.Format("2006-01-02T15:04:05Z07:00"),
+		}
+	}
 
-// 	return resp
-// }
+	return resp
+}
+
+type PostReportsRequest struct {
+	TeamID     uint   `param:"teamId" validate:"required,numeric,gte=0"`
+	ReportType string `json:"reportType" validate:"required,oneof=incident monitor"`
+	Start      string `json:"start" validate:"required"`
+	End        string `json:"end" validate:"required"`
+}
+
+func (h *Handlers) CreateReport(c hs.AuthenticatedContext) error {
+	req, err := helpers.Bind[PostReportsRequest](c)
+	if err != nil {
+		c.Log.WithError(err).Debug("failed to bind PostReportsRequest")
+
+		return echo.ErrBadRequest
+	}
+
+	ctx := c.Request().Context()
+
+	uptimeReport, err := h.CheckService.GetByTeamIDMonitorsUptime(ctx, req.TeamID, req.Start, req.End)
+	if err != nil {
+		c.Log.WithError(err).Error("failed to get uptime report")
+		return echo.ErrInternalServerError
+	}
+
+	err = h.ReportService.CreateReport(
+		ctx,
+		req.TeamID,
+		req.ReportType,
+		entities.ReportData{
+			Uptime: uptimeReport,
+		},
+	)
+	if err != nil {
+		c.Log.WithError(err).Error("failed to get Reports")
+
+		return echo.ErrInternalServerError
+	}
+
+	return c.NoContent(http.StatusCreated)
+}

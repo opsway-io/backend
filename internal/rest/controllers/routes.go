@@ -84,5 +84,5 @@ func Register(
 	incidents.Register(authRoot, logger, teamService, incidentService)
 
 	// Reports
-	reports.Register(authRoot, logger, teamService, reportsService)
+	reports.Register(authRoot, logger, teamService, reportsService, checkService)
 }

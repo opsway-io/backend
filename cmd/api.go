@@ -75,6 +75,7 @@ func runAPI(cmd *cobra.Command, args []string) {
 		entities.IncidentComment{},
 		entities.Changelog{},
 		entities.ChangelogEntry{},
+		entities.Report{},
 	)
 
 	ch_db, err := clickhouse.NewClient(ctx, conf.Clickhouse)
@@ -125,7 +126,8 @@ func runAPI(cmd *cobra.Command, args []string) {
 	incidentRepository := incident.NewRepository(db)
 	incidentService := incident.NewService(incidentRepository)
 
-	reportsService := report.NewService(db)
+	reportRepository := report.NewRepository(db)
+	reportsService := report.NewService(reportRepository)
 
 	srv, err := rest.NewServer(
 		conf.REST,
