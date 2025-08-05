@@ -29,4 +29,10 @@ func TeamOpsway(db *gorm.DB) {
 	if result.Error != nil {
 		panic(result.Error)
 	}
+
+	db.Create(&entities.TeamUser{
+		UserID: user.ID,
+		TeamID: t.ID,
+		Role:   entities.TeamRoleAdmin,
+	})
 }
