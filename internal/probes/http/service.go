@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"io"
 	"net"
-	"net/http"
 	xhttp "net/http"
 	"strings"
 	"time"
@@ -50,10 +49,8 @@ func (s *ServiceImpl) Probe(ctx context.Context, method, url string, headers map
 	}
 
 	// Set headers
-	if headers != nil {
-		for k, v := range headers {
-			req.Header.Set(k, v)
-		}
+	for k, v := range headers {
+		req.Header.Set(k, v)
 	}
 
 	// Set user agent
@@ -80,7 +77,7 @@ func (s *ServiceImpl) Probe(ctx context.Context, method, url string, headers map
 	}
 
 	// Close the response body to avoid leaking resources
-	resp.Body.Close()
+	_ = resp.Body.Close()
 
 	// End the httpstat timer
 	result.End(time.Now())
@@ -111,11 +108,11 @@ func (s *ServiceImpl) Probe(ctx context.Context, method, url string, headers map
 			Cipher:  tls.CipherSuiteName(resp.TLS.CipherSuite),
 		}
 
-		if resp.TLS.PeerCertificates != nil && len(resp.TLS.PeerCertificates) > 0 {
+		if len(resp.TLS.PeerCertificates) > 0 {
 			cert := resp.TLS.PeerCertificates[0]
 			hostname := req.URL.Hostname()
 
-			trustedCA := true // TODO: check if the CA is trusted
+			trustedCA := s.certificateTrusted(resp.TLS, hostname)
 
 			notExpired := s.certificateNotExpired(cert)
 			hostValid := s.certificateHostValid(cert, hostname)
@@ -160,7 +157,7 @@ func (s *ServiceImpl) newHttpClient(timeout time.Duration) *xhttp.Client {
 
 	return &xhttp.Client{
 		Timeout: timeout,
-		Transport: &http.Transport{
+		Transport: &xhttp.Transport{
 			DialContext: dialContext,
 			TLSClientConfig: &tls.Config{
 				// We don't want to verify the certificate here
@@ -180,4 +177,16 @@ func (s *ServiceImpl) certificateNotExpired(cert *x509.Certificate) (notExpired 
 
 func (s *ServiceImpl) certificateHostValid(cert *x509.Certificate, host string) (hostValid bool) {
 	return cert.VerifyHostname(host) == nil
+}
+
+func (s *ServiceImpl) certificateTrusted(state *tls.ConnectionState, host string) bool {
+	opts := x509.VerifyOptions{
+		DNSName:       host,
+		Intermediates: x509.NewCertPool(),
+	}
+	for _, cert := range state.PeerCertificates[1:] {
+		opts.Intermediates.AddCert(cert)
+	}
+	_, err := state.PeerCertificates[0].Verify(opts)
+	return err == nil
 }

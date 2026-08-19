@@ -2,6 +2,7 @@ package incidents
 
 import (
 	"net/http"
+	"time"
 
 	"github.com/labstack/echo/v4"
 	"github.com/opsway-io/backend/internal/entities"
@@ -23,7 +24,8 @@ type GetIncidentsResponse struct {
 type GetIncidentsResponseIncident struct {
 	ID          uint   `json:"id"`
 	TeamID      uint   `json:"teamId"`
-	MonitorID   uint   `json:"monitorId"`
+	MonitorID   *uint   `json:"monitorId"`
+	HeartbeatID *uint   `json:"heartbeatId"`
 	Title       string `json:"title"`
 	Description string `json:"description"`
 	CreatedAt   string `json:"createdAt"`
@@ -65,6 +67,7 @@ func (h *Handlers) newGetIncidentResponse(incidents *[]entities.Incident) *GetIn
 			ID:          in.ID,
 			TeamID:      in.TeamID,
 			MonitorID:   in.MonitorID,
+			HeartbeatID: in.HeartbeatID,
 			Title:       in.Title,
 			Description: *in.Description,
 			CreatedAt:   in.CreatedAt.Format("2006-01-02T15:04:05Z07:00"),
@@ -87,7 +90,8 @@ type GetIncidentOverviewResponse struct {
 type GetIncidentOverviewResponseIncident struct {
 	ID        uint   `json:"id"`
 	TeamID    uint   `json:"teamId"`
-	MonitorID uint   `json:"monitorId"`
+	MonitorID *uint   `json:"monitorId"`
+	HeartbeatID *uint `json:"heartbeatId"`
 	CreatedAt string `json:"createdAt"`
 	Count     int    `json:"count"`
 }
@@ -126,11 +130,12 @@ func (h *Handlers) newGetIncidentOverviewResponse(incidents *[]entities.Incident
 
 	for i, incident := range *incidents {
 		resp.Checks[i] = GetIncidentOverviewResponseIncident{
-			ID:        incident.ID,
-			TeamID:    incident.TeamID,
-			MonitorID: incident.MonitorID,
-			Count:     0,
-			CreatedAt: incident.CreatedAt.Format("2006-01-02T15:04:05Z07:00"),
+			ID:          incident.ID,
+			TeamID:      incident.TeamID,
+			MonitorID:   incident.MonitorID,
+			HeartbeatID: incident.HeartbeatID,
+			Count:       0,
+			CreatedAt:   incident.CreatedAt.Format("2006-01-02T15:04:05Z07:00"),
 		}
 	}
 
@@ -151,7 +156,8 @@ type GetMonitorIncidentsResponse struct {
 type GetMonitorIncidentsResponseIncident struct {
 	ID          uint   `json:"id"`
 	TeamID      uint   `json:"teamId"`
-	MonitorID   uint   `json:"monitorId"`
+	MonitorID   *uint   `json:"monitorId"`
+	HeartbeatID *uint   `json:"heartbeatId"`
 	Title       string `json:"title"`
 	Description string `json:"description"`
 	CreatedAt   string `json:"createdAt"`
@@ -193,56 +199,163 @@ func (h *Handlers) GetMonitorIncidentsResponse(incidents *[]incident.IncidentAnd
 	}
 
 	for i, in := range *incidents {
+		property := ""
+		if in.Property != nil {
+			property = *in.Property
+		}
+
+		target := ""
+		if in.Target != nil {
+			target = *in.Target
+		}
+
+		operator := ""
+		if in.Operator != nil {
+			operator = *in.Operator
+		}
+
 		resp.Incidents[i] = GetMonitorIncidentsResponseIncident{
 			ID:          in.ID,
 			TeamID:      in.TeamID,
 			MonitorID:   in.MonitorID,
+			HeartbeatID: in.HeartbeatID,
 			Title:       in.Title,
 			Description: *in.Description,
 			CreatedAt:   in.CreatedAt.Format("2006-01-02T15:04:05Z07:00"),
 			UpdatedAt:   in.UpdatedAt.Format("2006-01-02T15:04:05Z07:00"),
-			Property:    in.Property,
-			Target:      in.Target,
-			Operator:    in.Operator,
+			Property:    property,
+			Target:      target,
+			Operator:    operator,
 		}
 	}
 
 	return resp
 }
 
-type PatchSolveMonitorIncidentRequset struct {
+type GetIncidentRequest struct {
+	TeamID     uint `param:"teamId" validate:"required,numeric,gte=0"`
+	IncidentID uint `param:"incidentId" validate:"required,numeric,gte=0"`
+}
+
+type GetIncidentResponse struct {
+	ID          uint   `json:"id"`
+	TeamID      uint   `json:"teamId"`
+	MonitorID   *uint   `json:"monitorId"`
+	HeartbeatID *uint   `json:"heartbeatId"`
+	Title       string `json:"title"`
+	Description string `json:"description"`
+	Resolved    bool   `json:"resolved"`
+	Acknowledged bool  `json:"acknowledged"`
+	AcknowledgedAt *string `json:"acknowledgedAt,omitempty"`
+	RootCauseAnalysis *string `json:"rootCauseAnalysis,omitempty"`
+	CreatedAt   string `json:"createdAt"`
+	UpdatedAt   string `json:"updatedAt"`
+}
+
+func (h *Handlers) GetIncident(c hs.AuthenticatedContext) error {
+	req, err := helpers.Bind[GetIncidentRequest](c)
+	if err != nil {
+		c.Log.WithError(err).Debug("failed to bind GetIncidentRequest")
+		return echo.ErrBadRequest
+	}
+
+	ctx := c.Request().Context()
+	in, err := h.IncidentService.GetByID(ctx, req.IncidentID)
+	if err != nil {
+		c.Log.WithError(err).Error("failed to get incident")
+		return echo.ErrInternalServerError
+	}
+
+	// Verify it belongs to the team
+	if in.TeamID != req.TeamID {
+		return echo.ErrForbidden
+	}
+
+	resp := &GetIncidentResponse{
+		ID:          in.ID,
+		TeamID:      in.TeamID,
+		MonitorID:   in.MonitorID,
+		HeartbeatID: in.HeartbeatID,
+		Title:       in.Title,
+		Description: *in.Description,
+		Resolved:    in.Resolved,
+		Acknowledged: in.Acknowledged,
+	}
+
+	if in.AcknowledgedAt != nil {
+		ackAt := in.AcknowledgedAt.Format("2006-01-02T15:04:05Z07:00")
+		resp.AcknowledgedAt = &ackAt
+	}
+
+	if in.RootCauseAnalysis != nil {
+		resp.RootCauseAnalysis = in.RootCauseAnalysis
+	}
+
+	resp.CreatedAt = in.CreatedAt.Format("2006-01-02T15:04:05Z07:00")
+	resp.UpdatedAt = in.UpdatedAt.Format("2006-01-02T15:04:05Z07:00")
+
+	return c.JSON(http.StatusOK, resp)
+}
+
+type PatchSolveIncidentRequest struct {
 	TeamID     uint `param:"teamId" validate:"required,numeric,gte=0"`
 	IncidentID uint `param:"incidentId" validate:"required,numeric,gte=0"`
 	Resolved   bool `json:"resolved" validate:"required"`
 }
 
-func (h *Handlers) PatchSolveMonitorIncident(c hs.AuthenticatedContext) error {
-	req, err := helpers.Bind[PatchSolveMonitorIncidentRequset](c)
+func (h *Handlers) PatchSolveIncident(c hs.AuthenticatedContext) error {
+	req, err := helpers.Bind[PatchSolveIncidentRequest](c)
 	if err != nil {
-		c.Log.WithError(err).Debug("failed to bind PatchSolveMonitorIncidentRequset")
-
+		c.Log.WithError(err).Debug("failed to bind PatchSolveIncidentRequest")
 		return echo.ErrBadRequest
 	}
 
 	ctx := c.Request().Context()
-
-	incident, err := h.IncidentService.GetByID(ctx, req.IncidentID)
+	in, err := h.IncidentService.GetByID(ctx, req.IncidentID)
 	if err != nil {
 		c.Log.WithError(err).Error("failed to get incident")
-
 		return echo.ErrInternalServerError
 	}
 
-	incident.Resolved = req.Resolved
+	// Verify it belongs to the team
+	if in.TeamID != req.TeamID {
+		return echo.ErrForbidden
+	}
 
-	err = h.IncidentService.Update(
-		ctx,
-		incident,
-	)
-	if err != nil {
+	in.Resolved = req.Resolved
+	if err := h.IncidentService.Update(ctx, in); err != nil {
 		c.Log.WithError(err).Error("failed to update incident")
 		return echo.ErrInternalServerError
 	}
 
-	return c.NoContent(http.StatusNoContent)
+	return c.NoContent(http.StatusOK)
+}
+
+func (h *Handlers) PatchAcknowledgeIncident(c hs.AuthenticatedContext) error {
+	req, err := helpers.Bind[GetIncidentRequest](c)
+	if err != nil {
+		c.Log.WithError(err).Debug("failed to bind GetIncidentRequest")
+		return echo.ErrBadRequest
+	}
+
+	ctx := c.Request().Context()
+	in, err := h.IncidentService.GetByID(ctx, req.IncidentID)
+	if err != nil {
+		c.Log.WithError(err).Error("failed to get incident")
+		return echo.ErrInternalServerError
+	}
+
+	if in.TeamID != req.TeamID {
+		return echo.ErrForbidden
+	}
+
+	in.Acknowledged = true
+	now := time.Now()
+	in.AcknowledgedAt = &now
+	if err := h.IncidentService.Update(ctx, in); err != nil {
+		c.Log.WithError(err).Error("failed to update incident")
+		return echo.ErrInternalServerError
+	}
+
+	return c.NoContent(http.StatusOK)
 }

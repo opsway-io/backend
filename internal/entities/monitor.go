@@ -7,23 +7,24 @@ import (
 type MonitorState int
 
 const (
-	MonitorStateInactive MonitorState = 0
-	MonitorStateActive   MonitorState = 1
+	MonitorStateInactive    MonitorState = 0
+	MonitorStateActive      MonitorState = 1
+	MonitorStateMaintenance MonitorState = 2
 )
 
 type Monitor struct {
-	ID     uint
-	TeamID uint `gorm:"index;not null"`
+	ID     uint `json:"id"`
+	TeamID uint `gorm:"index;not null" json:"teamId"`
 
-	State MonitorState `gorm:"not null;default:0"`
-	Name  string       `gorm:"index;not null"`
+	State MonitorState `gorm:"not null;default:0" json:"state"`
+	Name  string       `gorm:"index;not null" json:"name"`
 
-	Settings   MonitorSettings    `gorm:"not null;constraint:OnDelete:CASCADE"`
-	Assertions []MonitorAssertion `gorm:"constraint:OnDelete:CASCADE"`
-	Incidents  []Incident         `gorm:"constraint:OnDelete:CASCADE"`
+	Settings   MonitorSettings    `gorm:"not null;constraint:OnDelete:CASCADE" json:"settings"`
+	Assertions []MonitorAssertion `gorm:"constraint:OnDelete:CASCADE" json:"assertions"`
+	Incidents  []Incident         `gorm:"constraint:OnDelete:CASCADE" json:"incidents"`
 
-	CreatedAt time.Time `gorm:"index"`
-	UpdatedAt time.Time `gorm:"index"`
+	CreatedAt time.Time `gorm:"index" json:"createdAt"`
+	UpdatedAt time.Time `gorm:"index" json:"updatedAt"`
 }
 
 func (Monitor) TableName() string {
@@ -36,6 +37,8 @@ func (m *Monitor) GetStateString() string {
 		return "INACTIVE"
 	case MonitorStateActive:
 		return "ACTIVE"
+	case MonitorStateMaintenance:
+		return "MAINTENANCE"
 	default:
 		return "UNKNOWN"
 	}
@@ -47,6 +50,8 @@ func (m *Monitor) SetStateString(state string) error {
 		m.State = MonitorStateInactive
 	case "ACTIVE":
 		m.State = MonitorStateActive
+	case "MAINTENANCE":
+		m.State = MonitorStateMaintenance
 	}
 
 	return nil
@@ -58,6 +63,8 @@ func GetMonitorStateEnumFromString(state string) MonitorState {
 		return MonitorStateInactive
 	case "ACTIVE":
 		return MonitorStateActive
+	case "MAINTENANCE":
+		return MonitorStateMaintenance
 	default:
 		return -1
 	}
@@ -74,6 +81,7 @@ type MonitorSettings struct {
 	Headers []MonitorSettingsHeader `gorm:"serializer:json"`
 	Body    MonitorSettingsBody     `gorm:"embedded;embeddedPrefix:body_"`
 	TLS     MonitorSettingsTLS      `gorm:"embedded;embeddedPrefix:tls_"`
+	Locations []string                `gorm:"serializer:json"`
 
 	UpdatedAt time.Time `gorm:"index"`
 }

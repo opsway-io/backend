@@ -19,6 +19,7 @@ type Service interface {
 
 	GetMonitorIDAndAssertions(ctx context.Context, monitorID uint, assertions []string) (*[]Check, error)
 	GetByTeamIDMonitorsUptime(ctx context.Context, teamID uint, start, end string) (*[]MonitorUptime, error)
+	GetByTeamIDMonitorsPerformance(ctx context.Context, teamID uint, start, end string) (*[]MonitorPerformance, error)
 }
 
 type ServiceImpl struct {
@@ -77,4 +78,7 @@ func (s *ServiceImpl) GetMonitorIDAndAssertions(ctx context.Context, monitorID u
 }
 func (s *ServiceImpl) GetByTeamIDMonitorsUptime(ctx context.Context, teamID uint, start, end string) (*[]MonitorUptime, error) {
 	return s.repository.GetByTeamIDMonitorsUptime(ctx, teamID, start, end)
+}
+func (s *ServiceImpl) GetByTeamIDMonitorsPerformance(ctx context.Context, teamID uint, start, end string) (*[]MonitorPerformance, error) {
+	return s.repository.GetByTeamIDMonitorsPerformance(ctx, teamID, start, end)
 }

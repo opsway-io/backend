@@ -3,6 +3,7 @@ package cmd
 import (
 	"context"
 
+	"github.com/opsway-io/backend/internal/alerting"
 	"github.com/opsway-io/backend/internal/authentication"
 	"github.com/opsway-io/backend/internal/billing"
 	"github.com/opsway-io/backend/internal/changelog"
@@ -12,13 +13,19 @@ import (
 	"github.com/opsway-io/backend/internal/connectors/redis"
 	"github.com/opsway-io/backend/internal/entities"
 	"github.com/opsway-io/backend/internal/event"
+	"github.com/opsway-io/backend/internal/heartbeats"
 	"github.com/opsway-io/backend/internal/incident"
+	"github.com/opsway-io/backend/internal/k8s"
+	"github.com/opsway-io/backend/internal/maintenance"
 	"github.com/opsway-io/backend/internal/monitor"
 	"github.com/opsway-io/backend/internal/notification/email"
 	"github.com/opsway-io/backend/internal/report"
 	"github.com/opsway-io/backend/internal/rest"
+	"github.com/opsway-io/backend/internal/statuspage"
+	"github.com/opsway-io/backend/internal/apikey"
 	"github.com/opsway-io/backend/internal/storage"
 	"github.com/opsway-io/backend/internal/team"
+	"github.com/opsway-io/backend/internal/escalation"
 	"github.com/opsway-io/backend/internal/user"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
@@ -68,6 +75,7 @@ func runAPI(cmd *cobra.Command, args []string) {
 		entities.Monitor{},
 		entities.MonitorSettings{},
 		entities.MonitorAssertion{},
+		entities.AlertRule{},
 		entities.Maintenance{},
 		entities.MaintenanceSettings{},
 		entities.MaintenanceComment{},
@@ -76,6 +84,12 @@ func runAPI(cmd *cobra.Command, args []string) {
 		entities.Changelog{},
 		entities.ChangelogEntry{},
 		entities.Report{},
+		entities.StatusPage{},
+		entities.StatusPageSubscriber{},
+		entities.APIKey{},
+		entities.EscalationPolicy{},
+		entities.OnCallRotation{},
+		entities.TeamInvitation{},
 	)
 
 	ch_db, err := clickhouse.NewClient(ctx, conf.Clickhouse)
@@ -89,9 +103,9 @@ func runAPI(cmd *cobra.Command, args []string) {
 
 	var emailSender email.Sender
 	if conf.Email.Debug {
-		l.Info("Using console email sender")
+		l.Info("Using SMTP email sender")
 
-		emailSender = email.NewConsoleSender()
+		emailSender = email.NewSMTPSender(conf.Email)
 	} else {
 		l.Info("Using Sendgrid email sender")
 
@@ -110,24 +124,45 @@ func runAPI(cmd *cobra.Command, args []string) {
 
 	userRepository := user.NewRepository(db)
 	userCache := user.NewCache(redisClient)
-	userService := user.NewService(userRepository, userCache, storageService, emailSender, eventService)
+	userService := user.NewService(userRepository, userCache, storageService, emailSender, eventService, conf.User)
 
 	teamRepository := team.NewRepository(db)
-	teamService := team.NewService(conf.Team, teamRepository, storageService, emailSender)
+	teamCache := team.NewCache(redisClient)
+	teamService := team.NewService(conf.Team, teamRepository, storageService, emailSender, teamCache)
 
 	monitorService := monitor.NewService(db, redisClient)
 
 	httpResultService := check.NewService(ch_db)
+
+	alertingRepository := alerting.NewRepository(db)
+	alertingService := alerting.NewService(alertingRepository)
+
+	heartbeatsRepository := heartbeats.NewRepository(db)
+	heartbeatsService := heartbeats.NewService(heartbeatsRepository)
+
+	maintenanceRepository := maintenance.NewRepository(db)
+	maintenanceService := maintenance.NewService(maintenanceRepository, eventService)
+
+	k8sService := k8s.NewService(l)
+
+	statuspageRepository := statuspage.NewRepository(db)
+	statuspageService := statuspage.NewService(statuspageRepository, k8sService)
 
 	billingService := billing.NewService(conf.Stripe)
 
 	changelogService := changelog.NewService(db)
 
 	incidentRepository := incident.NewRepository(db)
-	incidentService := incident.NewService(incidentRepository)
+	incidentService := incident.NewService(incidentRepository, eventService)
 
 	reportRepository := report.NewRepository(db)
 	reportsService := report.NewService(reportRepository)
+
+	apiKeyRepository := apikey.NewRepository(db)
+	apiKeyService := apikey.NewService(apiKeyRepository)
+
+	escalationRepo := escalation.NewRepository(db)
+	escalationService := escalation.NewService(escalationRepo)
 
 	srv, err := rest.NewServer(
 		conf.REST,
@@ -137,12 +172,24 @@ func runAPI(cmd *cobra.Command, args []string) {
 		authenticationService,
 		userService,
 		teamService,
+		alertingService,
 		monitorService,
 		httpResultService,
 		billingService,
 		changelogService,
+		heartbeatsService,
 		incidentService,
+		maintenanceService,
 		reportsService,
+		statuspageService,
+		escalationService,
+		eventService,
+		apiKeyService,
+		emailSender,
+		conf.Prober.AvailableLocations,
+		db,
+		ch_db,
+		conf.StatusPage.BaseURL,
 	)
 	if err != nil {
 		l.WithError(err).Fatal("Failed to create REST server")

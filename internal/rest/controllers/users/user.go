@@ -71,7 +71,7 @@ func newGetUserResponse(u *entities.User, userService user.Service, teamService 
 		}
 
 		if t.HasAvatar {
-			teams[i].AvatarURL = pointer.StringPtr(teamService.GetAvatarURLByID(t.ID))
+			teams[i].AvatarURL = pointer.String(teamService.GetAvatarURLByID(t.ID))
 		}
 	}
 
@@ -86,7 +86,7 @@ func newGetUserResponse(u *entities.User, userService user.Service, teamService 
 	}
 
 	if u.HasAvatar {
-		res.AvatarURL = pointer.StringPtr(userService.GetAvatarURLByID(u.ID))
+		res.AvatarURL = pointer.String(userService.GetAvatarURLByID(u.ID))
 	}
 
 	return res

@@ -98,9 +98,8 @@ func (h *Handlers) PostUserPasswordResetNewPassword(c hs.BaseContext) error {
 
 	if err := h.UserService.ChangePasswordWithResetToken(
 		c.Request().Context(),
-		req.UserID,
-		req.NewPassword,
 		req.ResetToken,
+		req.NewPassword,
 	); err != nil {
 		if errors.Is(err, user.ErrNotFound) {
 			c.Log.WithError(err).Debug("user or reset token not found")

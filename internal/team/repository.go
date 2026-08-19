@@ -20,7 +20,8 @@ var (
 type Repository interface {
 	GetByID(ctx context.Context, teamId uint) (*entities.Team, error)
 	GetByStripeID(ctx context.Context, stripeID string) (*entities.Team, error)
-	GetUsersByID(ctx context.Context, teamId uint, offset *int, limit *int, query *string) (*[]TeamUser, error)
+	GetUsersByID(ctx context.Context, teamId uint, offset *int, limit *int, query *string, role *entities.TeamRole) (*[]TeamUser, error)
+	GetTeamUserCount(ctx context.Context, teamId uint) (int64, error)
 	GetUserRole(ctx context.Context, teamID, userID uint) (*entities.TeamRole, error)
 	GetTeamsAndRoleByUserID(ctx context.Context, userID uint) (*[]TeamAndRole, error)
 
@@ -40,6 +41,11 @@ type Repository interface {
 
 	IsNameAvailable(ctx context.Context, name string) (bool, error)
 	IsUserOnTeamByEmail(ctx context.Context, teamID uint, email string) (bool, error)
+
+	CreateTeamInvitation(ctx context.Context, invitation *entities.TeamInvitation) error
+	GetTeamInvitations(ctx context.Context, teamID uint) (*[]entities.TeamInvitation, error)
+	DeleteTeamInvitation(ctx context.Context, teamID uint, email string) error
+	GetTeamInvitationByToken(ctx context.Context, token string) (*entities.TeamInvitation, error)
 }
 
 type RepositoryImpl struct {
@@ -82,10 +88,10 @@ type TeamUser struct {
 	TotalCount int
 }
 
-func (s *RepositoryImpl) GetUsersByID(ctx context.Context, teamId uint, offset *int, limit *int, query *string) (*[]TeamUser, error) {
+func (s *RepositoryImpl) GetUsersByID(ctx context.Context, teamId uint, offset *int, limit *int, query *string, role *entities.TeamRole) (*[]TeamUser, error) {
 	var users []TeamUser
 
-	s.db.WithContext(ctx).
+	q := s.db.WithContext(ctx).
 		Select("u.*, tu.role").
 		Table("team_users as tu").
 		Joins("INNER JOIN users as u ON u.id = tu.user_id AND tu.team_id = ?", teamId).
@@ -94,10 +100,29 @@ func (s *RepositoryImpl) GetUsersByID(ctx context.Context, teamId uint, offset *
 			postgres.Paginated(offset, limit),
 			postgres.IncludeTotalCount("total_count"),
 			postgres.Search([]string{"u.name", "u.display_name", "u.email"}, query),
-		).
-		Find(&users)
+		)
+
+	if role != nil {
+		q = q.Where("tu.role = ?", *role)
+	}
+
+	q.Find(&users)
 
 	return &users, nil
+}
+
+func (s *RepositoryImpl) GetTeamUserCount(ctx context.Context, teamId uint) (int64, error) {
+	var count int64
+	if err := s.db.WithContext(ctx).Model(&entities.TeamUser{}).Where("team_id = ?", teamId).Count(&count).Error; err != nil {
+		return 0, err
+	}
+
+	var inviteCount int64
+	if err := s.db.WithContext(ctx).Model(&entities.TeamInvitation{}).Where("team_id = ?", teamId).Count(&inviteCount).Error; err != nil {
+		return 0, err
+	}
+
+	return count + inviteCount, nil
 }
 
 func (s *RepositoryImpl) CreateWithOwnerUserID(ctx context.Context, team *entities.Team, ownerUserID uint) error {
@@ -314,4 +339,42 @@ func (s *RepositoryImpl) IsUserOnTeamByEmail(ctx context.Context, teamID uint, e
 	}
 
 	return count > 0, nil
+}
+
+func (s *RepositoryImpl) CreateTeamInvitation(ctx context.Context, invitation *entities.TeamInvitation) error {
+	// Upsert: If an invitation for this email and team already exists, update the role and token
+	return s.db.WithContext(ctx).
+		Where(entities.TeamInvitation{TeamID: invitation.TeamID, Email: invitation.Email}).
+		Assign(entities.TeamInvitation{Role: invitation.Role, Token: invitation.Token}).
+		FirstOrCreate(invitation).Error
+}
+
+func (s *RepositoryImpl) GetTeamInvitations(ctx context.Context, teamID uint) (*[]entities.TeamInvitation, error) {
+	var invites []entities.TeamInvitation
+	if err := s.db.WithContext(ctx).Where("team_id = ?", teamID).Order("created_at DESC").Find(&invites).Error; err != nil {
+		return nil, err
+	}
+	return &invites, nil
+}
+
+func (s *RepositoryImpl) DeleteTeamInvitation(ctx context.Context, teamID uint, email string) error {
+	result := s.db.WithContext(ctx).Where("team_id = ? AND email = ?", teamID, email).Delete(&entities.TeamInvitation{})
+	if result.Error != nil {
+		return result.Error
+	}
+	if result.RowsAffected == 0 {
+		return ErrNotFound
+	}
+	return nil
+}
+
+func (s *RepositoryImpl) GetTeamInvitationByToken(ctx context.Context, token string) (*entities.TeamInvitation, error) {
+	var invite entities.TeamInvitation
+	if err := s.db.WithContext(ctx).Where("token = ?", token).First(&invite).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, ErrNotFound
+		}
+		return nil, err
+	}
+	return &invite, nil
 }

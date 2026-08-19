@@ -50,10 +50,10 @@ func TeamsAndUsers(db *gorm.DB) {
 	for i := range defaultUsers {
 		u := defaultUsers[i]
 
-		u.SetPassword("pass")
-		db.Create(&u)
+		_ = u.SetPassword("pass")
+		db.Where(entities.User{Email: u.Email}).FirstOrCreate(&u)
 
-		db.Create(&entities.TeamUser{
+		db.Where(entities.TeamUser{UserID: u.ID, TeamID: t.ID}).FirstOrCreate(&entities.TeamUser{
 			UserID: u.ID,
 			TeamID: t.ID,
 			Role:   entities.TeamRoleOwner,
@@ -69,7 +69,7 @@ func TeamsAndUsers(db *gorm.DB) {
 			Email:       gofakeit.Email(),
 		}
 
-		u.SetPassword("pass")
+		_ = u.SetPassword("pass")
 		db.Create(&u)
 
 		db.Create(&entities.TeamUser{

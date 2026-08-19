@@ -33,7 +33,7 @@ func (h *Handlers) PutTeamAvatar(c hs.AuthenticatedContext) error {
 
 		return echo.ErrBadRequest
 	}
-	defer src.Close()
+	defer func() { _ = src.Close() }()
 
 	if err = h.TeamService.UploadAvatar(
 		c.Request().Context(),

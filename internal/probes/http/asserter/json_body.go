@@ -3,6 +3,8 @@ package asserter
 import (
 	"encoding/json"
 	"fmt"
+	"strconv"
+	"strings"
 
 	"github.com/opsway-io/backend/internal/probes/http"
 	"github.com/yalp/jsonpath"
@@ -27,16 +29,18 @@ import (
 */
 
 var allowedJSONBodyOperators = []string{
-	"EQUALS",
-	"NOT_EQUALS",
-	"IS_EMPTY",
-	"IS_NOT_EMPTY",
+	"EQUAL",
+	"NOT_EQUAL",
+	"EMPTY",
+	"NOT_EMPTY",
 	"GREATER_THAN",
 	"LESS_THAN",
 	"CONTAINS",
 	"NOT_CONTAINS",
-	"IS_NULL",
-	"IS_NOT_NULL",
+	"HAS_KEY",
+	"NOT_HAS_KEY",
+	"NULL",
+	"NOT_NULL",
 }
 
 type JSONBodyAsserter struct{}
@@ -98,11 +102,11 @@ func (a *JSONBodyAsserter) IsRuleValid(rule Rule) error {
 	}
 
 	// The target must be empty for the following operators:
-	// - IS_EMPTY
-	// - IS_NOT_EMPTY
-	// - IS_NULL
-	// - IS_NOT_NULL
-	if ok := rule.Operator == "IS_EMPTY" || rule.Operator == "IS_NOT_EMPTY" || rule.Operator == "IS_NULL" || rule.Operator == "IS_NOT_NULL"; ok {
+	// - EMPTY
+	// - NOT_EMPTY
+	// - NULL
+	// - NOT_NULL
+	if ok := rule.Operator == "EMPTY" || rule.Operator == "NOT_EMPTY" || rule.Operator == "NULL" || rule.Operator == "NOT_NULL"; ok {
 		if ok := rule.Target == ""; !ok {
 			return fmt.Errorf("target must be empty for operator: %s", rule.Operator)
 		}
@@ -139,21 +143,17 @@ func (a *JSONBodyAsserter) assert(result *http.Result, rule Rule) bool {
 	}
 
 	switch rule.Operator {
-	case "EQUALS":
+	case "EQUAL":
 		return a.assertEquals(value, rule.Target)
-	case "NOT_EQUALS":
+	case "NOT_EQUAL":
 		return a.assertNotEquals(value, rule.Target)
 	case "HAS_KEY":
 		return a.assertHasKey(value, rule.Target)
 	case "NOT_HAS_KEY":
 		return a.assertNotHasKey(value, rule.Target)
-	case "HAS_VALUE":
-		return a.assertHasValue(value, rule.Target)
-	case "NOT_HAS_VALUE":
-		return a.assertNotHasValue(value, rule.Target)
-	case "IS_EMPTY":
+	case "EMPTY":
 		return a.assertIsEmpty(value)
-	case "IS_NOT_EMPTY":
+	case "NOT_EMPTY":
 		return a.assertIsNotEmpty(value)
 	case "GREATER_THAN":
 		return a.assertGreaterThan(value, rule.Target)
@@ -163,9 +163,9 @@ func (a *JSONBodyAsserter) assert(result *http.Result, rule Rule) bool {
 		return a.assertContains(value, rule.Target)
 	case "NOT_CONTAINS":
 		return a.assertNotContains(value, rule.Target)
-	case "IS_NULL":
+	case "NULL":
 		return a.assertIsNull(value)
-	case "IS_NOT_NULL":
+	case "NOT_NULL":
 		return a.assertIsNotNull(value)
 	default:
 		return false
@@ -189,35 +189,85 @@ func (a *JSONBodyAsserter) assertNotHasKey(value interface{}, target string) boo
 }
 
 func (a *JSONBodyAsserter) assertHasValue(value interface{}, target string) bool {
-	return false // TODO: Implement
+	return a.assertEquals(value, target)
 }
 
 func (a *JSONBodyAsserter) assertNotHasValue(value interface{}, target string) bool {
-	return false // TODO: Implement
+	return a.assertNotEquals(value, target)
 }
 
 func (a *JSONBodyAsserter) assertIsEmpty(value interface{}) bool {
-	return false // TODO: Implement
+	if value == nil {
+		return true
+	}
+	switch v := value.(type) {
+	case string:
+		return len(v) == 0
+	case []interface{}:
+		return len(v) == 0
+	case map[string]interface{}:
+		return len(v) == 0
+	default:
+		return false
+	}
 }
 
 func (a *JSONBodyAsserter) assertIsNotEmpty(value interface{}) bool {
-	return false // TODO: Implement
+	return !a.assertIsEmpty(value)
 }
 
 func (a *JSONBodyAsserter) assertGreaterThan(value interface{}, target string) bool {
-	return false // TODO: Implement
+	targetFloat, err := strconv.ParseFloat(target, 64)
+	if err != nil {
+		return false
+	}
+	valueFloat, ok := value.(float64)
+	if !ok {
+		return false
+	}
+	return valueFloat > targetFloat
 }
 
 func (a *JSONBodyAsserter) assertLessThan(value interface{}, target string) bool {
-	return false // TODO: Implement
+	targetFloat, err := strconv.ParseFloat(target, 64)
+	if err != nil {
+		return false
+	}
+	valueFloat, ok := value.(float64)
+	if !ok {
+		return false
+	}
+	return valueFloat < targetFloat
 }
 
 func (a *JSONBodyAsserter) assertContains(value interface{}, target string) bool {
-	return false // TODO: Implement
+	if value == nil {
+		return false
+	}
+	switch v := value.(type) {
+	case string:
+		return strings.Contains(v, target)
+	case []interface{}:
+		for _, item := range v {
+			if fmt.Sprintf("%v", item) == target {
+				return true
+			}
+		}
+		return false
+	case map[string]interface{}:
+		for _, item := range v {
+			if fmt.Sprintf("%v", item) == target {
+				return true
+			}
+		}
+		return false
+	default:
+		return strings.Contains(fmt.Sprintf("%v", value), target)
+	}
 }
 
 func (a *JSONBodyAsserter) assertNotContains(value interface{}, target string) bool {
-	return false // TODO: Implement
+	return !a.assertContains(value, target)
 }
 
 func (a *JSONBodyAsserter) assertIsNull(value interface{}) bool {

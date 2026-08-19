@@ -1,6 +1,7 @@
 package authentication
 
 import (
+	"errors"
 	"net/http"
 	"time"
 
@@ -15,13 +16,17 @@ import (
 
 type PostLoginRequest struct {
 	Email    string `json:"email" validate:"required,email"`
-	Password string `json:"password" validate:"required"`
+	Password string `json:"password" validate:"required,min=4,max=255"`
+}
+
+type PostRegisterRequest struct {
+	Name     string `json:"name" validate:"required"`
+	Email    string `json:"email" validate:"required,email"`
+	Password string `json:"password" validate:"required,min=4,max=255"`
 }
 
 type PostLoginResponse struct {
 	User         PostLoginResponseUser `json:"user"`
-	AccessToken  string                `json:"accessToken"`
-	RefreshToken string                `json:"refreshToken"`
 }
 
 type PostLoginResponseUser struct {
@@ -74,16 +79,17 @@ func (h *Handlers) PostLogin(c hs.BaseContext) error {
 
 	c.Log.Info("user authenticated")
 
+	h.CookieService.SetAccessToken(c, accessToken)
+	h.CookieService.SetRefreshToken(c, refreshToken)
+
 	return c.JSON(http.StatusOK, newPostLoginResponse(
 		user,
-		accessToken,
-		refreshToken,
 		h.UserService,
 		h.TeamService,
 	))
 }
 
-func newPostLoginResponse(user *entities.User, accessToken, refreshToken string, userService user.Service, teamService team.Service) PostLoginResponse {
+func newPostLoginResponse(user *entities.User, userService user.Service, teamService team.Service) PostLoginResponse {
 	teams := make([]PostLoginResponseTeam, len(user.Teams))
 	for i, team := range user.Teams {
 		teams[i] = PostLoginResponseTeam{
@@ -107,8 +113,6 @@ func newPostLoginResponse(user *entities.User, accessToken, refreshToken string,
 			CreatedAt:   user.CreatedAt,
 			UpdatedAt:   user.UpdatedAt,
 		},
-		AccessToken:  accessToken,
-		RefreshToken: refreshToken,
 	}
 
 	if user.HasAvatar {
@@ -116,4 +120,119 @@ func newPostLoginResponse(user *entities.User, accessToken, refreshToken string,
 	}
 
 	return res
+}
+
+func (h *Handlers) PostRegister(c hs.BaseContext) error {
+	req, err := helpers.Bind[PostRegisterRequest](c)
+	if err != nil {
+		c.Log.WithError(err).Debug("failed to bind PostRegisterRequest")
+
+		return echo.ErrBadRequest
+	}
+
+	u := &entities.User{
+		Name: req.Name,
+	}
+	u.SetEmail(req.Email)
+	if err := u.SetPassword(req.Password); err != nil {
+		c.Log.WithError(err).Debug("failed to set password")
+
+		return echo.ErrInternalServerError
+	}
+
+	if err := h.UserService.Create(c.Request().Context(), u); err != nil {
+		if errors.Is(err, user.ErrEmailAlreadyExists) {
+			return echo.NewHTTPError(http.StatusConflict, "user already exists")
+		}
+
+		c.Log.WithError(err).Debug("failed to create user")
+
+		return echo.ErrInternalServerError
+	}
+
+	c.Log = c.Log.WithField("user_id", u.ID)
+
+	accessToken, refreshToken, err := h.AuthenticationService.Generate(c.Request().Context(), u)
+	if err != nil {
+		c.Log.WithError(err).Debug("failed to generate access and refresh token for user")
+
+		return echo.ErrInternalServerError
+	}
+
+	c.Log.Info("user registered")
+
+	h.CookieService.SetAccessToken(c, accessToken)
+	h.CookieService.SetRefreshToken(c, refreshToken)
+
+	return c.JSON(http.StatusOK, newPostLoginResponse(
+		u,
+		h.UserService,
+		h.TeamService,
+	))
+}
+
+type PostForgotPasswordRequest struct {
+	Email string `json:"email" validate:"required,email"`
+}
+
+func (h *Handlers) PostForgotPassword(c hs.BaseContext) error {
+	req, err := helpers.Bind[PostForgotPasswordRequest](c)
+	if err != nil {
+		c.Log.WithError(err).Debug("failed to bind PostForgotPasswordRequest")
+		return echo.ErrBadRequest
+	}
+
+	user, err := h.UserService.GetUserAndTeamsByEmailAddress(c.Request().Context(), req.Email)
+	if err != nil {
+		c.Log.WithError(err).Debug("failed to get user")
+		// We return 200 OK anyway to prevent user enumeration
+		return c.NoContent(http.StatusOK)
+	}
+
+	if err := h.UserService.RequestPasswordReset(c.Request().Context(), user.ID); err != nil {
+		c.Log.WithError(err).Error("failed to request password reset")
+		return echo.ErrInternalServerError
+	}
+
+	return c.NoContent(http.StatusOK)
+}
+
+type PostResetPasswordRequest struct {
+	Token    string `json:"token" validate:"required"`
+	Password string `json:"password" validate:"required,min=4,max=255"`
+}
+
+func (h *Handlers) PostResetPassword(c hs.BaseContext) error {
+	req, err := helpers.Bind[PostResetPasswordRequest](c)
+	if err != nil {
+		c.Log.WithError(err).Debug("failed to bind PostResetPasswordRequest")
+		return echo.ErrBadRequest
+	}
+
+	if err := h.UserService.ChangePasswordWithResetToken(c.Request().Context(), req.Token, req.Password); err != nil {
+		c.Log.WithError(err).Error("failed to change password with reset token")
+		return echo.ErrBadRequest
+	}
+
+	return c.NoContent(http.StatusOK)
+}
+
+func (h *Handlers) PostLogout(c hs.BaseContext) error {
+	// Set cookies to expire immediately
+	c.SetCookie(&http.Cookie{
+		Name:     "access_token",
+		Value:    "",
+		Path:     "/",
+		MaxAge:   -1,
+		HttpOnly: true,
+	})
+	c.SetCookie(&http.Cookie{
+		Name:     "refresh_token",
+		Value:    "",
+		Path:     "/",
+		MaxAge:   -1,
+		HttpOnly: true,
+	})
+	
+	return c.NoContent(http.StatusOK)
 }

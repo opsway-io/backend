@@ -16,8 +16,8 @@ func (h *Handlers) PostConfig(c hs.AuthenticatedContext) error {
 }
 
 type PostCreateCheckoutSession struct {
-	TeamID         uint   `param:"teamId" validate:"required,numeric,gt=0"`
-	PriceLookupKey string `json:"priceLookupKey" validate:"required,max=255"`
+	TeamID uint   `param:"teamId" validate:"required,numeric,gt=0"`
+	Plan   string `json:"plan" validate:"required,max=255"`
 }
 
 func (h *Handlers) PostCreateCheckoutSession(c hs.AuthenticatedContext) error {
@@ -35,15 +35,22 @@ func (h *Handlers) PostCreateCheckoutSession(c hs.AuthenticatedContext) error {
 		return echo.ErrInternalServerError
 	}
 
-	if team.PaymentPlan == entities.PaymentPlan(req.PriceLookupKey) {
+	if team.PaymentPlan == entities.PaymentPlan(req.Plan) {
 		return c.JSON(http.StatusOK, "")
 	}
 
+	priceID := ""
+	if req.Plan == "TEAM" {
+		priceID = h.BillingService.PostConfig().TeamPrice
+	} else if req.Plan == "ENTERPRISE" {
+		priceID = h.BillingService.PostConfig().EnterprisePrice
+	}
+
 	if team.StripeCustomerID == nil {
-		if req.PriceLookupKey == "FREE" {
+		if req.Plan == "FREE" {
 			return c.JSON(http.StatusOK, "")
 		}
-		s, err := h.BillingService.CreateCheckoutSession(team, req.PriceLookupKey)
+		s, err := h.BillingService.CreateCheckoutSession(team, priceID)
 		if err != nil {
 			c.Log.WithError(err).Debug("create stripe checkout session")
 
@@ -52,7 +59,7 @@ func (h *Handlers) PostCreateCheckoutSession(c hs.AuthenticatedContext) error {
 		return c.JSON(http.StatusOK, s.URL)
 	}
 
-	if req.PriceLookupKey == "FREE" {
+	if req.Plan == "FREE" {
 		_, err := h.BillingService.CancelSubscribtion(team)
 		if err != nil {
 			c.Log.WithError(err).Debug("cancel subscription")
@@ -63,7 +70,7 @@ func (h *Handlers) PostCreateCheckoutSession(c hs.AuthenticatedContext) error {
 	}
 
 	if team.PaymentPlan == "FREE" {
-		s, err := h.BillingService.CreateCheckoutSession(team, req.PriceLookupKey)
+		s, err := h.BillingService.CreateCheckoutSession(team, priceID)
 		if err != nil {
 			c.Log.WithError(err).Debug("create stripe checkout session")
 
@@ -72,7 +79,7 @@ func (h *Handlers) PostCreateCheckoutSession(c hs.AuthenticatedContext) error {
 		return c.JSON(http.StatusOK, s.URL)
 	}
 
-	_, err = h.BillingService.UpdateSubscribtion(team, req.PriceLookupKey)
+	_, err = h.BillingService.UpdateSubscribtion(team, priceID)
 	if err != nil {
 		c.Log.WithError(err).Debug("update subscription")
 

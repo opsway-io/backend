@@ -39,6 +39,7 @@ func (s *CookieServiceImpl) SetAccessToken(c echo.Context, value string) error {
 	cookie.Path = "/"
 	cookie.SameSite = http.SameSiteLaxMode
 	cookie.Secure = s.authConfig.CookieSecure
+	cookie.HttpOnly = true
 
 	c.SetCookie(cookie)
 
@@ -54,6 +55,7 @@ func (s *CookieServiceImpl) SetRefreshToken(c echo.Context, value string) error 
 	cookie.Path = "/"
 	cookie.SameSite = http.SameSiteLaxMode
 	cookie.Secure = s.authConfig.CookieSecure
+	cookie.HttpOnly = true
 
 	c.SetCookie(cookie)
 

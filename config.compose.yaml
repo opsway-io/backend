@@ -1,5 +1,5 @@
 log:
-  level: info
+  level: debug
   format: text
 
 rest:
@@ -19,7 +19,7 @@ postgres:
   debug: true
 
 clickhouse:
-  dsn: clickhouse+native://default:@ch_server:9000/opsway
+  dsn: clickhouse+native://default:@ch_server:9000/opsway?async_insert=1&wait_for_async_insert=1
   debug: true
 
 redis:
@@ -31,6 +31,10 @@ email:
   debug: true
   sender_name: "opsway"
   sender_email: "no-reply@opsway.io"
+  smtp_host: "mailhog"
+  smtp_port: 1025
+  smtp_username: ""
+  smtp_password: ""
 
 object_storage:
   endpoint_url: "http://storage:9001"
@@ -41,6 +45,11 @@ object_storage:
 
 prober:
   concurrency: 1
+  location: "global"
+  available_locations:
+    - "global"
+    - "eu-central-1"
+    - "us-east-1"
 
 team:
   invitation_secret: supersecret
@@ -51,3 +60,10 @@ stripe:
   secret_key: "sk_test_51NjhPuAAd26uMXu2QkGAVDTZDLYGRQB2oxqWkZfH6j4XUOIg2HBOOKB5wRL25vOo0VkpfjnxXnP0aZ8NZqvqex3N00JZU6eD2H"
   webhook_secret: "whsec_4665482442d698095ed89e386c0069beb54a1ba141a371edd4e8e0c5126d7568"
   domain: http://localhost:5173
+  team_price_id: "price_1QyF7nAAd26uMXu2Z04p59ce"
+  enterprise_price_id: "price_1QyF7dAAd26uMXu2LIbml2m7"
+user:
+  password_reset_token_ttl: 24h
+  password_reset_url: "http://localhost:5173/login/reset-password"
+status_page:
+  base_url: "http://localhost:5174"

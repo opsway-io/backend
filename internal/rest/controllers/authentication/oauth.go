@@ -58,8 +58,8 @@ func (h *Handlers) GetOAuthCallback(c hs.BaseContext) error {
 		return c.Redirect(http.StatusTemporaryRedirect, h.OAuthConfig.FailureURL)
 	}
 
-	h.CookieService.SetRefreshToken(c, refreshToken)
-	h.CookieService.SetAccessToken(c, accessToken)
+	_ = h.CookieService.SetRefreshToken(c, refreshToken)
+	_ = h.CookieService.SetAccessToken(c, accessToken)
 
 	return c.Redirect(http.StatusTemporaryRedirect, h.OAuthConfig.SuccessURL)
 }

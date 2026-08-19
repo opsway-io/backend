@@ -5,6 +5,9 @@
 data/
 
 .env
+config.yaml
+config.yml
+secrets.yaml
 *.exe
 *.exe~
 *.dll

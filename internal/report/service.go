@@ -9,7 +9,9 @@ import (
 
 type Service interface {
 	GetResportsByTeam(ctx context.Context, teamID uint) (*[]entities.Report, error)
-	CreateReport(ctx context.Context, teamID uint, reportType string, reportData entities.ReportData) error
+	GetByID(ctx context.Context, id uint) (*entities.Report, error)
+	CreateReport(ctx context.Context, teamID uint, reportType string, reportData entities.ReportData) (*entities.Report, error)
+	Update(ctx context.Context, rep *entities.Report) error
 }
 
 type ServiceImpl struct {
@@ -25,15 +27,30 @@ func NewService(repository Repository) Service {
 func (s *ServiceImpl) GetResportsByTeam(ctx context.Context, teamID uint) (*[]entities.Report, error) {
 	return s.repository.GetReportsByTeamID(ctx, teamID)
 }
-func (s *ServiceImpl) CreateReport(ctx context.Context, teamID uint, reportType string, reportData entities.ReportData) error {
+func (s *ServiceImpl) GetByID(ctx context.Context, id uint) (*entities.Report, error) {
+	return s.repository.GetByID(ctx, id)
+}
+
+func (s *ServiceImpl) Update(ctx context.Context, rep *entities.Report) error {
+	return s.repository.Update(ctx, rep)
+}
+
+func (s *ServiceImpl) CreateReport(ctx context.Context, teamID uint, reportType string, reportData entities.ReportData) (*entities.Report, error) {
 	reportTypeEnum, err := entities.ReportFrom(reportType)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	return s.repository.Create(ctx, &entities.Report{
+	rep := &entities.Report{
 		TeamID: teamID,
 		Type:   reportTypeEnum,
+		Status: entities.ReportStatusPending,
 		Report: datatypes.NewJSONType(reportData),
-	})
+	}
+
+	err = s.repository.Create(ctx, rep)
+	if err != nil {
+		return nil, err
+	}
+	return rep, nil
 }

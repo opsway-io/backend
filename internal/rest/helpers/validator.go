@@ -1,7 +1,10 @@
 package helpers
 
 import (
+	"reflect"
+
 	"github.com/go-playground/validator"
+	"github.com/opsway-io/backend/internal/probes/http/asserter"
 	"github.com/pkg/errors"
 )
 
@@ -12,12 +15,12 @@ type Validator struct {
 func NewValidator() *Validator {
 	v := validator.New()
 
-	v.RegisterValidation("teamRole", TeamRoleValidator)
-	v.RegisterValidation("monitorFrequency", MonitorFrequencyValidator)
-	v.RegisterValidation("monitorMethod", MonitorMethodValidator)
-	v.RegisterValidation("monitorBodyType", BodyTypeValidator)
-	v.RegisterValidation("monitorState", MonitorStateValidator)
-	v.RegisterValidation("monitorAssertions", MonitorAssertionsValidator)
+	_ = v.RegisterValidation("teamRole", TeamRoleValidator)
+	_ = v.RegisterValidation("monitorFrequency", MonitorFrequencyValidator)
+	_ = v.RegisterValidation("monitorMethod", MonitorMethodValidator)
+	_ = v.RegisterValidation("monitorBodyType", BodyTypeValidator)
+	_ = v.RegisterValidation("monitorState", MonitorStateValidator)
+	_ = v.RegisterValidation("monitorAssertions", MonitorAssertionsValidator)
 
 	return &Validator{
 		validator: v,
@@ -62,7 +65,7 @@ func MonitorFrequencyValidator(fl validator.FieldLevel) bool {
 	return false
 }
 
-var AllowedMonitorMethods = []string{"GET", "POST", "PUT", "DELETE", "HEAD", "OPTIONS", "PATCH"}
+var AllowedMonitorMethods = []string{"GET", "POST", "PUT", "DELETE", "HEAD", "OPTIONS", "PATCH", "TCP", "ICMP", "DNS", "POSTGRES", "MYSQL", "REDIS", "BROWSER"}
 
 func MonitorMethodValidator(fl validator.FieldLevel) bool {
 	for _, method := range AllowedMonitorMethods {
@@ -86,7 +89,7 @@ func BodyTypeValidator(fl validator.FieldLevel) bool {
 	return false
 }
 
-var AllowedMonitorStates = []string{"ACTIVE", "INACTIVE"}
+var AllowedMonitorStates = []string{"ACTIVE", "INACTIVE", "MAINTENANCE"}
 
 func MonitorStateValidator(fl validator.FieldLevel) bool {
 	for _, state := range AllowedMonitorStates {
@@ -99,5 +102,24 @@ func MonitorStateValidator(fl validator.FieldLevel) bool {
 }
 
 func MonitorAssertionsValidator(fl validator.FieldLevel) bool {
-	return true // TODO: use asserter to validate assertion
+	v := fl.Field()
+	if v.Kind() == reflect.Slice {
+		a := asserter.New()
+		for i := 0; i < v.Len(); i++ {
+			elem := v.Index(i)
+			if elem.Kind() == reflect.Struct {
+				rule := asserter.Rule{
+					Source:   elem.FieldByName("Source").String(),
+					Property: elem.FieldByName("Property").String(),
+					Operator: elem.FieldByName("Operator").String(),
+					Target:   elem.FieldByName("Target").String(),
+				}
+				if err := a.IsRuleValid(rule); err != nil {
+					return false
+				}
+			}
+		}
+		return true
+	}
+	return false
 }

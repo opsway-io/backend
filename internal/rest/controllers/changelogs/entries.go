@@ -71,8 +71,11 @@ func (h *Handlers) newGetChangelogEntriesResponse(entries []entities.ChangelogEn
 }
 
 type PostChangelogEntriesRequest struct {
-	TeamID      uint `param:"teamId" validate:"required,numeric,gte=0"`
-	ChangelogID uint `param:"changelogId" validate:"required,numeric,gte=0"`
+	TeamID      uint   `param:"teamId" validate:"required,numeric,gte=0"`
+	ChangelogID uint   `param:"changelogId" validate:"required,numeric,gte=0"`
+	Title       string `json:"title" validate:"required,max=512"`
+	Content     string `json:"content"`
+	AuthorIDs   []uint `json:"authorIds"`
 }
 
 func (h *Handlers) PostChangelogEntries(c hs.AuthenticatedContext) error {
@@ -83,9 +86,13 @@ func (h *Handlers) PostChangelogEntries(c hs.AuthenticatedContext) error {
 		return echo.ErrBadRequest
 	}
 
-	// TODO: implement
+	entry, err := h.ChangelogsService.CreateEntry(c.Request().Context(), req.TeamID, req.ChangelogID, req.Title, req.Content, req.AuthorIDs)
+	if err != nil {
+		c.Log.WithError(err).Error("failed to create changelog entry")
+		return echo.ErrInternalServerError
+	}
 
-	return c.JSON(http.StatusOK, req)
+	return c.JSON(http.StatusOK, entry)
 }
 
 type GetChangelogEntryRequest struct {
@@ -109,9 +116,13 @@ func (h *Handlers) GetChangelogEntry(c hs.AuthenticatedContext) error {
 		return echo.ErrBadRequest
 	}
 
-	// TODO: implement
+	entry, err := h.ChangelogsService.GetEntryWithAuthors(c.Request().Context(), req.TeamID, req.ChangelogID, req.EntryID)
+	if err != nil {
+		c.Log.WithError(err).Error("failed to get changelog entry")
+		return echo.ErrNotFound
+	}
 
-	return c.JSON(http.StatusOK, req)
+	return c.JSON(http.StatusOK, entry)
 }
 
 type DeleteChangelogEntryRequest struct {
@@ -128,9 +139,13 @@ func (h *Handlers) DeleteChangelogEntry(c hs.AuthenticatedContext) error {
 		return echo.ErrBadRequest
 	}
 
-	// TODO: implement
+	err = h.ChangelogsService.DeleteEntry(c.Request().Context(), req.TeamID, req.ChangelogID, req.EntryID)
+	if err != nil {
+		c.Log.WithError(err).Error("failed to delete changelog entry")
+		return echo.ErrInternalServerError
+	}
 
-	return c.JSON(http.StatusOK, req)
+	return c.NoContent(http.StatusNoContent)
 }
 
 type PutChangelogEntryRequest struct {
@@ -148,7 +163,11 @@ func (h *Handlers) PutChangelogEntry(c hs.AuthenticatedContext) error {
 		return echo.ErrBadRequest
 	}
 
-	// TODO: implement
+	entry, err := h.ChangelogsService.UpdateEntry(c.Request().Context(), req.TeamID, req.ChangelogID, req.EntryID, req.Title, "", nil)
+	if err != nil {
+		c.Log.WithError(err).Error("failed to update changelog entry")
+		return echo.ErrInternalServerError
+	}
 
-	return c.JSON(http.StatusOK, req)
+	return c.JSON(http.StatusOK, entry)
 }

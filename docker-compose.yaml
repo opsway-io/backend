@@ -12,23 +12,153 @@ services:
     volumes:
       - .:/app
     ports:
-      - 8001:8001
+      - '127.0.0.1:8001:8001'
     depends_on:
       - postgres
       - redis
       - ch_server
       - storage
-  prober:
+  scheduler:
     image: acim/go-reflex
     restart: unless-stopped
+    command: reflex -r '\.go|\.yaml$' -R '\.data\/' -s -- sh -c 'go run main.go scheduler --config config.compose.yaml'
+    environment:
+      - RACE_DETECTOR=1
+    volumes:
+      - .:/app
+    depends_on:
+      - postgres
+      - redis
+  prober:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    restart: unless-stopped
     command: reflex -r '\.go|\.yaml$' -R '\.data\/' -s -- sh -c 'go run main.go prober --config config.compose.yaml'
+    environment:
+      - RACE_DETECTOR=1
+      - PROBER_LOCATION=global
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - .:/app
+    depends_on:
+      - redis
+      - ch_server
+  prober-eu-central-1:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    restart: unless-stopped
+    command: reflex -r '\.go|\.yaml$' -R '\.data\/' -s -- sh -c 'go run main.go prober --config config.compose.yaml'
+    environment:
+      - RACE_DETECTOR=1
+      - PROBER_LOCATION=eu-central-1
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - .:/app
+    depends_on:
+      - redis
+      - ch_server
+  prober-us-east-1:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    restart: unless-stopped
+    command: reflex -r '\.go|\.yaml$' -R '\.data\/' -s -- sh -c 'go run main.go prober --config config.compose.yaml'
+    environment:
+      - RACE_DETECTOR=1
+      - PROBER_LOCATION=us-east-1
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - .:/app
+    depends_on:
+      - redis
+      - ch_server
+  alerter:
+    image: acim/go-reflex
+    restart: unless-stopped
+    command: reflex -r '\.go|\.yaml$' -R '\.data\/' -s -- sh -c 'go run main.go alerter --config config.compose.yaml'
     environment:
       - RACE_DETECTOR=1
     volumes:
       - .:/app
     depends_on:
       - redis
+      - postgres
+  heartbeater:
+    image: acim/go-reflex
+    restart: unless-stopped
+    command: reflex -r '\.go|\.yaml$' -R '\.data\/' -s -- sh -c 'go run main.go heartbeater --config config.compose.yaml'
+    environment:
+      - RACE_DETECTOR=1
+    volumes:
+      - .:/app
+    depends_on:
+      - redis
+      - postgres
+  maintainer:
+    image: acim/go-reflex
+    restart: unless-stopped
+    command: reflex -r '\.go|\.yaml$' -R '\.data\/' -s -- sh -c 'go run main.go maintainer --config config.compose.yaml'
+    environment:
+      - RACE_DETECTOR=1
+    volumes:
+      - .:/app
+    depends_on:
+      - redis
+      - postgres
+  mlflow-server:
+    image: ghcr.io/mlflow/mlflow:v2.10.2
+    restart: unless-stopped
+    ports:
+      - '127.0.0.1:5000:5000'
+    command: mlflow server --host 0.0.0.0 --port 5000
+  forecaster:
+    build:
+      context: ../forecaster
+    restart: unless-stopped
+    environment:
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - CLICKHOUSE_HOST=ch_server
+      - CLICKHOUSE_PORT=8123
+      - MLFLOW_TRACKING_URI=http://mlflow-server:5000
+    depends_on:
+      - redis
       - ch_server
+      - mlflow-server
+  forecaster-api:
+    build:
+      context: ../forecaster
+    restart: unless-stopped
+    command: ["uv", "run", "uvicorn", "api:app", "--host", "0.0.0.0", "--port", "8000", "--app-dir", "src"]
+    environment:
+      - MLFLOW_TRACKING_URI=http://mlflow-server:5000
+      - CLICKHOUSE_HOST=ch_server
+      - CLICKHOUSE_PORT=8123
+    depends_on:
+      - mlflow-server
+  report:
+    image: acim/go-reflex
+    restart: unless-stopped
+    command: reflex -r '\.go|\.yaml$' -R '\.data\/' -s -- sh -c 'go run main.go report --config config.compose.yaml'
+    environment:
+      - RACE_DETECTOR=1
+    volumes:
+      - .:/app
+    depends_on:
+      - redis
+      - postgres
+      - ch_server
+
+  mockserver:
+    image: mccutchen/go-httpbin
+    restart: unless-stopped
+    ports:
+      - '8080:8080'
 
   # Dependencies
   postgres:
@@ -41,14 +171,14 @@ services:
     volumes:
       - './.data/postgres:/var/lib/posgresql/data'
     ports:
-      - '5432:5432'
+      - '127.0.0.1:5432:5432'
 
   redis:
-    image: 'redis/redis-stack:latest'
+    image: 'redis/redis-stack:7.4.0-v3'
     restart: unless-stopped
     ports:
-      - '6379:6379'
-      - '8002:8001'
+      - '127.0.0.1:6380:6379'
+      - '127.0.0.1:8002:8001'
 
   ch_server:
     image: clickhouse/clickhouse-server:25.6
@@ -59,10 +189,11 @@ services:
       CLICKHOUSE_DB: "opsway"
       CLICKHOUSE_SKIP_USER_SETUP: 1
     ports:
-      - '8123:8123'
-      - '9000:9000'
+      - '127.0.0.1:8123:8123'
+      - '127.0.0.1:9000:9000'
     volumes:
       - './.data/clickhouse:/var/lib/clickhouse'
+      - './clickhouse-listen.xml:/etc/clickhouse-server/config.d/listen.xml'
     healthcheck:
       test: wget --no-verbose --tries=1 --spider http://localhost:8123/?query=SELECT%201 || exit 1
 
@@ -77,7 +208,7 @@ services:
     image: ghcr.io/caioricciuti/ch-ui:latest
     restart: always
     ports:
-      - "5521:5521"
+      - '127.0.0.1:5521:5521'
     environment:
       VITE_CLICKHOUSE_URL: "http://localhost:8123"
       VITE_CLICKHOUSE_USER: "default"
@@ -86,14 +217,21 @@ services:
     image: minio/minio
     restart: unless-stopped
     ports:
-      - '9001:9001'
-      - '5566:5566'
+      - '127.0.0.1:9001:9001'
+      - '127.0.0.1:5566:5566'
     volumes:
       - './.data/minio:/data'
     environment:
       MINIO_ACCESS_KEY: guest
       MINIO_SECRET_KEY: supersecret
     command: 'server --address 0.0.0.0:9001 --console-address 0.0.0.0:5566 /data'
+
+  mailhog:
+    image: mailhog/mailhog
+    restart: unless-stopped
+    ports:
+      - '127.0.0.1:1025:1025'
+      - '127.0.0.1:8025:8025'
 
   storage_init:
     image: minio/mc:latest

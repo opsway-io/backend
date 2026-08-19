@@ -2,6 +2,7 @@ package monitors
 
 import (
 	"errors"
+	"fmt"
 	"net/http"
 	"time"
 
@@ -29,9 +30,9 @@ type Monitor struct {
 
 type MonitorSettings struct {
 	Method           string                  `json:"method" validate:"required,monitorMethod"`
-	URL              string                  `json:"url" validate:"required,url"`
+	URL              string                  `json:"url" validate:"required,max=2048"`
 	FrequencySeconds uint64                  `json:"frequencySeconds" validate:"required,monitorFrequency"`
-	Headers          []MonitorSettingsHeader `json:"headers" validate:"required,dive,required,max=255"`
+	Headers          []MonitorSettingsHeader `json:"headers" validate:"dive"`
 	Body             MonitorSettingsBody     `json:"body" validate:"required,dive"`
 	TLS              MonitorSettingsTLS      `json:"tls" validate:"required,dive"`
 	Locations        []string                `json:"locations" validate:"omitempty,dive,required,max=255"`
@@ -170,7 +171,7 @@ func newGetMonitorsResponse(monitors *[]monitor.MonitorWithTotalCount, stats *[]
 						CheckExpiration:         m.Settings.TLS.CheckExpiration,
 						ExpirationThresholdDays: m.Settings.TLS.ExpirationThresholdDays,
 					},
-					Locations: []string{}, // TODO: Implement
+					Locations: m.Settings.Locations,
 				},
 				Assertions: assertions,
 			},
@@ -179,7 +180,7 @@ func newGetMonitorsResponse(monitors *[]monitor.MonitorWithTotalCount, stats *[]
 		stat, ok := monitorStatsMap[m.ID]
 		if ok {
 			res[i].Stats = GetMonitorsResponseMonitorStats{
-				UptimePercentage:     0, // TODO: Implement
+				UptimePercentage:     float64(stat.UptimePercentage),
 				AverageResponseTimes: stat.Stats,
 				P99:                  uint(stat.P99),
 				P95:                  uint(stat.P95),
@@ -289,13 +290,13 @@ func newGetMonitorResponse(m *entities.Monitor, stats *check.MonitorStats) (*Get
 					CheckExpiration:         m.Settings.TLS.CheckExpiration,
 					ExpirationThresholdDays: m.Settings.TLS.ExpirationThresholdDays,
 				},
-				Locations: []string{}, // TODO: Implement
+				Locations: m.Settings.Locations,
 			},
 			Assertions: assertions,
 		},
 		Stats: GetMonitorResponseStats{
-			UptimePercentage:    float64(stats.UptimePercentage),    // TODO: Implement
-			AverageResponseTime: float64(stats.AverageResponseTime), // TODO: Implement
+			UptimePercentage:    float64(stats.UptimePercentage),
+			AverageResponseTime: float64(stats.AverageResponseTime),
 		},
 	}
 
@@ -345,8 +346,27 @@ func (h *Handlers) PostMonitor(c hs.AuthenticatedContext) error {
 	req, err := helpers.Bind[PostMonitorRequest](c)
 	if err != nil {
 		c.Log.WithError(err).Debug("failed to bind PostMonitorRequest")
-
+		fmt.Println("BIND ERROR POST MONITOR:", err)
 		return echo.ErrBadRequest
+	}
+
+	ctx := c.Request().Context()
+	teamEntity, err := h.TeamService.GetByID(ctx, req.TeamID)
+	if err != nil {
+		c.Log.WithError(err).Debug("failed to get team")
+		return echo.ErrInternalServerError
+	}
+
+	limit := teamEntity.GetMonitorLimit()
+	if limit != -1 {
+		count, err := h.MonitorService.CountByTeamID(ctx, req.TeamID)
+		if err != nil {
+			c.Log.WithError(err).Debug("failed to get monitor count")
+			return echo.ErrInternalServerError
+		}
+		if count >= int64(limit) {
+			return echo.NewHTTPError(http.StatusPaymentRequired, "Payment Required")
+		}
 	}
 
 	headers := make([]entities.MonitorSettingsHeader, len(req.Settings.Headers))
@@ -383,8 +403,7 @@ func (h *Handlers) PostMonitor(c hs.AuthenticatedContext) error {
 				CheckExpiration:         req.Settings.TLS.CheckExpiration,
 				ExpirationThresholdDays: req.Settings.TLS.ExpirationThresholdDays,
 			},
-			// TODO: Implement
-			// Locations: req.Settings.Locations,
+			Locations: req.Settings.Locations,
 		},
 		Assertions: assertions,
 	}
@@ -423,7 +442,7 @@ type Incident struct {
 	ID                 uint      `json:"id"`
 	CreatedAt          time.Time `json:"createdAt"`
 	UpdatedAt          time.Time `json:"updatedAt"`
-	MonitorAssertionID uint      `json:"monitorAssertionId"`
+	MonitorAssertionID *uint     `json:"monitorAssertionId"`
 }
 
 func (h *Handlers) GetMonitorIncidents(c hs.AuthenticatedContext) error {
@@ -540,8 +559,7 @@ func (h *Handlers) PutMonitor(c hs.AuthenticatedContext) error {
 				CheckExpiration:         req.Settings.TLS.CheckExpiration,
 				ExpirationThresholdDays: req.Settings.TLS.ExpirationThresholdDays,
 			},
-			// TODO: Implement
-			// Locations: req.Settings.Locations,
+			Locations: req.Settings.Locations,
 		},
 		Assertions: assertions,
 	}
@@ -549,6 +567,33 @@ func (h *Handlers) PutMonitor(c hs.AuthenticatedContext) error {
 	m.SetStateString(req.State)
 	m.Settings.SetFrequencySeconds(req.Settings.FrequencySeconds)
 	m.Settings.Body.SetContentString(req.Settings.Body.Content)
+
+	if req.State == "ACTIVE" {
+		activeMaintenances, err := h.MaintenanceService.GetActive(ctx, time.Now())
+		if err != nil {
+			c.Log.WithError(err).Error("failed to get active maintenances")
+			return echo.ErrInternalServerError
+		}
+		
+		for _, maintenance := range *activeMaintenances {
+			if maintenance.TeamID == req.TeamID {
+				appliesToAll := len(maintenance.Monitors) == 0
+				appliesToThis := false
+				if !appliesToAll {
+					for _, m := range maintenance.Monitors {
+						if m.ID == req.MonitorID {
+							appliesToThis = true
+							break
+						}
+					}
+				}
+
+				if appliesToAll || appliesToThis {
+					return echo.NewHTTPError(http.StatusConflict, "Cannot resume monitor while an active maintenance window is ongoing for this monitor. Please complete or delete the maintenance first.")
+				}
+			}
+		}
+	}
 
 	if err := h.MonitorService.Update(
 		ctx,
@@ -585,6 +630,33 @@ func (h *Handlers) PutMonitorState(c hs.AuthenticatedContext) error {
 	}
 
 	stateEnum := entities.GetMonitorStateEnumFromString(req.State)
+
+	if req.State == "ACTIVE" {
+		activeMaintenances, err := h.MaintenanceService.GetActive(ctx, time.Now())
+		if err != nil {
+			c.Log.WithError(err).Error("failed to get active maintenances")
+			return echo.ErrInternalServerError
+		}
+		
+		for _, maintenance := range *activeMaintenances {
+			if maintenance.TeamID == req.TeamID {
+				appliesToAll := len(maintenance.Monitors) == 0
+				appliesToThis := false
+				if !appliesToAll {
+					for _, m := range maintenance.Monitors {
+						if m.ID == req.MonitorID {
+							appliesToThis = true
+							break
+						}
+					}
+				}
+
+				if appliesToAll || appliesToThis {
+					return echo.NewHTTPError(http.StatusConflict, "Cannot resume monitor while an active maintenance window is ongoing for this monitor. Please complete or delete the maintenance first.")
+				}
+			}
+		}
+	}
 
 	if err := h.MonitorService.SetState(
 		ctx,

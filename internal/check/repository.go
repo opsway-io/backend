@@ -21,6 +21,7 @@ type Repository interface {
 	GetMonitorOverviewStatsByTeamID(ctx context.Context, teamID uint) (*[]MonitorOverviewStats, error)
 	GetMonitorIDAndAssertions(ctx context.Context, monitorID uint, assertions []string) (*[]Check, error)
 	GetByTeamIDMonitorsUptime(ctx context.Context, teamID uint, start, end string) (*[]MonitorUptime, error)
+	GetByTeamIDMonitorsPerformance(ctx context.Context, teamID uint, start, end string) (*[]MonitorPerformance, error)
 }
 
 type RepositoryImpl struct {
@@ -125,8 +126,8 @@ func (r *RepositoryImpl) GetMonitorStatsByMonitorID(ctx context.Context, monitor
 	err := r.db.WithContext(
 		ctx,
 	).Table("checks").Select(`
-		(count(status_code <= 400) / count(status_code)) * 100 as uptime_percentage,
-		avg(timing_total/1000000) as average_response_time`).
+		if(count() = 0, 0, (countIf(status_code < 400) / count()) * 100) as uptime_percentage,
+		if(count() = 0, 0, avg(timing_total/1000000)) as average_response_time`).
 		Where("monitor_id = ?", monitorID).
 		Where("created_at BETWEEN DATE_SUB(NOW(), INTERVAL 1 DAY) AND NOW()").
 		Scan(&stats).Error
@@ -135,11 +136,13 @@ func (r *RepositoryImpl) GetMonitorStatsByMonitorID(ctx context.Context, monitor
 }
 
 type MonitorOverviews struct {
-	MonitorID uint
-	Latest    string
-	P99       float32
-	P95       float32
-	Stats     []float64 `gorm:"type:float"`
+	MonitorID           uint
+	Latest              string
+	UptimePercentage    float32
+	AverageResponseTime float32
+	P99                 float32
+	P95                 float32
+	Stats               []float64 `gorm:"type:float"`
 }
 
 type MonitorOverviewStats struct {
@@ -154,6 +157,8 @@ func (r *RepositoryImpl) GetMonitorOverviewsByTeamID(ctx context.Context, teamID
 	).Table("checks").Select(`
 		monitor_id,
 		max(created_at) as latest, 
+		(countIf(status_code < 400) / count()) * 100 as uptime_percentage,
+		avg(timing_total/1000000) as average_response_time,
 		quantile(0.99)(timing_total)/1000000 as p99, 
 		quantile(0.95)(timing_total)/1000000 as p95`).
 		Where("team_id = ?", teamID).
@@ -179,13 +184,13 @@ func (r *RepositoryImpl) GetMonitorOverviewStatsByTeamID(ctx context.Context, te
 				avg(timing_total) / 1000000 AS timing,
 				tumbleStart(wndw) AS start
 			FROM checks
-			WHERE (team_id = 1) AND ((created_at >= (NOW() - toIntervalDay(1))) AND (created_at <= NOW()))
+			WHERE (team_id = ?) AND ((created_at >= (NOW() - toIntervalDay(1))) AND (created_at <= NOW()))
 			GROUP BY
 				monitor_id,
 				tumble(toDateTime(created_at), toIntervalHour('1')) AS wndw
 			ORDER BY start ASC
 		)
-		GROUP BY monitor_id`).
+		GROUP BY monitor_id`, teamID).
 		Find(&overviews).Error
 
 	return &overviews, err
@@ -199,7 +204,7 @@ func (r *RepositoryImpl) GetMonitorIDAndAssertions(ctx context.Context, monitorI
 		Check{
 			MonitorID: uint64(monitorID),
 		},
-	).Where(assertions[0]).Order(
+	).Where("assertion = ?", assertions[0]).Order(
 		"created_at desc",
 	).Find(
 		&checks,
@@ -243,4 +248,32 @@ func (r *RepositoryImpl) GetByTeamIDMonitorsUptime(ctx context.Context, teamID u
 	}
 
 	return &uptime, nil
+}
+
+type MonitorPerformance struct {
+	MonitorID           uint
+	AverageResponseTime float32
+	P99                 float32
+	P95                 float32
+}
+
+func (r *RepositoryImpl) GetByTeamIDMonitorsPerformance(ctx context.Context, teamID uint, start, end string) (*[]MonitorPerformance, error) {
+	var performance []MonitorPerformance
+	err := r.db.WithContext(
+		ctx,
+	).Table("checks").Select(`
+		monitor_id, 
+		avg(timing_total/1000000) as average_response_time, 
+		quantile(0.99)(timing_total)/1000000 as p99, 
+		quantile(0.95)(timing_total)/1000000 as p95`).
+		Where("team_id = ?", teamID).
+		// Where("created_at BETWEEN ? AND ?", start, end).
+		Group("monitor_id").
+		Find(&performance).Error
+
+	if err != nil {
+		return nil, err
+	}
+
+	return &performance, nil
 }

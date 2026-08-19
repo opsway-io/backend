@@ -16,10 +16,10 @@ type Repository interface {
 	Update(ctx context.Context, teamID, changelogID uint, name string) (changelog entities.Changelog, err error)
 
 	GetEntriesWithAuthors(ctx context.Context, teamID, changelogID uint, offset *int, limit *int, query *string) (entries []entities.ChangelogEntry, total_count int, err error)
-	// GetEntryWithAuthors(ctx context.Context, teamID, changelogID, entryID uint) (entries entities.ChangelogEntry, err error)
-	// DeleteEntry(ctx context.Context, teamID, changelogID, entryID uint) (err error)
-	// CreateEntry(ctx context.Context, teamID, changelogID uint, title, content string, authorIDs []uint) (entry entities.ChangelogEntry, err error)
-	// UpdateEntry(ctx context.Context, teamID, changelogID, entryID uint, title, content string, authorIDs []uint) (entry entities.ChangelogEntry, err error)
+	GetEntryWithAuthors(ctx context.Context, teamID, changelogID, entryID uint) (entries entities.ChangelogEntry, err error)
+	DeleteEntry(ctx context.Context, teamID, changelogID, entryID uint) (err error)
+	CreateEntry(ctx context.Context, teamID, changelogID uint, title, content string, authorIDs []uint) (entry entities.ChangelogEntry, err error)
+	UpdateEntry(ctx context.Context, teamID, changelogID, entryID uint, title, content string, authorIDs []uint) (entry entities.ChangelogEntry, err error)
 }
 
 type RepositoryImpl struct {
@@ -154,4 +154,69 @@ func (r *RepositoryImpl) GetEntriesWithAuthors(ctx context.Context, teamID, chan
 	}
 
 	return entries, int(totalCount), nil
+}
+
+func (r *RepositoryImpl) GetEntryWithAuthors(ctx context.Context, teamID, changelogID, entryID uint) (entities.ChangelogEntry, error) {
+	var entry entities.ChangelogEntry
+
+	result := r.db.WithContext(ctx).
+		Preload("Authors").
+		Joins("JOIN changelogs ON changelogs.id = changelog_entries.changelog_id").
+		Where("changelogs.team_id = ? AND changelog_entries.changelog_id = ? AND changelog_entries.id = ?", teamID, changelogID, entryID).
+		First(&entry)
+
+	if result.Error != nil {
+		return entities.ChangelogEntry{}, result.Error
+	}
+
+	return entry, nil
+}
+
+func (r *RepositoryImpl) DeleteEntry(ctx context.Context, teamID, changelogID, entryID uint) error {
+	result := r.db.WithContext(ctx).
+		Where("changelog_id = ? AND id = ? AND EXISTS (SELECT 1 FROM changelogs WHERE id = ? AND team_id = ?)", changelogID, entryID, changelogID, teamID).
+		Delete(&entities.ChangelogEntry{})
+
+	return result.Error
+}
+
+func (r *RepositoryImpl) CreateEntry(ctx context.Context, teamID, changelogID uint, title, content string, authorIDs []uint) (entities.ChangelogEntry, error) {
+	authors := make([]entities.User, len(authorIDs))
+	for i, id := range authorIDs {
+		authors[i] = entities.User{ID: id}
+	}
+
+	entry := entities.ChangelogEntry{
+		ChangelogID: changelogID,
+		Title:       title,
+		Content:     content,
+		Authors:     authors,
+	}
+
+	result := r.db.WithContext(ctx).Create(&entry)
+
+	return entry, result.Error
+}
+
+func (r *RepositoryImpl) UpdateEntry(ctx context.Context, teamID, changelogID, entryID uint, title, content string, authorIDs []uint) (entities.ChangelogEntry, error) {
+	entry, err := r.GetEntryWithAuthors(ctx, teamID, changelogID, entryID)
+	if err != nil {
+		return entities.ChangelogEntry{}, err
+	}
+
+	authors := make([]entities.User, len(authorIDs))
+	for i, id := range authorIDs {
+		authors[i] = entities.User{ID: id}
+	}
+
+	entry.Title = title
+	entry.Content = content
+
+	err = r.db.WithContext(ctx).Model(&entry).Association("Authors").Replace(authors)
+	if err != nil {
+		return entities.ChangelogEntry{}, err
+	}
+
+	err = r.db.WithContext(ctx).Save(&entry).Error
+	return entry, err
 }

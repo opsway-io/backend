@@ -15,8 +15,8 @@ const taskKind = "http-probe"
 
 type Schedule interface {
 	Add(ctx context.Context, monitor *entities.Monitor) error
-	Remove(ctx context.Context, monitorID uint) error
-	On(ctx context.Context, handler func(ctx context.Context, monitor *entities.Monitor)) error
+	Remove(ctx context.Context, monitor *entities.Monitor) error
+	On(ctx context.Context, location string, handler func(ctx context.Context, monitor *entities.Monitor)) error
 }
 
 type ScheduleImpl struct {
@@ -35,17 +35,39 @@ func (s *ScheduleImpl) Add(ctx context.Context, monitor *entities.Monitor) error
 		return err
 	}
 
-	t := boomerang.NewTask(taskKind, fmt.Sprintf("%d", monitor.ID), data)
+	locations := monitor.Settings.Locations
+	if len(locations) == 0 {
+		locations = []string{"global"}
+	}
 
-	return s.bschedule.Add(ctx, t, monitor.Settings.Frequency, time.Now())
+	for _, loc := range locations {
+		t := boomerang.NewTask(fmt.Sprintf("%s:%s", taskKind, loc), fmt.Sprintf("%d", monitor.ID), data)
+		if err := s.bschedule.Add(ctx, t, monitor.Settings.Frequency, time.Now()); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
-func (s *ScheduleImpl) Remove(ctx context.Context, monitorID uint) error {
-	return s.bschedule.Remove(ctx, taskKind, fmt.Sprintf("%d", monitorID))
+func (s *ScheduleImpl) Remove(ctx context.Context, monitor *entities.Monitor) error {
+	locations := monitor.Settings.Locations
+	if len(locations) == 0 {
+		locations = []string{"global"}
+	}
+
+	for _, loc := range locations {
+		if err := s.bschedule.Remove(ctx, fmt.Sprintf("%s:%s", taskKind, loc), fmt.Sprintf("%d", monitor.ID)); err != nil {
+			if err.Error() != "task does not exist" { // Check underlying boomerang error
+				return err
+			}
+		}
+	}
+	return nil
 }
 
-func (s *ScheduleImpl) On(ctx context.Context, handler func(ctx context.Context, monitor *entities.Monitor)) error {
-	return s.bschedule.On(ctx, taskKind, func(ctx context.Context, task *boomerang.Task) {
+func (s *ScheduleImpl) On(ctx context.Context, location string, handler func(ctx context.Context, monitor *entities.Monitor)) error {
+	return s.bschedule.On(ctx, fmt.Sprintf("%s:%s", taskKind, location), func(ctx context.Context, task *boomerang.Task) {
 		monitor, err := s.unmarshalMonitor(task.Data)
 		if err != nil {
 			return

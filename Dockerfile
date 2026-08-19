@@ -11,6 +11,7 @@ RUN go mod download -x
 ############################
 FROM alpine:3.18 as image-base
 WORKDIR /app
+RUN apk add --no-cache chromium
 ENTRYPOINT [ "service" ]
 
 ############################

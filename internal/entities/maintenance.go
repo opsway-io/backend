@@ -7,16 +7,17 @@ import (
 )
 
 type Maintenance struct {
-	ID     uint
-	TeamID uint `gorm:"index;not null"`
+	ID     uint `json:"id"`
+	TeamID uint `gorm:"index;not null" json:"teamId"`
 
-	Title       string `gorm:"index;not null"`
-	Description *string
-	Settings    MaintenanceSettings  `gorm:"constraint:OnDelete:CASCADE"`
-	Comments    []MaintenanceComment `gorm:"constraint:OnDelete:CASCADE"`
+	Title       string               `gorm:"index;not null" json:"title"`
+	Description *string              `json:"description"`
+	Settings    MaintenanceSettings  `gorm:"constraint:OnDelete:CASCADE" json:"settings"`
+	Comments    []MaintenanceComment `gorm:"constraint:OnDelete:CASCADE" json:"comments"`
+	Monitors    []Monitor            `gorm:"many2many:maintenance_monitors;constraint:OnDelete:CASCADE" json:"monitors"`
 
-	UpdatedAt time.Time `gorm:"index"`
-	CreatedAt time.Time `gorm:"index"`
+	UpdatedAt time.Time `gorm:"index" json:"updatedAt"`
+	CreatedAt time.Time `gorm:"index" json:"createdAt"`
 }
 
 func (Maintenance) TableName() string {
@@ -24,14 +25,15 @@ func (Maintenance) TableName() string {
 }
 
 type MaintenanceSettings struct {
-	ID            uint
-	MaintenanceID uint `gorm:"index;not null"`
+	ID            uint `json:"id"`
+	MaintenanceID uint `gorm:"index;not null" json:"maintenanceId"`
 
-	StartAt time.Time       `gorm:"index;not null"`
-	EndAt   time.Time       `gorm:"index;not null"`
-	Tags    *pq.StringArray `gorm:"type:text[]"`
+	StartAt  time.Time       `gorm:"index;not null" json:"startAt"`
+	EndAt    time.Time       `gorm:"index;not null" json:"endAt"`
+	Tags     *pq.StringArray `gorm:"type:text[]" json:"tags"`
+	Notified bool            `gorm:"default:false" json:"notified"`
 
-	UpdatedAt time.Time `gorm:"index"`
+	UpdatedAt time.Time `gorm:"index" json:"updatedAt"`
 }
 
 func (MaintenanceSettings) TableName() string {
@@ -39,14 +41,14 @@ func (MaintenanceSettings) TableName() string {
 }
 
 type MaintenanceComment struct {
-	ID            uint
-	UserID        uint `gorm:"index;not null"`
-	MaintenanceID uint `gorm:"index;not null"`
+	ID            uint `json:"id"`
+	UserID        uint `gorm:"index;not null" json:"userId"`
+	MaintenanceID uint `gorm:"index;not null" json:"maintenanceId"`
 
-	Content string
+	Content string `json:"content"`
 
-	CreatedAt time.Time `gorm:"index"`
-	UpdatedAt time.Time `gorm:"index"`
+	CreatedAt time.Time `gorm:"index" json:"createdAt"`
+	UpdatedAt time.Time `gorm:"index" json:"updatedAt"`
 }
 
 func (MaintenanceComment) TableName() string {

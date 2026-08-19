@@ -7,7 +7,7 @@ import (
 
 	"github.com/redis/go-redis/v9"
 
-	"github.com/golang-jwt/jwt"
+	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
 	"github.com/opsway-io/backend/internal/entities"
 	"github.com/pkg/errors"
@@ -65,6 +65,9 @@ func (s *ServiceImpl) Refresh(ctx context.Context, refreshToken string) (string,
 func (s *ServiceImpl) Verify(ctx context.Context, accessToken string) (bool, *AccessClaims, error) {
 	claims := &AccessClaims{}
 	token, err := jwt.ParseWithClaims(accessToken, claims, func(token *jwt.Token) (interface{}, error) {
+		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
+			return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
+		}
 		return []byte(s.Config.Secret), nil
 	})
 	if err != nil {
@@ -85,6 +88,9 @@ func (s *ServiceImpl) Verify(ctx context.Context, accessToken string) (bool, *Ac
 func (s *ServiceImpl) verifyRefreshToken(ctx context.Context, refreshToken string) (bool, *RefreshClaims, error) {
 	claims := &RefreshClaims{}
 	token, err := jwt.ParseWithClaims(refreshToken, claims, func(token *jwt.Token) (interface{}, error) {
+		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
+			return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
+		}
 		return []byte(s.Config.Secret), nil
 	})
 	if err != nil {
@@ -135,14 +141,14 @@ func (s *ServiceImpl) signClaims(claims jwt.Claims) (string, error) {
 
 func (s *ServiceImpl) newAccessTokenClaims(subject string) AccessClaims {
 	return AccessClaims{
-		StandardClaims: jwt.StandardClaims{
-			Id:        uuid.New().String(),
-			ExpiresAt: time.Now().Add(s.Config.ExpiresIn).Unix(),
-			IssuedAt:  time.Now().Unix(),
-			NotBefore: time.Now().Unix(),
+		RegisteredClaims: jwt.RegisteredClaims{
+			ID:        uuid.New().String(),
+			ExpiresAt: jwt.NewNumericDate(time.Now().Add(s.Config.ExpiresIn)),
+			IssuedAt:  jwt.NewNumericDate(time.Now()),
+			NotBefore: jwt.NewNumericDate(time.Now()),
 			Issuer:    s.Config.Issuer,
 			Subject:   subject,
-			Audience:  s.Config.Audience,
+			Audience:  jwt.ClaimStrings{s.Config.Audience},
 		},
 		Type: "access_token",
 	}
@@ -150,14 +156,14 @@ func (s *ServiceImpl) newAccessTokenClaims(subject string) AccessClaims {
 
 func (s *ServiceImpl) newRefreshTokenClaims(subject string) RefreshClaims {
 	return RefreshClaims{
-		StandardClaims: jwt.StandardClaims{
-			Id:        uuid.New().String(),
-			ExpiresAt: time.Now().Add(s.Config.RefreshExpiresIn).Unix(),
-			IssuedAt:  time.Now().Unix(),
-			NotBefore: time.Now().Unix(),
+		RegisteredClaims: jwt.RegisteredClaims{
+			ID:        uuid.New().String(),
+			ExpiresAt: jwt.NewNumericDate(time.Now().Add(s.Config.RefreshExpiresIn)),
+			IssuedAt:  jwt.NewNumericDate(time.Now()),
+			NotBefore: jwt.NewNumericDate(time.Now()),
 			Issuer:    s.Config.Issuer,
 			Subject:   subject,
-			Audience:  s.Config.Audience,
+			Audience:  jwt.ClaimStrings{s.Config.Audience},
 		},
 		Type: "refresh_token",
 	}

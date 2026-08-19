@@ -7,6 +7,7 @@ import (
 	"github.com/opsway-io/backend/internal/rest/handlers"
 	mw "github.com/opsway-io/backend/internal/rest/middleware"
 	"github.com/opsway-io/backend/internal/team"
+	"github.com/opsway-io/backend/internal/escalation"
 	"github.com/opsway-io/backend/internal/user"
 	"github.com/sirupsen/logrus"
 )
@@ -16,6 +17,7 @@ type Handlers struct {
 	TeamService           team.Service
 	UserService           user.Service
 	BillingService        billing.Service
+	EscalationService     escalation.Service
 }
 
 func Register(
@@ -24,11 +26,13 @@ func Register(
 	teamService team.Service,
 	userService user.Service,
 	billingService billing.Service,
+	escalationService escalation.Service,
 ) {
 	h := &Handlers{
 		TeamService:    teamService,
 		UserService:    userService,
 		BillingService: billingService,
+		EscalationService: escalationService,
 	}
 
 	TeamGuard := mw.TeamGuardFactory(logger, teamService)
@@ -52,7 +56,9 @@ func Register(
 	teamsGroup.DELETE("/users/:userId", AuthHandler(h.DeleteTeamUser), AllowedRoles(mw.UserRoleOwner, mw.UserRoleAdmin))
 	teamsGroup.PUT("/users/:userId", AuthHandler(h.PutTeamUser), AllowedRoles(mw.UserRoleOwner, mw.UserRoleAdmin))
 
+	teamsGroup.GET("/users/invites", AuthHandler(h.GetTeamUsersInvites), AllowedRoles(mw.UserRoleOwner, mw.UserRoleAdmin))
 	teamsGroup.POST("/users/invites", AuthHandler(h.PostTeamUsersInvites), AllowedRoles(mw.UserRoleOwner, mw.UserRoleAdmin))
+	teamsGroup.DELETE("/users/invites/:email", AuthHandler(h.DeleteTeamUsersInvites), AllowedRoles(mw.UserRoleOwner, mw.UserRoleAdmin))
 
 	teamsGroup.PUT("/avatar", AuthHandler(h.PutTeamAvatar), AllowedRoles(mw.UserRoleOwner, mw.UserRoleAdmin))
 	teamsGroup.DELETE("/avatar", AuthHandler(h.DeleteTeamAvatar), AllowedRoles(mw.UserRoleOwner, mw.UserRoleAdmin))
@@ -63,4 +69,7 @@ func Register(
 	teamsGroup.POST("/customer-portal", AuthHandler(h.PostCustomerPortal), AllowedRoles(mw.UserRoleOwner, mw.UserRoleAdmin))
 	teamsGroup.GET("/customer-session", AuthHandler(h.GetCustomerSession), AllowedRoles(mw.UserRoleOwner, mw.UserRoleAdmin))
 	teamsGroup.GET("/products", AuthHandler(h.GetProducts), AllowedRoles(mw.UserRoleOwner, mw.UserRoleAdmin))
+
+	teamsGroup.GET("/escalation", AuthHandler(h.GetEscalationPolicy), AllowedRoles(mw.UserRoleOwner, mw.UserRoleAdmin))
+	teamsGroup.PUT("/escalation", AuthHandler(h.PutEscalationPolicy), AllowedRoles(mw.UserRoleOwner, mw.UserRoleAdmin))
 }

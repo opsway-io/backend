@@ -13,7 +13,9 @@ var ErrNotFound = errors.New("monitor not found")
 
 type Repository interface {
 	GetMonitorAndSettingsByTeamIDAndID(ctx context.Context, teamID uint, monitorID uint) (*entities.Monitor, error)
+	CountByTeamID(ctx context.Context, teamID uint) (int64, error)
 	GetMonitorsAndSettingsByTeamID(ctx context.Context, teamID uint, offset *int, limit *int, query *string) (*[]MonitorWithTotalCount, error)
+	GetMonitorsByStates(ctx context.Context, states []entities.MonitorState) (*[]entities.Monitor, error)
 	GetMonitorsAndIncidentsByTeamID(ctx context.Context, teamID uint) (*[]entities.Monitor, error)
 	GetMonitorAssertionByID(ctx context.Context, monitorAssertionID uint) (*entities.MonitorAssertion, error)
 	SetState(ctx context.Context, teamID, monitorID uint, state entities.MonitorState) error
@@ -51,6 +53,12 @@ func (r *RepositoryImpl) GetMonitorAndSettingsByTeamIDAndID(ctx context.Context,
 	return &monitor, err
 }
 
+func (r *RepositoryImpl) CountByTeamID(ctx context.Context, teamID uint) (int64, error) {
+	var count int64
+	err := r.db.WithContext(ctx).Model(&entities.Monitor{}).Where("team_id = ?", teamID).Count(&count).Error
+	return count, err
+}
+
 type MonitorWithTotalCount struct {
 	entities.Monitor
 	TotalCount int
@@ -81,6 +89,12 @@ func (r *RepositoryImpl) GetMonitorsAndSettingsByTeamID(ctx context.Context, tea
 		return nil, err
 	}
 
+	return &monitors, err
+}
+
+func (r *RepositoryImpl) GetMonitorsByStates(ctx context.Context, states []entities.MonitorState) (*[]entities.Monitor, error) {
+	var monitors []entities.Monitor
+	err := r.db.WithContext(ctx).Preload("Settings").Where("state IN ?", states).Find(&monitors).Error
 	return &monitors, err
 }
 
@@ -171,13 +185,15 @@ func (r *RepositoryImpl) Update(ctx context.Context, teamID, monitorID uint, m *
 		return err
 	}
 
-	for i := range m.Assertions {
-		m.Assertions[i].MonitorID = monitorID
-	}
-	if err := tx.Create(&m.Assertions).Error; err != nil {
-		tx.Rollback()
+	if len(m.Assertions) > 0 {
+		for i := range m.Assertions {
+			m.Assertions[i].MonitorID = monitorID
+		}
+		if err := tx.Create(&m.Assertions).Error; err != nil {
+			tx.Rollback()
 
-		return err
+			return err
+		}
 	}
 
 	return tx.Commit().Error

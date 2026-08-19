@@ -17,20 +17,20 @@ func TeamOpsway(db *gorm.DB) {
 	user := entities.User{
 		Email:       "admin@opsway.io",
 		Name:        "Douglas Adams",
-		DisplayName: pointer.StringPtr("Ford Prefect"),
+		DisplayName: pointer.String("Ford Prefect"),
 		Teams: []entities.Team{
 			t,
 		},
 	}
 
-	user.SetPassword("pass")
+	_ = user.SetPassword("pass")
 
-	result := db.Create(&user)
+	result := db.Where(entities.User{Email: user.Email}).FirstOrCreate(&user)
 	if result.Error != nil {
 		panic(result.Error)
 	}
 
-	db.Create(&entities.TeamUser{
+	db.Where(entities.TeamUser{UserID: user.ID, TeamID: t.ID}).FirstOrCreate(&entities.TeamUser{
 		UserID: user.ID,
 		TeamID: t.ID,
 		Role:   entities.TeamRoleAdmin,

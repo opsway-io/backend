@@ -14,6 +14,7 @@ type User struct {
 	Name         string  `gorm:"index;not null"`
 	DisplayName  *string `gorm:"index"`
 	Email        string  `gorm:"uniqueIndex"`
+	PhoneNumber  *string `gorm:"type:text"`
 	HasAvatar    bool
 	PasswordHash *string
 

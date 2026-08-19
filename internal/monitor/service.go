@@ -12,7 +12,9 @@ import (
 
 type Service interface {
 	GetMonitorAndSettingsByTeamIDAndID(ctx context.Context, teamID uint, monitorID uint) (*entities.Monitor, error)
+	CountByTeamID(ctx context.Context, teamID uint) (int64, error)
 	GetMonitorsAndSettingsByTeamID(ctx context.Context, teamID uint, offset *int, limit *int, query *string) (*[]MonitorWithTotalCount, error)
+	GetMonitorsByStates(ctx context.Context, states []entities.MonitorState) (*[]entities.Monitor, error)
 	GetMonitorsAndIncidentsByTeamID(ctx context.Context, teamID uint) (*[]entities.Monitor, error)
 	GetMonitorAssertionByID(ctx context.Context, monitorAssertionID uint) (*entities.MonitorAssertion, error)
 	SetState(ctx context.Context, teamID, monitorID uint, state entities.MonitorState) error
@@ -33,12 +35,28 @@ func NewService(db *gorm.DB, redisClient *redis.Client) Service {
 	}
 }
 
+// NewServiceWithDeps is primarily used for testing
+func NewServiceWithDeps(repo Repository, schedule Schedule) Service {
+	return &ServiceImpl{
+		repository: repo,
+		schedule:   schedule,
+	}
+}
+
 func (s *ServiceImpl) GetMonitorAndSettingsByTeamIDAndID(ctx context.Context, teamID uint, monitorID uint) (*entities.Monitor, error) {
 	return s.repository.GetMonitorAndSettingsByTeamIDAndID(ctx, teamID, monitorID)
 }
 
+func (s *ServiceImpl) CountByTeamID(ctx context.Context, teamID uint) (int64, error) {
+	return s.repository.CountByTeamID(ctx, teamID)
+}
+
 func (s *ServiceImpl) GetMonitorsAndSettingsByTeamID(ctx context.Context, teamID uint, offset *int, limit *int, query *string) (*[]MonitorWithTotalCount, error) {
 	return s.repository.GetMonitorsAndSettingsByTeamID(ctx, teamID, offset, limit, query)
+}
+
+func (s *ServiceImpl) GetMonitorsByStates(ctx context.Context, states []entities.MonitorState) (*[]entities.Monitor, error) {
+	return s.repository.GetMonitorsByStates(ctx, states)
 }
 
 func (s *ServiceImpl) GetMonitorsAndIncidentsByTeamID(ctx context.Context, teamID uint) (*[]entities.Monitor, error) {
@@ -59,11 +77,16 @@ func (s *ServiceImpl) SetState(ctx context.Context, teamID, monitorID uint, stat
 		return err
 	}
 
-	if state == entities.MonitorStateInactive {
-		return s.schedule.Remove(ctx, monitorID)
+	m, err := s.repository.GetMonitorAndSettingsByTeamIDAndID(ctx, teamID, monitorID)
+	if err != nil {
+		return err
 	}
 
-	m, err := s.repository.GetMonitorAndSettingsByTeamIDAndID(ctx, teamID, monitorID)
+	if state == entities.MonitorStateInactive {
+		return s.schedule.Remove(ctx, m)
+	}
+
+	err = s.schedule.Remove(ctx, m)
 	if err != nil {
 		return err
 	}
@@ -85,10 +108,13 @@ func (s *ServiceImpl) Create(ctx context.Context, m *entities.Monitor) error {
 func (s *ServiceImpl) Update(ctx context.Context, teamID, monitorID uint, m *entities.Monitor) error {
 	m.ID = monitorID
 
-	err := s.schedule.Remove(ctx, m.ID)
-	if err != nil {
-		if !errors.Is(err, boomerang.ErrTaskDoesNotExist) {
-			return err
+	oldMonitor, err := s.repository.GetMonitorAndSettingsByTeamIDAndID(ctx, teamID, monitorID)
+	if err == nil {
+		err = s.schedule.Remove(ctx, oldMonitor)
+		if err != nil {
+			if !errors.Is(err, boomerang.ErrTaskDoesNotExist) {
+				return err
+			}
 		}
 	}
 
@@ -109,19 +135,15 @@ func (s *ServiceImpl) Update(ctx context.Context, teamID, monitorID uint, m *ent
 }
 
 func (s *ServiceImpl) Delete(ctx context.Context, teamID, monitorID uint) error {
-	err := s.repository.Delete(ctx, teamID, monitorID)
+	oldMonitor, err := s.repository.GetMonitorAndSettingsByTeamIDAndID(ctx, teamID, monitorID)
+	if err == nil {
+		_ = s.schedule.Remove(ctx, oldMonitor)
+	}
+
+	err = s.repository.Delete(ctx, teamID, monitorID)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return ErrNotFound
-		}
-
-		return err
-	}
-
-	err = s.schedule.Remove(ctx, monitorID)
-	if err != nil {
-		if errors.Is(err, boomerang.ErrTaskDoesNotExist) {
-			return nil
 		}
 
 		return err

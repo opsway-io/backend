@@ -15,24 +15,24 @@ func AuthGuardFactory(logger *logrus.Entry, jwtService authentication.Service) f
 	return func() func(next echo.HandlerFunc) echo.HandlerFunc {
 		return func(next echo.HandlerFunc) echo.HandlerFunc {
 			return func(c echo.Context) error {
-				header := c.Request().Header.Get("Authorization")
-				if header == "" {
-					l.Debug("missing authorization header")
+				var token string
+				
+				cookie, err := c.Cookie("access_token")
+				if err == nil && cookie.Value != "" {
+					token = cookie.Value
+				} else {
+					header := c.Request().Header.Get("Authorization")
+					if header == "" {
+						l.Debug("missing authorization header and cookie")
+						return echo.ErrUnauthorized
+					}
 
-					return echo.ErrUnauthorized
-				}
-
-				typ, token, ok := strings.Cut(header, " ")
-				if !ok {
-					l.Debug("invalid authorization token type")
-
-					return echo.ErrUnauthorized
-				}
-
-				if typ != "Bearer" {
-					l.Debug("authorization token not Bearer")
-
-					return echo.ErrUnauthorized
+					typ, t, ok := strings.Cut(header, " ")
+					if !ok || typ != "Bearer" {
+						l.Debug("invalid authorization token type")
+						return echo.ErrUnauthorized
+					}
+					token = t
 				}
 
 				valid, claims, err := jwtService.Verify(c.Request().Context(), token)

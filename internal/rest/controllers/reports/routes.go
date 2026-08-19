@@ -4,6 +4,7 @@ import (
 	"github.com/labstack/echo/v4"
 	"github.com/opsway-io/backend/internal/authentication"
 	"github.com/opsway-io/backend/internal/check"
+	"github.com/opsway-io/backend/internal/event"
 	"github.com/opsway-io/backend/internal/report"
 	"github.com/opsway-io/backend/internal/rest/handlers"
 	mw "github.com/opsway-io/backend/internal/rest/middleware"
@@ -16,6 +17,7 @@ type Handlers struct {
 	TeamService           team.Service
 	ReportService         report.Service
 	CheckService          check.Service
+	EventService          event.Service
 }
 
 func Register(
@@ -24,10 +26,12 @@ func Register(
 	teamService team.Service,
 	reportService report.Service,
 	checkService check.Service,
+	eventService event.Service,
 ) {
 	h := &Handlers{
 		ReportService: reportService,
 		CheckService:  checkService,
+		EventService:  eventService,
 	}
 
 	TeamGuard := mw.TeamGuardFactory(logger, teamService)
@@ -40,5 +44,6 @@ func Register(
 	)
 
 	reportsGroup.GET("", AuthHandler(h.GetReports))
+	reportsGroup.GET("/:reportId", AuthHandler(h.GetReport))
 	reportsGroup.POST("", AuthHandler(h.CreateReport))
 }

@@ -1,0 +1,65 @@
+log:
+  level: info
+  format: text
+
+rest:
+  port: 8005
+
+authentication:
+  secret: "CHANGE_ME_TO_A_RANDOM_256_BIT_SECRET"
+  audience: "https://opsway.io"
+  issuer: "opsway.io"
+  expires_in: 24h
+  refresh_expires_in: 720h
+  cookie_domain: localhost
+  cookie_secure: false  # Set to true in production
+
+postgres:
+  dsn: "host=localhost user=postgres password=CHANGE_ME dbname=opsway port=5432 sslmode=disable"
+  debug: false
+
+clickhouse:
+  dsn: clickhouse+native://default:@localhost:9000/opsway
+  debug: true
+
+redis:
+  host: localhost
+  port: 6379
+  db: 0
+
+email:
+  debug: true
+  sender_name: "opsway"
+  sender_email: "no-reply@opsway.io"
+  smtp_host: "localhost"
+  smtp_port: 1025
+  smtp_username: ""
+  smtp_password: ""
+
+object_storage:
+  endpoint_url: "http://localhost:9001"
+  access_key: "CHANGE_ME"
+  secret_key: "CHANGE_ME"
+  region: "eu-central-1"
+  public_url: "http://localhost:9001"
+
+team:
+  invitation_secret: CHANGE_ME_TO_A_RANDOM_SECRET
+  application_url: http://localhost:5173
+
+prober:
+  concurrency: 1
+  location: "global"
+  available_locations:
+    - "global"
+    - "da-west-1"
+
+stripe:
+  publishable_key: pk_test_CHANGE_ME
+  secret_key: sk_test_CHANGE_ME
+  webhook_secret: "whsec_CHANGE_ME"
+  domain: http://localhost:5173
+
+user:
+  password_reset_token_ttl: 24h
+  password_reset_url: "http://localhost:5173/login/reset-password"

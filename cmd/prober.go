@@ -2,7 +2,11 @@ package cmd
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"io"
+	xhttp "net/http"
+	"strings"
 	"time"
 
 	"github.com/gammazero/workerpool"
@@ -11,17 +15,28 @@ import (
 	"github.com/opsway-io/backend/internal/connectors/postgres"
 	connectorRedis "github.com/opsway-io/backend/internal/connectors/redis"
 	"github.com/opsway-io/backend/internal/entities"
+	"github.com/opsway-io/backend/internal/event"
+	"github.com/opsway-io/backend/internal/event/events"
 	"github.com/opsway-io/backend/internal/incident"
-	"github.com/opsway-io/backend/internal/monitor"
+	"github.com/opsway-io/backend/internal/probes/dns"
 	"github.com/opsway-io/backend/internal/probes/http"
 	"github.com/opsway-io/backend/internal/probes/http/asserter"
+	"github.com/opsway-io/backend/internal/probes/icmp"
+	probeMysql "github.com/opsway-io/backend/internal/probes/mysql"
+	probePostgres "github.com/opsway-io/backend/internal/probes/postgres"
+	probeRedis "github.com/opsway-io/backend/internal/probes/redis"
+	"github.com/opsway-io/backend/internal/probes/tcp"
+	"github.com/opsway-io/backend/internal/probes/browser"
+	"github.com/redis/go-redis/v9"
 	"github.com/sirupsen/logrus"
 
 	"github.com/spf13/cobra"
 )
 
 type ProberConfig struct {
-	Concurrency int `mapstructure:"concurrency" default:"25"`
+	Concurrency        int      `mapstructure:"concurrency" default:"25"`
+	Location           string   `mapstructure:"location" default:"global"`
+	AvailableLocations []string `mapstructure:"available_locations"`
 }
 
 //nolint:gochecknoglobals
@@ -60,8 +75,6 @@ func runProber(cmd *cobra.Command, args []string) {
 		l.WithError(err).Fatal("failed to connect to redis")
 	}
 
-	schedule := monitor.NewSchedule(redisClient)
-
 	ch, err := clickhouse.NewClient(ctx, conf.Clickhouse)
 	if err != nil {
 		l.WithError(err).Fatal("Failed to create clickhouse")
@@ -74,42 +87,105 @@ func runProber(cmd *cobra.Command, args []string) {
 		l.WithError(err).Fatal("Failed to create Postgres client")
 	}
 
-	incidentRepository := incident.NewRepository(db)
-	incidentService := incident.NewService(incidentRepository)
+	eventService, err := event.NewService(redisClient)
+	if err != nil {
+		l.WithError(err).Fatal("Failed to create event service")
+	}
 
-	prober := http.NewService(conf.HTTPProbe)
+	incidentRepository := incident.NewRepository(db)
+	incidentService := incident.NewService(incidentRepository, eventService)
+
+	httpProber := http.NewService(conf.HTTPProbe)
+	tcpProber := tcp.NewService()
+	icmpProber := icmp.NewService()
+	dnsProber := dns.NewService()
+	postgresProber := probePostgres.NewService()
+	mysqlProber := probeMysql.NewService()
+	redisProber := probeRedis.NewService()
+	browserProber := browser.NewService()
 
 	l.Info("Waiting for tasks...")
 
-	if err := schedule.On(ctx, func(ctx context.Context, monitor *entities.Monitor) {
-		wp.Submit(func() {
-			handleTask(ctx, l, prober, monitor, httpResultService, incidentService)
-		})
-	}); err != nil {
-		l.WithError(err).Fatal("failed to start schedule")
+	subscriber, err := eventService.Subscribe(ctx, fmt.Sprintf("prober.tasks.%s", conf.Prober.Location))
+	if err != nil {
+		l.WithError(err).Fatal("failed to subscribe to prober tasks")
 	}
 
-	l.Info("Shutting down...")
+	for {
+		select {
+		case <-ctx.Done():
+			l.Info("Shutting down...")
+			wp.StopWait()
+			l.Info("Goodbye!")
+			return
+		case msg := <-subscriber:
+			if msg == nil {
+				continue
+			}
+
+			wp.Submit(func() {
+				var task events.ProberTask
+				if err := json.Unmarshal(msg.Payload, &task); err != nil {
+					l.WithError(err).Error("failed to unmarshal prober task")
+					msg.Nack()
+					return
+				}
+
+				handleTask(ctx, l, httpProber, tcpProber, icmpProber, dnsProber, postgresProber, mysqlProber, redisProber, browserProber, task.Monitor, httpResultService, incidentService, conf.Prober.Location, redisClient)
+				msg.Ack()
+			})
+		}
+	}
 
 	wp.StopWait()
 
 	l.Info("Goodbye!")
 }
 
-func handleTask(ctx context.Context, logger *logrus.Logger, prober http.Service, m *entities.Monitor, c check.Service, i incident.Service) {
+func handleTask(ctx context.Context, logger *logrus.Logger, httpProber http.Service, tcpProber tcp.Service, icmpProber icmp.Service, dnsProber dns.Service, postgresProber probePostgres.Service, mysqlProber probeMysql.Service, redisProber probeRedis.Service, browserProber browser.Service, m *entities.Monitor, c check.Service, i incident.Service, location string, rc *redis.Client) {
 	l := logger.WithFields(logrus.Fields{
 		"monitor_id": m.ID,
+		"location":   location,
 	})
 
-	res, err := prober.Probe(
-		ctx,
-		m.Settings.Method,
-		m.Settings.URL,
-		nil,
-		nil,
-		time.Duration(time.Second*5),
-	)
-	if err != nil {
+	var res *http.Result
+	var err error
+
+	timeout := time.Duration(time.Second * 5)
+
+	switch m.Settings.Method {
+	case "TCP":
+		res, err = tcpProber.Probe(ctx, m.Settings.URL, timeout)
+	case "ICMP":
+		res, err = icmpProber.Probe(ctx, m.Settings.URL, timeout)
+	case "DNS":
+		res, err = dnsProber.Probe(ctx, m.Settings.URL, timeout)
+	case "POSTGRES":
+		res, err = postgresProber.Probe(ctx, m.Settings.URL, timeout)
+	case "MYSQL":
+		res, err = mysqlProber.Probe(ctx, m.Settings.URL, timeout)
+	case "REDIS":
+		res, err = redisProber.Probe(ctx, m.Settings.URL, timeout)
+	case "BROWSER":
+		var scriptJSON string
+		if m.Settings.Body.Content != nil {
+			scriptJSON = string(*m.Settings.Body.Content)
+		}
+		// Browser needs longer timeout, give it 15 seconds
+		browserTimeout := time.Duration(time.Second * 15)
+		res, err = browserProber.Probe(ctx, m.Settings.URL, scriptJSON, browserTimeout)
+	default:
+		res, err = httpProber.Probe(
+			ctx,
+			m.Settings.Method,
+			m.Settings.URL,
+			nil,
+			nil,
+			timeout,
+		)
+	}
+
+	if err != nil && res == nil {
 		l.WithError(err).Error("failed to probe")
 
 		return
@@ -120,7 +196,7 @@ func handleTask(ctx context.Context, logger *logrus.Logger, prober http.Service,
 		"total_time": fmt.Sprintf("%v", res.Timing.Phases.Total),
 	})
 
-	newCheck := mapResultToCheck(m, res)
+	newCheck := mapResultToCheck(m, res, location)
 
 	if err = c.Create(ctx, newCheck); err != nil {
 		l.WithError(err).Error("failed add result to clickhouse")
@@ -143,15 +219,154 @@ func handleTask(ctx context.Context, logger *logrus.Logger, prober http.Service,
 		"assertions_failed": failedCount,
 	})
 
-	if failedCount > 0 {
-		l.Info("some assertions failed, triggering incident")
+	failKey := fmt.Sprintf("monitor:%d:failures", m.ID)
 
-		if err = triggerIncident(ctx, m, res, &failed, i); err != nil {
-			l.WithError(err).Error("failed to trigger incident")
+	if failedCount > 0 {
+		l.Info("some assertions failed, incrementing failure counter")
+		val, err := rc.Incr(ctx, failKey).Result()
+		if err != nil {
+			l.WithError(err).Error("failed to increment failure counter")
+		}
+		
+		// Hardcoded threshold of 3 for MVP
+		if val == 3 {
+			l.Info("failure threshold reached, triggering incident")
+			if err = triggerIncident(ctx, m, res, &failed, i); err != nil {
+				l.WithError(err).Error("failed to trigger incident")
+			}
+		} else if val > 3 {
+			// Already triggered, could optionally update the incident here
 		}
 	} else {
 		l.Info("all assertions passed")
+		
+		// Reset counter
+		rc.Del(ctx, failKey)
+		
+		// Auto-resolve any open incidents for this monitor
+		openIncidents, err := i.GetByMonitorIDWithAssertionPaginated(ctx, m.ID, nil, nil)
+		if err == nil && openIncidents != nil {
+			for _, inc := range *openIncidents {
+				if !inc.Incident.Resolved && inc.Incident.Title != "Anomaly Detected" && inc.Incident.Title != "SSL/TLS Cert Expiry" {
+					l.WithField("incident_id", inc.Incident.ID).Info("auto-resolving incident")
+					inc.Incident.Resolved = true
+					if err := i.Update(ctx, &inc.Incident); err != nil {
+						l.WithError(err).Error("failed to resolve incident")
+					}
+				}
+			}
+		}
 	}
+
+	// Check for anomalies
+	isAnomaly, err := checkAnomaly(m.ID, res)
+	if err != nil {
+		l.WithError(err).Error("failed to check for anomaly")
+	} else if isAnomaly {
+		hasOpenAnomalyIncident := false
+		openIncidents, err := i.GetByMonitorIDWithAssertionPaginated(ctx, m.ID, nil, nil)
+		if err == nil && openIncidents != nil {
+			for _, inc := range *openIncidents {
+				if inc.Title == "Anomaly Detected" {
+					hasOpenAnomalyIncident = true
+					break
+				}
+			}
+		}
+
+		if !hasOpenAnomalyIncident {
+			l.Info("anomaly detected, triggering incident")
+			desc := "Response time anomaly detected by forecaster"
+			anomalyIncident := entities.Incident{
+				MonitorID:   &m.ID,
+				TeamID:      m.TeamID,
+				Title:       "Anomaly Detected",
+				Description: &desc,
+			}
+			if err := i.Create(ctx, &[]entities.Incident{anomalyIncident}); err != nil {
+				l.WithError(err).Error("failed to trigger anomaly incident")
+			}
+		}
+	}
+
+	// SSL/TLS Certificate Expiration Monitoring
+	if res.TLS != nil {
+		expiry := res.TLS.Certificate.NotAfter
+		timeRemaining := time.Until(expiry)
+
+		if timeRemaining > 0 && timeRemaining < 30*24*time.Hour {
+			hasOpenSSLIncident := false
+			openIncidents, err := i.GetByMonitorIDWithAssertionPaginated(ctx, m.ID, nil, nil)
+			if err == nil && openIncidents != nil {
+				for _, inc := range *openIncidents {
+					if inc.Title == "SSL/TLS Cert Expiry" {
+						hasOpenSSLIncident = true
+						break
+					}
+				}
+			}
+
+			if !hasOpenSSLIncident {
+				l.Warn("SSL/TLS certificate is expiring soon, triggering incident")
+				desc := fmt.Sprintf("SSL/TLS certificate for %s expires in %.1f days (on %s)",
+					m.Settings.URL,
+					timeRemaining.Hours()/24,
+					expiry.Format(time.RFC822),
+				)
+				sslIncident := entities.Incident{
+					MonitorID:   &m.ID,
+					TeamID:      m.TeamID,
+					Title:       "SSL/TLS Cert Expiry",
+					Description: &desc,
+				}
+				if err := i.Create(ctx, &[]entities.Incident{sslIncident}); err != nil {
+					l.WithError(err).Error("failed to trigger SSL/TLS cert expiry incident")
+				}
+			}
+		} else {
+			// Auto-resolve any open SSL/TLS cert expiry incidents if the cert is now valid for >= 30 days
+			openIncidents, err := i.GetByMonitorIDWithAssertionPaginated(ctx, m.ID, nil, nil)
+			if err == nil && openIncidents != nil {
+				for _, inc := range *openIncidents {
+					if inc.Title == "SSL/TLS Cert Expiry" {
+						l.Info("SSL/TLS certificate is now valid, resolving open incident")
+						inc.Incident.Resolved = true
+						if err := i.Update(ctx, &inc.Incident); err != nil {
+							l.WithError(err).Error("failed to resolve SSL/TLS cert expiry incident")
+						}
+					}
+				}
+			}
+		}
+	}
+}
+
+func checkAnomaly(monitorID uint, res *http.Result) (bool, error) {
+	reqBody := fmt.Sprintf(`{"monitor_id": %d, "timings": [{"response_time": %f, "dns_lookup": %f, "tcp_connection": %f, "tls_handshake": %f, "server_processing": %f, "content_transfer": %f}]}`, 
+		monitorID, 
+		float64(res.Timing.Phases.Total.Milliseconds()),
+		float64(res.Timing.Phases.DNSLookup.Milliseconds()),
+		float64(res.Timing.Phases.TCPConnection.Milliseconds()),
+		float64(res.Timing.Phases.TLSHandshake.Milliseconds()),
+		float64(res.Timing.Phases.ServerProcessing.Milliseconds()),
+		float64(res.Timing.Phases.ContentTransfer.Milliseconds()),
+	)
+	resp, err := xhttp.Post("http://forecaster-api:8000/predict", "application/json", strings.NewReader(reqBody))
+	if err != nil {
+		return false, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != xhttp.StatusOK {
+		return false, fmt.Errorf("forecaster API returned status %d", resp.StatusCode)
+	}
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return false, err
+	}
+
+	return strings.Contains(string(body), `"anomalies":[true]`) || strings.Contains(string(body), `"anomalies": [true]`), nil
 }
 
 func assertResult(httpResult *http.Result, assertions []entities.MonitorAssertion) ([]entities.MonitorAssertion, []entities.MonitorAssertion, error) {
@@ -195,13 +410,14 @@ func mapMonitorAssertionsToAssertionRules(ma []entities.MonitorAssertion) []asse
 	return rules
 }
 
-func mapResultToCheck(m *entities.Monitor, res *http.Result) *check.Check {
+func mapResultToCheck(m *entities.Monitor, res *http.Result, location string) *check.Check {
 	c := &check.Check{
 		MonitorID:  uint64(m.ID),
 		TeamID:     uint64(m.TeamID),
 		StatusCode: uint64(res.Response.StatusCode),
 		Method:     m.Settings.Method,
 		URL:        m.Settings.URL,
+		Location:   location,
 		Timing: check.Timing{
 			DNSLookup:        res.Timing.Phases.DNSLookup,
 			TCPConnection:    res.Timing.Phases.TCPConnection,
@@ -229,14 +445,15 @@ func mapResultToCheck(m *entities.Monitor, res *http.Result) *check.Check {
 func triggerIncident(ctx context.Context, m *entities.Monitor, hr *http.Result, failed *[]entities.MonitorAssertion, i incident.Service) error {
 	incidents := make([]entities.Incident, len(*failed))
 
-	for i, assertion := range *failed {
-
-		incidents[i] = entities.Incident{
-			MonitorID:          assertion.MonitorID,
+	for j := range *failed {
+		assertion := (*failed)[j]
+		
+		incidents[j] = entities.Incident{
+			MonitorID:          &assertion.MonitorID,
 			TeamID:             m.TeamID,
 			Title:              assertion.Source,
 			Description:        &assertion.Source,
-			MonitorAssertionID: assertion.ID,
+			MonitorAssertionID: &assertion.ID,
 		}
 	}
 

@@ -7,12 +7,17 @@ import (
 type Incident struct {
 	ID                 uint
 	TeamID             uint `gorm:"index;not null"`
-	MonitorID          uint `gorm:"index;not null"`
-	MonitorAssertionID uint `gorm:"uniqueIndex:unresolved_incident;not null"`
-	Resolved           bool `gorm:"uniqueIndex:unresolved_incident;not null;default:false"`
+	MonitorID          *uint `gorm:"index"`
+	MonitorAssertionID *uint `gorm:"uniqueIndex:unresolved_monitor_incident"`
+	HeartbeatID        *uint `gorm:"uniqueIndex:unresolved_heartbeat_incident"`
+	Resolved           bool `gorm:"not null;default:false"`
+	Acknowledged       bool `gorm:"not null;default:false"`
+	AcknowledgedBy     *uint `gorm:"index"`
+	AcknowledgedAt     *time.Time
 
-	Title       string `gorm:"index;not null"`
-	Description *string
+	Title               string `gorm:"index;not null"`
+	Description         *string
+	RootCauseAnalysis   *string
 	Comments    []IncidentComment `gorm:"constraint:OnDelete:CASCADE"`
 
 	CreatedAt time.Time `gorm:"index"`

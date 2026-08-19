@@ -38,5 +38,7 @@ func Register(
 	monitorsGroup.GET("", AuthHandler(h.GetIncidents))
 	monitorsGroup.GET("/overview", AuthHandler(h.GetIncidents))
 	monitorsGroup.GET("/monitor/:monitorId", AuthHandler(h.GetMonitorIncidents))
-	monitorsGroup.PATCH("/:incidentId/resolved", AuthHandler(h.PatchSolveMonitorIncident))
+	monitorsGroup.GET("/:incidentId", AuthHandler(h.GetIncident))
+	monitorsGroup.PATCH("/:incidentId/resolved", AuthHandler(h.PatchSolveIncident))
+	monitorsGroup.PATCH("/:incidentId/acknowledge", AuthHandler(h.PatchAcknowledgeIncident))
 }

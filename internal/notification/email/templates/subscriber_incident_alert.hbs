@@ -1,0 +1,11 @@
+  <p>Hi there,</p>
+  {{#if is_resolved}}
+    <p>An incident has been <strong>resolved</strong> for <strong>{{status_page_name}}</strong>.</p>
+  {{else}}
+    <p>An incident has been <strong>reported</strong> for <strong>{{status_page_name}}</strong>.</p>
+  {{/if}}
+  <p><strong>Issue:</strong> {{incident_title}}</p>
+  <p>Please check our status page for the latest updates.</p>
+  <p>
+    <a href="{{status_page_url}}" style="display: inline-block; padding: 10px 20px; background-color: #007bff; color: white; text-decoration: none; border-radius: 5px;">View Status Page</a>
+  </p>

@@ -25,13 +25,15 @@ func IncludeTotalCount(columnName string) func(db *gorm.DB) *gorm.DB {
 func Search(column []string, search *string) func(db *gorm.DB) *gorm.DB {
 	return func(db *gorm.DB) *gorm.DB {
 		if search != nil {
+			query := db.Session(&gorm.Session{NewDB: true})
 			for i, c := range column {
 				if i == 0 {
-					db = db.Where(c+" ILIKE ?", "%"+*search+"%")
+					query = query.Where(c+" ILIKE ?", "%"+*search+"%")
 				} else {
-					db = db.Or(c+" ILIKE ?", "%"+*search+"%")
+					query = query.Or(c+" ILIKE ?", "%"+*search+"%")
 				}
 			}
+			db = db.Where(query)
 		}
 
 		return db

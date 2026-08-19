@@ -1,6 +1,8 @@
 package cmd
 
 import (
+	"strings"
+
 	"github.com/go-playground/validator/v10"
 	"github.com/mcuadros/go-defaults"
 	auth "github.com/opsway-io/backend/internal/authentication"
@@ -14,6 +16,7 @@ import (
 	"github.com/opsway-io/backend/internal/rest/controllers/authentication"
 	"github.com/opsway-io/backend/internal/storage"
 	"github.com/opsway-io/backend/internal/team"
+	"github.com/opsway-io/backend/internal/user"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -23,6 +26,10 @@ import (
 )
 
 var cfgFile string
+
+type ReportConfig struct {
+	Concurrency int `mapstructure:"concurrency" default:"5"`
+}
 
 type Config struct {
 	Log            LogConfig                             `mapstructure:"log"`
@@ -37,7 +44,14 @@ type Config struct {
 	HTTPProbe      http.Config                           `mapstructure:"http_probe"`
 	Email          email.Config                          `mapstructure:"email"`
 	Team           team.Config                           `mapstructure:"team"`
+	User           user.Config                           `mapstructure:"user"`
 	Stripe         billing.Config                        `mapstructure:"stripe"`
+	Report         ReportConfig                          `mapstructure:"report"`
+	StatusPage     StatusPageConfig                      `mapstructure:"status_page"`
+}
+
+type StatusPageConfig struct {
+	BaseURL string `mapstructure:"base_url" default:"https://status.opsway.io"`
 }
 
 var validate = validator.New()
@@ -79,6 +93,7 @@ func initConfig() {
 		logrus.Info("Using secret file: ", viper.ConfigFileUsed())
 	}
 
+	viper.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
 	viper.AutomaticEnv()
 }
 

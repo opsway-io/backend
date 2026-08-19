@@ -1,7 +1,10 @@
 package authentication
 
 import (
+	"time"
+
 	"github.com/labstack/echo/v4"
+	"github.com/labstack/echo/v4/middleware"
 	"github.com/markbates/goth"
 	"github.com/markbates/goth/providers/github"
 	"github.com/markbates/goth/providers/google"
@@ -11,6 +14,7 @@ import (
 	"github.com/opsway-io/backend/internal/team"
 	"github.com/opsway-io/backend/internal/user"
 	"github.com/sirupsen/logrus"
+	"golang.org/x/time/rate"
 )
 
 type Handlers struct {
@@ -44,9 +48,25 @@ func Register(
 	BaseHandler := handlers.BaseHandlerFactory(logger)
 
 	authGroup := e.Group("/auth")
+	authGroup.Use(middleware.RateLimiterWithConfig(middleware.RateLimiterConfig{
+		Store: middleware.NewRateLimiterMemoryStoreWithConfig(
+			middleware.RateLimiterMemoryStoreConfig{
+				Rate:      rate.Limit(10),
+				Burst:     30,
+				ExpiresIn: 3 * 60 * time.Second,
+			},
+		),
+		IdentifierExtractor: func(c echo.Context) (string, error) {
+			return c.RealIP(), nil
+		},
+	}))
 
 	authGroup.POST("/login", BaseHandler(h.PostLogin))
+	authGroup.POST("/register", BaseHandler(h.PostRegister))
+	authGroup.POST("/logout", BaseHandler(h.PostLogout))
 	authGroup.POST("/refresh", BaseHandler(h.PostRefreshToken))
+	authGroup.POST("/forgot-password", BaseHandler(h.PostForgotPassword))
+	authGroup.POST("/reset-password", BaseHandler(h.PostResetPassword))
 
 	if oAuthConfig != nil {
 		goth.UseProviders(

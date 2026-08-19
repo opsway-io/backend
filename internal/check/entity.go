@@ -11,6 +11,7 @@ type Check struct {
 	TeamID     uint64    `gorm:"index;not null"`
 	Method     string    `gorm:"index;not null"`
 	URL        string    `gorm:"index;not null"`
+	Location   string    `gorm:"index;not null"`
 	MonitorID  uint64    `gorm:"index;not null"`
 	StatusCode uint64    `gorm:"index; not null"`
 	Timing     Timing    `gorm:"embedded;embeddedPrefix:timing_"`
@@ -18,8 +19,14 @@ type Check struct {
 	CreatedAt  time.Time `gorm:"index"`
 }
 
+// TableName returns the table name for the Check model, with ClickHouse engine options
 func (Check) TableName() string {
 	return "checks"
+}
+
+// TableOptions sets table options for ClickHouse to optimize group by queries
+func (Check) TableOptions() string {
+	return "ENGINE=MergeTree() ORDER BY (team_id, monitor_id, created_at)"
 }
 
 type Timing struct {

@@ -10,8 +10,6 @@ import (
 var baseTemplateSource string
 
 type BaseTemplate struct {
-	subject string
-	body    string
 }
 
 func (t *BaseTemplate) Render(source string, ctx map[string]any) string {

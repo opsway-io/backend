@@ -34,7 +34,7 @@ func NewObjectStorageRepository(ctx context.Context, conf ObjectStorageRepositor
 	}
 
 	if conf.EndpointURL != nil {
-		cfg.EndpointResolver = aws.EndpointResolverFunc(func(service, region string) (aws.Endpoint, error) {
+		cfg.EndpointResolverWithOptions = aws.EndpointResolverWithOptionsFunc(func(service, region string, options ...interface{}) (aws.Endpoint, error) {
 			return aws.Endpoint{
 				PartitionID:       "aws",
 				URL:               *conf.EndpointURL,

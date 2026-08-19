@@ -17,7 +17,8 @@ type GetTeamUsersRequest struct {
 	TeamID uint    `param:"teamId" validate:"required,numeric,gt=0"`
 	Offset *int    `query:"offset" validate:"numeric,gte=0" default:"0"`
 	Limit  *int    `query:"limit" validate:"numeric,gt=0" default:"10"`
-	Query  *string `query:"query" validate:"omitempty"`
+	Query  *string            `query:"query" validate:"omitempty"`
+	Role   *entities.TeamRole `query:"role" validate:"omitempty,teamRole"`
 }
 
 type GetTeamUsersResponse struct {
@@ -42,7 +43,7 @@ func (h *Handlers) GetTeamUsers(c hs.AuthenticatedContext) error {
 		return echo.ErrBadRequest
 	}
 
-	users, err := h.TeamService.GetUsersByID(c.Request().Context(), req.TeamID, req.Offset, req.Limit, req.Query)
+	users, err := h.TeamService.GetUsersByID(c.Request().Context(), req.TeamID, req.Offset, req.Limit, req.Query, req.Role)
 	if err != nil {
 		c.Log.WithError(err).Debug("failed to get users")
 
