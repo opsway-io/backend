@@ -1,7 +1,7 @@
 #!/bin/bash
 set -e
 # login
-TOKEN=$(curl -s -X POST http://localhost:8001/v1/auth/login -H 'Content-Type: application/json' -d '{"email":"admin@opsway.io","password":"pass"}' -c cookies.txt | jq -r '.user.id')
+TOKEN=$(curl -s -X POST http://localhost:8001/v1/auth/login -H 'Content-Type: application/json' -d '{"email":"admin@opsway.eu","password":"pass"}' -c cookies.txt | jq -r '.user.id')
 
 # create monitor
 curl -s -X POST http://localhost:8001/v1/teams/1/monitors -H 'Content-Type: application/json' -b cookies.txt -d '{

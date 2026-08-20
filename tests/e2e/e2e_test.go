@@ -27,7 +27,7 @@ func TestE2E_MockServer(t *testing.T) {
 	// 1. Authentication
 	t.Log("Authenticating as John Doe...")
 	loginBody := map[string]string{
-		"email":    "john@opsway.io",
+		"email":    "john@opsway.eu",
 		"password": "pass",
 	}
 	loginJSON, _ := json.Marshal(loginBody)

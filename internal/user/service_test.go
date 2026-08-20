@@ -28,7 +28,7 @@ func TestService_Create(t *testing.T) {
 
 		u := &entities.User{
 			Name:  "Test User",
-			Email: "test@opsway.io",
+			Email: "test@opsway.eu",
 		}
 
 		repo.On("Create", ctx, u).Return(nil)
@@ -56,7 +56,7 @@ func TestService_GetUserByID(t *testing.T) {
 		u := &entities.User{
 			ID:    1,
 			Name:  "Test User",
-			Email: "test@opsway.io",
+			Email: "test@opsway.eu",
 		}
 		
 		cache.On("GetUser", ctx, uint(1)).Return(nil, nil)
@@ -84,7 +84,7 @@ func TestService_Update(t *testing.T) {
 		u := &entities.User{
 			ID:    1,
 			Name:  "Test User",
-			Email: "test@opsway.io",
+			Email: "test@opsway.eu",
 		}
 
 		repo.On("Update", ctx, u).Return(nil)

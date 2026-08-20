@@ -7,8 +7,8 @@ rest:
 
 authentication:
   secret: "secret"
-  audience: "https://opsway.io"
-  issuer: "opsway.io"
+  audience: "https://opsway.eu"
+  issuer: "opsway.eu"
   expires_in: 1h
   refresh_expires_in: 720h
   cookie_domain: localhost
@@ -30,7 +30,7 @@ redis:
 email:
   debug: true
   sender_name: "opsway"
-  sender_email: "no-reply@opsway.io"
+  sender_email: "no-reply@opsway.eu"
   smtp_host: "mailhog"
   smtp_port: 1025
   smtp_username: ""

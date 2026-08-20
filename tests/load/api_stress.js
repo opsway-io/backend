@@ -15,7 +15,7 @@ const BASE_URL = 'http://localhost:8001/v1';
 export function setup() {
     // Authenticate and get token
     const loginRes = http.post(`${BASE_URL}/authentication/login`, JSON.stringify({
-        email: 'admin@opsway.io',
+        email: 'admin@opsway.eu',
         password: 'pass'
     }), {
         headers: { 'Content-Type': 'application/json' }

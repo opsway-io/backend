@@ -62,7 +62,7 @@ func TestRepositoryIntegration(t *testing.T) {
 	displayName := "Tester"
 	u := &entities.User{
 		Name:        "Test User",
-		Email:       "test@opsway.io",
+		Email:       "test@opsway.eu",
 		DisplayName: &displayName,
 	}
 

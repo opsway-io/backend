@@ -15,7 +15,7 @@ func TeamOpsway(db *gorm.DB) {
 
 	// Users
 	user := entities.User{
-		Email:       "admin@opsway.io",
+		Email:       "admin@opsway.eu",
 		Name:        "Douglas Adams",
 		DisplayName: pointer.String("Ford Prefect"),
 		Teams: []entities.Team{

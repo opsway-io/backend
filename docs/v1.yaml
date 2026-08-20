@@ -5,7 +5,7 @@ info:
   version: 1.0.0
 
 servers:
-  - url: https://opsway.io/api/v1
+  - url: https://opsway.eu/api/v1
   - url: "{scheme}://{host}"
     description: Custom
     variables:

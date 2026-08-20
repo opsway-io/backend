@@ -61,7 +61,7 @@ func TestRepositoryIntegration(t *testing.T) {
 
 	u := &entities.User{
 		Name:  "Test User",
-		Email: "test@opsway.io",
+		Email: "test@opsway.eu",
 	}
 	require.NoError(t, db.Create(u).Error)
 

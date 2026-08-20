@@ -51,7 +51,7 @@ type Config struct {
 }
 
 type StatusPageConfig struct {
-	BaseURL string `mapstructure:"base_url" default:"https://status.opsway.io"`
+	BaseURL string `mapstructure:"base_url" default:"https://status.opsway.eu"`
 }
 
 var validate = validator.New()

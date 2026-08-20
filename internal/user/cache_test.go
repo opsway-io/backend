@@ -44,7 +44,7 @@ func TestCacheIntegration(t *testing.T) {
 		u := &entities.User{
 			ID:    1,
 			Name:  "Test User",
-			Email: "test@opsway.io",
+			Email: "test@opsway.eu",
 		}
 
 		err := c.SetUser(ctx, u, 1*time.Minute)
@@ -65,7 +65,7 @@ func TestCacheIntegration(t *testing.T) {
 		u := &entities.User{
 			ID:    2,
 			Name:  "Test User 2",
-			Email: "test2@opsway.io",
+			Email: "test2@opsway.eu",
 		}
 
 		err := c.SetUserByEmail(ctx, u, 1*time.Minute)

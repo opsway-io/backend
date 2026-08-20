@@ -33,17 +33,17 @@ func TeamsAndUsers(db *gorm.DB) {
 		{
 			Name:        "Douglas Adams",
 			DisplayName: pointer.String("I Am Admin"),
-			Email:       "admin@opsway.io",
+			Email:       "admin@opsway.eu",
 		},
 		{
 			Name:        "John Doe",
 			DisplayName: pointer.String("John"),
-			Email:       "john@opsway.io",
+			Email:       "john@opsway.eu",
 		},
 		{
 			Name:        "Jane Doe",
 			DisplayName: pointer.String("Jane"),
-			Email:       "jane@opsway.io",
+			Email:       "jane@opsway.eu",
 		},
 	}
 
