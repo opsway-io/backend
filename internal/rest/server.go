@@ -80,7 +80,7 @@ func NewServer(
 		middleware.Recover(),
 		middleware.Logger(),
 		middleware.CORSWithConfig(middleware.CORSConfig{
-			AllowOrigins:     []string{"http://localhost:5173", "http://localhost:5174", "https://app.opsway.eu", "https://opsway.eu"},
+			AllowOrigins:     []string{"http://localhost:5173", "http://localhost:5174", "https://app.opsway.eu", "https://opsway.eu", "https://my.opsway.eu"},
 			AllowCredentials: true,
 		}),
 		middleware.SecureWithConfig(middleware.SecureConfig{
