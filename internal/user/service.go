@@ -242,7 +242,11 @@ func (s *ServiceImpl) ChangePasswordWithOldPassword(ctx context.Context, userID 
 		return errors.Wrap(err, "failed to get user")
 	}
 
-	if !user.CheckPassword(oldPassword) {
+	if user.PasswordHash != nil {
+		if !user.CheckPassword(oldPassword) {
+			return ErrInvalidPassword
+		}
+	} else if oldPassword != "" {
 		return ErrInvalidPassword
 	}
 

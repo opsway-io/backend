@@ -85,6 +85,7 @@ type GetMonitorsResponseMonitor struct {
 
 type GetMonitorsResponseMonitorStats struct {
 	UptimePercentage     float64   `json:"uptimePercentage"`
+	AverageResponseTime  float64   `json:"averageResponseTime"`
 	AverageResponseTimes []float64 `json:"averageResponseTimes"`
 	P99                  uint      `json:"p99"`
 	P95                  uint      `json:"p95"`
@@ -148,6 +149,10 @@ func newGetMonitorsResponse(monitors *[]monitor.MonitorWithTotalCount, stats *[]
 				Property: a.Property,
 			}
 		}
+		locations := m.Settings.Locations
+		if locations == nil {
+			locations = []string{}
+		}
 
 		res[i] = GetMonitorsResponseMonitor{
 			Monitor: Monitor{
@@ -171,7 +176,7 @@ func newGetMonitorsResponse(monitors *[]monitor.MonitorWithTotalCount, stats *[]
 						CheckExpiration:         m.Settings.TLS.CheckExpiration,
 						ExpirationThresholdDays: m.Settings.TLS.ExpirationThresholdDays,
 					},
-					Locations: m.Settings.Locations,
+					Locations: locations,
 				},
 				Assertions: assertions,
 			},
@@ -181,6 +186,7 @@ func newGetMonitorsResponse(monitors *[]monitor.MonitorWithTotalCount, stats *[]
 		if ok {
 			res[i].Stats = GetMonitorsResponseMonitorStats{
 				UptimePercentage:     float64(stat.UptimePercentage),
+				AverageResponseTime:  float64(stat.AverageResponseTime),
 				AverageResponseTimes: stat.Stats,
 				P99:                  uint(stat.P99),
 				P95:                  uint(stat.P95),
@@ -257,6 +263,10 @@ func newGetMonitorResponse(m *entities.Monitor, stats *check.MonitorStats) (*Get
 			Value: h.Value,
 		}
 	}
+	locations := m.Settings.Locations
+	if locations == nil {
+		locations = []string{}
+	}
 
 	assertions := make([]MonitorAssertion, len(m.Assertions))
 	for j, a := range m.Assertions {
@@ -290,7 +300,7 @@ func newGetMonitorResponse(m *entities.Monitor, stats *check.MonitorStats) (*Get
 					CheckExpiration:         m.Settings.TLS.CheckExpiration,
 					ExpirationThresholdDays: m.Settings.TLS.ExpirationThresholdDays,
 				},
-				Locations: m.Settings.Locations,
+				Locations: locations,
 			},
 			Assertions: assertions,
 		},

@@ -74,7 +74,7 @@ func (s *RepositoryImpl) GetUserAndTeamsByEmailAddress(ctx context.Context, emai
 
 func (s *RepositoryImpl) Create(ctx context.Context, user *entities.User) error {
 	if err := s.db.WithContext(ctx).Create(user).Error; err != nil {
-		if errors.As(err, &postgres.ErrDuplicateEntry) {
+		if postgres.IsDuplicateEntryError(err) {
 			return ErrEmailAlreadyExists
 		}
 

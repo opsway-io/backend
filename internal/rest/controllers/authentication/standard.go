@@ -55,22 +55,26 @@ func (h *Handlers) PostLogin(c hs.BaseContext) error {
 		return echo.ErrBadRequest
 	}
 
-	user, err := h.UserService.GetUserAndTeamsByEmailAddress(c.Request().Context(), req.Email)
+	u, err := h.UserService.GetUserAndTeamsByEmailAddress(c.Request().Context(), req.Email)
 	if err != nil {
-		c.Log.WithError(err).Debug("failed to get user")
-
-		return echo.ErrUnauthorized
+		if errors.Is(err, user.ErrNotFound) {
+			c.Log.WithError(err).Debug("user not found")
+			return echo.ErrUnauthorized
+		}
+		
+		c.Log.WithError(err).Error("failed to get user")
+		return echo.ErrInternalServerError
 	}
 
-	c.Log = c.Log.WithField("user_id", user.ID)
+	c.Log = c.Log.WithField("user_id", u.ID)
 
-	if ok := user.CheckPassword(req.Password); !ok {
+	if ok := u.CheckPassword(req.Password); !ok {
 		c.Log.Debug("password invalid")
 
 		return echo.ErrUnauthorized
 	}
 
-	accessToken, refreshToken, err := h.AuthenticationService.Generate(c.Request().Context(), user)
+	accessToken, refreshToken, err := h.AuthenticationService.Generate(c.Request().Context(), u)
 	if err != nil {
 		c.Log.WithError(err).Debug("failed to generate access and refresh token for user")
 
@@ -83,7 +87,7 @@ func (h *Handlers) PostLogin(c hs.BaseContext) error {
 	h.CookieService.SetRefreshToken(c, refreshToken)
 
 	return c.JSON(http.StatusOK, newPostLoginResponse(
-		user,
+		u,
 		h.UserService,
 		h.TeamService,
 	))

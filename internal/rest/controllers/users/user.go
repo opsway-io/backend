@@ -25,6 +25,7 @@ type GetUserResponse struct {
 	Email       string                `json:"email"`
 	AvatarURL   *string               `json:"avatarUrl"`
 	Teams       []GetUserResponseTeam `json:"teams"`
+	HasPassword bool                  `json:"hasPassword"`
 	CreatedAt   time.Time             `json:"createdAt"`
 	UpdatedAt   time.Time             `json:"updatedAt"`
 }
@@ -80,6 +81,7 @@ func newGetUserResponse(u *entities.User, userService user.Service, teamService 
 		Name:        u.Name,
 		DisplayName: u.DisplayName,
 		Email:       u.Email,
+		HasPassword: u.PasswordHash != nil,
 		Teams:       teams,
 		CreatedAt:   u.CreatedAt,
 		UpdatedAt:   u.UpdatedAt,

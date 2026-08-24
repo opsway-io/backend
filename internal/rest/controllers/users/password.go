@@ -12,7 +12,7 @@ import (
 
 type PutUserPasswordRequest struct {
 	UserID      uint   `param:"userId" validate:"required,numeric,gt=0"`
-	OldPassword string `json:"oldPassword" validate:"required,max=255"`
+	OldPassword string `json:"oldPassword" validate:"max=255"`
 	NewPassword string `json:"newPassword" validate:"required,min=8,max=255"`
 }
 
@@ -39,7 +39,7 @@ func (h *Handlers) PutUserPassword(c hs.AuthenticatedContext) error {
 		if errors.Is(err, user.ErrInvalidPassword) {
 			c.Log.WithError(err).Debug("invalid password")
 
-			return echo.ErrBadRequest
+			return echo.ErrForbidden
 		}
 
 		c.Log.WithError(err).Error("failed to change user password")
