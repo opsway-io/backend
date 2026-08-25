@@ -23,7 +23,9 @@ type Service interface {
 	Delete(ctx context.Context, id, teamID uint) error
 	ReplaceMonitors(ctx context.Context, statusPage *entities.StatusPage, monitors []entities.Monitor) error
 	Subscribe(ctx context.Context, statusPageID uint, email string, token string) error
+	GetSubscriberByToken(ctx context.Context, token string) (*entities.StatusPageSubscriber, error)
 	VerifySubscriber(ctx context.Context, token string) error
+	Unsubscribe(ctx context.Context, token string) error
 	GetVerifiedSubscribers(ctx context.Context, statusPageID uint) ([]entities.StatusPageSubscriber, error)
 }
 
@@ -122,13 +124,21 @@ func (s *ServiceImpl) Subscribe(ctx context.Context, statusPageID uint, email st
 		StatusPageID: statusPageID,
 		Email:        email,
 		Token:        token,
-		Verified:     false,
+		Verified:     false, // explicitly set false though it's default
 	}
 	return s.repository.CreateSubscriber(ctx, sub)
 }
 
+func (s *ServiceImpl) GetSubscriberByToken(ctx context.Context, token string) (*entities.StatusPageSubscriber, error) {
+	return s.repository.GetSubscriberByToken(ctx, token)
+}
+
 func (s *ServiceImpl) VerifySubscriber(ctx context.Context, token string) error {
 	return s.repository.VerifySubscriber(ctx, token)
+}
+
+func (s *ServiceImpl) Unsubscribe(ctx context.Context, token string) error {
+	return s.repository.Unsubscribe(ctx, token)
 }
 
 func (s *ServiceImpl) GetVerifiedSubscribers(ctx context.Context, statusPageID uint) ([]entities.StatusPageSubscriber, error) {

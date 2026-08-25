@@ -14,6 +14,7 @@ type MaintenanceAlertTemplate struct {
 	StatusPageName   string
 	MaintenanceTitle string
 	StatusPageURL    string
+	UnsubscribeURL   string
 }
 
 func (t *MaintenanceAlertTemplate) Subject() string {
@@ -26,6 +27,7 @@ func (t *MaintenanceAlertTemplate) HTML() string {
 		"status_page_name":   t.StatusPageName,
 		"maintenance_title":  t.MaintenanceTitle,
 		"status_page_url":    t.StatusPageURL,
+		"unsubscribe_url":    t.UnsubscribeURL,
 	})
 }
 
@@ -37,9 +39,13 @@ This is a notification regarding scheduled maintenance for "%s":
 %s
 
 Please visit our status page for more details: %s
+
+If you wish to stop receiving these emails, you can unsubscribe here:
+%s
 	`,
 		t.StatusPageName,
 		t.MaintenanceTitle,
 		t.StatusPageURL,
+		t.UnsubscribeURL,
 	)
 }

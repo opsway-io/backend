@@ -47,6 +47,7 @@ func RegisterPublic(
 	publicGroup.GET("/:domain", h.GetPublicStatusPage)
 	publicGroup.POST("/:domain/subscribe", h.Subscribe)
 	publicGroup.GET("/:domain/subscribe/verify/:token", h.VerifySubscriber)
+	publicGroup.DELETE("/:domain/subscribe/:token", h.Unsubscribe)
 }
 
 type GetPublicStatusPageRequest struct {
@@ -270,11 +271,53 @@ func (h *PublicHandlers) VerifySubscriber(c echo.Context) error {
 		return echo.ErrBadRequest
 	}
 
+	sp, err := h.StatusPageService.GetByDomain(c.Request().Context(), req.Domain)
+	if err != nil {
+		if errors.Is(err, statuspage.ErrNotFound) {
+			return echo.ErrNotFound
+		}
+		return echo.ErrInternalServerError
+	}
+
+	sub, err := h.StatusPageService.GetSubscriberByToken(c.Request().Context(), req.Token)
+	if err != nil {
+		logrus.WithError(err).Error("failed to get subscriber")
+		return echo.ErrInternalServerError
+	}
+
 	err = h.StatusPageService.VerifySubscriber(c.Request().Context(), req.Token)
 	if err != nil {
 		logrus.WithError(err).Error("failed to verify subscriber")
 		return echo.ErrInternalServerError
 	}
 
+	// Dispatch subscription confirmed email
+	statusPageURL := fmt.Sprintf("%s/%s", h.StatusPageBaseURL, sp.Domain)
+	unsubscribeURL := fmt.Sprintf("%s/%s/subscribe/%s", h.StatusPageBaseURL, sp.Domain, sub.Token)
+	err = h.EmailSender.Send(c.Request().Context(), "", sub.Email, &templates.SubscriptionConfirmedTemplate{
+		StatusPageName: sp.Name,
+		StatusPageURL:  statusPageURL,
+		UnsubscribeURL: unsubscribeURL,
+	})
+	if err != nil {
+		logrus.WithError(err).Error("failed to dispatch subscription confirmed email")
+	}
+
 	return c.JSON(http.StatusOK, map[string]bool{"verified": true})
+}
+
+func (h *PublicHandlers) Unsubscribe(c echo.Context) error {
+	req, err := helpers.Bind[VerifySubscriberRequest](c) // reusing VerifySubscriberRequest struct since it has Domain and Token
+	if err != nil {
+		logrus.WithError(err).Debug("failed to bind unsubscribe request")
+		return echo.ErrBadRequest
+	}
+
+	err = h.StatusPageService.Unsubscribe(c.Request().Context(), req.Token)
+	if err != nil {
+		logrus.WithError(err).Error("failed to unsubscribe")
+		return echo.ErrInternalServerError
+	}
+
+	return c.JSON(http.StatusOK, map[string]bool{"unsubscribed": true})
 }

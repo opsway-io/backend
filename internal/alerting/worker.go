@@ -208,11 +208,13 @@ func (w *worker) notifyStatusPageSubscribers(ctx context.Context, incident *enti
 
 		statusPageURL := fmt.Sprintf("%s/%s", w.config.StatusPageBaseURL, sp.Domain)
 		for _, sub := range subs {
+			unsubscribeURL := fmt.Sprintf("%s/%s/subscribe/%s", w.config.StatusPageBaseURL, sp.Domain, sub.Token)
 			err := w.emailSender.Send(ctx, "", sub.Email, &templates.SubscriberIncidentAlertTemplate{
 				StatusPageName: sp.Name,
 				IncidentTitle:  incident.Title,
 				StatusPageURL:  statusPageURL,
 				IsResolved:     incident.Resolved,
+				UnsubscribeURL: unsubscribeURL,
 			})
 			if err != nil {
 				w.logger.WithError(err).Error("failed to send subscriber incident alert email")
@@ -259,10 +261,12 @@ func (w *worker) notifyMaintenanceStatusPageSubscribers(ctx context.Context, mai
 		statusPageURL := fmt.Sprintf("%s/%s", w.config.StatusPageBaseURL, sp.Domain)
 		titleWithAction := fmt.Sprintf("[%s] %s", strings.ToUpper(action), maintenance.Title)
 		for _, sub := range subs {
+			unsubscribeURL := fmt.Sprintf("%s/%s/subscribe/%s", w.config.StatusPageBaseURL, sp.Domain, sub.Token)
 			err := w.emailSender.Send(ctx, "", sub.Email, &templates.MaintenanceAlertTemplate{
 				StatusPageName:   sp.Name,
 				MaintenanceTitle: titleWithAction,
 				StatusPageURL:    statusPageURL,
+				UnsubscribeURL:   unsubscribeURL,
 			})
 			if err != nil {
 				w.logger.WithError(err).Error("failed to send subscriber maintenance alert email")

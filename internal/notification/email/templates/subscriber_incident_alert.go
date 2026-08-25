@@ -15,6 +15,7 @@ type SubscriberIncidentAlertTemplate struct {
 	IncidentTitle  string
 	StatusPageURL  string
 	IsResolved     bool
+	UnsubscribeURL string
 }
 
 func (t *SubscriberIncidentAlertTemplate) Subject() string {
@@ -36,6 +37,7 @@ func (t *SubscriberIncidentAlertTemplate) HTML() string {
 		"incident_title":   t.IncidentTitle,
 		"status_page_url":  t.StatusPageURL,
 		"is_resolved":      t.IsResolved,
+		"unsubscribe_url":  t.UnsubscribeURL,
 	})
 }
 
@@ -52,10 +54,14 @@ Hi there,
 %s
 
 View the latest updates on our status page: %s
+
+If you wish to stop receiving these emails, you can unsubscribe here:
+%s
 	`,
 		status,
 		t.StatusPageName,
 		t.IncidentTitle,
 		t.StatusPageURL,
+		t.UnsubscribeURL,
 	)
 }

@@ -18,6 +18,7 @@ type Repository interface {
 	CreateSubscriber(ctx context.Context, sub *entities.StatusPageSubscriber) error
 	GetSubscriberByToken(ctx context.Context, token string) (*entities.StatusPageSubscriber, error)
 	VerifySubscriber(ctx context.Context, token string) error
+	Unsubscribe(ctx context.Context, token string) error
 	GetVerifiedSubscribers(ctx context.Context, statusPageID uint) ([]entities.StatusPageSubscriber, error)
 	ReplaceMonitors(ctx context.Context, statusPage *entities.StatusPage, monitors []entities.Monitor) error
 }
@@ -83,6 +84,10 @@ func (r *RepositoryImpl) GetSubscriberByToken(ctx context.Context, token string)
 
 func (r *RepositoryImpl) VerifySubscriber(ctx context.Context, token string) error {
 	return r.db.WithContext(ctx).Model(&entities.StatusPageSubscriber{}).Where("token = ?", token).Update("verified", true).Error
+}
+
+func (r *RepositoryImpl) Unsubscribe(ctx context.Context, token string) error {
+	return r.db.WithContext(ctx).Where("token = ?", token).Delete(&entities.StatusPageSubscriber{}).Error
 }
 
 func (r *RepositoryImpl) GetVerifiedSubscribers(ctx context.Context, statusPageID uint) ([]entities.StatusPageSubscriber, error) {

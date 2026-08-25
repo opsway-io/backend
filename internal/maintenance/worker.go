@@ -170,10 +170,12 @@ func (w *worker) notifySubscribers(ctx context.Context, m *entities.Maintenance)
 		// 3. Dispatch email to each subscriber
 		statusPageURL := fmt.Sprintf("%s/%s", w.statusPageBaseURL, sp.Domain)
 		for _, sub := range subs {
+			unsubscribeURL := fmt.Sprintf("%s/%s/subscribe/%s", w.statusPageBaseURL, sp.Domain, sub.Token)
 			err := w.emailSender.Send(ctx, "", sub.Email, &templates.MaintenanceAlertTemplate{
 				StatusPageName:   sp.Name,
 				MaintenanceTitle: m.Title,
 				StatusPageURL:    statusPageURL,
+				UnsubscribeURL:   unsubscribeURL,
 			})
 			if err != nil {
 				w.logger.WithError(err).Error("failed to dispatch maintenance email")
