@@ -63,7 +63,7 @@ func runReport(cmd *cobra.Command, args []string) {
 		l.WithError(err).Fatal("Failed to create clickhouse")
 	}
 
-	eventService, err := event.NewService(redisClient)
+	eventService, err := event.NewService(redisClient, "report_generator")
 	if err != nil {
 		l.WithError(err).Fatal("Failed to create event service")
 	}

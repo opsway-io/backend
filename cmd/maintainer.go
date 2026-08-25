@@ -42,7 +42,7 @@ var MaintainerCmd = &cobra.Command{
 		}
 
 		monitorService := monitor.NewService(db, redisClient)
-		eventService, err := event.NewService(redisClient)
+		eventService, err := event.NewService(redisClient, "maintainer")
 		if err != nil {
 			logger.WithError(err).Fatal("failed to create event service")
 		}

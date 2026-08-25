@@ -87,7 +87,7 @@ func runProber(cmd *cobra.Command, args []string) {
 		l.WithError(err).Fatal("Failed to create Postgres client")
 	}
 
-	eventService, err := event.NewService(redisClient)
+	eventService, err := event.NewService(redisClient, "prober")
 	if err != nil {
 		l.WithError(err).Fatal("Failed to create event service")
 	}

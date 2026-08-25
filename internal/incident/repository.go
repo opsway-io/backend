@@ -156,7 +156,7 @@ func (r *RepositoryImpl) GetByTeamIDMonitorsIncidentStats(ctx context.Context, t
 		count(id) as count`).
 		Where("team_id = ?", teamID).
 		Where("monitor_id IS NOT NULL").
-		// Where("created_at BETWEEN ? AND ?", start, end).
+		Where("created_at BETWEEN ? AND ?", start, end).
 		Group("monitor_id").
 		Find(&incidents).Error
 

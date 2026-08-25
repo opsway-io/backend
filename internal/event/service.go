@@ -21,7 +21,7 @@ type service struct {
 	subscriber *redisstream.Subscriber
 }
 
-func NewService(redisClient *redis.Client) (Service, error) {
+func NewService(redisClient *redis.Client, consumerGroup string) (Service, error) {
 	publisher, err := redisstream.NewPublisher(
 		redisstream.PublisherConfig{
 			Client:     redisClient,
@@ -33,10 +33,16 @@ func NewService(redisClient *redis.Client) (Service, error) {
 		return nil, err
 	}
 
+	subscriberConfig := redisstream.SubscriberConfig{
+		Client: redisClient,
+	}
+	if consumerGroup != "" {
+		subscriberConfig.ConsumerGroup = consumerGroup
+		subscriberConfig.Consumer = watermill.NewShortUUID()
+	}
+
 	subscriber, err := redisstream.NewSubscriber(
-		redisstream.SubscriberConfig{
-			Client: redisClient,
-		},
+		subscriberConfig,
 		watermill.NewStdLogger(false, false),
 	)
 	if err != nil {

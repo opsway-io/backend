@@ -112,7 +112,7 @@ func runAPI(cmd *cobra.Command, args []string) {
 		emailSender = email.NewSendgridSender(conf.Email)
 	}
 
-	eventService, err := event.NewService(redisClient)
+	eventService, err := event.NewService(redisClient, "")
 	if err != nil {
 		l.WithError(err).Fatal("Failed to create event service")
 	}

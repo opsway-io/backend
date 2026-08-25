@@ -50,7 +50,7 @@ func runScheduler(cmd *cobra.Command, args []string) {
 
 	schedule := monitor.NewSchedule(redisClient)
 
-	eventService, err := event.NewService(redisClient)
+	eventService, err := event.NewService(redisClient, "")
 	if err != nil {
 		l.WithError(err).Fatal("Failed to create event service")
 	}
