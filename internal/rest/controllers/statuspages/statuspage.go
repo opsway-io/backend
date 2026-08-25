@@ -124,7 +124,7 @@ func (h *Handlers) GetStatusPages(c handlers.AuthenticatedContext) error {
 type PostStatusPageRequest struct {
 	TeamID uint   `param:"teamId" validate:"required,numeric,gt=0"`
 	Name   string `json:"name" validate:"required,max=255"`
-	Domain string `json:"domain" validate:"required,max=255"`
+	Domain string `json:"domain" validate:"required,max=255,fqdn"`
 }
 
 func (h *Handlers) PostStatusPage(c handlers.AuthenticatedContext) error {
@@ -225,7 +225,7 @@ type PutStatusPageRequest struct {
 	TeamID       uint    `param:"teamId" validate:"required,numeric,gt=0"`
 	StatusPageID uint    `param:"statusPageId" validate:"required,numeric,gt=0"`
 	Name         string  `json:"name" validate:"required,max=255"`
-	Domain       string  `json:"domain" validate:"required,max=255"`
+	Domain       string  `json:"domain" validate:"required,max=255,fqdn"`
 	LogoURL      string  `json:"logoUrl"`
 	LogoLink     string  `json:"logoLink"`
 	FaviconURL   string  `json:"faviconUrl"`
