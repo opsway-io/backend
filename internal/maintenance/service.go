@@ -16,6 +16,7 @@ type Service interface {
 	GetActiveByMonitorIDs(ctx context.Context, now time.Time, monitorIDs []uint) ([]entities.Maintenance, error)
 	GetUpcomingByMonitorIDs(ctx context.Context, now time.Time, monitorIDs []uint) ([]entities.Maintenance, error)
 	GetAllByMonitorIDs(ctx context.Context, monitorIDs []uint) ([]entities.Maintenance, error)
+	GetUnnotified(ctx context.Context, now time.Time) (*[]entities.Maintenance, error)
 	Create(ctx context.Context, maintenance *entities.Maintenance) error
 	Update(ctx context.Context, maintenance *entities.Maintenance) error
 	Delete(ctx context.Context, maintenance *entities.Maintenance) error
@@ -55,6 +56,10 @@ func (s *ServiceImpl) GetUpcomingByMonitorIDs(ctx context.Context, now time.Time
 
 func (s *ServiceImpl) GetAllByMonitorIDs(ctx context.Context, monitorIDs []uint) ([]entities.Maintenance, error) {
 	return s.repository.GetAllByMonitorIDs(ctx, monitorIDs)
+}
+
+func (s *ServiceImpl) GetUnnotified(ctx context.Context, now time.Time) (*[]entities.Maintenance, error) {
+	return s.repository.GetUnnotified(ctx, now)
 }
 
 func (s *ServiceImpl) Create(ctx context.Context, maintenance *entities.Maintenance) error {

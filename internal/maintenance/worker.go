@@ -59,6 +59,20 @@ func (w *worker) Start(ctx context.Context) error {
 func (w *worker) processMaintenanceWindows(ctx context.Context) {
 	now := time.Now()
 
+	unnotifiedMaintenances, err := w.maintenance.GetUnnotified(ctx, now)
+	if err != nil {
+		w.logger.WithError(err).Error("failed to fetch unnotified maintenance windows")
+	} else {
+		for _, m := range *unnotifiedMaintenances {
+			w.notifySubscribers(ctx, &m)
+			
+			m.Settings.Notified = true
+			if err := w.maintenance.Update(ctx, &m); err != nil {
+				w.logger.WithError(err).Error("failed to mark maintenance as notified")
+			}
+		}
+	}
+
 	activeMaintenances, err := w.maintenance.GetActive(ctx, now)
 	if err != nil {
 		w.logger.WithError(err).Error("failed to fetch active maintenance windows")
@@ -77,15 +91,6 @@ func (w *worker) processMaintenanceWindows(ctx context.Context) {
 		} else {
 			for _, mon := range m.Monitors {
 				monitorsUnderMaintenance[mon.ID] = true
-			}
-		}
-		
-		if !m.Settings.Notified {
-			w.notifySubscribers(ctx, m.TeamID, m.Title)
-			
-			m.Settings.Notified = true
-			if err := w.maintenance.Update(ctx, &m); err != nil {
-				w.logger.WithError(err).Error("failed to mark maintenance as notified")
 			}
 		}
 	}
@@ -124,15 +129,37 @@ func (w *worker) processMaintenanceWindows(ctx context.Context) {
 	}
 }
 
-func (w *worker) notifySubscribers(ctx context.Context, teamID uint, title string) {
+func (w *worker) notifySubscribers(ctx context.Context, m *entities.Maintenance) {
 	// 1. Get all status pages for this team
-	statusPages, err := w.statusPageService.GetByTeamID(ctx, teamID)
+	statusPages, err := w.statusPageService.GetByTeamID(ctx, m.TeamID)
 	if err != nil {
 		w.logger.WithError(err).Error("failed to fetch status pages for notification")
 		return
 	}
 
+	// Determine if this maintenance applies to specific monitors
+	maintenanceMonitors := make(map[uint]bool)
+	isFullMaintenance := len(m.Monitors) == 0
+	for _, mon := range m.Monitors {
+		maintenanceMonitors[mon.ID] = true
+	}
+
 	for _, sp := range statusPages {
+		// Check if this status page is affected by the maintenance
+		isAffected := isFullMaintenance
+		if !isAffected {
+			for _, spMon := range sp.Monitors {
+				if maintenanceMonitors[spMon.ID] {
+					isAffected = true
+					break
+				}
+			}
+		}
+
+		if !isAffected {
+			continue
+		}
+
 		// 2. Get verified subscribers for each status page
 		subs, err := w.statusPageService.GetVerifiedSubscribers(ctx, sp.ID)
 		if err != nil {
@@ -145,7 +172,7 @@ func (w *worker) notifySubscribers(ctx context.Context, teamID uint, title strin
 		for _, sub := range subs {
 			err := w.emailSender.Send(ctx, "", sub.Email, &templates.MaintenanceAlertTemplate{
 				StatusPageName:   sp.Name,
-				MaintenanceTitle: title,
+				MaintenanceTitle: m.Title,
 				StatusPageURL:    statusPageURL,
 			})
 			if err != nil {
@@ -155,7 +182,7 @@ func (w *worker) notifySubscribers(ctx context.Context, teamID uint, title strin
 			w.logger.WithFields(logrus.Fields{
 				"email":          sub.Email,
 				"status_page_id": sp.ID,
-				"maintenance":    title,
+				"maintenance":    m.Title,
 			}).Info("Dispatched maintenance email to subscriber")
 		}
 	}
