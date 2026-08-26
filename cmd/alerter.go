@@ -1,19 +1,18 @@
 package cmd
 
 import (
-
 	"github.com/opsway-io/backend/internal/alerting"
 	"github.com/opsway-io/backend/internal/connectors/postgres"
 	connectorRedis "github.com/opsway-io/backend/internal/connectors/redis"
-	"github.com/opsway-io/backend/internal/event"
-	"github.com/opsway-io/backend/internal/monitor"
-	"github.com/opsway-io/backend/internal/notification/email"
-	"github.com/opsway-io/backend/internal/storage"
-	"github.com/opsway-io/backend/internal/statuspage"
-	"github.com/opsway-io/backend/internal/team"
 	"github.com/opsway-io/backend/internal/escalation"
+	"github.com/opsway-io/backend/internal/event"
 	"github.com/opsway-io/backend/internal/incident"
 	"github.com/opsway-io/backend/internal/llm"
+	"github.com/opsway-io/backend/internal/monitor"
+	"github.com/opsway-io/backend/internal/notification/email"
+	"github.com/opsway-io/backend/internal/statuspage"
+	"github.com/opsway-io/backend/internal/storage"
+	"github.com/opsway-io/backend/internal/team"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 )

@@ -35,7 +35,7 @@ func (h *Handlers) GetPrometheusMetrics(c hs.AuthenticatedContext) error {
 	}
 
 	ctx := c.Request().Context()
-	
+
 	// Fetch all monitors for the team
 	type monitorRow struct {
 		ID   uint
@@ -57,12 +57,12 @@ func (h *Handlers) GetPrometheusMetrics(c hs.AuthenticatedContext) error {
 		if err != nil {
 			continue
 		}
-		
+
 		uptimeRatio := 0.0
 		if stats != nil {
 			uptimeRatio = float64(stats.UptimePercentage) / 100.0
 		}
-		
+
 		sb.WriteString(fmt.Sprintf("opsway_monitor_uptime_ratio{monitor_id=\"%d\",monitor_name=\"%s\"} %f\n", m.ID, m.Name, uptimeRatio))
 	}
 

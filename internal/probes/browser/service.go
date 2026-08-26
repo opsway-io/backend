@@ -42,7 +42,7 @@ func (s *ServiceImpl) Probe(ctx context.Context, url string, scriptJSON string, 
 		chromedp.Headless,
 		chromedp.DisableGPU,
 	)
-	
+
 	allocCtx, cancelAlloc := chromedp.NewExecAllocator(ctx, opts...)
 	defer cancelAlloc()
 

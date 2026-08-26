@@ -161,4 +161,3 @@ func (h *Handlers) DeleteTeamUsersInvites(c hs.AuthenticatedContext) error {
 
 	return c.NoContent(http.StatusNoContent)
 }
-

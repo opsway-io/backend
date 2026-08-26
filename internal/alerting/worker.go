@@ -11,15 +11,15 @@ import (
 	"time"
 
 	"github.com/opsway-io/backend/internal/entities"
-	"github.com/opsway-io/backend/internal/incident"
+	"github.com/opsway-io/backend/internal/escalation"
 	"github.com/opsway-io/backend/internal/event"
 	"github.com/opsway-io/backend/internal/event/events"
+	"github.com/opsway-io/backend/internal/incident"
 	"github.com/opsway-io/backend/internal/monitor"
 	"github.com/opsway-io/backend/internal/notification/email"
 	"github.com/opsway-io/backend/internal/notification/email/templates"
-	"github.com/opsway-io/backend/internal/team"
-	"github.com/opsway-io/backend/internal/escalation"
 	"github.com/opsway-io/backend/internal/statuspage"
+	"github.com/opsway-io/backend/internal/team"
 	"github.com/sirupsen/logrus"
 )
 
@@ -33,16 +33,16 @@ type Worker interface {
 }
 
 type worker struct {
-	config       WorkerConfig
-	eventService event.Service
-	alertService Service
-	teamService  team.Service
-	monitorSvc   monitor.Service
+	config        WorkerConfig
+	eventService  event.Service
+	alertService  Service
+	teamService   team.Service
+	monitorSvc    monitor.Service
 	statusPageSvc statuspage.Service
-	emailSender  email.Sender
+	emailSender   email.Sender
 	escalationSvc escalation.Service
-	incidentSvc  incident.Service
-	logger       *logrus.Entry
+	incidentSvc   incident.Service
+	logger        *logrus.Entry
 }
 
 func NewWorker(
@@ -58,16 +58,16 @@ func NewWorker(
 	logger *logrus.Entry,
 ) Worker {
 	return &worker{
-		config:       config,
-		eventService: eventService,
-		alertService: alertService,
-		teamService:  teamService,
-		monitorSvc:   monitorSvc,
+		config:        config,
+		eventService:  eventService,
+		alertService:  alertService,
+		teamService:   teamService,
+		monitorSvc:    monitorSvc,
 		statusPageSvc: statusPageSvc,
-		emailSender:  emailSender,
+		emailSender:   emailSender,
 		escalationSvc: escalationSvc,
-		incidentSvc:  incidentSvc,
-		logger:       logger.WithField("component", "alerting_worker"),
+		incidentSvc:   incidentSvc,
+		logger:        logger.WithField("component", "alerting_worker"),
 	}
 }
 
@@ -305,18 +305,18 @@ func (w *worker) scheduleEscalationCheck(ctx context.Context, incident *entities
 		for currentTier := 2; currentTier <= maxTier; currentTier++ {
 			w.logger.Infof("Scheduling escalation check for incident %d to Tier %d in %d minutes", incident.ID, currentTier, policy.EscalationTimeoutMinutes)
 			time.Sleep(time.Duration(policy.EscalationTimeoutMinutes) * time.Minute)
-			
+
 			inc, err := w.incidentSvc.GetByID(bgCtx, incident.ID)
 			if err != nil {
 				w.logger.WithError(err).Error("failed to get incident during escalation check")
 				return
 			}
-			
+
 			if inc.Acknowledged || inc.Resolved {
 				w.logger.Infof("Incident %d acknowledged or resolved, stopping escalation", incident.ID)
 				return // Stop escalation loop
 			}
-			
+
 			w.logger.Infof("Escalating incident %d to Tier %d", incident.ID, currentTier)
 			w.triggerRule(bgCtx, inc, rule, currentTier)
 		}
@@ -327,14 +327,14 @@ func (w *worker) triggerMaintenanceRule(ctx context.Context, maintenance *entiti
 	// Create a mock incident to reuse the incident alerting channels
 	mockTitle := fmt.Sprintf("Maintenance %s: %s", strings.ToUpper(action), maintenance.Title)
 	mockDesc := maintenance.Description
-	
+
 	mockIncident := &entities.Incident{
-		ID:          maintenance.ID, // use maintenance ID just so it's non-zero
-		TeamID:      maintenance.TeamID,
-		Title:       mockTitle,
-		Resolved:    action == "completed",
+		ID:       maintenance.ID, // use maintenance ID just so it's non-zero
+		TeamID:   maintenance.TeamID,
+		Title:    mockTitle,
+		Resolved: action == "completed",
 	}
-	
+
 	if mockDesc != nil && *mockDesc != "" {
 		mockIncident.Description = mockDesc
 	}
@@ -383,12 +383,12 @@ func (w *worker) sendEmailAlert(ctx context.Context, incident *entities.Incident
 		w.logger.WithError(err).Error("failed to get team users")
 		return
 	}
-	
+
 	onCallUserIDs, err := w.escalationSvc.GetOnCallUsersByTeamID(ctx, incident.TeamID, tier)
 	if err != nil {
 		w.logger.WithError(err).Error("failed to get on call users")
 	}
-	
+
 	onCallMap := make(map[uint]bool)
 	for _, id := range onCallUserIDs {
 		onCallMap[id] = true
@@ -412,7 +412,7 @@ func (w *worker) sendEmailAlert(ctx context.Context, incident *entities.Incident
 		if len(onCallUserIDs) > 0 && !onCallMap[u.ID] {
 			continue
 		}
-		
+
 		userName := "Team Member"
 		if u.DisplayName != nil {
 			userName = *u.DisplayName
@@ -495,8 +495,8 @@ func (w *worker) sendSlackAlert(ctx context.Context, incident *entities.Incident
 							"type": "plain_text",
 							"text": "Acknowledge",
 						},
-						"style": "primary",
-						"value": fmt.Sprintf("ack_%d", incident.ID),
+						"style":     "primary",
+						"value":     fmt.Sprintf("ack_%d", incident.ID),
 						"action_id": "acknowledge_incident",
 					},
 					{
@@ -505,8 +505,8 @@ func (w *worker) sendSlackAlert(ctx context.Context, incident *entities.Incident
 							"type": "plain_text",
 							"text": "Resolve",
 						},
-						"style": "danger",
-						"value": fmt.Sprintf("resolve_%d", incident.ID),
+						"style":     "danger",
+						"value":     fmt.Sprintf("resolve_%d", incident.ID),
 						"action_id": "resolve_incident",
 					},
 				},
@@ -564,9 +564,9 @@ func (w *worker) sendDiscordAlert(ctx context.Context, incident *entities.Incide
 	payload := map[string]interface{}{
 		"embeds": []map[string]interface{}{
 			{
-				"title": "🚨 Incident Alert: " + monitorName,
+				"title":       "🚨 Incident Alert: " + monitorName,
 				"description": fmt.Sprintf("**Issue:**\n%s\n\n[View details and manage this incident on the dashboard](%s)", incident.Title, dashboardURL),
-				"color": 16711680, // Red
+				"color":       16711680, // Red
 			},
 		},
 	}
@@ -624,8 +624,8 @@ func (w *worker) sendTelegramAlert(ctx context.Context, incident *entities.Incid
 	message := fmt.Sprintf("🚨 *Incident Alert*\n\n*Monitor:*\n%s\n\n*Issue:*\n%s\n\n[Go to Dashboard](%s)", monitorName, incident.Title, dashboardURL)
 
 	payload := map[string]interface{}{
-		"chat_id": *team.TelegramChatID,
-		"text": message,
+		"chat_id":    *team.TelegramChatID,
+		"text":       message,
 		"parse_mode": "Markdown",
 	}
 
@@ -739,11 +739,11 @@ func (w *worker) sendDatadogAlert(ctx context.Context, incident *entities.Incide
 
 	// Format as Datadog Event Payload
 	payload := map[string]interface{}{
-		"title": "Opsway Incident: " + monitorName,
-		"text":  fmt.Sprintf("An incident has been created in Opsway.\n\nIssue: %s", incident.Title),
-		"alert_type": "error",
+		"title":            "Opsway Incident: " + monitorName,
+		"text":             fmt.Sprintf("An incident has been created in Opsway.\n\nIssue: %s", incident.Title),
+		"alert_type":       "error",
 		"source_type_name": "Opsway",
-		"tags": []string{"source:opsway", fmt.Sprintf("monitor:%s", monitorName)},
+		"tags":             []string{"source:opsway", fmt.Sprintf("monitor:%s", monitorName)},
 	}
 
 	body, _ := json.Marshal(payload)
@@ -792,11 +792,11 @@ func (w *worker) sendNewRelicAlert(ctx context.Context, incident *entities.Incid
 	}
 
 	payload := map[string]interface{}{
-		"eventType": "OpswayIncident",
-		"monitorName": monitorName,
+		"eventType":     "OpswayIncident",
+		"monitorName":   monitorName,
 		"incidentTitle": incident.Title,
-		"description": "An incident has been created in Opsway.",
-		"timestamp": time.Now().Unix(),
+		"description":   "An incident has been created in Opsway.",
+		"timestamp":     time.Now().Unix(),
 	}
 
 	body, _ := json.Marshal(payload)

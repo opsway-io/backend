@@ -17,8 +17,8 @@ import (
 )
 
 type Config struct {
-	PublishableKey string `mapstructure:"publishable_key"`
-	SecretKey      string `mapstructure:"secret_key"`
+	PublishableKey    string `mapstructure:"publishable_key"`
+	SecretKey         string `mapstructure:"secret_key"`
 	WebhookSecret     string `mapstructure:"webhook_secret"`
 	Domain            string `mapstructure:"domain"`
 	TeamPriceID       string `mapstructure:"team_price_id"`

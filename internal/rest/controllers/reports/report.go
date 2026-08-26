@@ -151,7 +151,7 @@ func (h *Handlers) CreateReport(c hs.AuthenticatedContext) error {
 	})
 	if err != nil {
 		c.Log.WithError(err).Error("failed to publish report generation task")
-		
+
 		// Optional: mark report as failed since it couldn't be enqueued
 		report.Status = entities.ReportStatusFailed
 		_ = h.ReportService.Update(ctx, report)

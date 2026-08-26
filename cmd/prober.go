@@ -18,6 +18,7 @@ import (
 	"github.com/opsway-io/backend/internal/event"
 	"github.com/opsway-io/backend/internal/event/events"
 	"github.com/opsway-io/backend/internal/incident"
+	"github.com/opsway-io/backend/internal/probes/browser"
 	"github.com/opsway-io/backend/internal/probes/dns"
 	"github.com/opsway-io/backend/internal/probes/http"
 	"github.com/opsway-io/backend/internal/probes/http/asserter"
@@ -26,7 +27,6 @@ import (
 	probePostgres "github.com/opsway-io/backend/internal/probes/postgres"
 	probeRedis "github.com/opsway-io/backend/internal/probes/redis"
 	"github.com/opsway-io/backend/internal/probes/tcp"
-	"github.com/opsway-io/backend/internal/probes/browser"
 	"github.com/redis/go-redis/v9"
 	"github.com/sirupsen/logrus"
 
@@ -227,7 +227,7 @@ func handleTask(ctx context.Context, logger *logrus.Logger, httpProber http.Serv
 		if err != nil {
 			l.WithError(err).Error("failed to increment failure counter")
 		}
-		
+
 		// Hardcoded threshold of 3 for MVP
 		if val == 3 {
 			l.Info("failure threshold reached, triggering incident")
@@ -239,10 +239,10 @@ func handleTask(ctx context.Context, logger *logrus.Logger, httpProber http.Serv
 		}
 	} else {
 		l.Info("all assertions passed")
-		
+
 		// Reset counter
 		rc.Del(ctx, failKey)
-		
+
 		// Auto-resolve any open incidents for this monitor
 		openIncidents, err := i.GetByMonitorIDWithAssertionPaginated(ctx, m.ID, nil, nil)
 		if err == nil && openIncidents != nil {
@@ -342,8 +342,8 @@ func handleTask(ctx context.Context, logger *logrus.Logger, httpProber http.Serv
 }
 
 func checkAnomaly(monitorID uint, res *http.Result) (bool, error) {
-	reqBody := fmt.Sprintf(`{"monitor_id": %d, "timings": [{"response_time": %f, "dns_lookup": %f, "tcp_connection": %f, "tls_handshake": %f, "server_processing": %f, "content_transfer": %f}]}`, 
-		monitorID, 
+	reqBody := fmt.Sprintf(`{"monitor_id": %d, "timings": [{"response_time": %f, "dns_lookup": %f, "tcp_connection": %f, "tls_handshake": %f, "server_processing": %f, "content_transfer": %f}]}`,
+		monitorID,
 		float64(res.Timing.Phases.Total.Milliseconds()),
 		float64(res.Timing.Phases.DNSLookup.Milliseconds()),
 		float64(res.Timing.Phases.TCPConnection.Milliseconds()),
@@ -447,7 +447,7 @@ func triggerIncident(ctx context.Context, m *entities.Monitor, hr *http.Result, 
 
 	for j := range *failed {
 		assertion := (*failed)[j]
-		
+
 		incidents[j] = entities.Incident{
 			MonitorID:          &assertion.MonitorID,
 			TeamID:             m.TeamID,

@@ -584,7 +584,7 @@ func (h *Handlers) PutMonitor(c hs.AuthenticatedContext) error {
 			c.Log.WithError(err).Error("failed to get active maintenances")
 			return echo.ErrInternalServerError
 		}
-		
+
 		for _, maintenance := range *activeMaintenances {
 			if maintenance.TeamID == req.TeamID {
 				appliesToAll := len(maintenance.Monitors) == 0
@@ -647,7 +647,7 @@ func (h *Handlers) PutMonitorState(c hs.AuthenticatedContext) error {
 			c.Log.WithError(err).Error("failed to get active maintenances")
 			return echo.ErrInternalServerError
 		}
-		
+
 		for _, maintenance := range *activeMaintenances {
 			if maintenance.TeamID == req.TeamID {
 				appliesToAll := len(maintenance.Monitors) == 0

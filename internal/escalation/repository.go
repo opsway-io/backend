@@ -11,7 +11,7 @@ type Repository interface {
 	GetPolicyByTeamID(ctx context.Context, teamID uint) (*entities.EscalationPolicy, error)
 	CreatePolicy(ctx context.Context, policy *entities.EscalationPolicy) error
 	UpdatePolicy(ctx context.Context, policy *entities.EscalationPolicy) error
-	
+
 	GetRotationsByPolicyID(ctx context.Context, policyID uint) ([]entities.OnCallRotation, error)
 	GetRotationsByPolicyIDAndTier(ctx context.Context, policyID uint, tier int) ([]entities.OnCallRotation, error)
 	SetRotations(ctx context.Context, policyID uint, rotations []entities.OnCallRotation) error

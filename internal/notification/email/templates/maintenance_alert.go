@@ -23,11 +23,11 @@ func (t *MaintenanceAlertTemplate) Subject() string {
 
 func (t *MaintenanceAlertTemplate) HTML() string {
 	return t.Render(MaintenanceAlertTemplateSource, map[string]any{
-		"title":              "Scheduled Maintenance",
-		"status_page_name":   t.StatusPageName,
-		"maintenance_title":  t.MaintenanceTitle,
-		"status_page_url":    t.StatusPageURL,
-		"unsubscribe_url":    t.UnsubscribeURL,
+		"title":             "Scheduled Maintenance",
+		"status_page_name":  t.StatusPageName,
+		"maintenance_title": t.MaintenanceTitle,
+		"status_page_url":   t.StatusPageURL,
+		"unsubscribe_url":   t.UnsubscribeURL,
 	})
 }
 

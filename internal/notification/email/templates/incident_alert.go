@@ -11,10 +11,10 @@ var IncidentAlertTemplateSource string
 type IncidentAlertTemplate struct {
 	BaseTemplate
 
-	Name         string
-	MonitorName  string
+	Name          string
+	MonitorName   string
 	IncidentTitle string
-	DashboardURL string
+	DashboardURL  string
 }
 
 func (t *IncidentAlertTemplate) Subject() string {

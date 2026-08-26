@@ -37,11 +37,11 @@ const (
 )
 
 type Team struct {
-	ID               uint
-	Name             string      `gorm:"uniqueIndex;not null"`
-	DisplayName      *string     `gorm:"index"`
-	PaymentPlan      PaymentPlan `gorm:"default:FREE;not null"`
-	StripeCustomerID *string     `gorm:"index"`
+	ID                 uint
+	Name               string      `gorm:"uniqueIndex;not null"`
+	DisplayName        *string     `gorm:"index"`
+	PaymentPlan        PaymentPlan `gorm:"default:FREE;not null"`
+	StripeCustomerID   *string     `gorm:"index"`
 	SlackWebhookURL    *string     `gorm:"type:text"`
 	DiscordWebhookURL  *string     `gorm:"type:text"`
 	TelegramChatID     *string     `gorm:"type:text"`
@@ -49,11 +49,11 @@ type Team struct {
 	NewRelicWebhookURL *string     `gorm:"type:text"`
 	HasAvatar          bool
 
-	Users       []User        `gorm:"many2many:team_users;constraint:OnDelete:CASCADE;"`
-	Monitors    []Monitor     `gorm:"constraint:OnDelete:CASCADE"`
-	Maintenance []Maintenance `gorm:"constraint:OnDelete:CASCADE"`
-	Incidents   []Incident    `gorm:"constraint:OnDelete:CASCADE"`
-	Changelogs  []Changelog   `gorm:"constraint:OnDelete:CASCADE"`
+	Users       []User           `gorm:"many2many:team_users;constraint:OnDelete:CASCADE;"`
+	Monitors    []Monitor        `gorm:"constraint:OnDelete:CASCADE"`
+	Maintenance []Maintenance    `gorm:"constraint:OnDelete:CASCADE"`
+	Incidents   []Incident       `gorm:"constraint:OnDelete:CASCADE"`
+	Changelogs  []Changelog      `gorm:"constraint:OnDelete:CASCADE"`
 	Invitations []TeamInvitation `gorm:"constraint:OnDelete:CASCADE"`
 
 	CreatedAt time.Time `gorm:"index"`
@@ -184,11 +184,11 @@ func (tu *TeamUser) BeforeSave(tx *gorm.DB) error {
 }
 
 type TeamInvitation struct {
-	ID        uint      `gorm:"primaryKey"`
-	TeamID    uint      `gorm:"index;not null"`
-	Email     string    `gorm:"index;not null"`
-	Role      TeamRole  `gorm:"not null"`
-	Token     string    `gorm:"uniqueIndex;not null"`
+	ID        uint     `gorm:"primaryKey"`
+	TeamID    uint     `gorm:"index;not null"`
+	Email     string   `gorm:"index;not null"`
+	Role      TeamRole `gorm:"not null"`
+	Token     string   `gorm:"uniqueIndex;not null"`
 	CreatedAt time.Time
 	UpdatedAt time.Time
 }

@@ -26,7 +26,7 @@ type PostRegisterRequest struct {
 }
 
 type PostLoginResponse struct {
-	User         PostLoginResponseUser `json:"user"`
+	User PostLoginResponseUser `json:"user"`
 }
 
 type PostLoginResponseUser struct {
@@ -61,7 +61,7 @@ func (h *Handlers) PostLogin(c hs.BaseContext) error {
 			c.Log.WithError(err).Debug("user not found")
 			return echo.ErrUnauthorized
 		}
-		
+
 		c.Log.WithError(err).Error("failed to get user")
 		return echo.ErrInternalServerError
 	}
@@ -237,6 +237,6 @@ func (h *Handlers) PostLogout(c hs.BaseContext) error {
 		MaxAge:   -1,
 		HttpOnly: true,
 	})
-	
+
 	return c.NoContent(http.StatusOK)
 }

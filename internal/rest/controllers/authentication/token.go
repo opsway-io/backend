@@ -27,7 +27,7 @@ func (h *Handlers) PostRefreshToken(c hs.BaseContext) error {
 		c.Log.WithError(err).Debug("missing refresh token cookie")
 		return echo.ErrUnauthorized
 	}
-	
+
 	refreshTokenStr := cookie.Value
 
 	accessToken, refreshToken, err := h.AuthenticationService.Refresh(c.Request().Context(), refreshTokenStr)
@@ -38,7 +38,7 @@ func (h *Handlers) PostRefreshToken(c hs.BaseContext) error {
 	}
 
 	c.Log.Info("access and refresh token refreshed")
-	
+
 	h.CookieService.SetAccessToken(c, accessToken)
 	h.CookieService.SetRefreshToken(c, refreshToken)
 

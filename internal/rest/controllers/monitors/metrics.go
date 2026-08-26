@@ -218,4 +218,3 @@ func (h *Handlers) GetMonitorMetrics(c hs.AuthenticatedContext) error {
 
 	return c.JSON(http.StatusOK, GetMonitorMetricsRespone{Metrics: metricResp})
 }
-

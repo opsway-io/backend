@@ -78,5 +78,3 @@ func (s *service) marshal(e events.Event) ([]byte, error) {
 
 	return b, nil
 }
-
-

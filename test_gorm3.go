@@ -27,7 +27,7 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-	
+
 	if user.PasswordHash == nil {
 		fmt.Println("PasswordHash is nil!")
 	} else {

@@ -19,28 +19,28 @@ func TestJSONBodyAsserter_IsRuleValid(t *testing.T) {
 		wantErr bool
 	}{
 		{
-			name: "Valid rule EQUAL",
-			args: args{rule: Rule{Source: "JSON_BODY", Property: "$.name", Operator: "EQUAL", Target: "test"}},
+			name:    "Valid rule EQUAL",
+			args:    args{rule: Rule{Source: "JSON_BODY", Property: "$.name", Operator: "EQUAL", Target: "test"}},
 			wantErr: false,
 		},
 		{
-			name: "Invalid source",
-			args: args{rule: Rule{Source: "RAW_BODY", Property: "$.name", Operator: "EQUAL", Target: "test"}},
+			name:    "Invalid source",
+			args:    args{rule: Rule{Source: "RAW_BODY", Property: "$.name", Operator: "EQUAL", Target: "test"}},
 			wantErr: true,
 		},
 		{
-			name: "Empty property",
-			args: args{rule: Rule{Source: "JSON_BODY", Property: "", Operator: "EQUAL", Target: "test"}},
+			name:    "Empty property",
+			args:    args{rule: Rule{Source: "JSON_BODY", Property: "", Operator: "EQUAL", Target: "test"}},
 			wantErr: true,
 		},
 		{
-			name: "Invalid operator",
-			args: args{rule: Rule{Source: "JSON_BODY", Property: "$.name", Operator: "INVALID", Target: "test"}},
+			name:    "Invalid operator",
+			args:    args{rule: Rule{Source: "JSON_BODY", Property: "$.name", Operator: "INVALID", Target: "test"}},
 			wantErr: true,
 		},
 		{
-			name: "EMPTY operator with non-empty target",
-			args: args{rule: Rule{Source: "JSON_BODY", Property: "$.name", Operator: "EMPTY", Target: "test"}},
+			name:    "EMPTY operator with non-empty target",
+			args:    args{rule: Rule{Source: "JSON_BODY", Property: "$.name", Operator: "EMPTY", Target: "test"}},
 			wantErr: true,
 		},
 	}
@@ -75,27 +75,27 @@ func TestJSONBodyAsserter_assert(t *testing.T) {
 			name: "Valid json path EQUAL",
 			args: args{
 				result: &http.Result{Response: http.Response{Body: []byte(`{"name": "test"}`)}},
-				rules: []Rule{{Source: "JSON_BODY", Property: "$.name", Operator: "EQUAL", Target: "test"}},
+				rules:  []Rule{{Source: "JSON_BODY", Property: "$.name", Operator: "EQUAL", Target: "test"}},
 			},
-			wantOk: []bool{true},
+			wantOk:  []bool{true},
 			wantErr: false,
 		},
 		{
 			name: "Valid json path NOT_EQUAL",
 			args: args{
 				result: &http.Result{Response: http.Response{Body: []byte(`{"name": "test2"}`)}},
-				rules: []Rule{{Source: "JSON_BODY", Property: "$.name", Operator: "EQUAL", Target: "test"}},
+				rules:  []Rule{{Source: "JSON_BODY", Property: "$.name", Operator: "EQUAL", Target: "test"}},
 			},
-			wantOk: []bool{false},
+			wantOk:  []bool{false},
 			wantErr: false,
 		},
 		{
 			name: "Invalid json body",
 			args: args{
 				result: &http.Result{Response: http.Response{Body: []byte(`invalid`)}},
-				rules: []Rule{{Source: "JSON_BODY", Property: "$.name", Operator: "EQUAL", Target: "test"}},
+				rules:  []Rule{{Source: "JSON_BODY", Property: "$.name", Operator: "EQUAL", Target: "test"}},
 			},
-			wantOk: []bool{false},
+			wantOk:  []bool{false},
 			wantErr: false,
 		},
 	}

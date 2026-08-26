@@ -6,8 +6,9 @@ import (
 
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
-	auth "github.com/opsway-io/backend/internal/authentication"
 	"github.com/opsway-io/backend/internal/alerting"
+	"github.com/opsway-io/backend/internal/apikey"
+	auth "github.com/opsway-io/backend/internal/authentication"
 	"github.com/opsway-io/backend/internal/billing"
 	"github.com/opsway-io/backend/internal/changelog"
 	"github.com/opsway-io/backend/internal/check"
@@ -22,7 +23,6 @@ import (
 	"github.com/opsway-io/backend/internal/rest/controllers"
 	"github.com/opsway-io/backend/internal/rest/controllers/authentication"
 	"github.com/opsway-io/backend/internal/rest/helpers"
-	"github.com/opsway-io/backend/internal/apikey"
 	"github.com/opsway-io/backend/internal/statuspage"
 	"github.com/opsway-io/backend/internal/team"
 	"github.com/opsway-io/backend/internal/user"

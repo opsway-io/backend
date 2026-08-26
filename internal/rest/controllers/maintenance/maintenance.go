@@ -143,7 +143,7 @@ type PutMaintenanceWindowRequest struct {
 	Description   *string   `json:"description"`
 	StartAt       time.Time `json:"startAt" validate:"required"`
 	EndAt         time.Time `json:"endAt" validate:"required,gtfield=StartAt"`
-	MonitorIDs  []uint    `json:"monitorIds"`
+	MonitorIDs    []uint    `json:"monitorIds"`
 }
 
 func (h *Handlers) PutMaintenanceWindow(c handlers.AuthenticatedContext) error {

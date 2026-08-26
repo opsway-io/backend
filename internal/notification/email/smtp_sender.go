@@ -25,10 +25,10 @@ func (s *SMTPSender) Send(ctx context.Context, name string, to string, template 
 	}
 
 	address := fmt.Sprintf("%s:%d", s.config.SMTPHost, s.config.SMTPPort)
-	
+
 	subject := template.Subject()
 	body := template.HTML()
-	
+
 	msg := []byte("To: " + to + "\r\n" +
 		"From: " + from + "\r\n" +
 		"Subject: " + subject + "\r\n" +

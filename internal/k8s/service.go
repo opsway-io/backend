@@ -24,7 +24,7 @@ type ServiceImpl struct {
 
 func NewService(logger *logrus.Logger) Service {
 	l := logger.WithField("module", "k8s")
-	
+
 	config, err := rest.InClusterConfig()
 	if err != nil {
 		l.WithError(err).Warn("Running outside of Kubernetes cluster; dynamic auto-TLS ingress generation will be skipped.")
@@ -56,7 +56,7 @@ func (s *ServiceImpl) UpsertIngress(ctx context.Context, domain string) error {
 	namespace := "status-page"
 
 	pathType := networkingv1.PathTypePrefix
-	
+
 	ingress := &networkingv1.Ingress{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      ingressName,
@@ -114,7 +114,7 @@ func (s *ServiceImpl) UpsertIngress(ctx context.Context, domain string) error {
 	}
 
 	ingresses := s.client.NetworkingV1().Ingresses(namespace)
-	
+
 	existing, err := ingresses.Get(ctx, ingressName, metav1.GetOptions{})
 	if err == nil && existing != nil {
 		ingress.ResourceVersion = existing.ResourceVersion

@@ -21,7 +21,7 @@ type Service interface {
 }
 
 type ServiceImpl struct {
-	repository Repository
+	repository   Repository
 	eventService event.Service
 }
 

@@ -34,5 +34,3 @@ func TestService_Create(t *testing.T) {
 		schedule.Mock.AssertExpectations(t)
 	})
 }
-
-

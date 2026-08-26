@@ -47,11 +47,11 @@ type MonitorIncident struct {
 }
 
 type ReportData struct {
-	Uptime      *[]check.MonitorUptime       `json:"uptime"`
-	Performance *[]check.MonitorPerformance  `json:"performance"`
-	Incident    *[]MonitorIncident           `json:"incident"`
-	All         *string                      `json:"all"`
-	Custom      *string                      `json:"custom"`
+	Uptime      *[]check.MonitorUptime      `json:"uptime"`
+	Performance *[]check.MonitorPerformance `json:"performance"`
+	Incident    *[]MonitorIncident          `json:"incident"`
+	All         *string                     `json:"all"`
+	Custom      *string                     `json:"custom"`
 }
 
 func ReportFrom(source any) (ReportType, error) {

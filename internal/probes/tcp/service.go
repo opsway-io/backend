@@ -23,7 +23,7 @@ func (s *ServiceImpl) Probe(ctx context.Context, target string, timeout time.Dur
 
 	dialer := net.Dialer{Timeout: timeout}
 	conn, err := dialer.DialContext(ctx, "tcp", target)
-	
+
 	duration := time.Since(start)
 
 	res := &probeHttp.Result{

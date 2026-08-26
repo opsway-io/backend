@@ -236,9 +236,9 @@ func (r *RepositoryImpl) GetByTeamIDMonitorsUptime(ctx context.Context, teamID u
 		url,
 		count(status_code <= 400) / count(status_code) * 100 as uptime_percentage, 
 		avg(timing_total/1000000) as average_response_time, 
-		toMonth(created_at) as date`).
+		toString(toMonth(created_at)) as date`).
 		Where("team_id = ?", teamID).
-		Where("created_at BETWEEN ? AND ?", start, end).
+		Where("created_at BETWEEN parseDateTimeBestEffort(?) AND parseDateTimeBestEffort(?)", start, end).
 		Group("monitor_id, url, date").
 		Order("date ASC").
 		Find(&uptime).Error
@@ -267,7 +267,7 @@ func (r *RepositoryImpl) GetByTeamIDMonitorsPerformance(ctx context.Context, tea
 		quantile(0.99)(timing_total)/1000000 as p99, 
 		quantile(0.95)(timing_total)/1000000 as p95`).
 		Where("team_id = ?", teamID).
-		Where("created_at BETWEEN ? AND ?", start, end).
+		Where("created_at BETWEEN parseDateTimeBestEffort(?) AND parseDateTimeBestEffort(?)", start, end).
 		Group("monitor_id").
 		Find(&performance).Error
 

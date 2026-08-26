@@ -12,11 +12,11 @@ type Service interface {
 	GetPolicyByTeamID(ctx context.Context, teamID uint) (*entities.EscalationPolicy, error)
 	CreatePolicy(ctx context.Context, policy *entities.EscalationPolicy) error
 	UpdatePolicy(ctx context.Context, policy *entities.EscalationPolicy) error
-	
+
 	GetRotationsByPolicyID(ctx context.Context, policyID uint) ([]entities.OnCallRotation, error)
 	GetRotationsByPolicyIDAndTier(ctx context.Context, policyID uint, tier int) ([]entities.OnCallRotation, error)
 	SetRotations(ctx context.Context, policyID uint, rotations []entities.OnCallRotation) error
-	
+
 	// Helper to get tier 1 and tier 2 users quickly for a team
 	GetOnCallUsersByTeamID(ctx context.Context, teamID uint, tier int) ([]uint, error)
 }
@@ -61,16 +61,16 @@ func (s *ServiceImpl) GetOnCallUsersByTeamID(ctx context.Context, teamID uint, t
 		}
 		return nil, err
 	}
-	
+
 	rotations, err := s.repo.GetRotationsByPolicyIDAndTier(ctx, policy.ID, tier)
 	if err != nil {
 		return nil, err
 	}
-	
+
 	var userIDs []uint
 	for _, r := range rotations {
 		userIDs = append(userIDs, r.UserID)
 	}
-	
+
 	return userIDs, nil
 }

@@ -28,7 +28,7 @@ func main() {
 
 	newHash := "new_hash"
 	fetched.PasswordHash = &newHash
-	
+
 	db.Model(&fetched).Updates(&fetched)
 
 	var verify User

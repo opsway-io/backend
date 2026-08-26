@@ -166,7 +166,7 @@ func runReport(cmd *cobra.Command, args []string) {
 			msg.Ack()
 		})
 	}
-	
+
 	l.Info("Shutting down report generator...")
 	wp.StopWait()
 }

@@ -5,8 +5,8 @@ import (
 	"testing"
 
 	"github.com/opsway-io/backend/internal/entities"
-	emailMocks "github.com/opsway-io/backend/internal/notification/email/mocks"
 	eventMocks "github.com/opsway-io/backend/internal/event/mocks"
+	emailMocks "github.com/opsway-io/backend/internal/notification/email/mocks"
 	storageMocks "github.com/opsway-io/backend/internal/storage/mocks"
 	"github.com/opsway-io/backend/internal/user"
 	userMocks "github.com/opsway-io/backend/internal/user/mocks"
@@ -58,7 +58,7 @@ func TestService_GetUserByID(t *testing.T) {
 			Name:  "Test User",
 			Email: "test@opsway.eu",
 		}
-		
+
 		cache.On("GetUser", ctx, uint(1)).Return(nil, nil)
 		cache.On("SetUser", ctx, mock.Anything, mock.Anything).Return(nil)
 

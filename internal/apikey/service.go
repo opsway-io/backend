@@ -34,7 +34,7 @@ func (s *ServiceImpl) Create(ctx context.Context, teamID uint, name string) (str
 		return "", err
 	}
 	plaintextKey := hex.EncodeToString(b)
-	
+
 	// Hash the key for storage
 	hash := sha256.Sum256([]byte(plaintextKey))
 	keyHash := hex.EncodeToString(hash[:])
@@ -60,7 +60,7 @@ func (s *ServiceImpl) GetByTeamID(ctx context.Context, teamID uint) (*[]entities
 func (s *ServiceImpl) GetByPlaintext(ctx context.Context, plaintextKey string) (*entities.APIKey, error) {
 	hash := sha256.Sum256([]byte(plaintextKey))
 	keyHash := hex.EncodeToString(hash[:])
-	
+
 	return s.repository.GetByHash(ctx, keyHash)
 }
 

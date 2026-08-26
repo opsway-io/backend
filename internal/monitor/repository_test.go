@@ -54,8 +54,8 @@ func TestRepositoryIntegration(t *testing.T) {
 
 	// Migrate schema
 	err = db.AutoMigrate(
-		&entities.Team{}, 
-		&entities.Monitor{}, 
+		&entities.Team{},
+		&entities.Monitor{},
 		&entities.MonitorSettings{},
 		&entities.MonitorSettingsHeader{},
 		&entities.MonitorSettingsBody{},

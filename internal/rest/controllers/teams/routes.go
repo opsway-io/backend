@@ -4,10 +4,10 @@ import (
 	"github.com/labstack/echo/v4"
 	"github.com/opsway-io/backend/internal/authentication"
 	"github.com/opsway-io/backend/internal/billing"
+	"github.com/opsway-io/backend/internal/escalation"
 	"github.com/opsway-io/backend/internal/rest/handlers"
 	mw "github.com/opsway-io/backend/internal/rest/middleware"
 	"github.com/opsway-io/backend/internal/team"
-	"github.com/opsway-io/backend/internal/escalation"
 	"github.com/opsway-io/backend/internal/user"
 	"github.com/sirupsen/logrus"
 )
@@ -29,9 +29,9 @@ func Register(
 	escalationService escalation.Service,
 ) {
 	h := &Handlers{
-		TeamService:    teamService,
-		UserService:    userService,
-		BillingService: billingService,
+		TeamService:       teamService,
+		UserService:       userService,
+		BillingService:    billingService,
 		EscalationService: escalationService,
 	}
 

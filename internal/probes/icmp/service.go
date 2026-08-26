@@ -26,7 +26,7 @@ func (s *ServiceImpl) Probe(ctx context.Context, target string, timeout time.Dur
 
 	cmd := exec.CommandContext(timeoutCtx, "ping", "-c", "1", target)
 	err := cmd.Run()
-	
+
 	duration := time.Since(start)
 
 	res := &probeHttp.Result{

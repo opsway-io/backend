@@ -25,7 +25,7 @@ func (s *ServiceImpl) Probe(ctx context.Context, target string, timeout time.Dur
 	db, err := sql.Open("postgres", target)
 	if err == nil {
 		defer db.Close()
-		
+
 		ctxWithTimeout, cancel := context.WithTimeout(ctx, timeout)
 		defer cancel()
 

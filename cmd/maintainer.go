@@ -26,7 +26,7 @@ var MaintainerCmd = &cobra.Command{
 		if err != nil {
 			logrus.WithError(err).Fatal("Failed to load config")
 		}
-		
+
 		logger := getLogger(conf.Log)
 
 		logger.Info("Starting maintainer")

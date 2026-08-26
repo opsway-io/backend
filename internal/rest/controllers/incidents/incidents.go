@@ -24,8 +24,8 @@ type GetIncidentsResponse struct {
 type GetIncidentsResponseIncident struct {
 	ID          uint   `json:"id"`
 	TeamID      uint   `json:"teamId"`
-	MonitorID   *uint   `json:"monitorId"`
-	HeartbeatID *uint   `json:"heartbeatId"`
+	MonitorID   *uint  `json:"monitorId"`
+	HeartbeatID *uint  `json:"heartbeatId"`
 	Title       string `json:"title"`
 	Description string `json:"description"`
 	CreatedAt   string `json:"createdAt"`
@@ -88,12 +88,12 @@ type GetIncidentOverviewResponse struct {
 }
 
 type GetIncidentOverviewResponseIncident struct {
-	ID        uint   `json:"id"`
-	TeamID    uint   `json:"teamId"`
-	MonitorID *uint   `json:"monitorId"`
-	HeartbeatID *uint `json:"heartbeatId"`
-	CreatedAt string `json:"createdAt"`
-	Count     int    `json:"count"`
+	ID          uint   `json:"id"`
+	TeamID      uint   `json:"teamId"`
+	MonitorID   *uint  `json:"monitorId"`
+	HeartbeatID *uint  `json:"heartbeatId"`
+	CreatedAt   string `json:"createdAt"`
+	Count       int    `json:"count"`
 }
 
 func (h *Handlers) GetIncidentOverview(c hs.AuthenticatedContext) error {
@@ -156,8 +156,8 @@ type GetMonitorIncidentsResponse struct {
 type GetMonitorIncidentsResponseIncident struct {
 	ID          uint   `json:"id"`
 	TeamID      uint   `json:"teamId"`
-	MonitorID   *uint   `json:"monitorId"`
-	HeartbeatID *uint   `json:"heartbeatId"`
+	MonitorID   *uint  `json:"monitorId"`
+	HeartbeatID *uint  `json:"heartbeatId"`
 	Title       string `json:"title"`
 	Description string `json:"description"`
 	CreatedAt   string `json:"createdAt"`
@@ -238,18 +238,18 @@ type GetIncidentRequest struct {
 }
 
 type GetIncidentResponse struct {
-	ID          uint   `json:"id"`
-	TeamID      uint   `json:"teamId"`
-	MonitorID   *uint   `json:"monitorId"`
-	HeartbeatID *uint   `json:"heartbeatId"`
-	Title       string `json:"title"`
-	Description string `json:"description"`
-	Resolved    bool   `json:"resolved"`
-	Acknowledged bool  `json:"acknowledged"`
-	AcknowledgedAt *string `json:"acknowledgedAt,omitempty"`
+	ID                uint    `json:"id"`
+	TeamID            uint    `json:"teamId"`
+	MonitorID         *uint   `json:"monitorId"`
+	HeartbeatID       *uint   `json:"heartbeatId"`
+	Title             string  `json:"title"`
+	Description       string  `json:"description"`
+	Resolved          bool    `json:"resolved"`
+	Acknowledged      bool    `json:"acknowledged"`
+	AcknowledgedAt    *string `json:"acknowledgedAt,omitempty"`
 	RootCauseAnalysis *string `json:"rootCauseAnalysis,omitempty"`
-	CreatedAt   string `json:"createdAt"`
-	UpdatedAt   string `json:"updatedAt"`
+	CreatedAt         string  `json:"createdAt"`
+	UpdatedAt         string  `json:"updatedAt"`
 }
 
 func (h *Handlers) GetIncident(c hs.AuthenticatedContext) error {
@@ -272,13 +272,13 @@ func (h *Handlers) GetIncident(c hs.AuthenticatedContext) error {
 	}
 
 	resp := &GetIncidentResponse{
-		ID:          in.ID,
-		TeamID:      in.TeamID,
-		MonitorID:   in.MonitorID,
-		HeartbeatID: in.HeartbeatID,
-		Title:       in.Title,
-		Description: *in.Description,
-		Resolved:    in.Resolved,
+		ID:           in.ID,
+		TeamID:       in.TeamID,
+		MonitorID:    in.MonitorID,
+		HeartbeatID:  in.HeartbeatID,
+		Title:        in.Title,
+		Description:  *in.Description,
+		Resolved:     in.Resolved,
 		Acknowledged: in.Acknowledged,
 	}
 

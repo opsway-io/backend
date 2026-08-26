@@ -6,8 +6,8 @@ import (
 
 	"github.com/labstack/echo/v4"
 	"github.com/opsway-io/backend/internal/entities"
-	"github.com/opsway-io/backend/internal/rest/helpers"
 	hs "github.com/opsway-io/backend/internal/rest/handlers"
+	"github.com/opsway-io/backend/internal/rest/helpers"
 	"gorm.io/gorm"
 )
 
@@ -39,9 +39,9 @@ func (h *Handlers) GetEscalationPolicy(c hs.AuthenticatedContext) error {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			// Return default empty policy if none exists
 			return c.JSON(http.StatusOK, EscalationPolicyResponse{
-				Name: "Default Escalation",
+				Name:                     "Default Escalation",
 				EscalationTimeoutMinutes: 15,
-				Rotations: []OnCallRotationResponse{},
+				Rotations:                []OnCallRotationResponse{},
 			})
 		}
 		c.Log.WithError(err).Error("failed to get escalation policy")
@@ -63,9 +63,9 @@ func (h *Handlers) GetEscalationPolicy(c hs.AuthenticatedContext) error {
 	}
 
 	return c.JSON(http.StatusOK, EscalationPolicyResponse{
-		Name: policy.Name,
+		Name:                     policy.Name,
 		EscalationTimeoutMinutes: policy.EscalationTimeoutMinutes,
-		Rotations: rotationResps,
+		Rotations:                rotationResps,
 	})
 }
 
@@ -93,8 +93,8 @@ func (h *Handlers) PutEscalationPolicy(c hs.AuthenticatedContext) error {
 
 	if errors.Is(err, gorm.ErrRecordNotFound) || policy == nil {
 		policy = &entities.EscalationPolicy{
-			TeamID: req.TeamID,
-			Name: req.Name,
+			TeamID:                   req.TeamID,
+			Name:                     req.Name,
 			EscalationTimeoutMinutes: req.EscalationTimeoutMinutes,
 		}
 		if err := h.EscalationService.CreatePolicy(ctx, policy); err != nil {
@@ -114,8 +114,8 @@ func (h *Handlers) PutEscalationPolicy(c hs.AuthenticatedContext) error {
 	for _, r := range req.Rotations {
 		newRotations = append(newRotations, entities.OnCallRotation{
 			EscalationPolicyID: policy.ID,
-			UserID: r.UserID,
-			Tier: r.Tier,
+			UserID:             r.UserID,
+			Tier:               r.Tier,
 		})
 	}
 

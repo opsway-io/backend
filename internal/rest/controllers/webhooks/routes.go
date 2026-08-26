@@ -41,10 +41,10 @@ func Register(
 	StripeHandler := handlers.StripeHandlerFactory(logger)
 
 	root.POST("/stripe", StripeHandler(h.handleWebhook), StripeGuard())
-	
+
 	// Slack
 	root.POST("/slack/interactive", h.PostSlackInteractive)
-	
+
 	// APM Integrations
 	root.POST("/datadog/:teamId", h.PostDatadogWebhook)
 	root.POST("/new_relic/:teamId", h.PostNewRelicWebhook)

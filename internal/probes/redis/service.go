@@ -25,10 +25,10 @@ func (s *ServiceImpl) Probe(ctx context.Context, target string, timeout time.Dur
 	if err == nil {
 		opt.DialTimeout = timeout
 		opt.ReadTimeout = timeout
-		
+
 		client := redis.NewClient(opt)
 		defer client.Close()
-		
+
 		ctxWithTimeout, cancel := context.WithTimeout(ctx, timeout)
 		defer cancel()
 

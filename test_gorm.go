@@ -29,7 +29,7 @@ func main() {
 
 	// Change password
 	fetched.PasswordHash = pointer.String("new_hash")
-	
+
 	// Update user
 	db.Model(&fetched).Updates(&fetched)
 

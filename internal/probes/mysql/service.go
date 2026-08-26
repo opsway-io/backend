@@ -36,7 +36,7 @@ func urlToDSN(target string) string {
 	if u.User != nil {
 		dsn += u.User.String() + "@"
 	}
-	
+
 	host := u.Host
 	if host != "" {
 		dsn += fmt.Sprintf("tcp(%s)", host)
@@ -63,7 +63,7 @@ func (s *ServiceImpl) Probe(ctx context.Context, target string, timeout time.Dur
 	db, err := sql.Open("mysql", dsn)
 	if err == nil {
 		defer db.Close()
-		
+
 		ctxWithTimeout, cancel := context.WithTimeout(ctx, timeout)
 		defer cancel()
 

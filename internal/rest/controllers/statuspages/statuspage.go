@@ -57,22 +57,22 @@ type GetStatusPagesResponse struct {
 }
 
 type GetStatusPageResponse struct {
-	ID           uint     `json:"id"`
-	Name         string   `json:"name"`
-	Domain       string   `json:"domain"`
-	LogoURL      string   `json:"logoUrl"`
-	LogoLink     string   `json:"logoLink"`
-	FaviconURL   string   `json:"faviconUrl"`
-	Layout       string   `json:"layout"`
-	CustomCSS            string   `json:"customCss"`
-	HeaderHTML           string   `json:"headerHtml"`
-	FooterHTML           string   `json:"footerHtml"`
-	CustomComponentsHTML string   `json:"customComponentsHtml"`
-	ShowBranding         bool     `json:"showBranding"`
-	IsPrivate            bool     `json:"isPrivate"`
-	MonitorIDs   []uint   `json:"monitorIds"`
-	CreatedAt    string   `json:"createdAt"`
-	UpdatedAt    string   `json:"updatedAt"`
+	ID                   uint   `json:"id"`
+	Name                 string `json:"name"`
+	Domain               string `json:"domain"`
+	LogoURL              string `json:"logoUrl"`
+	LogoLink             string `json:"logoLink"`
+	FaviconURL           string `json:"faviconUrl"`
+	Layout               string `json:"layout"`
+	CustomCSS            string `json:"customCss"`
+	HeaderHTML           string `json:"headerHtml"`
+	FooterHTML           string `json:"footerHtml"`
+	CustomComponentsHTML string `json:"customComponentsHtml"`
+	ShowBranding         bool   `json:"showBranding"`
+	IsPrivate            bool   `json:"isPrivate"`
+	MonitorIDs           []uint `json:"monitorIds"`
+	CreatedAt            string `json:"createdAt"`
+	UpdatedAt            string `json:"updatedAt"`
 }
 
 func (h *Handlers) GetStatusPages(c handlers.AuthenticatedContext) error {
@@ -99,22 +99,22 @@ func (h *Handlers) GetStatusPages(c handlers.AuthenticatedContext) error {
 		}
 
 		res.StatusPages[i] = GetStatusPageResponse{
-			ID:           sp.ID,
-			Name:         sp.Name,
-			Domain:       sp.Domain,
-			LogoURL:      sp.LogoURL,
-			LogoLink:     sp.LogoLink,
-			FaviconURL:   sp.FaviconURL,
-			Layout:       sp.Layout,
+			ID:                   sp.ID,
+			Name:                 sp.Name,
+			Domain:               sp.Domain,
+			LogoURL:              sp.LogoURL,
+			LogoLink:             sp.LogoLink,
+			FaviconURL:           sp.FaviconURL,
+			Layout:               sp.Layout,
 			CustomCSS:            sp.CustomCSS,
 			HeaderHTML:           sp.HeaderHTML,
 			FooterHTML:           sp.FooterHTML,
 			CustomComponentsHTML: sp.CustomComponentsHTML,
 			ShowBranding:         sp.ShowBranding,
 			IsPrivate:            sp.IsPrivate,
-			MonitorIDs:   monitorIDs,
-			CreatedAt:    sp.CreatedAt.String(),
-			UpdatedAt:    sp.UpdatedAt.String(),
+			MonitorIDs:           monitorIDs,
+			CreatedAt:            sp.CreatedAt.String(),
+			UpdatedAt:            sp.UpdatedAt.String(),
 		}
 	}
 
@@ -202,42 +202,42 @@ func (h *Handlers) GetStatusPage(c handlers.AuthenticatedContext) error {
 	}
 
 	return c.JSON(http.StatusOK, GetStatusPageResponse{
-		ID:           sp.ID,
-		Name:         sp.Name,
-		Domain:       sp.Domain,
-		LogoURL:      sp.LogoURL,
-		LogoLink:     sp.LogoLink,
-		FaviconURL:   sp.FaviconURL,
-		Layout:       sp.Layout,
+		ID:                   sp.ID,
+		Name:                 sp.Name,
+		Domain:               sp.Domain,
+		LogoURL:              sp.LogoURL,
+		LogoLink:             sp.LogoLink,
+		FaviconURL:           sp.FaviconURL,
+		Layout:               sp.Layout,
 		CustomCSS:            sp.CustomCSS,
 		HeaderHTML:           sp.HeaderHTML,
 		FooterHTML:           sp.FooterHTML,
 		CustomComponentsHTML: sp.CustomComponentsHTML,
 		ShowBranding:         sp.ShowBranding,
 		IsPrivate:            sp.IsPrivate,
-		MonitorIDs:   monitorIDs,
-		CreatedAt:    sp.CreatedAt.String(),
-		UpdatedAt:    sp.UpdatedAt.String(),
+		MonitorIDs:           monitorIDs,
+		CreatedAt:            sp.CreatedAt.String(),
+		UpdatedAt:            sp.UpdatedAt.String(),
 	})
 }
 
 type PutStatusPageRequest struct {
-	TeamID       uint    `param:"teamId" validate:"required,numeric,gt=0"`
-	StatusPageID uint    `param:"statusPageId" validate:"required,numeric,gt=0"`
-	Name         string  `json:"name" validate:"required,max=255"`
-	Domain       string  `json:"domain" validate:"required,max=255,fqdn"`
-	LogoURL      string  `json:"logoUrl"`
-	LogoLink     string  `json:"logoLink"`
-	FaviconURL   string  `json:"faviconUrl"`
-	Layout       string  `json:"layout"`
-	CustomCSS            string  `json:"customCss"`
-	HeaderHTML           string  `json:"headerHtml"`
-	FooterHTML           string  `json:"footerHtml"`
-	CustomComponentsHTML string  `json:"customComponentsHtml"`
-	ShowBranding         *bool   `json:"showBranding"`
-	IsPrivate            *bool   `json:"isPrivate"`
-	Password             string  `json:"password"`
-	MonitorIDs   []uint  `json:"monitorIds"`
+	TeamID               uint   `param:"teamId" validate:"required,numeric,gt=0"`
+	StatusPageID         uint   `param:"statusPageId" validate:"required,numeric,gt=0"`
+	Name                 string `json:"name" validate:"required,max=255"`
+	Domain               string `json:"domain" validate:"required,max=255,fqdn"`
+	LogoURL              string `json:"logoUrl"`
+	LogoLink             string `json:"logoLink"`
+	FaviconURL           string `json:"faviconUrl"`
+	Layout               string `json:"layout"`
+	CustomCSS            string `json:"customCss"`
+	HeaderHTML           string `json:"headerHtml"`
+	FooterHTML           string `json:"footerHtml"`
+	CustomComponentsHTML string `json:"customComponentsHtml"`
+	ShowBranding         *bool  `json:"showBranding"`
+	IsPrivate            *bool  `json:"isPrivate"`
+	Password             string `json:"password"`
+	MonitorIDs           []uint `json:"monitorIds"`
 }
 
 func (h *Handlers) PutStatusPage(c handlers.AuthenticatedContext) error {
@@ -313,22 +313,22 @@ func (h *Handlers) PutStatusPage(c handlers.AuthenticatedContext) error {
 	}
 
 	return c.JSON(http.StatusOK, GetStatusPageResponse{
-		ID:           sp.ID,
-		Name:         sp.Name,
-		Domain:       sp.Domain,
-		LogoURL:      sp.LogoURL,
-		LogoLink:     sp.LogoLink,
-		FaviconURL:   sp.FaviconURL,
-		Layout:       sp.Layout,
+		ID:                   sp.ID,
+		Name:                 sp.Name,
+		Domain:               sp.Domain,
+		LogoURL:              sp.LogoURL,
+		LogoLink:             sp.LogoLink,
+		FaviconURL:           sp.FaviconURL,
+		Layout:               sp.Layout,
 		CustomCSS:            sp.CustomCSS,
 		HeaderHTML:           sp.HeaderHTML,
 		FooterHTML:           sp.FooterHTML,
 		CustomComponentsHTML: sp.CustomComponentsHTML,
 		ShowBranding:         sp.ShowBranding,
 		IsPrivate:            sp.IsPrivate,
-		MonitorIDs:   monitorIDs,
-		CreatedAt:    sp.CreatedAt.String(),
-		UpdatedAt:    sp.UpdatedAt.String(),
+		MonitorIDs:           monitorIDs,
+		CreatedAt:            sp.CreatedAt.String(),
+		UpdatedAt:            sp.UpdatedAt.String(),
 	})
 }
 

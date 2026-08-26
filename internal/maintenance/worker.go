@@ -65,7 +65,7 @@ func (w *worker) processMaintenanceWindows(ctx context.Context) {
 	} else {
 		for _, m := range *unnotifiedMaintenances {
 			w.notifySubscribers(ctx, &m)
-			
+
 			m.Settings.Notified = true
 			if err := w.maintenance.Update(ctx, &m); err != nil {
 				w.logger.WithError(err).Error("failed to mark maintenance as notified")
@@ -82,7 +82,7 @@ func (w *worker) processMaintenanceWindows(ctx context.Context) {
 	teamsUnderMaintenance := make(map[uint]bool)
 	teamsWithFullMaintenance := make(map[uint]bool)
 	monitorsUnderMaintenance := make(map[uint]bool)
-	
+
 	for _, m := range *activeMaintenances {
 		teamsUnderMaintenance[m.TeamID] = true
 
@@ -112,7 +112,7 @@ func (w *worker) processMaintenanceWindows(ctx context.Context) {
 				"monitor_id": m.ID,
 				"team_id":    m.TeamID,
 			}).Info("setting monitor state to maintenance")
-			
+
 			if err := w.monitor.SetState(ctx, m.TeamID, m.ID, entities.MonitorStateMaintenance); err != nil {
 				w.logger.WithError(err).Error("failed to set monitor state to maintenance")
 			}
@@ -121,7 +121,7 @@ func (w *worker) processMaintenanceWindows(ctx context.Context) {
 				"monitor_id": m.ID,
 				"team_id":    m.TeamID,
 			}).Info("setting monitor state back to active")
-			
+
 			if err := w.monitor.SetState(ctx, m.TeamID, m.ID, entities.MonitorStateActive); err != nil {
 				w.logger.WithError(err).Error("failed to set monitor state back to active")
 			}

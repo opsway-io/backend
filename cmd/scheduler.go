@@ -3,11 +3,11 @@ package cmd
 import (
 	"context"
 
+	connectorRedis "github.com/opsway-io/backend/internal/connectors/redis"
 	"github.com/opsway-io/backend/internal/entities"
 	"github.com/opsway-io/backend/internal/event"
 	"github.com/opsway-io/backend/internal/event/events"
 	"github.com/opsway-io/backend/internal/monitor"
-	connectorRedis "github.com/opsway-io/backend/internal/connectors/redis"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 )

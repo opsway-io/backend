@@ -78,9 +78,9 @@ type MonitorSettings struct {
 	URL       string        `gorm:"not null"`
 	Frequency time.Duration `gorm:"not null;serializer:timeDurationSeconds"`
 
-	Headers []MonitorSettingsHeader `gorm:"serializer:json"`
-	Body    MonitorSettingsBody     `gorm:"embedded;embeddedPrefix:body_"`
-	TLS     MonitorSettingsTLS      `gorm:"embedded;embeddedPrefix:tls_"`
+	Headers   []MonitorSettingsHeader `gorm:"serializer:json"`
+	Body      MonitorSettingsBody     `gorm:"embedded;embeddedPrefix:body_"`
+	TLS       MonitorSettingsTLS      `gorm:"embedded;embeddedPrefix:tls_"`
 	Locations []string                `gorm:"serializer:json"`
 
 	UpdatedAt time.Time `gorm:"index"`

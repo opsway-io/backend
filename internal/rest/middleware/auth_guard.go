@@ -16,7 +16,7 @@ func AuthGuardFactory(logger *logrus.Entry, jwtService authentication.Service) f
 		return func(next echo.HandlerFunc) echo.HandlerFunc {
 			return func(c echo.Context) error {
 				var token string
-				
+
 				cookie, err := c.Cookie("access_token")
 				if err == nil && cookie.Value != "" {
 					token = cookie.Value

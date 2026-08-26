@@ -160,7 +160,7 @@ func (s *ServiceImpl) UploadAvatar(ctx context.Context, teamID uint, file io.Rea
 	}); err != nil {
 		return errors.Wrap(err, "failed to update team")
 	}
-	
+
 	_ = s.cache.DeleteTeam(ctx, teamID)
 
 	return nil
@@ -180,7 +180,7 @@ func (s *ServiceImpl) DeleteAvatar(ctx context.Context, teamID uint) error {
 	if err != nil {
 		return errors.Wrap(err, "failed to delete avatar from storage")
 	}
-	
+
 	_ = s.cache.DeleteTeam(ctx, teamID)
 
 	return nil
@@ -350,7 +350,7 @@ func (s *ServiceImpl) AcceptInviteByToken(ctx context.Context, tokenString strin
 	); err != nil {
 		return errors.Wrap(err, "failed to add user to team")
 	}
-	
+
 	_ = s.cache.DeleteTeamUserCount(ctx, teamID)
 
 	// Delete the invitation since it has been accepted
