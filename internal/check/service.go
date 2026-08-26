@@ -12,6 +12,7 @@ type Service interface {
 
 	GetByTeamIDAndMonitorIDPaginated(ctx context.Context, teamID, monitorID uint, offset, limit *int) (*[]Check, error)
 	GetByTeamIDAndMonitorIDAndCheckID(ctx context.Context, teamID uint, monitorID uint, checkID uuid.UUID) (*Check, error)
+	GetLatestByMonitorID(ctx context.Context, monitorID uint) (*Check, error)
 
 	GetMonitorMetricsByMonitorID(ctx context.Context, monitorID uint) (*[]AggMetric, error)
 	GetMonitorStatsByMonitorID(ctx context.Context, monitorID uint) (*MonitorStats, error)
@@ -42,6 +43,10 @@ func (s *ServiceImpl) GetByTeamIDAndMonitorIDPaginated(ctx context.Context, team
 
 func (s *ServiceImpl) GetByTeamIDAndMonitorIDAndCheckID(ctx context.Context, teamID uint, monitorID uint, checkID uuid.UUID) (*Check, error) {
 	return s.repository.GetByTeamIDAndMonitorIDAndCheckID(ctx, teamID, monitorID, checkID)
+}
+
+func (s *ServiceImpl) GetLatestByMonitorID(ctx context.Context, monitorID uint) (*Check, error) {
+	return s.repository.GetLatestByMonitorID(ctx, monitorID)
 }
 
 func (s *ServiceImpl) GetMonitorStatsByMonitorID(ctx context.Context, monitorID uint) (*MonitorStats, error) {

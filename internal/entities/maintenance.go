@@ -30,8 +30,10 @@ type MaintenanceSettings struct {
 
 	StartAt  time.Time       `gorm:"index;not null" json:"startAt"`
 	EndAt    time.Time       `gorm:"index;not null" json:"endAt"`
-	Tags     *pq.StringArray `gorm:"type:text[]" json:"tags"`
-	Notified bool            `gorm:"default:false" json:"notified"`
+	Tags              *pq.StringArray `gorm:"type:text[]" json:"tags"`
+	Notified          bool            `gorm:"default:false" json:"notified"`
+	Reminded          bool            `gorm:"default:false" json:"reminded"`
+	ConcludedNotified bool            `gorm:"default:false" json:"concludedNotified"`
 
 	UpdatedAt time.Time `gorm:"index" json:"updatedAt"`
 }

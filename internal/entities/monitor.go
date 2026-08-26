@@ -83,6 +83,9 @@ type MonitorSettings struct {
 	TLS       MonitorSettingsTLS      `gorm:"embedded;embeddedPrefix:tls_"`
 	Locations []string                `gorm:"serializer:json"`
 
+	SslExpiryNotifiedAt    *time.Time `gorm:"index"`
+	DomainExpiryNotifiedAt *time.Time `gorm:"index"`
+
 	UpdatedAt time.Time `gorm:"index"`
 }
 

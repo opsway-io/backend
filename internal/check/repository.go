@@ -14,6 +14,7 @@ var ErrNotFound = errors.New("probe result not found")
 type Repository interface {
 	Create(ctx context.Context, maintenance *Check) error
 	GetByTeamIDAndMonitorIDAndCheckID(ctx context.Context, teamID uint, monitorID uint, checkID uuid.UUID) (*Check, error)
+	GetLatestByMonitorID(ctx context.Context, monitorID uint) (*Check, error)
 	GetByTeamIDAndMonitorIDPaginated(ctx context.Context, teamID, monitorID uint, offset, limit *int) (*[]Check, error)
 	GetMonitorMetricsByMonitorID(ctx context.Context, monitorID uint) (*[]AggMetric, error)
 	GetMonitorOverviewsByTeamID(ctx context.Context, teamID uint) (*[]MonitorOverviews, error)
@@ -42,6 +43,30 @@ func (r *RepositoryImpl) GetByTeamIDAndMonitorIDAndCheckID(ctx context.Context, 
 			TeamID:    uint64(teamID),
 			MonitorID: uint64(monitorID),
 		},
+	).First(
+		&check,
+	).Error
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, ErrNotFound
+		}
+
+		return nil, err
+	}
+
+	return &check, nil
+}
+
+func (r *RepositoryImpl) GetLatestByMonitorID(ctx context.Context, monitorID uint) (*Check, error) {
+	var check Check
+	err := r.db.WithContext(
+		ctx,
+	).Where(
+		Check{
+			MonitorID: uint64(monitorID),
+		},
+	).Order(
+		"created_at desc",
 	).First(
 		&check,
 	).Error

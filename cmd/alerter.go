@@ -61,8 +61,8 @@ func runAlerter(cmd *cobra.Command, args []string) {
 
 	var emailSender email.Sender
 	if conf.Email.Debug {
-		l.Info("Using console email sender")
-		emailSender = email.NewConsoleSender()
+		l.Info("Using SMTP email sender")
+		emailSender = email.NewSMTPSender(conf.Email)
 	} else {
 		l.Info("Using Sendgrid email sender")
 		emailSender = email.NewSendgridSender(conf.Email)

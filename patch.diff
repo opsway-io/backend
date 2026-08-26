@@ -1,0 +1,87 @@
+diff --git a/internal/entities/incident.go b/internal/entities/incident.go
+index 99d36ce..4ff962b 100644
+--- a/internal/entities/incident.go
++++ b/internal/entities/incident.go
+@@ -7,9 +7,10 @@ import (
+ type Incident struct {
+ 	ID                 uint
+ 	TeamID             uint `gorm:"index;not null"`
+-	MonitorID          uint `gorm:"index;not null"`
+-	MonitorAssertionID uint `gorm:"uniqueIndex:unresolved_incident;not null"`
+-	Resolved           bool `gorm:"uniqueIndex:unresolved_incident;not null;default:false"`
++	MonitorID          *uint `gorm:"index"`
++	MonitorAssertionID *uint `gorm:"uniqueIndex:unresolved_monitor_incident,where:resolved = false"`
++	HeartbeatID        *uint `gorm:"uniqueIndex:unresolved_heartbeat_incident,where:resolved = false"`
++	Resolved           bool `gorm:"not null;default:false"`
+ 
+ 	Title       string `gorm:"index;not null"`
+ 	Description *string
+diff --git a/internal/entities/report.go b/internal/entities/report.go
+index c5c57e4..f1a578b 100644
+--- a/internal/entities/report.go
++++ b/internal/entities/report.go
+@@ -18,10 +18,19 @@ const (
+ 	ReportTypeCustom      ReportType = "CUSTOM"
+ )
+ 
++type ReportStatus string
++
++const (
++	ReportStatusPending   ReportStatus = "PENDING"
++	ReportStatusCompleted ReportStatus = "COMPLETED"
++	ReportStatusFailed    ReportStatus = "FAILED"
++)
++
+ type Report struct {
+ 	ID     uint
+ 	TeamID uint                           `gorm:"index;not null"`
+ 	Type   ReportType                     `gorm:"index;not null"`
++	Status ReportStatus                   `gorm:"index;not null;default:'PENDING'"`
+ 	Report datatypes.JSONType[ReportData] `gorm:"not null"`
+ 
+ 	CreatedAt time.Time `gorm:"index"`
+@@ -32,12 +41,17 @@ func (Report) TableName() string {
+ 	return "reports"
+ }
+ 
++type MonitorIncident struct {
++	MonitorID uint `json:"monitorId"`
++	Count     int  `json:"count"`
++}
++
+ type ReportData struct {
+-	Uptime      *[]check.MonitorUptime `json:"uptime"`
+-	Performance *string                `json:"performance"`
+-	Incident    *string                `json:"incident"`
+-	All         *string                `json:"all"`
+-	Custom      *string                `json:"custom"`
++	Uptime      *[]check.MonitorUptime       `json:"uptime"`
++	Performance *[]check.MonitorPerformance  `json:"performance"`
++	Incident    *[]MonitorIncident           `json:"incident"`
++	All         *string                      `json:"all"`
++	Custom      *string                      `json:"custom"`
+ }
+ 
+ func ReportFrom(source any) (ReportType, error) {
+@@ -61,3 +75,21 @@ func ReportFrom(source any) (ReportType, error) {
+ 		return "", errors.New("invalid report type")
+ 	}
+ }
++
++func ReportStatusFrom(source any) (ReportStatus, error) {
++	s, ok := source.(string)
++	if !ok {
++		return "", errors.New("invalid report status type, must be string")
++	}
++
++	switch s {
++	case "PENDING":
++		return ReportStatusPending, nil
++	case "COMPLETED":
++		return ReportStatusCompleted, nil
++	case "FAILED":
++		return ReportStatusFailed, nil
++	default:
++		return "", errors.New("invalid report status")
++	}
++}

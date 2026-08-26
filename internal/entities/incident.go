@@ -18,6 +18,7 @@ type Incident struct {
 	Title             string `gorm:"index;not null"`
 	Description       *string
 	RootCauseAnalysis *string
+	RootCauseNotified bool `gorm:"not null;default:false"`
 	Comments          []IncidentComment `gorm:"constraint:OnDelete:CASCADE"`
 
 	CreatedAt time.Time `gorm:"index"`

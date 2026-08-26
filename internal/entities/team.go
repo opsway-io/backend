@@ -45,8 +45,10 @@ type Team struct {
 	SlackWebhookURL    *string     `gorm:"type:text"`
 	DiscordWebhookURL  *string     `gorm:"type:text"`
 	TelegramChatID     *string     `gorm:"type:text"`
-	DatadogWebhookURL  *string     `gorm:"type:text"`
-	NewRelicWebhookURL *string     `gorm:"type:text"`
+	DatadogWebhookURL        *string     `gorm:"type:text"`
+	NewRelicWebhookURL       *string     `gorm:"type:text"`
+	MicrosoftTeamsWebhookURL *string     `gorm:"type:text"`
+	WebhookURL               *string     `gorm:"type:text"`
 	HasAvatar          bool
 
 	Users       []User           `gorm:"many2many:team_users;constraint:OnDelete:CASCADE;"`

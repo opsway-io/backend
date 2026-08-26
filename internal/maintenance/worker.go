@@ -64,11 +64,39 @@ func (w *worker) processMaintenanceWindows(ctx context.Context) {
 		w.logger.WithError(err).Error("failed to fetch unnotified maintenance windows")
 	} else {
 		for _, m := range *unnotifiedMaintenances {
-			w.notifySubscribers(ctx, &m)
+			w.notifySubscribers(ctx, &m, "alert")
 
 			m.Settings.Notified = true
 			if err := w.maintenance.Update(ctx, &m); err != nil {
 				w.logger.WithError(err).Error("failed to mark maintenance as notified")
+			}
+		}
+	}
+
+	unremindedMaintenances, err := w.maintenance.GetUnreminded(ctx, now, 24*time.Hour)
+	if err != nil {
+		w.logger.WithError(err).Error("failed to fetch unreminded maintenance windows")
+	} else {
+		for _, m := range *unremindedMaintenances {
+			w.notifySubscribers(ctx, &m, "reminder")
+
+			m.Settings.Reminded = true
+			if err := w.maintenance.Update(ctx, &m); err != nil {
+				w.logger.WithError(err).Error("failed to mark maintenance as reminded")
+			}
+		}
+	}
+
+	unconcludedMaintenances, err := w.maintenance.GetUnconcluded(ctx, now)
+	if err != nil {
+		w.logger.WithError(err).Error("failed to fetch unconcluded maintenance windows")
+	} else {
+		for _, m := range *unconcludedMaintenances {
+			w.notifySubscribers(ctx, &m, "concluded")
+
+			m.Settings.ConcludedNotified = true
+			if err := w.maintenance.Update(ctx, &m); err != nil {
+				w.logger.WithError(err).Error("failed to mark maintenance as concluded notified")
 			}
 		}
 	}
@@ -129,7 +157,7 @@ func (w *worker) processMaintenanceWindows(ctx context.Context) {
 	}
 }
 
-func (w *worker) notifySubscribers(ctx context.Context, m *entities.Maintenance) {
+func (w *worker) notifySubscribers(ctx context.Context, m *entities.Maintenance, notificationType string) {
 	// 1. Get all status pages for this team
 	statusPages, err := w.statusPageService.GetByTeamID(ctx, m.TeamID)
 	if err != nil {
@@ -171,12 +199,33 @@ func (w *worker) notifySubscribers(ctx context.Context, m *entities.Maintenance)
 		statusPageURL := fmt.Sprintf("%s/%s", w.statusPageBaseURL, sp.Domain)
 		for _, sub := range subs {
 			unsubscribeURL := fmt.Sprintf("%s/%s/subscribe/%s", w.statusPageBaseURL, sp.Domain, sub.Token)
-			err := w.emailSender.Send(ctx, "", sub.Email, &templates.MaintenanceAlertTemplate{
-				StatusPageName:   sp.Name,
-				MaintenanceTitle: m.Title,
-				StatusPageURL:    statusPageURL,
-				UnsubscribeURL:   unsubscribeURL,
-			})
+			
+			var template templates.Template
+			switch notificationType {
+			case "reminder":
+				template = &templates.MaintenanceReminderTemplate{
+					StatusPageName:   sp.Name,
+					MaintenanceTitle: m.Title,
+					StatusPageURL:    statusPageURL,
+					UnsubscribeURL:   unsubscribeURL,
+				}
+			case "concluded":
+				template = &templates.MaintenanceConcludedTemplate{
+					StatusPageName:   sp.Name,
+					MaintenanceTitle: m.Title,
+					StatusPageURL:    statusPageURL,
+					UnsubscribeURL:   unsubscribeURL,
+				}
+			default:
+				template = &templates.MaintenanceAlertTemplate{
+					StatusPageName:   sp.Name,
+					MaintenanceTitle: m.Title,
+					StatusPageURL:    statusPageURL,
+					UnsubscribeURL:   unsubscribeURL,
+				}
+			}
+
+			err := w.emailSender.Send(ctx, "", sub.Email, template)
 			if err != nil {
 				w.logger.WithError(err).Error("failed to dispatch maintenance email")
 			}
@@ -185,6 +234,7 @@ func (w *worker) notifySubscribers(ctx context.Context, m *entities.Maintenance)
 				"email":          sub.Email,
 				"status_page_id": sp.ID,
 				"maintenance":    m.Title,
+				"type":           notificationType,
 			}).Info("Dispatched maintenance email to subscriber")
 		}
 	}

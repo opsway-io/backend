@@ -25,8 +25,10 @@ type GetTeamResponse struct {
 	SlackWebhookURL    *string   `json:"slackWebhookUrl"`
 	DiscordWebhookURL  *string   `json:"discordWebhookUrl"`
 	TelegramChatID     *string   `json:"telegramChatId"`
-	DatadogWebhookURL  *string   `json:"datadogWebhookUrl"`
-	NewRelicWebhookURL *string   `json:"newRelicWebhookUrl"`
+	DatadogWebhookURL        *string   `json:"datadogWebhookUrl"`
+	NewRelicWebhookURL       *string   `json:"newRelicWebhookUrl"`
+	MicrosoftTeamsWebhookURL *string   `json:"microsoftTeamsWebhookUrl"`
+	WebhookURL               *string   `json:"webhookUrl"`
 	CreatedAt          time.Time `json:"createdAt"`
 	UpdatedAt          time.Time `json:"updatedAt"`
 }
@@ -58,8 +60,10 @@ func newGetTeamResponse(t *entities.Team, teamService team.Service) GetTeamRespo
 		SlackWebhookURL:    t.SlackWebhookURL,
 		DiscordWebhookURL:  t.DiscordWebhookURL,
 		TelegramChatID:     t.TelegramChatID,
-		DatadogWebhookURL:  t.DatadogWebhookURL,
-		NewRelicWebhookURL: t.NewRelicWebhookURL,
+		DatadogWebhookURL:        t.DatadogWebhookURL,
+		NewRelicWebhookURL:       t.NewRelicWebhookURL,
+		MicrosoftTeamsWebhookURL: t.MicrosoftTeamsWebhookURL,
+		WebhookURL:               t.WebhookURL,
 		CreatedAt:          t.CreatedAt,
 		UpdatedAt:          t.UpdatedAt,
 	}
@@ -77,8 +81,10 @@ type PutTeamRequest struct {
 	SlackWebhookURL    *string `json:"slackWebhookUrl"`
 	DiscordWebhookURL  *string `json:"discordWebhookUrl"`
 	TelegramChatID     *string `json:"telegramChatId"`
-	DatadogWebhookURL  *string `json:"datadogWebhookUrl"`
-	NewRelicWebhookURL *string `json:"newRelicWebhookUrl"`
+	DatadogWebhookURL        *string `json:"datadogWebhookUrl"`
+	NewRelicWebhookURL       *string `json:"newRelicWebhookUrl"`
+	MicrosoftTeamsWebhookURL *string `json:"microsoftTeamsWebhookUrl"`
+	WebhookURL               *string `json:"webhookUrl"`
 }
 
 func (h *Handlers) PutTeam(c hs.AuthenticatedContext) error {
@@ -110,6 +116,12 @@ func (h *Handlers) PutTeam(c hs.AuthenticatedContext) error {
 	}
 	if req.NewRelicWebhookURL != nil {
 		team.NewRelicWebhookURL = req.NewRelicWebhookURL
+	}
+	if req.MicrosoftTeamsWebhookURL != nil {
+		team.MicrosoftTeamsWebhookURL = req.MicrosoftTeamsWebhookURL
+	}
+	if req.WebhookURL != nil {
+		team.WebhookURL = req.WebhookURL
 	}
 
 	if err = h.TeamService.UpdateTeam(

@@ -6,6 +6,7 @@ import (
 
 	"github.com/labstack/echo/v4"
 	"github.com/opsway-io/backend/internal/entities"
+	"github.com/opsway-io/backend/internal/event/events"
 	"github.com/opsway-io/backend/internal/incident"
 	hs "github.com/opsway-io/backend/internal/rest/handlers"
 	"github.com/opsway-io/backend/internal/rest/helpers"
@@ -352,6 +353,46 @@ func (h *Handlers) PatchAcknowledgeIncident(c hs.AuthenticatedContext) error {
 	in.Acknowledged = true
 	now := time.Now()
 	in.AcknowledgedAt = &now
+	if err := h.IncidentService.Update(ctx, in); err != nil {
+		c.Log.WithError(err).Error("failed to update incident")
+		return echo.ErrInternalServerError
+	}
+
+	return c.NoContent(http.StatusOK)
+}
+
+type PatchRootCauseIncidentRequest struct {
+	TeamID            uint    `param:"teamId" validate:"required,numeric,gte=0"`
+	IncidentID        uint    `param:"incidentId" validate:"required,numeric,gte=0"`
+	RootCauseAnalysis *string `json:"rootCauseAnalysis"`
+}
+
+func (h *Handlers) PatchRootCauseIncident(c hs.AuthenticatedContext) error {
+	req, err := helpers.Bind[PatchRootCauseIncidentRequest](c)
+	if err != nil {
+		c.Log.WithError(err).Debug("failed to bind PatchRootCauseIncidentRequest")
+		return echo.ErrBadRequest
+	}
+
+	ctx := c.Request().Context()
+	in, err := h.IncidentService.GetByID(ctx, req.IncidentID)
+	if err != nil {
+		c.Log.WithError(err).Error("failed to get incident")
+		return echo.ErrInternalServerError
+	}
+
+	if in.TeamID != req.TeamID {
+		return echo.ErrForbidden
+	}
+
+	in.RootCauseAnalysis = req.RootCauseAnalysis
+	if req.RootCauseAnalysis != nil && *req.RootCauseAnalysis != "" && !in.RootCauseNotified {
+		in.RootCauseNotified = true
+		_ = h.EventService.Publish(events.IncidentPostMortemPublishedEvent{
+			Incident: in,
+		})
+	}
+	
 	if err := h.IncidentService.Update(ctx, in); err != nil {
 		c.Log.WithError(err).Error("failed to update incident")
 		return echo.ErrInternalServerError

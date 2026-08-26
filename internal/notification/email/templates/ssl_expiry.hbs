@@ -1,0 +1,19 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>SSL Certificate Expiring Soon</title>
+</head>
+<body>
+    <div style="font-family: Arial, sans-serif; padding: 20px;">
+        <h2>SSL Certificate Expiring Soon</h2>
+        <p>The SSL certificate for your monitor <strong>{{.MonitorName}}</strong> ({{.MonitorURL}}) is expiring in <strong>{{.DaysRemaining}} days</strong>.</p>
+        <p>Expiration Date: <strong>{{.ExpirationDate}}</strong></p>
+        <p>Please take action to renew your SSL certificate to avoid downtime and browser warnings for your users.</p>
+        <a href="{{.DashboardURL}}" style="display: inline-block; padding: 10px 20px; color: #fff; background-color: #d9534f; text-decoration: none; border-radius: 5px;">View Monitor Details</a>
+        <br>
+        <br>
+        <p>Thanks,<br>The Opsway Team</p>
+    </div>
+</body>
+</html>

@@ -3,6 +3,7 @@ package incidents
 import (
 	"github.com/labstack/echo/v4"
 	"github.com/opsway-io/backend/internal/authentication"
+	"github.com/opsway-io/backend/internal/event"
 	"github.com/opsway-io/backend/internal/incident"
 	"github.com/opsway-io/backend/internal/rest/handlers"
 	mw "github.com/opsway-io/backend/internal/rest/middleware"
@@ -14,6 +15,7 @@ type Handlers struct {
 	AuthenticationService authentication.Service
 	TeamService           team.Service
 	IncidentService       incident.Service
+	EventService          event.Service
 }
 
 func Register(
@@ -21,9 +23,11 @@ func Register(
 	logger *logrus.Entry,
 	teamService team.Service,
 	incidentService incident.Service,
+	eventService event.Service,
 ) {
 	h := &Handlers{
 		IncidentService: incidentService,
+		EventService:    eventService,
 	}
 
 	TeamGuard := mw.TeamGuardFactory(logger, teamService)
@@ -41,4 +45,5 @@ func Register(
 	monitorsGroup.GET("/:incidentId", AuthHandler(h.GetIncident))
 	monitorsGroup.PATCH("/:incidentId/resolved", AuthHandler(h.PatchSolveIncident))
 	monitorsGroup.PATCH("/:incidentId/acknowledge", AuthHandler(h.PatchAcknowledgeIncident))
+	monitorsGroup.PATCH("/:incidentId/root_cause", AuthHandler(h.PatchRootCauseIncident))
 }

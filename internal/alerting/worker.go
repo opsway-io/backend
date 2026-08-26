@@ -84,9 +84,21 @@ func (w *worker) Start(ctx context.Context) error {
 		return fmt.Errorf("failed to subscribe to maintenance stream: %w", err)
 	}
 
+	incidentPostMortemMessages, err := w.eventService.Subscribe(ctx, string(events.EventTypeIncidentPostMortemPublished))
+	if err != nil {
+		return fmt.Errorf("failed to subscribe to incident post_mortem stream: %w", err)
+	}
+
 	go func() {
 		for msg := range incidentMessages {
 			w.processMessage(ctx, msg.Payload)
+			msg.Ack()
+		}
+	}()
+
+	go func() {
+		for msg := range incidentPostMortemMessages {
+			w.processPostMortemMessage(ctx, msg.Payload)
 			msg.Ack()
 		}
 	}()
@@ -100,6 +112,21 @@ func (w *worker) Start(ctx context.Context) error {
 
 	<-ctx.Done()
 	return nil
+}
+
+func (w *worker) processPostMortemMessage(ctx context.Context, payload []byte) {
+	var ev events.IncidentPostMortemPublishedEvent
+	if err := json.Unmarshal(payload, &ev); err != nil {
+		w.logger.WithError(err).Error("failed to unmarshal event")
+		return
+	}
+
+	incident := ev.Incident
+	if incident == nil {
+		return
+	}
+
+	w.notifyStatusPageSubscribersForPostMortem(ctx, incident)
 }
 
 func (w *worker) processMessage(ctx context.Context, payload []byte) {
@@ -218,6 +245,48 @@ func (w *worker) notifyStatusPageSubscribers(ctx context.Context, incident *enti
 			})
 			if err != nil {
 				w.logger.WithError(err).Error("failed to send subscriber incident alert email")
+			}
+		}
+	}
+}
+
+func (w *worker) notifyStatusPageSubscribersForPostMortem(ctx context.Context, incident *entities.Incident) {
+	statusPages, err := w.statusPageSvc.GetByTeamID(ctx, incident.TeamID)
+	if err != nil {
+		w.logger.WithError(err).Error("failed to fetch status pages for post mortem notification")
+		return
+	}
+
+	for _, sp := range statusPages {
+		hasMonitor := false
+		for _, m := range sp.Monitors {
+			if incident.MonitorID != nil && m.ID == *incident.MonitorID {
+				hasMonitor = true
+				break
+			}
+		}
+
+		if !hasMonitor {
+			continue
+		}
+
+		subs, err := w.statusPageSvc.GetVerifiedSubscribers(ctx, sp.ID)
+		if err != nil {
+			w.logger.WithError(err).Error("failed to fetch subscribers for status page")
+			continue
+		}
+
+		statusPageURL := fmt.Sprintf("%s/%s", w.config.StatusPageBaseURL, sp.Domain)
+		for _, sub := range subs {
+			unsubscribeURL := fmt.Sprintf("%s/%s/subscribe/%s", w.config.StatusPageBaseURL, sp.Domain, sub.Token)
+			err := w.emailSender.Send(ctx, "", sub.Email, &templates.PostMortemPublishedTemplate{
+				StatusPageName: sp.Name,
+				IncidentTitle:  incident.Title,
+				StatusPageURL:  statusPageURL,
+				UnsubscribeURL: unsubscribeURL,
+			})
+			if err != nil {
+				w.logger.WithError(err).Error("failed to send post mortem alert email")
 			}
 		}
 	}
@@ -357,6 +426,12 @@ func (w *worker) triggerRule(ctx context.Context, incident *entities.Incident, r
 		switch channel {
 		case "email":
 			w.sendEmailAlert(ctx, incident, tier)
+		case "slack":
+			w.sendSlackAlert(ctx, incident)
+		case "microsoft_teams":
+			w.sendMicrosoftTeamsAlert(ctx, incident)
+		case "webhook":
+			w.sendGenericWebhookAlert(ctx, incident)
 		case "discord":
 			w.sendDiscordAlert(ctx, incident)
 		case "telegram":
@@ -819,5 +894,121 @@ func (w *worker) sendNewRelicAlert(ctx context.Context, incident *entities.Incid
 		w.logger.Errorf("new relic alert returned error status: %d", resp.StatusCode)
 	} else {
 		w.logger.Info("new relic alert sent successfully")
+	}
+}
+
+func (w *worker) sendMicrosoftTeamsAlert(ctx context.Context, incident *entities.Incident) {
+	team, err := w.teamService.GetByID(ctx, incident.TeamID)
+	if err != nil {
+		w.logger.WithError(err).Error("failed to get team for microsoft teams alert")
+		return
+	}
+
+	if team.MicrosoftTeamsWebhookURL == nil || *team.MicrosoftTeamsWebhookURL == "" {
+		w.logger.Debug("microsoft teams webhook not configured for team")
+		return
+	}
+
+	monitorName := "Unknown Monitor / Heartbeat"
+	if incident.MonitorID != nil {
+		mon, err := w.monitorSvc.GetMonitorAndSettingsByTeamIDAndID(ctx, incident.TeamID, *incident.MonitorID)
+		if err == nil && mon != nil {
+			monitorName = mon.Name
+		}
+	} else if incident.HeartbeatID != nil {
+		monitorName = "Heartbeat Monitor"
+	}
+
+	dashboardURL := fmt.Sprintf("%s/dashboard/incidents", w.config.ApplicationURL)
+
+	payload := map[string]interface{}{
+		"@type":      "MessageCard",
+		"@context":   "http://schema.org/extensions",
+		"themeColor": "FF0000",
+		"summary":    "Incident Alert",
+		"sections": []map[string]interface{}{
+			{
+				"activityTitle":    "🚨 Incident Alert: " + monitorName,
+				"activitySubtitle": incident.Title,
+				"text":             fmt.Sprintf("[View details and manage this incident on the dashboard](%s)", dashboardURL),
+			},
+		},
+	}
+
+	body, _ := json.Marshal(payload)
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, *team.MicrosoftTeamsWebhookURL, bytes.NewReader(body))
+	if err != nil {
+		w.logger.WithError(err).Error("failed to create microsoft teams request")
+		return
+	}
+	req.Header.Set("Content-Type", "application/json")
+
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		w.logger.WithError(err).Error("failed to send microsoft teams alert")
+		return
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	if resp.StatusCode >= 400 {
+		w.logger.Errorf("microsoft teams alert returned error status: %d", resp.StatusCode)
+	} else {
+		w.logger.Info("microsoft teams alert sent successfully")
+	}
+}
+
+func (w *worker) sendGenericWebhookAlert(ctx context.Context, incident *entities.Incident) {
+	team, err := w.teamService.GetByID(ctx, incident.TeamID)
+	if err != nil {
+		w.logger.WithError(err).Error("failed to get team for generic webhook alert")
+		return
+	}
+
+	if team.WebhookURL == nil || *team.WebhookURL == "" {
+		w.logger.Debug("generic webhook not configured for team")
+		return
+	}
+
+	monitorName := "Unknown Monitor / Heartbeat"
+	if incident.MonitorID != nil {
+		mon, err := w.monitorSvc.GetMonitorAndSettingsByTeamIDAndID(ctx, incident.TeamID, *incident.MonitorID)
+		if err == nil && mon != nil {
+			monitorName = mon.Name
+		}
+	} else if incident.HeartbeatID != nil {
+		monitorName = "Heartbeat Monitor"
+	}
+
+	payload := map[string]interface{}{
+		"event":         "incident_alert",
+		"incidentId":    incident.ID,
+		"incidentTitle": incident.Title,
+		"monitorName":   monitorName,
+		"teamId":        incident.TeamID,
+		"timestamp":     time.Now().Unix(),
+		"resolved":      incident.Resolved,
+	}
+
+	body, _ := json.Marshal(payload)
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, *team.WebhookURL, bytes.NewReader(body))
+	if err != nil {
+		w.logger.WithError(err).Error("failed to create generic webhook request")
+		return
+	}
+	req.Header.Set("Content-Type", "application/json")
+
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		w.logger.WithError(err).Error("failed to send generic webhook alert")
+		return
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	if resp.StatusCode >= 400 {
+		w.logger.Errorf("generic webhook alert returned error status: %d", resp.StatusCode)
+	} else {
+		w.logger.Info("generic webhook alert sent successfully")
 	}
 }

@@ -19,6 +19,8 @@ type Repository interface {
 	GetUpcomingByMonitorIDs(ctx context.Context, now time.Time, monitorIDs []uint) ([]entities.Maintenance, error)
 	GetAllByMonitorIDs(ctx context.Context, monitorIDs []uint) ([]entities.Maintenance, error)
 	GetUnnotified(ctx context.Context, now time.Time) (*[]entities.Maintenance, error)
+	GetUnreminded(ctx context.Context, now time.Time, reminderWindow time.Duration) (*[]entities.Maintenance, error)
+	GetUnconcluded(ctx context.Context, now time.Time) (*[]entities.Maintenance, error)
 	Create(ctx context.Context, maintenance *entities.Maintenance) error
 	Update(ctx context.Context, maintenance *entities.Maintenance) error
 	Delete(ctx context.Context, maintenance *entities.Maintenance) error
@@ -86,6 +88,41 @@ func (r *RepositoryImpl) GetUnnotified(ctx context.Context, now time.Time) (*[]e
 		Preload("Monitors").
 		Where("ms.notified = ?", false).
 		Where("ms.end_at > ?", now).
+		Find(&maintenances).Error; err != nil {
+		return nil, err
+	}
+
+	return &maintenances, nil
+}
+
+func (r *RepositoryImpl) GetUnreminded(ctx context.Context, now time.Time, reminderWindow time.Duration) (*[]entities.Maintenance, error) {
+	var maintenances []entities.Maintenance
+	targetTime := now.Add(reminderWindow)
+	
+	if err := r.db.WithContext(
+		ctx,
+	).Joins("JOIN maintenance_settings ms ON ms.maintenance_id = maintenance.id").
+		Preload("Settings").
+		Preload("Monitors").
+		Where("ms.reminded = ?", false).
+		Where("ms.start_at > ?", now).
+		Where("ms.start_at <= ?", targetTime).
+		Find(&maintenances).Error; err != nil {
+		return nil, err
+	}
+
+	return &maintenances, nil
+}
+
+func (r *RepositoryImpl) GetUnconcluded(ctx context.Context, now time.Time) (*[]entities.Maintenance, error) {
+	var maintenances []entities.Maintenance
+	if err := r.db.WithContext(
+		ctx,
+	).Joins("JOIN maintenance_settings ms ON ms.maintenance_id = maintenance.id").
+		Preload("Settings").
+		Preload("Monitors").
+		Where("ms.concluded_notified = ?", false).
+		Where("ms.end_at <= ?", now).
 		Find(&maintenances).Error; err != nil {
 		return nil, err
 	}

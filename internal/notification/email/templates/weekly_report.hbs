@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Weekly Opsway Report</title>
+</head>
+<body>
+    <div style="font-family: Arial, sans-serif; padding: 20px;">
+        <h2>Weekly Opsway Report: {{.TeamName}}</h2>
+        <p>Here is your weekly summary for the period of <strong>{{.StartDate}}</strong> to <strong>{{.EndDate}}</strong>.</p>
+        
+        <h3>Overview</h3>
+        <ul>
+            <li><strong>Total Monitors:</strong> {{.TotalMonitors}}</li>
+            <li><strong>Monitors Currently Up:</strong> {{.MonitorsUp}}</li>
+            <li><strong>Monitors Currently Down:</strong> {{.MonitorsDown}}</li>
+            <li><strong>Average Uptime:</strong> {{.AverageUptime}}%</li>
+        </ul>
+
+        <h3>Incident Activity</h3>
+        <ul>
+            <li><strong>Total Incidents:</strong> {{.TotalIncidents}}</li>
+            <li><strong>Resolved Incidents:</strong> {{.ResolvedIncidents}}</li>
+        </ul>
+
+        <a href="{{.DashboardURL}}" style="display: inline-block; padding: 10px 20px; color: #fff; background-color: #007bff; text-decoration: none; border-radius: 5px;">Go to Dashboard</a>
+        <br>
+        <br>
+        <p>Thanks,<br>The Opsway Team</p>
+    </div>
+</body>
+</html>
