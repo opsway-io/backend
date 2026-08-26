@@ -6,6 +6,7 @@ import _ "embed"
 var sslExpiryTemplate string
 
 type SSLExpiryTemplate struct {
+	BaseTemplate
 	MonitorName    string
 	MonitorURL     string
 	DashboardURL   string
@@ -18,5 +19,15 @@ func (t *SSLExpiryTemplate) Subject() string {
 }
 
 func (t *SSLExpiryTemplate) HTML() string {
-	return renderTemplate(sslExpiryTemplate, t)
+	return t.Render(sslExpiryTemplate, map[string]any{
+		"MonitorName":    t.MonitorName,
+		"MonitorURL":     t.MonitorURL,
+		"DashboardURL":   t.DashboardURL,
+		"DaysRemaining":  t.DaysRemaining,
+		"ExpirationDate": t.ExpirationDate,
+	})
+}
+
+func (t *SSLExpiryTemplate) PlainText() string {
+	return "SSL Expiry Alert"
 }

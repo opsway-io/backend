@@ -193,7 +193,43 @@ func (s *ServiceImpl) GetAvatarURLByID(teamID uint) string {
 }
 
 func (s *ServiceImpl) UpdateUserRole(ctx context.Context, teamID, userID uint, role entities.TeamRole) error {
-	return s.repository.UpdateUserRole(ctx, teamID, userID, role)
+	err := s.repository.UpdateUserRole(ctx, teamID, userID, role)
+	if err != nil {
+		return err
+	}
+
+	if role == entities.TeamRoleAdmin || role == entities.TeamRoleOwner {
+		team, err := s.GetByID(ctx, teamID)
+		if err == nil {
+			offset, limit := 0, 100
+			users, err := s.GetUsersByID(ctx, teamID, &offset, &limit, nil, nil)
+			if err == nil && users != nil {
+				for _, u := range *users {
+					if u.ID == userID {
+						userName := u.Name
+						if u.DisplayName != nil {
+							userName = *u.DisplayName
+						}
+						
+						_ = s.email.Send(
+							ctx,
+							"",
+							u.Email,
+							&templates.RoleChangedTemplate{
+								UserName:     userName,
+								NewRole:      string(role),
+								TeamName:     team.Name,
+								DashboardURL: fmt.Sprintf("%s/dashboard", s.config.ApplicationURL),
+							},
+						)
+						break
+					}
+				}
+			}
+		}
+	}
+
+	return nil
 }
 
 func (s *ServiceImpl) UpdateBilling(ctx context.Context, teamID uint, customerID string, plan string) error {

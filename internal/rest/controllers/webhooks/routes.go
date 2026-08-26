@@ -5,6 +5,7 @@ import (
 	"github.com/opsway-io/backend/internal/authentication"
 	"github.com/opsway-io/backend/internal/billing"
 	"github.com/opsway-io/backend/internal/incident"
+	"github.com/opsway-io/backend/internal/notification/email"
 	"github.com/opsway-io/backend/internal/rest/handlers"
 	"github.com/opsway-io/backend/internal/rest/middleware"
 	"github.com/opsway-io/backend/internal/team"
@@ -16,6 +17,7 @@ type Handlers struct {
 	BillingService        billing.Service
 	TeamService           team.Service
 	IncidentService       incident.Service
+	EmailSender           email.Sender
 }
 
 func Register(
@@ -24,11 +26,13 @@ func Register(
 	billingService billing.Service,
 	teamService team.Service,
 	incidentService incident.Service,
+	emailSender email.Sender,
 ) {
 	h := &Handlers{
 		BillingService:  billingService,
 		TeamService:     teamService,
 		IncidentService: incidentService,
+		EmailSender:     emailSender,
 	}
 
 	root := e.Group(

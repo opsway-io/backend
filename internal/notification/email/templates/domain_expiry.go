@@ -6,6 +6,7 @@ import _ "embed"
 var domainExpiryTemplate string
 
 type DomainExpiryTemplate struct {
+	BaseTemplate
 	MonitorName    string
 	MonitorURL     string
 	DashboardURL   string
@@ -18,5 +19,15 @@ func (t *DomainExpiryTemplate) Subject() string {
 }
 
 func (t *DomainExpiryTemplate) HTML() string {
-	return renderTemplate(domainExpiryTemplate, t)
+	return t.Render(domainExpiryTemplate, map[string]any{
+		"MonitorName":    t.MonitorName,
+		"MonitorURL":     t.MonitorURL,
+		"DashboardURL":   t.DashboardURL,
+		"DaysRemaining":  t.DaysRemaining,
+		"ExpirationDate": t.ExpirationDate,
+	})
+}
+
+func (t *DomainExpiryTemplate) PlainText() string {
+	return "Domain Expiry Alert"
 }

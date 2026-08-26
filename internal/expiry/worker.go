@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/opsway-io/backend/internal/check"
+	"github.com/opsway-io/backend/internal/entities"
 	"github.com/opsway-io/backend/internal/monitor"
 	"github.com/opsway-io/backend/internal/notification/email"
 	"github.com/opsway-io/backend/internal/notification/email/templates"
@@ -67,35 +68,20 @@ func (w *worker) Start(ctx context.Context) error {
 func (w *worker) processExpiries(ctx context.Context) {
 	w.logger.Info("checking for SSL and Domain expiries")
 
-	offset := 0
-	limit := 1000
+	monitorsList, err := w.monitorService.GetMonitorsByStates(ctx, []entities.MonitorState{entities.MonitorStateActive, entities.MonitorStateInactive, entities.MonitorStateMaintenance})
+	if err != nil {
+		w.logger.WithError(err).Error("failed to fetch monitors")
+		return
+	}
 
-	for {
-		monitors, err := w.monitorService.GetMonitorsAndSettings(ctx, &offset, &limit, nil)
-		if err != nil {
-			w.logger.WithError(err).Error("failed to fetch monitors")
-			return
+	for _, m := range *monitorsList {
+		if m.Settings.TLS.CheckExpiration != nil && *m.Settings.TLS.CheckExpiration {
+			w.checkSSLExpiry(ctx, &m)
 		}
-
-		if len(*monitors) == 0 {
-			break
-		}
-
-		for _, m := range *monitors {
-			if m.Settings.TLS.CheckExpiration != nil && *m.Settings.TLS.CheckExpiration {
-				w.checkSSLExpiry(ctx, &m)
-			}
-			
-			// We can check domain expiry similarly if we have domain expiry checking enabled.
-			// For MVP, we will only do SSL if TLS.CheckExpiration is true.
-			// If we wanted to add domain expiry, we could do it here.
-		}
-
-		offset += limit
 	}
 }
 
-func (w *worker) checkSSLExpiry(ctx context.Context, m *monitor.MonitorAndSettings) {
+func (w *worker) checkSSLExpiry(ctx context.Context, m *entities.Monitor) {
 	thresholdDays := uint(7)
 	if m.Settings.TLS.ExpirationThresholdDays != nil {
 		thresholdDays = *m.Settings.TLS.ExpirationThresholdDays
@@ -117,7 +103,7 @@ func (w *worker) checkSSLExpiry(ctx context.Context, m *monitor.MonitorAndSettin
 			m.Settings.SslExpiryNotifiedAt = &now
 			
 			// Update the monitor settings using monitorService
-			err := w.monitorService.UpdateSettings(ctx, m.TeamID, m.ID, &m.Settings)
+			err := w.monitorService.Update(ctx, m.TeamID, m.ID, m)
 			if err != nil {
 				w.logger.WithError(err).Error("failed to update ssl expiry notified at")
 			}
@@ -125,7 +111,7 @@ func (w *worker) checkSSLExpiry(ctx context.Context, m *monitor.MonitorAndSettin
 	}
 }
 
-func (w *worker) notifySSLExpiry(ctx context.Context, m *monitor.MonitorAndSettings, daysRemaining int, expirationDate time.Time) {
+func (w *worker) notifySSLExpiry(ctx context.Context, m *entities.Monitor, daysRemaining int, expirationDate time.Time) {
 	offset := 0
 	limit := 100
 	query := ""

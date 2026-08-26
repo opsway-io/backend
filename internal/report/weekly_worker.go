@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/opsway-io/backend/internal/check"
+	"github.com/opsway-io/backend/internal/entities"
 	"github.com/opsway-io/backend/internal/incident"
 	"github.com/opsway-io/backend/internal/monitor"
 	"github.com/opsway-io/backend/internal/notification/email"
@@ -71,25 +72,23 @@ func (w *weeklyWorker) Start(ctx context.Context) error {
 func (w *weeklyWorker) generateAndSendReports(ctx context.Context) {
 	w.logger.Info("generating weekly reports for all teams")
 
-	offset := 0
-	limit := 100
-
 	for {
 		// Fetch teams. We don't have a GetTeamsPaginated without query? Let's use GetMonitors to find active teams, or maybe just teamService.
 		// Wait, teamService.GetUsersByID needs team ID. Let's assume we can get all teams or just get all monitors and group by team.
 		// A cleaner way is fetching all teams, but let's just group from monitors.
-		monitors, err := w.monitorService.GetMonitorsAndSettings(ctx, &offset, &limit, nil)
+		// Get monitors by states
+		monitorsList, err := w.monitorService.GetMonitorsByStates(ctx, []entities.MonitorState{entities.MonitorStateActive, entities.MonitorStateInactive, entities.MonitorStateMaintenance})
 		if err != nil {
 			w.logger.WithError(err).Error("failed to fetch monitors")
 			return
 		}
 
-		if len(*monitors) == 0 {
+		if len(*monitorsList) == 0 {
 			break
 		}
 
-		teamMonitors := make(map[uint][]monitor.MonitorAndSettings)
-		for _, m := range *monitors {
+		teamMonitors := make(map[uint][]entities.Monitor)
+		for _, m := range *monitorsList {
 			teamMonitors[m.TeamID] = append(teamMonitors[m.TeamID], m)
 		}
 
@@ -98,15 +97,15 @@ func (w *weeklyWorker) generateAndSendReports(ctx context.Context) {
 		startStr := start.Format(time.RFC3339)
 		endStr := end.Format(time.RFC3339)
 
-		for teamID, monitorsList := range teamMonitors {
-			w.sendReportForTeam(ctx, teamID, monitorsList, startStr, endStr, start, end)
+		for teamID, mList := range teamMonitors {
+			w.sendReportForTeam(ctx, teamID, mList, startStr, endStr, start, end)
 		}
 
-		offset += limit
+		break // since we got all monitors in one go
 	}
 }
 
-func (w *weeklyWorker) sendReportForTeam(ctx context.Context, teamID uint, monitors []monitor.MonitorAndSettings, startStr, endStr string, start, end time.Time) {
+func (w *weeklyWorker) sendReportForTeam(ctx context.Context, teamID uint, monitors []entities.Monitor, startStr, endStr string, start, end time.Time) {
 	// 1. Gather stats
 	uptimeStats, err := w.checkService.GetByTeamIDMonitorsUptime(ctx, teamID, startStr, endStr)
 	if err != nil {
@@ -126,14 +125,14 @@ func (w *weeklyWorker) sendReportForTeam(ctx context.Context, teamID uint, monit
 	monitorsDown := 0
 
 	for _, m := range monitors {
-		if m.State == 1 { // Active
-			monitorsUp++ // naive, better to check current status if we had it
+		if m.State == entities.MonitorStateActive { // Active
+			monitorsUp++
 		}
 	}
 	
 	totalMonitorsWithData := 0
 	for _, u := range *uptimeStats {
-		totalUptime += u.Uptime
+		totalUptime += float64(u.UptimePercentage)
 		totalMonitorsWithData++
 	}
 
@@ -145,8 +144,7 @@ func (w *weeklyWorker) sendReportForTeam(ctx context.Context, teamID uint, monit
 	totalIncidents := 0
 	resolvedIncidents := 0
 	for _, inc := range *incidentStats {
-		totalIncidents += inc.Total
-		resolvedIncidents += inc.Resolved
+		totalIncidents += inc.Count
 	}
 
 	// 3. Get team users

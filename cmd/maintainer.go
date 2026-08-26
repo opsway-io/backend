@@ -11,9 +11,11 @@ import (
 	"github.com/opsway-io/backend/internal/event"
 	"github.com/opsway-io/backend/internal/expiry"
 	"github.com/opsway-io/backend/internal/forecaster"
+	"github.com/opsway-io/backend/internal/incident"
 	"github.com/opsway-io/backend/internal/maintenance"
 	"github.com/opsway-io/backend/internal/monitor"
 	"github.com/opsway-io/backend/internal/notification/email"
+	"github.com/opsway-io/backend/internal/report"
 	"github.com/opsway-io/backend/internal/statuspage"
 	"github.com/opsway-io/backend/internal/team"
 	"github.com/sirupsen/logrus"
@@ -88,8 +90,7 @@ var MaintainerCmd = &cobra.Command{
 			logger.WithError(err).Fatal("failed to connect to clickhouse")
 		}
 
-		checkRepo := check.NewRepository(chDB)
-		checkSvc := check.NewService(checkRepo)
+		checkSvc := check.NewService(chDB)
 		
 		teamRepo := team.NewRepository(db)
 		teamCache := team.NewCache(redisClient)
@@ -97,8 +98,19 @@ var MaintainerCmd = &cobra.Command{
 
 		expiryWorker := expiry.NewWorker(logger.WithField("module", "expiry_worker"), monitorService, checkSvc, teamSvc, emailSender, time.Hour, conf.Team.ApplicationURL)
 		
-		if err := expiryWorker.Start(ctx); err != nil {
-			logger.WithError(err).Fatal("expiry worker failed")
+		go func() {
+			if err := expiryWorker.Start(ctx); err != nil {
+				logger.WithError(err).Fatal("expiry worker failed")
+			}
+		}()
+
+		incidentRepo := incident.NewRepository(db)
+		incidentSvc := incident.NewService(incidentRepo, eventService)
+
+		weeklyWorker := report.NewWeeklyWorker(logger.WithField("module", "weekly_report_worker"), teamSvc, monitorService, checkSvc, incidentSvc, emailSender, 7*24*time.Hour, conf.Team.ApplicationURL)
+		
+		if err := weeklyWorker.Start(ctx); err != nil {
+			logger.WithError(err).Fatal("weekly report worker failed")
 		}
 	},
 }

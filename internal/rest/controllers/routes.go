@@ -89,6 +89,7 @@ func Register(
 		billingService,
 		teamService,
 		incidentService,
+		emailSender,
 	)
 
 	// Healthz

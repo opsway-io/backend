@@ -493,14 +493,24 @@ func (w *worker) sendEmailAlert(ctx context.Context, incident *entities.Incident
 			userName = *u.DisplayName
 		}
 
-		tpl := &templates.IncidentAlertTemplate{
-			Name:          userName,
-			MonitorName:   monitorName,
-			IncidentTitle: incident.Title,
-			DashboardURL:  dashboardURL,
+		if incident.Title == "Anomaly Detected" {
+			tpl := &templates.PerformanceDegradationTemplate{
+				MonitorName:    monitorName,
+				CurrentLatency: "Unexpected Spike",
+				Threshold:      "Normal Baseline",
+				DashboardURL:   dashboardURL,
+			}
+			err = w.emailSender.Send(ctx, "", u.Email, tpl)
+		} else {
+			tpl := &templates.IncidentAlertTemplate{
+				Name:          userName,
+				MonitorName:   monitorName,
+				IncidentTitle: incident.Title,
+				DashboardURL:  dashboardURL,
+			}
+			err = w.emailSender.Send(ctx, "", u.Email, tpl)
 		}
 
-		err = w.emailSender.Send(ctx, "", u.Email, tpl)
 		if err != nil {
 			w.logger.WithError(err).Error("failed to send incident alert email")
 		}

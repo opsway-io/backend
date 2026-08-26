@@ -10,6 +10,7 @@ import (
 
 	"github.com/labstack/echo/v4"
 	"github.com/opsway-io/backend/internal/entities"
+	"github.com/opsway-io/backend/internal/notification/email/templates"
 	hs "github.com/opsway-io/backend/internal/rest/handlers"
 	"github.com/stripe/stripe-go/v81"
 )
@@ -151,6 +152,37 @@ func (h *Handlers) handleWebhook(c hs.StripeContext) error {
 		if err != nil {
 			c.Log.WithError(err).Debug("Error updating team")
 			return c.NoContent(http.StatusInternalServerError)
+		}
+
+	case "invoice.payment_failed":
+		var invoice stripe.Invoice
+		err := json.Unmarshal(event.Data.Raw, &invoice)
+		if err != nil {
+			c.Log.WithError(err).Debug("Error parsing webhook JSON")
+			return echo.ErrBadRequest
+		}
+
+		team, err := h.TeamService.GetByStripeID(c.Request().Context(), invoice.Customer.ID)
+		if err != nil {
+			c.Log.WithError(err).Debug("Error getting team by stripe id")
+			return c.NoContent(http.StatusInternalServerError)
+		}
+
+		// fetch owner
+		offset, limit := 0, 1
+		users, err := h.TeamService.GetUsersByID(c.Request().Context(), team.ID, &offset, &limit, nil, nil)
+		if err == nil && len(*users) > 0 {
+			owner := (*users)[0]
+			_ = h.EmailSender.Send(
+				c.Request().Context(),
+				"",
+				owner.Email,
+				&templates.BillingAlertTemplate{
+					TeamName:   team.Name,
+					Message:    "We failed to process the payment for your recent invoice.",
+					BillingURL: "https://app.opsway.eu/settings/billing", // Hardcoded for MVP
+				},
+			)
 		}
 
 	default:
