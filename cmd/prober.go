@@ -243,7 +243,44 @@ func handleTask(ctx context.Context, logger *logrus.Logger, httpProber http.Serv
 				l.WithError(err).Error("failed to trigger incident")
 			}
 		} else if val > 3 {
-			// Already triggered, could optionally update the incident here
+			openIncidents, err := i.GetByMonitorIDWithAssertionPaginated(ctx, m.ID, nil, nil)
+			if err == nil && openIncidents != nil {
+				var unhandledFailures []entities.MonitorAssertion
+				openAssertionIDs := make(map[uint]bool)
+				for _, inc := range *openIncidents {
+					if inc.MonitorAssertionID != nil {
+						openAssertionIDs[*inc.MonitorAssertionID] = true
+					}
+				}
+				for _, f := range failed {
+					if !openAssertionIDs[f.ID] {
+						unhandledFailures = append(unhandledFailures, f)
+					}
+				}
+				if len(unhandledFailures) > 0 {
+					l.Info("some assertions are failing but have no open incidents (likely resolved manually), re-triggering")
+					if err = triggerIncident(ctx, m, res, &unhandledFailures, i); err != nil {
+						l.WithError(err).Error("failed to trigger incident")
+					}
+				}
+			}
+			// Already triggered, update the incident's updated_at occurrence time
+			openIncidents, err = i.GetByMonitorIDWithAssertionPaginated(ctx, m.ID, nil, nil)
+			if err == nil && openIncidents != nil {
+				for _, inc := range *openIncidents {
+					if !inc.Incident.Resolved && inc.Incident.Title != "Anomaly Detected" && inc.Incident.Title != "SSL/TLS Cert Expiry" {
+						for _, assertion := range failed {
+							if inc.Incident.MonitorAssertionID != nil && *inc.Incident.MonitorAssertionID == assertion.ID {
+								inc.Incident.UpdatedAt = time.Now()
+								if err := i.Update(ctx, &inc.Incident); err != nil {
+									l.WithError(err).Error("failed to update incident occurrence")
+								}
+								break
+							}
+						}
+					}
+				}
+			}
 		}
 	} else {
 		l.Info("all assertions passed")
@@ -294,6 +331,16 @@ func handleTask(ctx context.Context, logger *logrus.Logger, httpProber http.Serv
 			if err := i.Create(ctx, &[]entities.Incident{anomalyIncident}); err != nil {
 				l.WithError(err).Error("failed to trigger anomaly incident")
 			}
+		} else {
+			for _, inc := range *openIncidents {
+				if inc.Title == "Anomaly Detected" {
+					inc.Incident.UpdatedAt = time.Now()
+					if err := i.Update(ctx, &inc.Incident); err != nil {
+						l.WithError(err).Error("failed to update anomaly incident occurrence")
+					}
+					break
+				}
+			}
 		}
 	}
 
@@ -329,6 +376,16 @@ func handleTask(ctx context.Context, logger *logrus.Logger, httpProber http.Serv
 				}
 				if err := i.Create(ctx, &[]entities.Incident{sslIncident}); err != nil {
 					l.WithError(err).Error("failed to trigger SSL/TLS cert expiry incident")
+				}
+			} else {
+				for _, inc := range *openIncidents {
+					if inc.Title == "SSL/TLS Cert Expiry" {
+						inc.Incident.UpdatedAt = time.Now()
+						if err := i.Update(ctx, &inc.Incident); err != nil {
+							l.WithError(err).Error("failed to update ssl incident occurrence")
+						}
+						break
+					}
 				}
 			}
 		} else {
