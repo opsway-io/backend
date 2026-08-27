@@ -113,9 +113,8 @@ func (r *RepositoryImpl) GetActiveByMonitorIDs(ctx context.Context, monitorIDs [
 
 func (r *RepositoryImpl) Upsert(ctx context.Context, incidents *[]entities.Incident) error {
 	return r.db.WithContext(ctx).Clauses(clause.OnConflict{
-		Columns:     []clause.Column{{Name: "monitor_assertion_id"}},
-		TargetWhere: clause.Where{Exprs: []clause.Expression{clause.Expr{SQL: "resolved = false"}}},
-		DoUpdates:   clause.AssignmentColumns([]string{"updated_at"}),
+		Columns:   []clause.Column{{Name: "monitor_assertion_id"}},
+		DoUpdates: clause.AssignmentColumns([]string{"updated_at", "resolved", "acknowledged", "acknowledged_by", "acknowledged_at", "root_cause_analysis", "root_cause_notified"}),
 	}).Create(incidents).Error
 }
 
