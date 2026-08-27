@@ -122,8 +122,10 @@ func getMetricsForecast(monitorID uint, timestamps []string) (*ForecasterForecas
 }
 
 type GetMonitorMetricsRequest struct {
-	TeamID    uint `param:"teamId" validate:"required,numeric,gte=0"`
-	MonitorID uint `param:"monitorId" validate:"required,numeric,gte=0"`
+	TeamID    uint    `param:"teamId" validate:"required,numeric,gte=0"`
+	MonitorID uint    `param:"monitorId" validate:"required,numeric,gte=0"`
+	Start     *string `query:"start"`
+	End       *string `query:"end"`
 }
 
 type GetMonitorMetricsRespone struct {
@@ -152,6 +154,8 @@ func (h *Handlers) GetMonitorMetrics(c hs.AuthenticatedContext) error {
 	metrics, err := h.CheckService.GetMonitorMetricsByMonitorID(
 		ctx,
 		req.MonitorID,
+		req.Start,
+		req.End,
 	)
 	if err != nil {
 		c.Log.WithError(err).Error("failed to get monitors")

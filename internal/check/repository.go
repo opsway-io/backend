@@ -3,6 +3,7 @@ package check
 import (
 	"context"
 	"errors"
+	"time"
 
 	"github.com/gofrs/uuid"
 	"github.com/opsway-io/backend/internal/connectors/clickhouse"
@@ -16,7 +17,7 @@ type Repository interface {
 	GetByTeamIDAndMonitorIDAndCheckID(ctx context.Context, teamID uint, monitorID uint, checkID uuid.UUID) (*Check, error)
 	GetLatestByMonitorID(ctx context.Context, monitorID uint) (*Check, error)
 	GetByTeamIDAndMonitorIDPaginated(ctx context.Context, teamID, monitorID uint, offset, limit *int) (*[]Check, error)
-	GetMonitorMetricsByMonitorID(ctx context.Context, monitorID uint) (*[]AggMetric, error)
+	GetMonitorMetricsByMonitorID(ctx context.Context, monitorID uint, start *string, end *string) (*[]AggMetric, error)
 	GetMonitorOverviewsByTeamID(ctx context.Context, teamID uint) (*[]MonitorOverviews, error)
 	GetMonitorStatsByMonitorID(ctx context.Context, monitorID uint) (*MonitorStats, error)
 	GetMonitorOverviewStatsByTeamID(ctx context.Context, teamID uint) (*[]MonitorOverviewStats, error)
@@ -117,9 +118,10 @@ type AggMetric struct {
 	Transfer   float64
 }
 
-func (r *RepositoryImpl) GetMonitorMetricsByMonitorID(ctx context.Context, monitorID uint) (*[]AggMetric, error) {
+func (r *RepositoryImpl) GetMonitorMetricsByMonitorID(ctx context.Context, monitorID uint, start *string, end *string) (*[]AggMetric, error) {
 	var metrics []AggMetric
-	err := r.db.WithContext(
+
+	query := r.db.WithContext(
 		ctx,
 	).Table("checks").Select(`
 		tumbleStart(wndw) as start, 
@@ -128,10 +130,35 @@ func (r *RepositoryImpl) GetMonitorMetricsByMonitorID(ctx context.Context, monit
 		avg(timing_tls_handshake)/1000000 as tls,
 		avg(timing_server_processing)/1000000 as processing,
 		avg(timing_content_transfer)/1000000 as transfer`).
-		Where("monitor_id = ?", monitorID).
-		Group("tumble(toDateTime(created_at), INTERVAL 1 HOUR) as wndw").
-		Where("created_at BETWEEN DATE_SUB(NOW(), INTERVAL 1 MONTH) AND NOW()").
-		Order("start ASC").
+		Where("monitor_id = ?", monitorID)
+
+	if start != nil && end != nil {
+		// Calculate the difference in hours
+		startTime, err1 := time.Parse(time.RFC3339, *start)
+		endTime, err2 := time.Parse(time.RFC3339, *end)
+		if err1 == nil && err2 == nil {
+			duration := endTime.Sub(startTime)
+			if duration.Hours() <= 24 {
+				// Less than a day, group by 5 minutes
+				query = query.Group("tumble(toDateTime(created_at), INTERVAL 5 MINUTE) as wndw")
+			} else if duration.Hours() <= 72 {
+				// Less than 3 days, group by 15 minutes
+				query = query.Group("tumble(toDateTime(created_at), INTERVAL 15 MINUTE) as wndw")
+			} else {
+				// Otherwise group by 1 hour
+				query = query.Group("tumble(toDateTime(created_at), INTERVAL 1 HOUR) as wndw")
+			}
+			query = query.Where("created_at BETWEEN ? AND ?", *start, *end)
+		} else {
+			query = query.Group("tumble(toDateTime(created_at), INTERVAL 1 HOUR) as wndw")
+			query = query.Where("created_at BETWEEN DATE_SUB(NOW(), INTERVAL 1 MONTH) AND NOW()")
+		}
+	} else {
+		query = query.Group("tumble(toDateTime(created_at), INTERVAL 1 HOUR) as wndw")
+		query = query.Where("created_at BETWEEN DATE_SUB(NOW(), INTERVAL 1 MONTH) AND NOW()")
+	}
+
+	err := query.Order("start ASC").
 		Find(&metrics).Error
 
 	return &metrics, err

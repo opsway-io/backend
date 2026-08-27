@@ -59,6 +59,11 @@ func runAlerter(cmd *cobra.Command, args []string) {
 		l.WithError(err).Fatal("Failed to create event service")
 	}
 
+	eventServiceRCA, err := event.NewService(redisClient, "alerter_rca")
+	if err != nil {
+		l.WithError(err).Fatal("Failed to create event service for rca")
+	}
+
 	var emailSender email.Sender
 	if conf.Email.Debug {
 		l.Info("Using SMTP email sender")
@@ -109,7 +114,7 @@ func runAlerter(cmd *cobra.Command, args []string) {
 
 	llmClient := llm.NewClient("", "", "") // Use defaults for MVP
 	rcaWorker := incident.NewRCAWorker(
-		eventService,
+		eventServiceRCA,
 		incidentSvc,
 		llmClient,
 		l.WithField("module", "rca_worker"),
