@@ -1,7 +1,9 @@
 package webhooks
 
 import (
+	"bytes"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"strconv"
 	"strings"
@@ -15,10 +17,15 @@ type SlackAction struct {
 	Value    string `json:"value"`
 }
 
+type SlackMessage struct {
+	Blocks []map[string]interface{} `json:"blocks"`
+}
+
 type SlackPayload struct {
 	Type        string        `json:"type"`
 	Actions     []SlackAction `json:"actions"`
 	ResponseURL string        `json:"response_url"`
+	Message     SlackMessage  `json:"message"`
 }
 
 func (h *Handlers) PostSlackInteractive(c echo.Context) error {
@@ -77,6 +84,35 @@ func (h *Handlers) PostSlackInteractive(c echo.Context) error {
 		}
 	}
 
-	// In a real app we'd post back to payload.ResponseURL to update the message visually
+	// Post back to payload.ResponseURL to update the message visually
+	go func() {
+		statusText := "✅ Incident Resolved"
+		if isAck {
+			statusText = "👀 Incident Acknowledged"
+		}
+
+		resPayload := map[string]interface{}{
+			"replace_original": true,
+			"blocks": []map[string]interface{}{
+				{
+					"type": "section",
+					"text": map[string]interface{}{
+						"type": "mrkdwn",
+						"text": fmt.Sprintf("*%s*\nIssue: %s", statusText, incident.Title),
+					},
+				},
+			},
+		}
+
+		body, _ := json.Marshal(resPayload)
+		req, err := http.NewRequest(http.MethodPost, payload.ResponseURL, bytes.NewReader(body))
+		if err == nil {
+			req.Header.Set("Content-Type", "application/json")
+			if resp, err := http.DefaultClient.Do(req); err == nil {
+				defer resp.Body.Close()
+			}
+		}
+	}()
+
 	return c.String(http.StatusOK, "ok")
 }

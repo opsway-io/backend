@@ -478,7 +478,7 @@ func (w *worker) sendEmailAlert(ctx context.Context, incident *entities.Incident
 		monitorName = "Heartbeat Monitor"
 	}
 
-	dashboardURL := fmt.Sprintf("%s/dashboard/incidents", w.config.ApplicationURL)
+	dashboardURL := fmt.Sprintf("%s/incidents/incident/%d", w.config.ApplicationURL, incident.ID)
 
 	for _, u := range *users {
 		// If escalation policy exists for this team, only send to on-call users
@@ -537,7 +537,7 @@ func (w *worker) sendSlackAlert(ctx context.Context, incident *entities.Incident
 		monitorName = "Heartbeat Monitor"
 	}
 
-	dashboardURL := fmt.Sprintf("%s/dashboard/incidents", w.config.ApplicationURL)
+	dashboardURL := fmt.Sprintf("%s/incidents/incident/%d", w.config.ApplicationURL, incident.ID)
 
 	payload := map[string]interface{}{
 		"blocks": []map[string]interface{}{
@@ -642,7 +642,7 @@ func (w *worker) sendDiscordAlert(ctx context.Context, incident *entities.Incide
 		monitorName = "Heartbeat Monitor"
 	}
 
-	dashboardURL := fmt.Sprintf("%s/dashboard/incidents", w.config.ApplicationURL)
+	dashboardURL := fmt.Sprintf("%s/incidents/incident/%d", w.config.ApplicationURL, incident.ID)
 
 	payload := map[string]interface{}{
 		"embeds": []map[string]interface{}{
@@ -703,7 +703,7 @@ func (w *worker) sendTelegramAlert(ctx context.Context, incident *entities.Incid
 		monitorName = "Heartbeat Monitor"
 	}
 
-	dashboardURL := fmt.Sprintf("%s/dashboard/incidents", w.config.ApplicationURL)
+	dashboardURL := fmt.Sprintf("%s/incidents/incident/%d", w.config.ApplicationURL, incident.ID)
 	message := fmt.Sprintf("🚨 *Incident Alert*\n\n*Monitor:*\n%s\n\n*Issue:*\n%s\n\n[Go to Dashboard](%s)", monitorName, incident.Title, dashboardURL)
 
 	payload := map[string]interface{}{
