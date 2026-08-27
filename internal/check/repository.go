@@ -148,7 +148,7 @@ func (r *RepositoryImpl) GetMonitorMetricsByMonitorID(ctx context.Context, monit
 				// Otherwise group by 1 hour
 				query = query.Group("tumble(toDateTime(created_at), INTERVAL 1 HOUR) as wndw")
 			}
-			query = query.Where("created_at BETWEEN ? AND ?", *start, *end)
+			query = query.Where("created_at BETWEEN ? AND ?", startTime, endTime)
 		} else {
 			query = query.Group("tumble(toDateTime(created_at), INTERVAL 1 HOUR) as wndw")
 			query = query.Where("created_at BETWEEN DATE_SUB(NOW(), INTERVAL 1 MONTH) AND NOW()")
