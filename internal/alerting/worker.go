@@ -420,6 +420,19 @@ func (w *worker) triggerRule(ctx context.Context, incident *entities.Incident, r
 		return
 	}
 
+	// Log trigger
+	trigger := &entities.AlertTrigger{
+		TeamID:      rule.TeamID,
+		AlertRuleID: rule.ID,
+		Channels:    rule.Channels,
+	}
+	if incident != nil {
+		trigger.IncidentID = &incident.ID
+	}
+	if err := w.alertService.CreateTrigger(ctx, trigger); err != nil {
+		w.logger.WithError(err).Error("failed to create alert trigger log")
+	}
+
 	for _, channel := range channels {
 		switch channel {
 		case "email":

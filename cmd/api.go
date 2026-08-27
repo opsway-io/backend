@@ -76,6 +76,7 @@ func runAPI(cmd *cobra.Command, args []string) {
 		entities.MonitorSettings{},
 		entities.MonitorAssertion{},
 		entities.AlertRule{},
+		entities.AlertTrigger{},
 		entities.Maintenance{},
 		entities.MaintenanceSettings{},
 		entities.MaintenanceComment{},

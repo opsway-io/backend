@@ -13,6 +13,11 @@ type Repository interface {
 	Create(ctx context.Context, rule *entities.AlertRule) error
 	Update(ctx context.Context, rule *entities.AlertRule) error
 	Delete(ctx context.Context, rule *entities.AlertRule) error
+
+	// Triggers
+	GetTriggersByRuleID(ctx context.Context, teamID uint, ruleID uint, offset *int, limit *int) ([]entities.AlertTrigger, error)
+	GetTriggersByIncidentID(ctx context.Context, teamID uint, incidentID uint, offset *int, limit *int) ([]entities.AlertTrigger, error)
+	CreateTrigger(ctx context.Context, trigger *entities.AlertTrigger) error
 }
 
 type RepositoryImpl struct {
@@ -47,4 +52,34 @@ func (r *RepositoryImpl) Update(ctx context.Context, rule *entities.AlertRule) e
 
 func (r *RepositoryImpl) Delete(ctx context.Context, rule *entities.AlertRule) error {
 	return r.db.WithContext(ctx).Delete(rule).Error
+}
+
+func (r *RepositoryImpl) GetTriggersByRuleID(ctx context.Context, teamID uint, ruleID uint, offset *int, limit *int) ([]entities.AlertTrigger, error) {
+	var triggers []entities.AlertTrigger
+	query := r.db.WithContext(ctx).Where("team_id = ? AND alert_rule_id = ?", teamID, ruleID).Order("created_at DESC")
+	if offset != nil {
+		query = query.Offset(*offset)
+	}
+	if limit != nil {
+		query = query.Limit(*limit)
+	}
+	err := query.Find(&triggers).Error
+	return triggers, err
+}
+
+func (r *RepositoryImpl) GetTriggersByIncidentID(ctx context.Context, teamID uint, incidentID uint, offset *int, limit *int) ([]entities.AlertTrigger, error) {
+	var triggers []entities.AlertTrigger
+	query := r.db.WithContext(ctx).Where("team_id = ? AND incident_id = ?", teamID, incidentID).Order("created_at DESC")
+	if offset != nil {
+		query = query.Offset(*offset)
+	}
+	if limit != nil {
+		query = query.Limit(*limit)
+	}
+	err := query.Find(&triggers).Error
+	return triggers, err
+}
+
+func (r *RepositoryImpl) CreateTrigger(ctx context.Context, trigger *entities.AlertTrigger) error {
+	return r.db.WithContext(ctx).Create(trigger).Error
 }

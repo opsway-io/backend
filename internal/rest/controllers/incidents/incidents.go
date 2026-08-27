@@ -13,9 +13,10 @@ import (
 )
 
 type GetIncidentsRequest struct {
-	TeamID uint `param:"teamId" validate:"required,numeric,gte=0"`
-	Offset *int `query:"offset" validate:"omitempty,numeric,gte=0"`
-	Limit  *int `query:"limit" validate:"omitempty,numeric,gte=0,max=255"`
+	TeamID   uint  `param:"teamId" validate:"required,numeric,gte=0"`
+	Resolved *bool `query:"resolved" validate:"omitempty"`
+	Offset   *int  `query:"offset" validate:"omitempty,numeric,gte=0"`
+	Limit    *int  `query:"limit" validate:"omitempty,numeric,gte=0,max=255"`
 }
 
 type GetIncidentsResponse struct {
@@ -29,6 +30,7 @@ type GetIncidentsResponseIncident struct {
 	HeartbeatID *uint  `json:"heartbeatId"`
 	Title       string `json:"title"`
 	Description string `json:"description"`
+	Resolved    bool   `json:"resolved"`
 	CreatedAt   string `json:"createdAt"`
 }
 
@@ -42,9 +44,10 @@ func (h *Handlers) GetIncidents(c hs.AuthenticatedContext) error {
 
 	ctx := c.Request().Context()
 
-	incidents, err := h.IncidentService.GetByTeamIDPaginated(
+	incidents, err := h.IncidentService.GetByTeamIDAndStatusPaginated(
 		ctx,
 		req.TeamID,
+		req.Resolved,
 		req.Offset,
 		req.Limit)
 	if err != nil {
@@ -71,6 +74,7 @@ func (h *Handlers) newGetIncidentResponse(incidents *[]entities.Incident) *GetIn
 			HeartbeatID: in.HeartbeatID,
 			Title:       in.Title,
 			Description: *in.Description,
+			Resolved:    in.Resolved,
 			CreatedAt:   in.CreatedAt.Format("2006-01-02T15:04:05Z07:00"),
 		}
 	}

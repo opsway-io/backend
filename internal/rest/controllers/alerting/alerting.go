@@ -37,6 +37,7 @@ func Register(
 	cg.GET("/:ruleId", AuthHandler(h.GetAlertRule))
 	cg.PUT("/:ruleId", AuthHandler(h.PutAlertRule))
 	cg.DELETE("/:ruleId", AuthHandler(h.DeleteAlertRule))
+	cg.GET("/:ruleId/triggers", AuthHandler(h.GetAlertRuleTriggers))
 }
 
 type GetAlertRulesRequest struct {
