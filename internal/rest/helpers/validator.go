@@ -65,7 +65,7 @@ func MonitorFrequencyValidator(fl validator.FieldLevel) bool {
 	return false
 }
 
-var AllowedMonitorMethods = []string{"GET", "POST", "PUT", "DELETE", "HEAD", "OPTIONS", "PATCH", "TCP", "ICMP", "DNS", "POSTGRES", "MYSQL", "REDIS", "BROWSER"}
+var AllowedMonitorMethods = []string{"GET", "POST", "PUT", "DELETE", "HEAD", "OPTIONS", "PATCH", "TCP", "ICMP", "DNS", "POSTGRES", "MYSQL", "REDIS", "BROWSER", "WEBSOCKET", "UDP"}
 
 func MonitorMethodValidator(fl validator.FieldLevel) bool {
 	for _, method := range AllowedMonitorMethods {

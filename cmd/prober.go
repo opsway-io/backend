@@ -27,6 +27,8 @@ import (
 	probePostgres "github.com/opsway-io/backend/internal/probes/postgres"
 	probeRedis "github.com/opsway-io/backend/internal/probes/redis"
 	"github.com/opsway-io/backend/internal/probes/tcp"
+	"github.com/opsway-io/backend/internal/probes/udp"
+	"github.com/opsway-io/backend/internal/probes/websocket"
 	"github.com/redis/go-redis/v9"
 	"github.com/sirupsen/logrus"
 
@@ -103,6 +105,8 @@ func runProber(cmd *cobra.Command, args []string) {
 	mysqlProber := probeMysql.NewService()
 	redisProber := probeRedis.NewService()
 	browserProber := browser.NewService()
+	websocketProber := websocket.NewService()
+	udpProber := udp.NewService()
 
 	l.Info("Waiting for tasks...")
 
@@ -131,7 +135,7 @@ func runProber(cmd *cobra.Command, args []string) {
 					return
 				}
 
-				handleTask(ctx, l, httpProber, tcpProber, icmpProber, dnsProber, postgresProber, mysqlProber, redisProber, browserProber, task.Monitor, httpResultService, incidentService, conf.Prober.Location, redisClient)
+				handleTask(ctx, l, httpProber, tcpProber, icmpProber, dnsProber, postgresProber, mysqlProber, redisProber, browserProber, websocketProber, udpProber, task.Monitor, httpResultService, incidentService, conf.Prober.Location, redisClient)
 				msg.Ack()
 			})
 		}
@@ -142,7 +146,7 @@ func runProber(cmd *cobra.Command, args []string) {
 	l.Info("Goodbye!")
 }
 
-func handleTask(ctx context.Context, logger *logrus.Logger, httpProber http.Service, tcpProber tcp.Service, icmpProber icmp.Service, dnsProber dns.Service, postgresProber probePostgres.Service, mysqlProber probeMysql.Service, redisProber probeRedis.Service, browserProber browser.Service, m *entities.Monitor, c check.Service, i incident.Service, location string, rc *redis.Client) {
+func handleTask(ctx context.Context, logger *logrus.Logger, httpProber http.Service, tcpProber tcp.Service, icmpProber icmp.Service, dnsProber dns.Service, postgresProber probePostgres.Service, mysqlProber probeMysql.Service, redisProber probeRedis.Service, browserProber browser.Service, websocketProber websocket.Service, udpProber udp.Service, m *entities.Monitor, c check.Service, i incident.Service, location string, rc *redis.Client) {
 	l := logger.WithFields(logrus.Fields{
 		"monitor_id": m.ID,
 		"location":   location,
@@ -156,6 +160,10 @@ func handleTask(ctx context.Context, logger *logrus.Logger, httpProber http.Serv
 	switch m.Settings.Method {
 	case "TCP":
 		res, err = tcpProber.Probe(ctx, m.Settings.URL, timeout)
+	case "WEBSOCKET":
+		res, err = websocketProber.Probe(ctx, m.Settings.URL, timeout)
+	case "UDP":
+		res, err = udpProber.Probe(ctx, m.Settings.URL, timeout)
 	case "ICMP":
 		res, err = icmpProber.Probe(ctx, m.Settings.URL, timeout)
 	case "DNS":
