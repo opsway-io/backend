@@ -55,9 +55,10 @@ type GetPublicStatusPageRequest struct {
 }
 
 type PublicMonitor struct {
-	ID     uint   `json:"id"`
-	Name   string `json:"name"`
-	Status string `json:"status"` // "OPERATIONAL" or "OUTAGE"
+	ID        uint      `json:"id"`
+	Name      string    `json:"name"`
+	Status    string    `json:"status"` // "OPERATIONAL" or "OUTAGE"
+	CreatedAt time.Time `json:"createdAt"`
 }
 
 type PublicIncident struct {
@@ -136,9 +137,10 @@ func (h *PublicHandlers) GetPublicStatusPage(c echo.Context) error {
 			status = "OUTAGE"
 		}
 		monitors[i] = PublicMonitor{
-			ID:     m.ID,
-			Name:   m.Name,
-			Status: status,
+			ID:        m.ID,
+			Name:      m.Name,
+			Status:    status,
+			CreatedAt: m.CreatedAt,
 		}
 	}
 
