@@ -154,10 +154,8 @@ func (w *worker) processMessage(ctx context.Context, payload []byte) {
 			continue
 		}
 
-		// MVP match: simple substring or check if condition is present in title
-		if strings.Contains(strings.ToLower(incident.Title), strings.ToLower(rule.Condition)) ||
-			rule.Condition == "monitor_down" || // Fallback matching for the UI example
-			rule.Condition == "*" { // Wildcard
+		// Check if it matches exactly or is a substring, or wildcard
+		if rule.Condition == "*" || strings.Contains(strings.ToLower(incident.Title), strings.ToLower(rule.Condition)) {
 			w.triggerRule(ctx, incident, &rule, 1) // Base tier
 		}
 	}
@@ -167,7 +165,7 @@ func (w *worker) processMessage(ctx context.Context, payload []byte) {
 		if !rule.Enabled {
 			continue
 		}
-		if strings.Contains(strings.ToLower(incident.Title), strings.ToLower(rule.Condition)) || rule.Condition == "monitor_down" || rule.Condition == "*" {
+		if rule.Condition == "*" || strings.Contains(strings.ToLower(incident.Title), strings.ToLower(rule.Condition)) {
 			w.scheduleEscalationCheck(ctx, incident, &rule)
 			break // Only schedule once per incident
 		}
