@@ -142,6 +142,8 @@ func (w *worker) processPostMortemMessage(ctx context.Context, payload []byte) {
 }
 
 func (w *worker) processAlertRuleUpdatedMessage(ctx context.Context, payload []byte) {
+	w.logger.Infof("Received AlertRuleUpdatedEvent with payload: %s", string(payload))
+	
 	var ev events.AlertRuleUpdatedEvent
 	if err := json.Unmarshal(payload, &ev); err != nil {
 		w.logger.WithError(err).Error("failed to unmarshal AlertRuleUpdatedEvent")
@@ -149,7 +151,14 @@ func (w *worker) processAlertRuleUpdatedMessage(ctx context.Context, payload []b
 	}
 
 	rule := ev.Rule
-	if rule == nil || !rule.Enabled {
+	if rule == nil {
+		w.logger.Warn("Rule in AlertRuleUpdatedEvent is nil")
+		return
+	}
+
+	w.logger.Infof("Rule %d (team %d) updated. Enabled=%v", rule.ID, rule.TeamID, rule.Enabled)
+
+	if !rule.Enabled {
 		return
 	}
 
@@ -162,7 +171,10 @@ func (w *worker) processAlertRuleUpdatedMessage(ctx context.Context, payload []b
 		return
 	}
 
+	w.logger.Infof("Found %d active incidents for team %d", len(*incidents), rule.TeamID)
+
 	for _, incident := range *incidents {
+		w.logger.Infof("Evaluating incident %d ('%s') against rule condition '%s'", incident.ID, incident.Title, rule.Condition)
 		if rule.Condition == "*" || strings.Contains(strings.ToLower(incident.Title), strings.ToLower(rule.Condition)) {
 			// Check if we already triggered for this incident to avoid spam
 			hasTriggered, err := w.alertService.HasTriggered(ctx, incident.ID, rule.ID)
@@ -171,11 +183,16 @@ func (w *worker) processAlertRuleUpdatedMessage(ctx context.Context, payload []b
 				continue
 			}
 
+			w.logger.Infof("Incident %d match rule %d. HasTriggered=%v", incident.ID, rule.ID, hasTriggered)
+
 			if !hasTriggered {
 				// Pass a copy of incident since range loop var changes
 				inc := incident
+				w.logger.Infof("Triggering rule %d for incident %d", rule.ID, incident.ID)
 				w.triggerRule(ctx, &inc, rule, 1) // Base tier
 			}
+		} else {
+			w.logger.Infof("Incident %d does NOT match rule condition", incident.ID)
 		}
 	}
 }
