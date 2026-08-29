@@ -15,8 +15,8 @@ type Repository interface {
 	Delete(ctx context.Context, rule *entities.AlertRule) error
 
 	// Triggers
-	GetTriggersByRuleID(ctx context.Context, teamID uint, ruleID uint, offset *int, limit *int) ([]entities.AlertTrigger, error)
-	GetTriggersByIncidentID(ctx context.Context, teamID uint, incidentID uint, offset *int, limit *int) ([]entities.AlertTrigger, error)
+	GetTriggersByRuleID(ctx context.Context, teamID uint, ruleID uint, offset *int, limit *int) (int, []entities.AlertTrigger, error)
+	GetTriggersByIncidentID(ctx context.Context, teamID uint, incidentID uint, offset *int, limit *int) (int, []entities.AlertTrigger, error)
 	CreateTrigger(ctx context.Context, trigger *entities.AlertTrigger) error
 }
 
@@ -54,30 +54,48 @@ func (r *RepositoryImpl) Delete(ctx context.Context, rule *entities.AlertRule) e
 	return r.db.WithContext(ctx).Delete(rule).Error
 }
 
-func (r *RepositoryImpl) GetTriggersByRuleID(ctx context.Context, teamID uint, ruleID uint, offset *int, limit *int) ([]entities.AlertTrigger, error) {
+func (r *RepositoryImpl) GetTriggersByRuleID(ctx context.Context, teamID uint, ruleID uint, offset *int, limit *int) (int, []entities.AlertTrigger, error) {
 	var triggers []entities.AlertTrigger
-	query := r.db.WithContext(ctx).Where("team_id = ? AND alert_rule_id = ?", teamID, ruleID).Order("created_at DESC")
+	var totalCount int64
+
+	baseQuery := r.db.WithContext(ctx).Model(&entities.AlertTrigger{}).Where("team_id = ? AND alert_rule_id = ?", teamID, ruleID)
+	
+	err := baseQuery.Count(&totalCount).Error
+	if err != nil {
+		return 0, nil, err
+	}
+
+	query := baseQuery.Order("created_at DESC")
 	if offset != nil {
 		query = query.Offset(*offset)
 	}
 	if limit != nil {
 		query = query.Limit(*limit)
 	}
-	err := query.Find(&triggers).Error
-	return triggers, err
+	err = query.Find(&triggers).Error
+	return int(totalCount), triggers, err
 }
 
-func (r *RepositoryImpl) GetTriggersByIncidentID(ctx context.Context, teamID uint, incidentID uint, offset *int, limit *int) ([]entities.AlertTrigger, error) {
+func (r *RepositoryImpl) GetTriggersByIncidentID(ctx context.Context, teamID uint, incidentID uint, offset *int, limit *int) (int, []entities.AlertTrigger, error) {
 	var triggers []entities.AlertTrigger
-	query := r.db.WithContext(ctx).Where("team_id = ? AND incident_id = ?", teamID, incidentID).Order("created_at DESC")
+	var totalCount int64
+
+	baseQuery := r.db.WithContext(ctx).Model(&entities.AlertTrigger{}).Where("team_id = ? AND incident_id = ?", teamID, incidentID)
+	
+	err := baseQuery.Count(&totalCount).Error
+	if err != nil {
+		return 0, nil, err
+	}
+
+	query := baseQuery.Order("created_at DESC")
 	if offset != nil {
 		query = query.Offset(*offset)
 	}
 	if limit != nil {
 		query = query.Limit(*limit)
 	}
-	err := query.Find(&triggers).Error
-	return triggers, err
+	err = query.Find(&triggers).Error
+	return int(totalCount), triggers, err
 }
 
 func (r *RepositoryImpl) CreateTrigger(ctx context.Context, trigger *entities.AlertTrigger) error {

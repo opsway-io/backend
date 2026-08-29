@@ -16,7 +16,8 @@ type GetIncidentAlertsRequest struct {
 }
 
 type GetIncidentAlertsResponse struct {
-	Alerts []GetIncidentAlertsResponseAlert `json:"alerts"`
+	TotalCount int                              `json:"totalCount"`
+	Alerts     []GetIncidentAlertsResponseAlert `json:"alerts"`
 }
 
 type GetIncidentAlertsResponseAlert struct {
@@ -33,14 +34,15 @@ func (h *Handlers) GetIncidentAlerts(c handlers.AuthenticatedContext) error {
 		return echo.ErrBadRequest
 	}
 
-	alerts, err := h.AlertingService.GetTriggersByIncidentID(c.Request().Context(), req.TeamID, req.IncidentID, req.Offset, req.Limit)
+	totalCount, alerts, err := h.AlertingService.GetTriggersByIncidentID(c.Request().Context(), req.TeamID, req.IncidentID, req.Offset, req.Limit)
 	if err != nil {
 		c.Log.WithError(err).Error("failed to get incident alerts")
 		return echo.ErrInternalServerError
 	}
 
 	resp := &GetIncidentAlertsResponse{
-		Alerts: make([]GetIncidentAlertsResponseAlert, len(alerts)),
+		TotalCount: totalCount,
+		Alerts:     make([]GetIncidentAlertsResponseAlert, len(alerts)),
 	}
 
 	for i, a := range alerts {

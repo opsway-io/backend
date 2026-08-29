@@ -14,8 +14,8 @@ type Service interface {
 	Delete(ctx context.Context, rule *entities.AlertRule) error
 
 	// Triggers
-	GetTriggersByRuleID(ctx context.Context, teamID uint, ruleID uint, offset *int, limit *int) ([]entities.AlertTrigger, error)
-	GetTriggersByIncidentID(ctx context.Context, teamID uint, incidentID uint, offset *int, limit *int) ([]entities.AlertTrigger, error)
+	GetTriggersByRuleID(ctx context.Context, teamID uint, ruleID uint, offset *int, limit *int) (int, []entities.AlertTrigger, error)
+	GetTriggersByIncidentID(ctx context.Context, teamID uint, incidentID uint, offset *int, limit *int) (int, []entities.AlertTrigger, error)
 	CreateTrigger(ctx context.Context, trigger *entities.AlertTrigger) error
 }
 
@@ -49,11 +49,11 @@ func (s *ServiceImpl) Delete(ctx context.Context, rule *entities.AlertRule) erro
 	return s.repository.Delete(ctx, rule)
 }
 
-func (s *ServiceImpl) GetTriggersByRuleID(ctx context.Context, teamID uint, ruleID uint, offset *int, limit *int) ([]entities.AlertTrigger, error) {
+func (s *ServiceImpl) GetTriggersByRuleID(ctx context.Context, teamID uint, ruleID uint, offset *int, limit *int) (int, []entities.AlertTrigger, error) {
 	return s.repository.GetTriggersByRuleID(ctx, teamID, ruleID, offset, limit)
 }
 
-func (s *ServiceImpl) GetTriggersByIncidentID(ctx context.Context, teamID uint, incidentID uint, offset *int, limit *int) ([]entities.AlertTrigger, error) {
+func (s *ServiceImpl) GetTriggersByIncidentID(ctx context.Context, teamID uint, incidentID uint, offset *int, limit *int) (int, []entities.AlertTrigger, error) {
 	return s.repository.GetTriggersByIncidentID(ctx, teamID, incidentID, offset, limit)
 }
 

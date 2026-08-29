@@ -16,7 +16,8 @@ type GetAlertRuleTriggersRequest struct {
 }
 
 type GetAlertRuleTriggersResponse struct {
-	Triggers []GetAlertRuleTriggersResponseTrigger `json:"triggers"`
+	TotalCount int                                   `json:"totalCount"`
+	Triggers   []GetAlertRuleTriggersResponseTrigger `json:"triggers"`
 }
 
 type GetAlertRuleTriggersResponseTrigger struct {
@@ -33,14 +34,15 @@ func (h *Handlers) GetAlertRuleTriggers(c handlers.AuthenticatedContext) error {
 		return echo.ErrBadRequest
 	}
 
-	triggers, err := h.AlertingService.GetTriggersByRuleID(c.Request().Context(), req.TeamID, req.RuleID, req.Offset, req.Limit)
+	totalCount, triggers, err := h.AlertingService.GetTriggersByRuleID(c.Request().Context(), req.TeamID, req.RuleID, req.Offset, req.Limit)
 	if err != nil {
 		c.Log.WithError(err).Error("failed to get alert rule triggers")
 		return echo.ErrInternalServerError
 	}
 
 	resp := &GetAlertRuleTriggersResponse{
-		Triggers: make([]GetAlertRuleTriggersResponseTrigger, len(triggers)),
+		TotalCount: totalCount,
+		Triggers:   make([]GetAlertRuleTriggersResponseTrigger, len(triggers)),
 	}
 
 	for i, t := range triggers {
