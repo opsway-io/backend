@@ -17,6 +17,7 @@ type Service interface {
 	GetTriggersByRuleID(ctx context.Context, teamID uint, ruleID uint, offset *int, limit *int) (int, []entities.AlertTrigger, error)
 	GetTriggersByIncidentID(ctx context.Context, teamID uint, incidentID uint, offset *int, limit *int) (int, []entities.AlertTrigger, error)
 	CreateTrigger(ctx context.Context, trigger *entities.AlertTrigger) error
+	HasTriggered(ctx context.Context, incidentID uint, ruleID uint) (bool, error)
 }
 
 type ServiceImpl struct {
@@ -59,4 +60,8 @@ func (s *ServiceImpl) GetTriggersByIncidentID(ctx context.Context, teamID uint, 
 
 func (s *ServiceImpl) CreateTrigger(ctx context.Context, trigger *entities.AlertTrigger) error {
 	return s.repository.CreateTrigger(ctx, trigger)
+}
+
+func (s *ServiceImpl) HasTriggered(ctx context.Context, incidentID uint, ruleID uint) (bool, error) {
+	return s.repository.HasTriggered(ctx, incidentID, ruleID)
 }

@@ -89,6 +89,11 @@ func (w *worker) Start(ctx context.Context) error {
 		return fmt.Errorf("failed to subscribe to incident post_mortem stream: %w", err)
 	}
 
+	alertRuleUpdatedMessages, err := w.eventService.Subscribe(ctx, string(events.EventTypeAlertRuleUpdated))
+	if err != nil {
+		return fmt.Errorf("failed to subscribe to alert_rule updated stream: %w", err)
+	}
+
 	go func() {
 		for msg := range incidentMessages {
 			w.processMessage(ctx, msg.Payload)
@@ -110,6 +115,13 @@ func (w *worker) Start(ctx context.Context) error {
 		}
 	}()
 
+	go func() {
+		for msg := range alertRuleUpdatedMessages {
+			w.processAlertRuleUpdatedMessage(ctx, msg.Payload)
+			msg.Ack()
+		}
+	}()
+
 	<-ctx.Done()
 	return nil
 }
@@ -127,6 +139,45 @@ func (w *worker) processPostMortemMessage(ctx context.Context, payload []byte) {
 	}
 
 	w.notifyStatusPageSubscribersForPostMortem(ctx, incident)
+}
+
+func (w *worker) processAlertRuleUpdatedMessage(ctx context.Context, payload []byte) {
+	var ev events.AlertRuleUpdatedEvent
+	if err := json.Unmarshal(payload, &ev); err != nil {
+		w.logger.WithError(err).Error("failed to unmarshal AlertRuleUpdatedEvent")
+		return
+	}
+
+	rule := ev.Rule
+	if rule == nil || !rule.Enabled {
+		return
+	}
+
+	resolved := false
+	offset := 0
+	limit := 100 // Hardcoded limit for now, ideally handle pagination if many incidents
+	incidents, err := w.incidentSvc.GetByTeamIDAndStatusPaginated(ctx, rule.TeamID, &resolved, &offset, &limit)
+	if err != nil {
+		w.logger.WithError(err).Error("failed to get active incidents for team")
+		return
+	}
+
+	for _, incident := range *incidents {
+		if rule.Condition == "*" || strings.Contains(strings.ToLower(incident.Title), strings.ToLower(rule.Condition)) {
+			// Check if we already triggered for this incident to avoid spam
+			hasTriggered, err := w.alertService.HasTriggered(ctx, incident.ID, rule.ID)
+			if err != nil {
+				w.logger.WithError(err).Error("failed to check if alert has triggered")
+				continue
+			}
+
+			if !hasTriggered {
+				// Pass a copy of incident since range loop var changes
+				inc := incident
+				w.triggerRule(ctx, &inc, rule, 1) // Base tier
+			}
+		}
+	}
 }
 
 func (w *worker) processMessage(ctx context.Context, payload []byte) {

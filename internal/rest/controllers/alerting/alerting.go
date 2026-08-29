@@ -6,6 +6,8 @@ import (
 	"github.com/labstack/echo/v4"
 	"github.com/opsway-io/backend/internal/alerting"
 	"github.com/opsway-io/backend/internal/entities"
+	"github.com/opsway-io/backend/internal/event"
+	"github.com/opsway-io/backend/internal/event/events"
 	"github.com/opsway-io/backend/internal/rest/handlers"
 	"github.com/opsway-io/backend/internal/rest/helpers"
 	"github.com/opsway-io/backend/internal/team"
@@ -15,6 +17,7 @@ import (
 type Handlers struct {
 	TeamService     team.Service
 	AlertingService alerting.Service
+	EventService    event.Service
 }
 
 func Register(
@@ -22,10 +25,12 @@ func Register(
 	logger *logrus.Entry,
 	teamService team.Service,
 	alertingService alerting.Service,
+	eventService event.Service,
 ) {
 	h := &Handlers{
 		TeamService:     teamService,
 		AlertingService: alertingService,
+		EventService:    eventService,
 	}
 
 	AuthHandler := handlers.AuthenticatedHandlerFactory(logger)
@@ -110,6 +115,12 @@ func (h *Handlers) PostAlertRule(c handlers.AuthenticatedContext) error {
 		return echo.ErrInternalServerError
 	}
 
+	if rule.Enabled {
+		_ = h.EventService.Publish(events.AlertRuleUpdatedEvent{
+			Rule: rule,
+		})
+	}
+
 	return c.JSON(http.StatusCreated, rule)
 }
 
@@ -144,6 +155,12 @@ func (h *Handlers) PutAlertRule(c handlers.AuthenticatedContext) error {
 	if err != nil {
 		c.Log.WithError(err).Error("failed to update alert rule")
 		return echo.ErrInternalServerError
+	}
+
+	if rule.Enabled {
+		_ = h.EventService.Publish(events.AlertRuleUpdatedEvent{
+			Rule: rule,
+		})
 	}
 
 	return c.JSON(http.StatusOK, rule)

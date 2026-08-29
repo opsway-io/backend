@@ -121,7 +121,7 @@ func Register(
 	changelogs.Register(authRoot, logger, teamService, changelogService)
 
 	// Alerting
-	alertingController.Register(authRoot, logger, teamService, alertingService)
+	alertingController.Register(authRoot, logger, teamService, alertingService, eventService)
 
 	// Incidents
 	incidents.Register(authRoot, logger, teamService, incidentService, eventService, alertingService)

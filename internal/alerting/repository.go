@@ -18,6 +18,7 @@ type Repository interface {
 	GetTriggersByRuleID(ctx context.Context, teamID uint, ruleID uint, offset *int, limit *int) (int, []entities.AlertTrigger, error)
 	GetTriggersByIncidentID(ctx context.Context, teamID uint, incidentID uint, offset *int, limit *int) (int, []entities.AlertTrigger, error)
 	CreateTrigger(ctx context.Context, trigger *entities.AlertTrigger) error
+	HasTriggered(ctx context.Context, incidentID uint, ruleID uint) (bool, error)
 }
 
 type RepositoryImpl struct {
@@ -100,4 +101,15 @@ func (r *RepositoryImpl) GetTriggersByIncidentID(ctx context.Context, teamID uin
 
 func (r *RepositoryImpl) CreateTrigger(ctx context.Context, trigger *entities.AlertTrigger) error {
 	return r.db.WithContext(ctx).Create(trigger).Error
+}
+
+func (r *RepositoryImpl) HasTriggered(ctx context.Context, incidentID uint, ruleID uint) (bool, error) {
+	var count int64
+	err := r.db.WithContext(ctx).Model(&entities.AlertTrigger{}).
+		Where("incident_id = ? AND alert_rule_id = ?", incidentID, ruleID).
+		Count(&count).Error
+	if err != nil {
+		return false, err
+	}
+	return count > 0, nil
 }
