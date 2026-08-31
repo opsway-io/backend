@@ -323,10 +323,10 @@ func handleTask(ctx context.Context, logger *logrus.Logger, httpProber http.Serv
 	}
 
 	// Check for anomalies
-	isAnomaly, err := checkAnomaly(m.ID, res)
+	anomalyResp, err := checkAnomaly(m.ID, res)
 	if err != nil {
 		l.WithError(err).Error("failed to check for anomaly")
-	} else if isAnomaly {
+	} else if anomalyResp != nil && len(anomalyResp.Anomalies) > 0 && anomalyResp.Anomalies[0] {
 		hasOpenAnomalyIncident := false
 		openIncidents, err := i.GetByMonitorIDWithAssertionPaginated(ctx, m.ID, nil, nil)
 		if err == nil && openIncidents != nil {
@@ -340,7 +340,7 @@ func handleTask(ctx context.Context, logger *logrus.Logger, httpProber http.Serv
 
 		if !hasOpenAnomalyIncident {
 			l.Info("anomaly detected, triggering incident")
-			desc := "Response time anomaly detected by forecaster"
+			desc := fmt.Sprintf("Response time anomaly detected! Expected response time was %.0fms (upper limit: %.0fms), but actual response time was %.0fms.", anomalyResp.Predictions[0], anomalyResp.UpperBounds[0], float64(res.Timing.Phases.Total.Milliseconds()))
 			anomalyIncident := entities.Incident{
 				MonitorID:   &m.ID,
 				TeamID:      m.TeamID,
@@ -425,7 +425,14 @@ func handleTask(ctx context.Context, logger *logrus.Logger, httpProber http.Serv
 	}
 }
 
-func checkAnomaly(monitorID uint, res *http.Result) (bool, error) {
+type ForecasterPredictResponse struct {
+	Anomalies   []bool    `json:"anomalies"`
+	Predictions []float64 `json:"predictions"`
+	UpperBounds []float64 `json:"upper_bounds"`
+	LowerBounds []float64 `json:"lower_bounds"`
+}
+
+func checkAnomaly(monitorID uint, res *http.Result) (*ForecasterPredictResponse, error) {
 	reqBody := fmt.Sprintf(`{"monitor_id": %d, "timings": [{"response_time": %f, "dns_lookup": %f, "tcp_connection": %f, "tls_handshake": %f, "server_processing": %f, "content_transfer": %f}]}`,
 		monitorID,
 		float64(res.Timing.Phases.Total.Milliseconds()),
@@ -437,20 +444,25 @@ func checkAnomaly(monitorID uint, res *http.Result) (bool, error) {
 	)
 	resp, err := xhttp.Post("http://forecaster-api:8000/predict", "application/json", strings.NewReader(reqBody))
 	if err != nil {
-		return false, err
+		return nil, err
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != xhttp.StatusOK {
-		return false, fmt.Errorf("forecaster API returned status %d", resp.StatusCode)
+		return nil, fmt.Errorf("forecaster API returned status %d", resp.StatusCode)
 	}
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return false, err
+		return nil, err
 	}
 
-	return strings.Contains(string(body), `"anomalies":[true]`) || strings.Contains(string(body), `"anomalies": [true]`), nil
+	var parsed ForecasterPredictResponse
+	if err := json.Unmarshal(body, &parsed); err != nil {
+		return nil, err
+	}
+
+	return &parsed, nil
 }
 
 func assertResult(httpResult *http.Result, assertions []entities.MonitorAssertion) ([]entities.MonitorAssertion, []entities.MonitorAssertion, error) {
