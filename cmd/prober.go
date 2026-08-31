@@ -532,11 +532,16 @@ func triggerIncident(ctx context.Context, m *entities.Monitor, hr *http.Result, 
 	for j := range *failed {
 		assertion := (*failed)[j]
 
+		desc := fmt.Sprintf("Assertion failed: %s %s %s", assertion.Source, assertion.Operator, assertion.Target)
+		if assertion.Property != nil && *assertion.Property != "" {
+			desc = fmt.Sprintf("Assertion failed: %s (%s) %s %s", assertion.Source, *assertion.Property, assertion.Operator, assertion.Target)
+		}
+
 		incidents[j] = entities.Incident{
 			MonitorID:          &assertion.MonitorID,
 			TeamID:             m.TeamID,
 			Title:              assertion.Source,
-			Description:        &assertion.Source,
+			Description:        &desc,
 			MonitorAssertionID: &assertion.ID,
 		}
 	}
