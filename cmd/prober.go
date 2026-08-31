@@ -196,7 +196,19 @@ func handleTask(ctx context.Context, logger *logrus.Logger, httpProber http.Serv
 	if err != nil && res == nil {
 		l.WithError(err).Error("failed to probe")
 
-		return
+		// Create a dummy result for dead targets so assertions fail gracefully
+		res = &http.Result{
+			Response: http.Response{
+				StatusCode: 0,
+				Header:     make(xhttp.Header),
+				Body:       []byte{},
+			},
+			Timing: http.Timing{
+				Phases: http.TimingPhases{
+					Total: timeout,
+				},
+			},
+		}
 	}
 
 	l = l.WithFields(logrus.Fields{
@@ -287,12 +299,19 @@ func handleTask(ctx context.Context, logger *logrus.Logger, httpProber http.Serv
 
 		// Reset counter
 		rc.Del(ctx, failKey)
+	}
 
-		// Auto-resolve any open incidents for this monitor
-		openIncidents, err := i.GetByMonitorIDWithAssertionPaginated(ctx, m.ID, nil, nil)
-		if err == nil && openIncidents != nil {
-			for _, inc := range *openIncidents {
-				if !inc.Incident.Resolved && inc.Incident.Title != "Anomaly Detected" && inc.Incident.Title != "SSL/TLS Cert Expiry" {
+	// Auto-resolve any open incidents for this monitor whose assertion is not currently failing
+	openIncidents, err := i.GetByMonitorIDWithAssertionPaginated(ctx, m.ID, nil, nil)
+	if err == nil && openIncidents != nil {
+		failedAssertionIDs := make(map[uint]bool)
+		for _, f := range failed {
+			failedAssertionIDs[f.ID] = true
+		}
+
+		for _, inc := range *openIncidents {
+			if !inc.Incident.Resolved && inc.Incident.Title != "Anomaly Detected" && inc.Incident.Title != "SSL/TLS Cert Expiry" {
+				if inc.Incident.MonitorAssertionID == nil || !failedAssertionIDs[*inc.Incident.MonitorAssertionID] {
 					l.WithField("incident_id", inc.Incident.ID).Info("auto-resolving incident")
 					inc.Incident.Resolved = true
 					if err := i.Update(ctx, &inc.Incident); err != nil {
