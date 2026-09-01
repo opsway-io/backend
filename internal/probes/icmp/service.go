@@ -42,8 +42,7 @@ func (s *ServiceImpl) Probe(ctx context.Context, target string, timeout time.Dur
 	}
 
 	if err != nil {
-		res.Response.StatusCode = 503
-		res.Response.Body = []byte(err.Error())
+		return nil, err
 	}
 
 	return res, nil

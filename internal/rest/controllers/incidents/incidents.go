@@ -29,9 +29,10 @@ type GetIncidentsResponseIncident struct {
 	MonitorID   *uint  `json:"monitorId"`
 	HeartbeatID *uint  `json:"heartbeatId"`
 	Title       string `json:"title"`
-	Description string `json:"description"`
-	Resolved    bool   `json:"resolved"`
-	CreatedAt   string `json:"createdAt"`
+	Description       string `json:"description"`
+	RootCauseAnalysis *string `json:"rootCauseAnalysis,omitempty"`
+	Resolved          bool   `json:"resolved"`
+	CreatedAt         string `json:"createdAt"`
 }
 
 func (h *Handlers) GetIncidents(c hs.AuthenticatedContext) error {
@@ -72,10 +73,11 @@ func (h *Handlers) newGetIncidentResponse(incidents *[]entities.Incident) *GetIn
 			TeamID:      in.TeamID,
 			MonitorID:   in.MonitorID,
 			HeartbeatID: in.HeartbeatID,
-			Title:       in.Title,
-			Description: *in.Description,
-			Resolved:    in.Resolved,
-			CreatedAt:   in.CreatedAt.Format("2006-01-02T15:04:05Z07:00"),
+			Title:             in.Title,
+			Description:       *in.Description,
+			RootCauseAnalysis: in.RootCauseAnalysis,
+			Resolved:          in.Resolved,
+			CreatedAt:         in.CreatedAt.Format("2006-01-02T15:04:05Z07:00"),
 		}
 	}
 
@@ -164,9 +166,10 @@ type GetMonitorIncidentsResponseIncident struct {
 	MonitorID   *uint  `json:"monitorId"`
 	HeartbeatID *uint  `json:"heartbeatId"`
 	Title       string `json:"title"`
-	Description string `json:"description"`
-	CreatedAt   string `json:"createdAt"`
-	UpdatedAt   string `json:"updatedAt"`
+	Description       string `json:"description"`
+	RootCauseAnalysis *string `json:"rootCauseAnalysis,omitempty"`
+	CreatedAt         string `json:"createdAt"`
+	UpdatedAt         string `json:"updatedAt"`
 	Property    string `json:"property"`
 	Target      string `json:"target"`
 	Operator    string `json:"operator"`
@@ -224,10 +227,11 @@ func (h *Handlers) GetMonitorIncidentsResponse(incidents *[]incident.IncidentAnd
 			TeamID:      in.TeamID,
 			MonitorID:   in.MonitorID,
 			HeartbeatID: in.HeartbeatID,
-			Title:       in.Title,
-			Description: *in.Description,
-			CreatedAt:   in.CreatedAt.Format("2006-01-02T15:04:05Z07:00"),
-			UpdatedAt:   in.UpdatedAt.Format("2006-01-02T15:04:05Z07:00"),
+			Title:             in.Title,
+			Description:       *in.Description,
+			RootCauseAnalysis: in.RootCauseAnalysis,
+			CreatedAt:         in.CreatedAt.Format("2006-01-02T15:04:05Z07:00"),
+			UpdatedAt:         in.UpdatedAt.Format("2006-01-02T15:04:05Z07:00"),
 			Property:    property,
 			Target:      target,
 			Operator:    operator,
