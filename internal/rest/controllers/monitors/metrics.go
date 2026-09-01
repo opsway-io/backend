@@ -21,9 +21,8 @@ func getMetricsPredictions(monitorID uint, metrics *[]check.AggMetric) (*Forecas
 
 	timings := make([]ForecasterTimingMetric, len(*metrics))
 	for i, c := range *metrics {
-		total := c.DNS + c.TCP + c.TLS + c.Processing + c.Transfer
 		timings[i] = ForecasterTimingMetric{
-			ResponseTime:     total,
+			ResponseTime:     c.Total,
 			DNSLookup:        c.DNS,
 			TCPConnection:    c.TCP,
 			TLSHandshake:     c.TLS,
@@ -206,7 +205,7 @@ func (h *Handlers) GetMonitorMetrics(c hs.AuthenticatedContext) error {
 
 			var anomalyVal float64 = 0
 			if predictions.Anomalies[i] {
-				anomalyVal = c.DNS + c.TCP + c.TLS + c.Processing + c.Transfer
+				anomalyVal = c.Total
 			}
 			metricResp[8].Data = append(metricResp[8].Data, MonitorMetrics{Start: c.Start, Timing: time.Duration(anomalyVal)})
 		}

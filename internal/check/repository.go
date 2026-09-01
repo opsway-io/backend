@@ -116,6 +116,7 @@ type AggMetric struct {
 	TLS        float64
 	Processing float64
 	Transfer   float64
+	Total      float64
 }
 
 func (r *RepositoryImpl) GetMonitorMetricsByMonitorID(ctx context.Context, monitorID uint, start *string, end *string) (*[]AggMetric, error) {
@@ -129,7 +130,8 @@ func (r *RepositoryImpl) GetMonitorMetricsByMonitorID(ctx context.Context, monit
 		avg(timing_tcp_connection)/1000000 as tcp,
 		avg(timing_tls_handshake)/1000000 as tls,
 		avg(timing_server_processing)/1000000 as processing,
-		avg(timing_content_transfer)/1000000 as transfer`).
+		avg(timing_content_transfer)/1000000 as transfer,
+		avg(timing_total)/1000000 as total`).
 		Where("monitor_id = ?", monitorID)
 
 	if start != nil && end != nil {
