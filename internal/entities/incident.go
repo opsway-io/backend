@@ -17,9 +17,11 @@ type Incident struct {
 
 	Title             string `gorm:"index;not null"`
 	Description       *string
+	Occurrences       int `gorm:"not null;default:1"`
 	RootCauseAnalysis *string
 	RootCauseNotified bool `gorm:"not null;default:false"`
-	Comments          []IncidentComment `gorm:"constraint:OnDelete:CASCADE"`
+	Comments          []IncidentComment    `gorm:"constraint:OnDelete:CASCADE"`
+	OccurrencesList   []IncidentOccurrence `gorm:"constraint:OnDelete:CASCADE"`
 
 	CreatedAt time.Time `gorm:"index"`
 	UpdatedAt time.Time `gorm:"index"`
@@ -42,4 +44,14 @@ type IncidentComment struct {
 
 func (IncidentComment) TableName() string {
 	return "incident_comments"
+}
+
+type IncidentOccurrence struct {
+	ID         uint
+	IncidentID uint      `gorm:"index;not null"`
+	CreatedAt  time.Time `gorm:"index"`
+}
+
+func (IncidentOccurrence) TableName() string {
+	return "incident_occurrences"
 }

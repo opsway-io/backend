@@ -91,9 +91,49 @@ func (h *Handlers) PostSlackInteractive(c echo.Context) error {
 			statusText = "👀 Incident Acknowledged"
 		}
 
-		resPayload := map[string]interface{}{
-			"replace_original": true,
-			"blocks": []map[string]interface{}{
+		blocks := payload.Message.Blocks
+
+		if len(blocks) > 0 {
+			if blocks[0]["type"] == "header" {
+				blocks[0]["text"] = map[string]interface{}{
+					"type":  "plain_text",
+					"text":  statusText,
+					"emoji": true,
+				}
+			}
+		}
+
+		if isAck {
+			// Remove the acknowledge button, keep resolve
+			for i, block := range blocks {
+				if block["type"] == "actions" {
+					if elements, ok := block["elements"].([]interface{}); ok {
+						newElements := []interface{}{}
+						for _, el := range elements {
+							if elMap, ok := el.(map[string]interface{}); ok {
+								if actionID, _ := elMap["action_id"].(string); actionID != "acknowledge_incident" {
+									newElements = append(newElements, el)
+								}
+							}
+						}
+						blocks[i]["elements"] = newElements
+					}
+				}
+			}
+		} else {
+			// Remove the actions block entirely
+			newBlocks := []map[string]interface{}{}
+			for _, block := range blocks {
+				if block["type"] != "actions" {
+					newBlocks = append(newBlocks, block)
+				}
+			}
+			blocks = newBlocks
+		}
+
+		// Fallback if blocks were somehow not present in the payload
+		if len(blocks) == 0 {
+			blocks = []map[string]interface{}{
 				{
 					"type": "section",
 					"text": map[string]interface{}{
@@ -101,7 +141,12 @@ func (h *Handlers) PostSlackInteractive(c echo.Context) error {
 						"text": fmt.Sprintf("*%s*\nIssue: %s", statusText, incident.Title),
 					},
 				},
-			},
+			}
+		}
+
+		resPayload := map[string]interface{}{
+			"replace_original": true,
+			"blocks":           blocks,
 		}
 
 		body, _ := json.Marshal(resPayload)

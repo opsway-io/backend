@@ -132,11 +132,48 @@ func TestE2E_MockServer(t *testing.T) {
 		t.Fatalf("Create delay monitor failed with status %d: %s", respDelay.StatusCode, string(body))
 	}
 
-	// 4. Wait for Prober
+	// 4. Create Monitor 3: Unreachable URL (Connection Error Test)
+	t.Log("Creating monitor for Unreachable URL...")
+	monitorDeadBody := map[string]interface{}{
+		"name": "E2E Dead URL Monitor",
+		"settings": map[string]interface{}{
+			"method":           "GET",
+			"url":              "http://non-existent-domain.test",
+			"frequencySeconds": 30,
+			"headers":          []interface{}{},
+			"body": map[string]interface{}{
+				"type": "NONE",
+			},
+			"tls": map[string]interface{}{
+				"enabled": false,
+			},
+			"locations": []string{"global"},
+		},
+		"assertions": []map[string]interface{}{
+			{
+				"source":   "STATUS_CODE",
+				"property": "",
+				"operator": "EQUAL",
+				"target":   "200",
+			},
+		},
+	}
+	monitorDeadJSON, _ := json.Marshal(monitorDeadBody)
+	respDead, err := client.Post(fmt.Sprintf("%s/teams/%d/monitors", apiURL, teamID), "application/json", bytes.NewBuffer(monitorDeadJSON))
+	if err != nil {
+		t.Fatalf("Failed to create dead URL monitor: %v", err)
+	}
+	defer respDead.Body.Close()
+	if respDead.StatusCode > 299 {
+		body, _ := io.ReadAll(respDead.Body)
+		t.Fatalf("Create dead URL monitor failed with status %d: %s", respDead.StatusCode, string(body))
+	}
+
+	// 5. Wait for Prober
 	t.Log("Waiting 35 seconds for prober to execute checks...")
 	time.Sleep(35 * time.Second)
 
-	// 5. Verify Incidents
+	// 6. Verify Incidents
 	t.Log("Fetching incidents...")
 	respIncidents, err := client.Get(fmt.Sprintf("%s/teams/%d/incidents", apiURL, teamID))
 	if err != nil {
@@ -156,27 +193,27 @@ func TestE2E_MockServer(t *testing.T) {
 		t.Fatalf("Failed to decode incidents response: %v", err)
 	}
 
-	foundStatusCodeIncident := false
+	statusCodeIncidentCount := 0
 	foundAnomalyIncident := false
 	t.Log("Incidents returned by API:")
 	for _, inc := range incidentsResp.Incidents {
 		t.Logf(" - %s", inc.Title)
 		if inc.Title == "STATUS_CODE" {
-			foundStatusCodeIncident = true
+			statusCodeIncidentCount++
 		}
 		if inc.Title == "Anomaly Detected" {
 			foundAnomalyIncident = true
 		}
 	}
 
-	if !foundStatusCodeIncident {
-		t.Errorf("Expected STATUS_CODE incident to be created, but it was not found.")
+	if statusCodeIncidentCount < 2 {
+		t.Errorf("Expected at least 2 STATUS_CODE incidents to be created (one for 500, one for dead URL), but found %d.", statusCodeIncidentCount)
 	}
 	if !foundAnomalyIncident {
 		t.Errorf("Expected Anomaly Detected incident to be created, but it was not found.")
 	}
 
-	// 6. Verify Alerts in MailHog
+	// 7. Verify Alerts in MailHog
 	t.Log("Verifying alerts in MailHog...")
 	respMail, err := http.Get(mailHogURL)
 	if err != nil {

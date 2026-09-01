@@ -193,8 +193,10 @@ func handleTask(ctx context.Context, logger *logrus.Logger, httpProber http.Serv
 		)
 	}
 
+	targetDown := false
 	if err != nil && res == nil {
 		l.WithError(err).Error("failed to probe")
+		targetDown = true
 
 		// Create a dummy result for dead targets so assertions fail gracefully
 		res = &http.Result{
@@ -280,14 +282,15 @@ func handleTask(ctx context.Context, logger *logrus.Logger, httpProber http.Serv
 			openIncidents, err = i.GetByMonitorIDWithAssertionPaginated(ctx, m.ID, nil, nil)
 			if err == nil && openIncidents != nil {
 				for _, inc := range *openIncidents {
-					if !inc.Incident.Resolved && inc.Incident.Title != "Anomaly Detected" && inc.Incident.Title != "SSL/TLS Cert Expiry" {
+					if !inc.Incident.Resolved && inc.Incident.Title != "Anomaly Detected" && inc.Incident.Title != "SSL/TLS Cert Expiry" && inc.Incident.Title != "Target Down" {
 						for _, assertion := range failed {
 							if inc.Incident.MonitorAssertionID != nil && *inc.Incident.MonitorAssertionID == assertion.ID {
 								inc.Incident.UpdatedAt = time.Now()
+								inc.Incident.Occurrences++
 								if err := i.Update(ctx, &inc.Incident); err != nil {
-									l.WithError(err).Error("failed to update incident occurrence")
+									l.WithError(err).Error("failed to update incident occurrence time")
 								}
-								break
+								_ = i.CreateOccurrence(ctx, &entities.IncidentOccurrence{IncidentID: inc.Incident.ID, CreatedAt: time.Now()})
 							}
 						}
 					}
@@ -310,7 +313,7 @@ func handleTask(ctx context.Context, logger *logrus.Logger, httpProber http.Serv
 		}
 
 		for _, inc := range *openIncidents {
-			if !inc.Incident.Resolved && inc.Incident.Title != "Anomaly Detected" && inc.Incident.Title != "SSL/TLS Cert Expiry" {
+			if !inc.Incident.Resolved && inc.Incident.Title != "Anomaly Detected" && inc.Incident.Title != "SSL/TLS Cert Expiry" && inc.Incident.Title != "Target Down" {
 				if inc.Incident.MonitorAssertionID == nil || !failedAssertionIDs[*inc.Incident.MonitorAssertionID] {
 					l.WithField("incident_id", inc.Incident.ID).Info("auto-resolving incident")
 					inc.Incident.Resolved = true
@@ -322,42 +325,89 @@ func handleTask(ctx context.Context, logger *logrus.Logger, httpProber http.Serv
 		}
 	}
 
-	// Check for anomalies
-	anomalyResp, err := checkAnomaly(m.ID, res)
-	if err != nil {
-		l.WithError(err).Error("failed to check for anomaly")
-	} else if anomalyResp != nil && len(anomalyResp.Anomalies) > 0 && anomalyResp.Anomalies[0] {
-		hasOpenAnomalyIncident := false
+	if targetDown {
+		hasOpenDownIncident := false
 		openIncidents, err := i.GetByMonitorIDWithAssertionPaginated(ctx, m.ID, nil, nil)
 		if err == nil && openIncidents != nil {
 			for _, inc := range *openIncidents {
-				if inc.Title == "Anomaly Detected" {
-					hasOpenAnomalyIncident = true
+				if inc.Title == "Target Down" {
+					hasOpenDownIncident = true
+					inc.Incident.UpdatedAt = time.Now()
+					inc.Incident.Occurrences++
+					if err := i.Update(ctx, &inc.Incident); err != nil {
+						l.WithError(err).Error("failed to update target down incident occurrence")
+					}
+					_ = i.CreateOccurrence(ctx, &entities.IncidentOccurrence{IncidentID: inc.Incident.ID, CreatedAt: time.Now()})
 					break
 				}
 			}
 		}
 
-		if !hasOpenAnomalyIncident {
-			l.Info("anomaly detected, triggering incident")
-			desc := fmt.Sprintf("Response time anomaly detected! Expected response time was %.0fms (upper limit: %.0fms), but actual response time was %.0fms.", anomalyResp.Predictions[0], anomalyResp.UpperBounds[0], float64(res.Timing.Phases.Total.Milliseconds()))
-			anomalyIncident := entities.Incident{
+		if !hasOpenDownIncident {
+			l.Info("target is down, triggering incident")
+			desc := fmt.Sprintf("Target %s is unreachable or not responding.", m.Settings.URL)
+			downIncident := entities.Incident{
 				MonitorID:   &m.ID,
 				TeamID:      m.TeamID,
-				Title:       "Anomaly Detected",
+				Title:       "Target Down",
 				Description: &desc,
 			}
-			if err := i.Create(ctx, &[]entities.Incident{anomalyIncident}); err != nil {
-				l.WithError(err).Error("failed to trigger anomaly incident")
+			if err := i.Create(ctx, &[]entities.Incident{downIncident}); err != nil {
+				l.WithError(err).Error("failed to trigger target down incident")
 			}
-		} else {
+		}
+	} else {
+		openIncidents, err := i.GetByMonitorIDWithAssertionPaginated(ctx, m.ID, nil, nil)
+		if err == nil && openIncidents != nil {
 			for _, inc := range *openIncidents {
-				if inc.Title == "Anomaly Detected" {
-					inc.Incident.UpdatedAt = time.Now()
+				if inc.Title == "Target Down" && !inc.Resolved {
+					l.Info("target is now responding, resolving open Target Down incident")
+					inc.Incident.Resolved = true
 					if err := i.Update(ctx, &inc.Incident); err != nil {
-						l.WithError(err).Error("failed to update anomaly incident occurrence")
+						l.WithError(err).Error("failed to resolve target down incident")
 					}
-					break
+				}
+			}
+		}
+
+		// Check for anomalies
+		anomalyResp, err := checkAnomaly(m.ID, res)
+		if err != nil {
+			l.WithError(err).Error("failed to check for anomaly")
+		} else if anomalyResp != nil && len(anomalyResp.Anomalies) > 0 && anomalyResp.Anomalies[0] {
+			hasOpenAnomalyIncident := false
+			if openIncidents != nil {
+				for _, inc := range *openIncidents {
+					if inc.Title == "Anomaly Detected" {
+						hasOpenAnomalyIncident = true
+						break
+					}
+				}
+			}
+
+			if !hasOpenAnomalyIncident {
+				l.Info("anomaly detected, triggering incident")
+				desc := fmt.Sprintf("Response time anomaly detected! Expected response time was %.0fms (upper limit: %.0fms), but actual response time was %.0fms.", anomalyResp.Predictions[0], anomalyResp.UpperBounds[0], float64(res.Timing.Phases.Total.Milliseconds()))
+				anomalyIncident := entities.Incident{
+					MonitorID:   &m.ID,
+					TeamID:      m.TeamID,
+					Title:       "Anomaly Detected",
+					Description: &desc,
+				}
+				if err := i.Create(ctx, &[]entities.Incident{anomalyIncident}); err != nil {
+					l.WithError(err).Error("failed to trigger anomaly incident")
+				}
+			} else {
+				for _, inc := range *openIncidents {
+					if inc.Title == "Anomaly Detected" {
+						inc.Incident.UpdatedAt = time.Now()
+						inc.Incident.Occurrences++
+						if err := i.Update(ctx, &inc.Incident); err != nil {
+							l.WithError(err).Error("failed to update anomaly incident occurrence")
+						}
+						_ = i.CreateOccurrence(ctx, &entities.IncidentOccurrence{IncidentID: inc.Incident.ID, CreatedAt: time.Now()})
+						break
+					}
 				}
 			}
 		}
@@ -545,8 +595,8 @@ func triggerIncident(ctx context.Context, m *entities.Monitor, hr *http.Result, 
 		assertion := (*failed)[j]
 
 		desc := fmt.Sprintf("Assertion failed: %s %s %s", assertion.Source, assertion.Operator, assertion.Target)
-		if assertion.Property != nil && *assertion.Property != "" {
-			desc = fmt.Sprintf("Assertion failed: %s (%s) %s %s", assertion.Source, *assertion.Property, assertion.Operator, assertion.Target)
+		if assertion.Property != "" {
+			desc = fmt.Sprintf("Assertion failed: %s (%s) %s %s", assertion.Source, assertion.Property, assertion.Operator, assertion.Target)
 		}
 
 		incidents[j] = entities.Incident{
@@ -555,8 +605,15 @@ func triggerIncident(ctx context.Context, m *entities.Monitor, hr *http.Result, 
 			Title:              assertion.Source,
 			Description:        &desc,
 			MonitorAssertionID: &assertion.ID,
+			Occurrences:        1,
 		}
 	}
 
-	return i.Upsert(ctx, &incidents)
+	err := i.Upsert(ctx, &incidents)
+	if err == nil {
+		for _, inc := range incidents {
+			_ = i.CreateOccurrence(ctx, &entities.IncidentOccurrence{IncidentID: inc.ID, CreatedAt: time.Now()})
+		}
+	}
+	return err
 }

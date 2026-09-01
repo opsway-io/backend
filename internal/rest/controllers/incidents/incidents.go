@@ -255,6 +255,7 @@ type GetIncidentResponse struct {
 	RootCauseAnalysis *string `json:"rootCauseAnalysis,omitempty"`
 	CreatedAt         string  `json:"createdAt"`
 	UpdatedAt         string  `json:"updatedAt"`
+	Occurrences       int     `json:"occurrences"`
 }
 
 func (h *Handlers) GetIncident(c hs.AuthenticatedContext) error {
@@ -285,6 +286,7 @@ func (h *Handlers) GetIncident(c hs.AuthenticatedContext) error {
 		Description:  *in.Description,
 		Resolved:     in.Resolved,
 		Acknowledged: in.Acknowledged,
+		Occurrences:  in.Occurrences,
 	}
 
 	if in.AcknowledgedAt != nil {
@@ -403,4 +405,59 @@ func (h *Handlers) PatchRootCauseIncident(c hs.AuthenticatedContext) error {
 	}
 
 	return c.NoContent(http.StatusOK)
+}
+
+type GetIncidentOccurrencesRequest struct {
+	TeamID     uint `param:"teamId" validate:"required,numeric,gte=0"`
+	IncidentID uint `param:"incidentId" validate:"required,numeric,gte=0"`
+	Offset     *int `query:"offset" validate:"omitempty,numeric,gte=0"`
+	Limit      *int `query:"limit" validate:"omitempty,numeric,gt=0"`
+}
+
+type GetIncidentOccurrencesResponse struct {
+	Occurrences []IncidentOccurrenceResponse `json:"occurrences"`
+}
+
+type IncidentOccurrenceResponse struct {
+	ID        uint   `json:"id"`
+	CreatedAt string `json:"createdAt"`
+}
+
+func (h *Handlers) GetIncidentOccurrences(c hs.AuthenticatedContext) error {
+	req, err := helpers.Bind[GetIncidentOccurrencesRequest](c)
+	if err != nil {
+		c.Log.WithError(err).Debug("failed to bind GetIncidentOccurrencesRequest")
+		return echo.ErrBadRequest
+	}
+
+	ctx := c.Request().Context()
+	
+	// Verify incident belongs to team
+	in, err := h.IncidentService.GetByID(ctx, req.IncidentID)
+	if err != nil {
+		c.Log.WithError(err).Error("failed to get incident")
+		return echo.ErrInternalServerError
+	}
+	if in.TeamID != req.TeamID {
+		return echo.ErrForbidden
+	}
+
+	occurrences, err := h.IncidentService.GetOccurrencesPaginated(ctx, req.IncidentID, req.Offset, req.Limit)
+	if err != nil {
+		c.Log.WithError(err).Error("failed to get incident occurrences")
+		return echo.ErrInternalServerError
+	}
+
+	resp := GetIncidentOccurrencesResponse{
+		Occurrences: make([]IncidentOccurrenceResponse, len(*occurrences)),
+	}
+
+	for i, occ := range *occurrences {
+		resp.Occurrences[i] = IncidentOccurrenceResponse{
+			ID:        occ.ID,
+			CreatedAt: occ.CreatedAt.Format("2006-01-02T15:04:05Z07:00"),
+		}
+	}
+
+	return c.JSON(http.StatusOK, resp)
 }

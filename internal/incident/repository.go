@@ -23,6 +23,8 @@ type Repository interface {
 	Update(ctx context.Context, incident *entities.Incident) error
 	Delete(ctx context.Context, incident *entities.Incident) error
 	GetByTeamIDMonitorsIncidentStats(ctx context.Context, teamID uint, start, end string) (*[]entities.MonitorIncident, error)
+	CreateOccurrence(ctx context.Context, occurrence *entities.IncidentOccurrence) error
+	GetOccurrencesPaginated(ctx context.Context, incidentID uint, offset, limit *int) (*[]entities.IncidentOccurrence, error)
 }
 
 type RepositoryImpl struct {
@@ -133,7 +135,7 @@ func (r *RepositoryImpl) GetActiveByMonitorIDs(ctx context.Context, monitorIDs [
 func (r *RepositoryImpl) Upsert(ctx context.Context, incidents *[]entities.Incident) error {
 	return r.db.WithContext(ctx).Clauses(clause.OnConflict{
 		Columns:   []clause.Column{{Name: "monitor_assertion_id"}},
-		DoUpdates: clause.AssignmentColumns([]string{"updated_at", "resolved", "acknowledged", "acknowledged_by", "acknowledged_at", "root_cause_analysis", "root_cause_notified"}),
+		DoUpdates: clause.AssignmentColumns([]string{"updated_at", "resolved", "occurrences", "acknowledged", "acknowledged_by", "acknowledged_at", "root_cause_analysis", "root_cause_notified"}),
 	}).Create(incidents).Error
 }
 
@@ -183,4 +185,17 @@ func (r *RepositoryImpl) GetByTeamIDMonitorsIncidentStats(ctx context.Context, t
 	}
 
 	return &incidents, nil
+}
+
+func (r *RepositoryImpl) CreateOccurrence(ctx context.Context, occurrence *entities.IncidentOccurrence) error {
+	return r.db.WithContext(ctx).Create(occurrence).Error
+}
+
+func (r *RepositoryImpl) GetOccurrencesPaginated(ctx context.Context, incidentID uint, offset, limit *int) (*[]entities.IncidentOccurrence, error) {
+	var occurrences []entities.IncidentOccurrence
+	err := r.db.WithContext(ctx).Where("incident_id = ?", incidentID).Order("created_at desc").Scopes(postgres.Paginated(offset, limit)).Find(&occurrences).Error
+	if err != nil {
+		return nil, err
+	}
+	return &occurrences, nil
 }

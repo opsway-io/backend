@@ -82,6 +82,7 @@ func runAPI(cmd *cobra.Command, args []string) {
 		entities.MaintenanceComment{},
 		entities.Incident{},
 		entities.IncidentComment{},
+		entities.IncidentOccurrence{},
 		entities.Changelog{},
 		entities.ChangelogEntry{},
 		entities.Report{},

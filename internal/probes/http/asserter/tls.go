@@ -88,6 +88,10 @@ func (a *TLSAsserter) IsRuleValid(rule Rule) error {
 }
 
 func (a *TLSAsserter) assert(result *http.Result, rule Rule) bool {
+	if result.TLS == nil {
+		return false
+	}
+
 	switch rule.Operator {
 	case "EXPIRED":
 		return a.assertExpired(result)

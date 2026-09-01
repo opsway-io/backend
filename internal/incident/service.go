@@ -19,6 +19,8 @@ type Service interface {
 	Update(ctx context.Context, incident *entities.Incident) error
 	Delete(ctx context.Context, incident *entities.Incident) error
 	GetByTeamIDMonitorsIncidentStats(ctx context.Context, teamID uint, start, end string) (*[]entities.MonitorIncident, error)
+	CreateOccurrence(ctx context.Context, occurrence *entities.IncidentOccurrence) error
+	GetOccurrencesPaginated(ctx context.Context, incidentID uint, offset, limit *int) (*[]entities.IncidentOccurrence, error)
 }
 
 type ServiceImpl struct {
@@ -87,4 +89,12 @@ func (s *ServiceImpl) Delete(ctx context.Context, incident *entities.Incident) e
 
 func (s *ServiceImpl) GetByTeamIDMonitorsIncidentStats(ctx context.Context, teamID uint, start, end string) (*[]entities.MonitorIncident, error) {
 	return s.repository.GetByTeamIDMonitorsIncidentStats(ctx, teamID, start, end)
+}
+
+func (s *ServiceImpl) CreateOccurrence(ctx context.Context, occurrence *entities.IncidentOccurrence) error {
+	return s.repository.CreateOccurrence(ctx, occurrence)
+}
+
+func (s *ServiceImpl) GetOccurrencesPaginated(ctx context.Context, incidentID uint, offset, limit *int) (*[]entities.IncidentOccurrence, error) {
+	return s.repository.GetOccurrencesPaginated(ctx, incidentID, offset, limit)
 }
