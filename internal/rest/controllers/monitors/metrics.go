@@ -203,7 +203,7 @@ func (h *Handlers) GetMonitorMetrics(c hs.AuthenticatedContext) error {
 			metricResp[6].Data = append(metricResp[6].Data, MonitorMetrics{Start: c.Start, Timing: time.Duration(predictions.UpperBounds[i])})
 			metricResp[7].Data = append(metricResp[7].Data, MonitorMetrics{Start: c.Start, Timing: time.Duration(predictions.LowerBounds[i])})
 
-			var anomalyVal float64 = 0
+			var anomalyVal float64 = -1
 			if predictions.Anomalies[i] {
 				anomalyVal = c.Total
 			}
