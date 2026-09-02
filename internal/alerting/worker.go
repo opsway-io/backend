@@ -143,7 +143,7 @@ func (w *worker) processPostMortemMessage(ctx context.Context, payload []byte) {
 
 func (w *worker) processAlertRuleUpdatedMessage(ctx context.Context, payload []byte) {
 	w.logger.Infof("Received AlertRuleUpdatedEvent with payload: %s", string(payload))
-	
+
 	var ev events.AlertRuleUpdatedEvent
 	if err := json.Unmarshal(payload, &ev); err != nil {
 		w.logger.WithError(err).Error("failed to unmarshal AlertRuleUpdatedEvent")

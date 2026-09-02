@@ -91,13 +91,13 @@ var MaintainerCmd = &cobra.Command{
 		}
 
 		checkSvc := check.NewService(chDB)
-		
+
 		teamRepo := team.NewRepository(db)
 		teamCache := team.NewCache(redisClient)
 		teamSvc := team.NewService(conf.Team, teamRepo, nil, emailSender, teamCache) // nil storage is fine
 
 		expiryWorker := expiry.NewWorker(logger.WithField("module", "expiry_worker"), monitorService, checkSvc, teamSvc, emailSender, time.Hour, conf.Team.ApplicationURL)
-		
+
 		go func() {
 			if err := expiryWorker.Start(ctx); err != nil {
 				logger.WithError(err).Fatal("expiry worker failed")
@@ -108,7 +108,7 @@ var MaintainerCmd = &cobra.Command{
 		incidentSvc := incident.NewService(incidentRepo, eventService)
 
 		weeklyWorker := report.NewWeeklyWorker(logger.WithField("module", "weekly_report_worker"), teamSvc, monitorService, checkSvc, incidentSvc, emailSender, 7*24*time.Hour, conf.Team.ApplicationURL)
-		
+
 		if err := weeklyWorker.Start(ctx); err != nil {
 			logger.WithError(err).Fatal("weekly report worker failed")
 		}

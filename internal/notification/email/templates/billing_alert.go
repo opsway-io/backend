@@ -10,9 +10,9 @@ var billingAlertTemplate string
 
 type BillingAlertTemplate struct {
 	BaseTemplate
-	TeamName     string
-	Message      string
-	BillingURL   string
+	TeamName   string
+	Message    string
+	BillingURL string
 }
 
 func (t *BillingAlertTemplate) Subject() string {

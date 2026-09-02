@@ -24,15 +24,15 @@ type GetIncidentsResponse struct {
 }
 
 type GetIncidentsResponseIncident struct {
-	ID          uint   `json:"id"`
-	TeamID      uint   `json:"teamId"`
-	MonitorID   *uint  `json:"monitorId"`
-	HeartbeatID *uint  `json:"heartbeatId"`
-	Title       string `json:"title"`
-	Description       string `json:"description"`
+	ID                uint    `json:"id"`
+	TeamID            uint    `json:"teamId"`
+	MonitorID         *uint   `json:"monitorId"`
+	HeartbeatID       *uint   `json:"heartbeatId"`
+	Title             string  `json:"title"`
+	Description       string  `json:"description"`
 	RootCauseAnalysis *string `json:"rootCauseAnalysis,omitempty"`
-	Resolved          bool   `json:"resolved"`
-	CreatedAt         string `json:"createdAt"`
+	Resolved          bool    `json:"resolved"`
+	CreatedAt         string  `json:"createdAt"`
 }
 
 func (h *Handlers) GetIncidents(c hs.AuthenticatedContext) error {
@@ -69,10 +69,10 @@ func (h *Handlers) newGetIncidentResponse(incidents *[]entities.Incident) *GetIn
 
 	for i, in := range *incidents {
 		resp.Incidents[i] = GetIncidentsResponseIncident{
-			ID:          in.ID,
-			TeamID:      in.TeamID,
-			MonitorID:   in.MonitorID,
-			HeartbeatID: in.HeartbeatID,
+			ID:                in.ID,
+			TeamID:            in.TeamID,
+			MonitorID:         in.MonitorID,
+			HeartbeatID:       in.HeartbeatID,
 			Title:             in.Title,
 			Description:       *in.Description,
 			RootCauseAnalysis: in.RootCauseAnalysis,
@@ -161,18 +161,18 @@ type GetMonitorIncidentsResponse struct {
 }
 
 type GetMonitorIncidentsResponseIncident struct {
-	ID          uint   `json:"id"`
-	TeamID      uint   `json:"teamId"`
-	MonitorID   *uint  `json:"monitorId"`
-	HeartbeatID *uint  `json:"heartbeatId"`
-	Title       string `json:"title"`
-	Description       string `json:"description"`
+	ID                uint    `json:"id"`
+	TeamID            uint    `json:"teamId"`
+	MonitorID         *uint   `json:"monitorId"`
+	HeartbeatID       *uint   `json:"heartbeatId"`
+	Title             string  `json:"title"`
+	Description       string  `json:"description"`
 	RootCauseAnalysis *string `json:"rootCauseAnalysis,omitempty"`
-	CreatedAt         string `json:"createdAt"`
-	UpdatedAt         string `json:"updatedAt"`
-	Property    string `json:"property"`
-	Target      string `json:"target"`
-	Operator    string `json:"operator"`
+	CreatedAt         string  `json:"createdAt"`
+	UpdatedAt         string  `json:"updatedAt"`
+	Property          string  `json:"property"`
+	Target            string  `json:"target"`
+	Operator          string  `json:"operator"`
 }
 
 func (h *Handlers) GetMonitorIncidents(c hs.AuthenticatedContext) error {
@@ -223,18 +223,18 @@ func (h *Handlers) GetMonitorIncidentsResponse(incidents *[]incident.IncidentAnd
 		}
 
 		resp.Incidents[i] = GetMonitorIncidentsResponseIncident{
-			ID:          in.ID,
-			TeamID:      in.TeamID,
-			MonitorID:   in.MonitorID,
-			HeartbeatID: in.HeartbeatID,
+			ID:                in.ID,
+			TeamID:            in.TeamID,
+			MonitorID:         in.MonitorID,
+			HeartbeatID:       in.HeartbeatID,
 			Title:             in.Title,
 			Description:       *in.Description,
 			RootCauseAnalysis: in.RootCauseAnalysis,
 			CreatedAt:         in.CreatedAt.Format("2006-01-02T15:04:05Z07:00"),
 			UpdatedAt:         in.UpdatedAt.Format("2006-01-02T15:04:05Z07:00"),
-			Property:    property,
-			Target:      target,
-			Operator:    operator,
+			Property:          property,
+			Target:            target,
+			Operator:          operator,
 		}
 	}
 
@@ -402,7 +402,7 @@ func (h *Handlers) PatchRootCauseIncident(c hs.AuthenticatedContext) error {
 			Incident: in,
 		})
 	}
-	
+
 	if err := h.IncidentService.Update(ctx, in); err != nil {
 		c.Log.WithError(err).Error("failed to update incident")
 		return echo.ErrInternalServerError
@@ -435,7 +435,7 @@ func (h *Handlers) GetIncidentOccurrences(c hs.AuthenticatedContext) error {
 	}
 
 	ctx := c.Request().Context()
-	
+
 	// Verify incident belongs to team
 	in, err := h.IncidentService.GetByID(ctx, req.IncidentID)
 	if err != nil {

@@ -37,19 +37,19 @@ const (
 )
 
 type Team struct {
-	ID                 uint
-	Name               string      `gorm:"uniqueIndex;not null"`
-	DisplayName        *string     `gorm:"index"`
-	PaymentPlan        PaymentPlan `gorm:"default:FREE;not null"`
-	StripeCustomerID   *string     `gorm:"index"`
-	SlackWebhookURL    *string     `gorm:"type:text"`
-	DiscordWebhookURL  *string     `gorm:"type:text"`
-	TelegramChatID     *string     `gorm:"type:text"`
+	ID                       uint
+	Name                     string      `gorm:"uniqueIndex;not null"`
+	DisplayName              *string     `gorm:"index"`
+	PaymentPlan              PaymentPlan `gorm:"default:FREE;not null"`
+	StripeCustomerID         *string     `gorm:"index"`
+	SlackWebhookURL          *string     `gorm:"type:text"`
+	DiscordWebhookURL        *string     `gorm:"type:text"`
+	TelegramChatID           *string     `gorm:"type:text"`
 	DatadogWebhookURL        *string     `gorm:"type:text"`
 	NewRelicWebhookURL       *string     `gorm:"type:text"`
 	MicrosoftTeamsWebhookURL *string     `gorm:"type:text"`
 	WebhookURL               *string     `gorm:"type:text"`
-	HasAvatar          bool
+	HasAvatar                bool
 
 	Users       []User           `gorm:"many2many:team_users;constraint:OnDelete:CASCADE;"`
 	Monitors    []Monitor        `gorm:"constraint:OnDelete:CASCADE"`

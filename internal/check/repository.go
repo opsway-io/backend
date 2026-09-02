@@ -24,6 +24,7 @@ type Repository interface {
 	GetMonitorIDAndAssertions(ctx context.Context, monitorID uint, assertions []string) (*[]Check, error)
 	GetByTeamIDMonitorsUptime(ctx context.Context, teamID uint, start, end string) (*[]MonitorUptime, error)
 	GetByTeamIDMonitorsPerformance(ctx context.Context, teamID uint, start, end string) (*[]MonitorPerformance, error)
+	GetMonitorStatsByMonitorID(ctx context.Context, monitorID uint) (*MonitorStats, error)
 }
 
 type RepositoryImpl struct {
@@ -264,11 +265,19 @@ func (r *RepositoryImpl) GetMonitorUptimesByMonitorIDs(ctx context.Context, moni
 	}
 
 	// Calculate overall 90-day uptime and daily uptimes using ClickHouse array aggregation
+	var queryResults []struct {
+		MonitorID        uint
+		UptimePercentage float32
+		DailyUptimes     []float32   `gorm:"type:float"`
+		DailyDates       []time.Time `gorm:"type:datetime"`
+	}
+
 	err := r.db.WithContext(ctx).Raw(`
 		SELECT 
 			m.monitor_id as monitor_id,
 			if(sum(m.total_count) = 0, 0, (sum(m.up_count) / sum(m.total_count)) * 100) as uptime_percentage,
-			groupArray(m.daily_uptime) as daily_uptimes
+			groupArray(m.daily_uptime) as daily_uptimes,
+			groupArray(m.day) as daily_dates
 		FROM (
 			SELECT 
 				monitor_id,
@@ -282,10 +291,39 @@ func (r *RepositoryImpl) GetMonitorUptimesByMonitorIDs(ctx context.Context, moni
 			ORDER BY monitor_id, day ASC
 		) m
 		GROUP BY m.monitor_id
-	`, monitorIDs).Scan(&results).Error
+	`, monitorIDs).Scan(&queryResults).Error
 
 	if err != nil {
 		return nil, err
+	}
+
+	now := time.Now().UTC()
+	// Truncate to day
+	today := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, time.UTC)
+
+	for _, qr := range queryResults {
+		// Initialize exactly 90 days with -1
+		paddedUptimes := make([]float32, 90)
+		for i := 0; i < 90; i++ {
+			paddedUptimes[i] = -1 // No data
+		}
+
+		// Map existing data to the correct index
+		for i, date := range qr.DailyDates {
+			// Calculate days ago (0 = today, 89 = 89 days ago)
+			daysAgo := int(today.Sub(date.UTC()).Hours() / 24)
+			if daysAgo >= 0 && daysAgo < 90 {
+				// We want index 0 to be oldest (89 days ago) and index 89 to be today (0 days ago)
+				idx := 89 - daysAgo
+				paddedUptimes[idx] = qr.DailyUptimes[i]
+			}
+		}
+
+		results = append(results, MonitorUptimeResult{
+			MonitorID:        qr.MonitorID,
+			UptimePercentage: qr.UptimePercentage,
+			DailyUptimes:     paddedUptimes,
+		})
 	}
 
 	uptimes := make(map[uint]MonitorUptimeResult)

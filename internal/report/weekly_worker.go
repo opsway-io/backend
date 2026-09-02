@@ -20,14 +20,14 @@ type WeeklyWorker interface {
 }
 
 type weeklyWorker struct {
-	logger         *logrus.Entry
-	teamService    team.Service
-	monitorService monitor.Service
-	checkService   check.Service
+	logger          *logrus.Entry
+	teamService     team.Service
+	monitorService  monitor.Service
+	checkService    check.Service
 	incidentService incident.Service
-	emailSender    email.Sender
-	interval       time.Duration
-	applicationURL string
+	emailSender     email.Sender
+	interval        time.Duration
+	applicationURL  string
 }
 
 func NewWeeklyWorker(
@@ -41,14 +41,14 @@ func NewWeeklyWorker(
 	applicationURL string,
 ) WeeklyWorker {
 	return &weeklyWorker{
-		logger:         logger.WithField("component", "weekly_report_worker"),
-		teamService:    teamService,
-		monitorService: monitorService,
-		checkService:   checkService,
+		logger:          logger.WithField("component", "weekly_report_worker"),
+		teamService:     teamService,
+		monitorService:  monitorService,
+		checkService:    checkService,
 		incidentService: incidentService,
-		emailSender:    emailSender,
-		interval:       interval,
-		applicationURL: applicationURL,
+		emailSender:     emailSender,
+		interval:        interval,
+		applicationURL:  applicationURL,
 	}
 }
 
@@ -129,7 +129,7 @@ func (w *weeklyWorker) sendReportForTeam(ctx context.Context, teamID uint, monit
 			monitorsUp++
 		}
 	}
-	
+
 	totalMonitorsWithData := 0
 	for _, u := range *uptimeStats {
 		totalUptime += float64(u.UptimePercentage)
@@ -160,16 +160,16 @@ func (w *weeklyWorker) sendReportForTeam(ctx context.Context, teamID uint, monit
 	teamName := "Your Team" // We don't have GetTeamByID on teamService? We can just use "Your Team"
 
 	tpl := &templates.WeeklyReportTemplate{
-		TeamName:         teamName,
-		StartDate:        start.Format("Jan 02, 2006"),
-		EndDate:          end.Format("Jan 02, 2006"),
-		DashboardURL:     dashboardURL,
-		TotalMonitors:    len(monitors),
-		MonitorsUp:       monitorsUp,
-		MonitorsDown:     monitorsDown,
-		TotalIncidents:   totalIncidents,
+		TeamName:          teamName,
+		StartDate:         start.Format("Jan 02, 2006"),
+		EndDate:           end.Format("Jan 02, 2006"),
+		DashboardURL:      dashboardURL,
+		TotalMonitors:     len(monitors),
+		MonitorsUp:        monitorsUp,
+		MonitorsDown:      monitorsDown,
+		TotalIncidents:    totalIncidents,
 		ResolvedIncidents: resolvedIncidents,
-		AverageUptime:    fmt.Sprintf("%.2f", averageUptime),
+		AverageUptime:     fmt.Sprintf("%.2f", averageUptime),
 	}
 
 	// 4. Send emails

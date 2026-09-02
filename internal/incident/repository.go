@@ -75,7 +75,7 @@ func (r *RepositoryImpl) GetByTeamIDAndStatusPaginated(ctx context.Context, team
 	if resolved != nil {
 		query = query.Where("resolved = ?", *resolved)
 	}
-	
+
 	if err := query.Order(
 		"created_at desc",
 	).Scopes(

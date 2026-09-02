@@ -93,7 +93,7 @@ func (w *worker) checkSSLExpiry(ctx context.Context, m *entities.Monitor) {
 	}
 
 	daysRemaining := int(latestCheck.TLS.NotAfter.Sub(time.Now()).Hours() / 24)
-	
+
 	if daysRemaining <= int(thresholdDays) && daysRemaining >= 0 {
 		// Needs notification
 		if m.Settings.SslExpiryNotifiedAt == nil || time.Since(*m.Settings.SslExpiryNotifiedAt) > 24*time.Hour {
@@ -101,7 +101,7 @@ func (w *worker) checkSSLExpiry(ctx context.Context, m *entities.Monitor) {
 
 			now := time.Now()
 			m.Settings.SslExpiryNotifiedAt = &now
-			
+
 			// Update the monitor settings using monitorService
 			err := w.monitorService.Update(ctx, m.TeamID, m.ID, m)
 			if err != nil {

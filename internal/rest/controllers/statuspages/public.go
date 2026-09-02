@@ -150,7 +150,7 @@ func (h *PublicHandlers) GetPublicStatusPage(c echo.Context) error {
 		if m.State == 0 { // Inactive
 			status = "OUTAGE"
 		}
-		
+
 		var uptimePtr *float32
 		var dailyUptimes []float32
 		if res, ok := uptimes[m.ID]; ok {

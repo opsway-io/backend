@@ -28,8 +28,8 @@ type MaintenanceSettings struct {
 	ID            uint `json:"id"`
 	MaintenanceID uint `gorm:"index;not null" json:"maintenanceId"`
 
-	StartAt  time.Time       `gorm:"index;not null" json:"startAt"`
-	EndAt    time.Time       `gorm:"index;not null" json:"endAt"`
+	StartAt           time.Time       `gorm:"index;not null" json:"startAt"`
+	EndAt             time.Time       `gorm:"index;not null" json:"endAt"`
 	Tags              *pq.StringArray `gorm:"type:text[]" json:"tags"`
 	Notified          bool            `gorm:"default:false" json:"notified"`
 	Reminded          bool            `gorm:"default:false" json:"reminded"`

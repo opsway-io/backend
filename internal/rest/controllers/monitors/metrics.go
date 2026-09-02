@@ -220,9 +220,9 @@ func (h *Handlers) GetMonitorMetrics(c hs.AuthenticatedContext) error {
 
 	if hasForecast {
 		for i, ts := range futureTimestamps {
-			metricResp[5].Data = append(metricResp[5].Data, MonitorMetrics{Start: ts, Timing: time.Duration(forecast.Predictions[i])})
-			metricResp[6].Data = append(metricResp[6].Data, MonitorMetrics{Start: ts, Timing: time.Duration(forecast.UpperBounds[i])})
-			metricResp[7].Data = append(metricResp[7].Data, MonitorMetrics{Start: ts, Timing: time.Duration(forecast.LowerBounds[i])})
+			metricResp[7].Data = append(metricResp[7].Data, MonitorMetrics{Start: ts, Timing: time.Duration(forecast.Predictions[i])})
+			metricResp[8].Data = append(metricResp[8].Data, MonitorMetrics{Start: ts, Timing: time.Duration(forecast.UpperBounds[i])})
+			metricResp[9].Data = append(metricResp[9].Data, MonitorMetrics{Start: ts, Timing: time.Duration(forecast.LowerBounds[i])})
 		}
 	}
 

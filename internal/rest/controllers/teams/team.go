@@ -17,20 +17,20 @@ type GetTeamRequest struct {
 }
 
 type GetTeamResponse struct {
-	ID                 uint      `json:"id"`
-	Name               string    `json:"name"`
-	DisplayName        *string   `json:"displayName"`
-	PaymentPlan        string    `json:"paymentPlan"`
-	AvatarURL          *string   `json:"avatarUrl"`
-	SlackWebhookURL    *string   `json:"slackWebhookUrl"`
-	DiscordWebhookURL  *string   `json:"discordWebhookUrl"`
-	TelegramChatID     *string   `json:"telegramChatId"`
+	ID                       uint      `json:"id"`
+	Name                     string    `json:"name"`
+	DisplayName              *string   `json:"displayName"`
+	PaymentPlan              string    `json:"paymentPlan"`
+	AvatarURL                *string   `json:"avatarUrl"`
+	SlackWebhookURL          *string   `json:"slackWebhookUrl"`
+	DiscordWebhookURL        *string   `json:"discordWebhookUrl"`
+	TelegramChatID           *string   `json:"telegramChatId"`
 	DatadogWebhookURL        *string   `json:"datadogWebhookUrl"`
 	NewRelicWebhookURL       *string   `json:"newRelicWebhookUrl"`
 	MicrosoftTeamsWebhookURL *string   `json:"microsoftTeamsWebhookUrl"`
 	WebhookURL               *string   `json:"webhookUrl"`
-	CreatedAt          time.Time `json:"createdAt"`
-	UpdatedAt          time.Time `json:"updatedAt"`
+	CreatedAt                time.Time `json:"createdAt"`
+	UpdatedAt                time.Time `json:"updatedAt"`
 }
 
 func (h *Handlers) GetTeam(c hs.AuthenticatedContext) error {
@@ -53,19 +53,19 @@ func (h *Handlers) GetTeam(c hs.AuthenticatedContext) error {
 
 func newGetTeamResponse(t *entities.Team, teamService team.Service) GetTeamResponse {
 	team := GetTeamResponse{
-		ID:                 t.ID,
-		Name:               t.Name,
-		DisplayName:        t.DisplayName,
-		PaymentPlan:        string(t.PaymentPlan),
-		SlackWebhookURL:    t.SlackWebhookURL,
-		DiscordWebhookURL:  t.DiscordWebhookURL,
-		TelegramChatID:     t.TelegramChatID,
+		ID:                       t.ID,
+		Name:                     t.Name,
+		DisplayName:              t.DisplayName,
+		PaymentPlan:              string(t.PaymentPlan),
+		SlackWebhookURL:          t.SlackWebhookURL,
+		DiscordWebhookURL:        t.DiscordWebhookURL,
+		TelegramChatID:           t.TelegramChatID,
 		DatadogWebhookURL:        t.DatadogWebhookURL,
 		NewRelicWebhookURL:       t.NewRelicWebhookURL,
 		MicrosoftTeamsWebhookURL: t.MicrosoftTeamsWebhookURL,
 		WebhookURL:               t.WebhookURL,
-		CreatedAt:          t.CreatedAt,
-		UpdatedAt:          t.UpdatedAt,
+		CreatedAt:                t.CreatedAt,
+		UpdatedAt:                t.UpdatedAt,
 	}
 
 	if t.HasAvatar {
@@ -76,11 +76,11 @@ func newGetTeamResponse(t *entities.Team, teamService team.Service) GetTeamRespo
 }
 
 type PutTeamRequest struct {
-	TeamID             uint    `param:"teamId" validate:"required,numeric,gt=0"`
-	DisplayName        string  `json:"displayName" validate:"max=255"`
-	SlackWebhookURL    *string `json:"slackWebhookUrl"`
-	DiscordWebhookURL  *string `json:"discordWebhookUrl"`
-	TelegramChatID     *string `json:"telegramChatId"`
+	TeamID                   uint    `param:"teamId" validate:"required,numeric,gt=0"`
+	DisplayName              string  `json:"displayName" validate:"max=255"`
+	SlackWebhookURL          *string `json:"slackWebhookUrl"`
+	DiscordWebhookURL        *string `json:"discordWebhookUrl"`
+	TelegramChatID           *string `json:"telegramChatId"`
 	DatadogWebhookURL        *string `json:"datadogWebhookUrl"`
 	NewRelicWebhookURL       *string `json:"newRelicWebhookUrl"`
 	MicrosoftTeamsWebhookURL *string `json:"microsoftTeamsWebhookUrl"`

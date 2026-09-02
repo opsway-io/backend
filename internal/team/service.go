@@ -210,7 +210,7 @@ func (s *ServiceImpl) UpdateUserRole(ctx context.Context, teamID, userID uint, r
 						if u.DisplayName != nil {
 							userName = *u.DisplayName
 						}
-						
+
 						_ = s.email.Send(
 							ctx,
 							"",

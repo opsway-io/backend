@@ -7,16 +7,16 @@ var weeklyReportTemplate string
 
 type WeeklyReportTemplate struct {
 	BaseTemplate
-	TeamName         string
-	StartDate        string
-	EndDate          string
-	DashboardURL     string
-	TotalMonitors    int
-	MonitorsUp       int
-	MonitorsDown     int
-	TotalIncidents   int
+	TeamName          string
+	StartDate         string
+	EndDate           string
+	DashboardURL      string
+	TotalMonitors     int
+	MonitorsUp        int
+	MonitorsDown      int
+	TotalIncidents    int
 	ResolvedIncidents int
-	AverageUptime    string
+	AverageUptime     string
 }
 
 func (t *WeeklyReportTemplate) Subject() string {
@@ -25,16 +25,16 @@ func (t *WeeklyReportTemplate) Subject() string {
 
 func (t *WeeklyReportTemplate) HTML() string {
 	return t.Render(weeklyReportTemplate, map[string]any{
-		"TeamName":         t.TeamName,
-		"StartDate":        t.StartDate,
-		"EndDate":          t.EndDate,
-		"DashboardURL":     t.DashboardURL,
-		"TotalMonitors":    t.TotalMonitors,
-		"MonitorsUp":       t.MonitorsUp,
-		"MonitorsDown":     t.MonitorsDown,
-		"TotalIncidents":   t.TotalIncidents,
+		"TeamName":          t.TeamName,
+		"StartDate":         t.StartDate,
+		"EndDate":           t.EndDate,
+		"DashboardURL":      t.DashboardURL,
+		"TotalMonitors":     t.TotalMonitors,
+		"MonitorsUp":        t.MonitorsUp,
+		"MonitorsDown":      t.MonitorsDown,
+		"TotalIncidents":    t.TotalIncidents,
 		"ResolvedIncidents": t.ResolvedIncidents,
-		"AverageUptime":    t.AverageUptime,
+		"AverageUptime":     t.AverageUptime,
 	})
 }
 

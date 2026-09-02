@@ -2,8 +2,8 @@ package incidents
 
 import (
 	"github.com/labstack/echo/v4"
-	"github.com/opsway-io/backend/internal/authentication"
 	"github.com/opsway-io/backend/internal/alerting"
+	"github.com/opsway-io/backend/internal/authentication"
 	"github.com/opsway-io/backend/internal/event"
 	"github.com/opsway-io/backend/internal/incident"
 	"github.com/opsway-io/backend/internal/rest/handlers"

@@ -98,7 +98,7 @@ func (r *RepositoryImpl) GetUnnotified(ctx context.Context, now time.Time) (*[]e
 func (r *RepositoryImpl) GetUnreminded(ctx context.Context, now time.Time, reminderWindow time.Duration) (*[]entities.Maintenance, error) {
 	var maintenances []entities.Maintenance
 	targetTime := now.Add(reminderWindow)
-	
+
 	if err := r.db.WithContext(
 		ctx,
 	).Joins("JOIN maintenance_settings ms ON ms.maintenance_id = maintenance.id").

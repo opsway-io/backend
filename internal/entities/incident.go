@@ -19,7 +19,7 @@ type Incident struct {
 	Description       *string
 	Occurrences       int `gorm:"not null;default:1"`
 	RootCauseAnalysis *string
-	RootCauseNotified bool `gorm:"not null;default:false"`
+	RootCauseNotified bool                 `gorm:"not null;default:false"`
 	Comments          []IncidentComment    `gorm:"constraint:OnDelete:CASCADE"`
 	OccurrencesList   []IncidentOccurrence `gorm:"constraint:OnDelete:CASCADE"`
 

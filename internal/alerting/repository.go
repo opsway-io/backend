@@ -60,7 +60,7 @@ func (r *RepositoryImpl) GetTriggersByRuleID(ctx context.Context, teamID uint, r
 	var totalCount int64
 
 	baseQuery := r.db.WithContext(ctx).Model(&entities.AlertTrigger{}).Where("team_id = ? AND alert_rule_id = ?", teamID, ruleID)
-	
+
 	err := baseQuery.Count(&totalCount).Error
 	if err != nil {
 		return 0, nil, err
@@ -82,7 +82,7 @@ func (r *RepositoryImpl) GetTriggersByIncidentID(ctx context.Context, teamID uin
 	var totalCount int64
 
 	baseQuery := r.db.WithContext(ctx).Model(&entities.AlertTrigger{}).Where("team_id = ? AND incident_id = ?", teamID, incidentID)
-	
+
 	err := baseQuery.Count(&totalCount).Error
 	if err != nil {
 		return 0, nil, err

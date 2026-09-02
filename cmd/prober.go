@@ -219,23 +219,24 @@ func handleTask(ctx context.Context, logger *logrus.Logger, httpProber http.Serv
 		"total_time": fmt.Sprintf("%v", res.Timing.Phases.Total),
 	})
 
-	newCheck := mapResultToCheck(m, res, location)
-
-	if err = c.Create(ctx, newCheck); err != nil {
-		l.WithError(err).Error("failed add result to clickhouse")
-
-		return
-	}
-
 	failed, passed, err := assertResult(res, m.Assertions)
 	if err != nil {
 		l.WithError(err).Error("failed to assert result")
-
 		return
 	}
 
 	failedCount := len(failed)
 	passedCount := len(passed)
+
+	newCheck := mapResultToCheck(m, res, location)
+	if failedCount > 0 {
+		newCheck.StatusCode = 0
+	}
+
+	if err = c.Create(ctx, newCheck); err != nil {
+		l.WithError(err).Error("failed add result to clickhouse")
+		return
+	}
 
 	l = l.WithFields(logrus.Fields{
 		"assertions_passed": passedCount,

@@ -3,6 +3,7 @@ module github.com/opsway-io/backend
 go 1.26
 
 require (
+	github.com/ClickHouse/clickhouse-go/v2 v2.34.0
 	github.com/ThreeDotsLabs/watermill v1.2.0
 	github.com/ThreeDotsLabs/watermill-redisstream v1.0.0
 	github.com/aws/aws-sdk-go-v2 v1.17.3
@@ -20,6 +21,7 @@ require (
 	github.com/gofrs/uuid v4.0.0+incompatible
 	github.com/golang-jwt/jwt/v5 v5.3.1
 	github.com/google/uuid v1.6.0
+	github.com/gorilla/websocket v1.5.3
 	github.com/jackc/pgconn v1.13.0
 	github.com/json-iterator/go v1.1.12
 	github.com/labstack/echo/v4 v4.9.1
@@ -49,7 +51,6 @@ require (
 	gorm.io/datatypes v1.2.6
 	gorm.io/driver/clickhouse v0.5.0
 	gorm.io/driver/postgres v1.5.11
-	gorm.io/driver/sqlite v1.4.3
 	gorm.io/gorm v1.30.0
 	k8s.io/api v0.29.0
 	k8s.io/apimachinery v0.29.0
@@ -63,7 +64,6 @@ require (
 	filippo.io/edwards25519 v1.1.0 // indirect
 	github.com/Azure/go-ansiterm v0.0.0-20250102033503-faa5f7b0171c // indirect
 	github.com/ClickHouse/ch-go v0.65.1 // indirect
-	github.com/ClickHouse/clickhouse-go/v2 v2.34.0 // indirect
 	github.com/Microsoft/go-winio v0.6.2 // indirect
 	github.com/Rican7/retry v0.3.1 // indirect
 	github.com/andybalholm/brotli v1.1.1 // indirect
@@ -119,7 +119,6 @@ require (
 	github.com/gorilla/mux v1.6.2 // indirect
 	github.com/gorilla/securecookie v1.1.1 // indirect
 	github.com/gorilla/sessions v1.1.1 // indirect
-	github.com/gorilla/websocket v1.5.3 // indirect
 	github.com/hashicorp/go-version v1.7.0 // indirect
 	github.com/hashicorp/hcl v1.0.0 // indirect
 	github.com/inconshreveable/mousetrap v1.0.1 // indirect
@@ -143,7 +142,6 @@ require (
 	github.com/mailru/easyjson v0.7.7 // indirect
 	github.com/mattn/go-colorable v0.1.12 // indirect
 	github.com/mattn/go-isatty v0.0.14 // indirect
-	github.com/mattn/go-sqlite3 v1.14.15 // indirect
 	github.com/mdelapenya/tlscert v0.2.0 // indirect
 	github.com/mitchellh/mapstructure v1.5.0 // indirect
 	github.com/moby/docker-image-spec v1.3.1 // indirect

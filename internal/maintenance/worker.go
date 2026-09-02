@@ -199,7 +199,7 @@ func (w *worker) notifySubscribers(ctx context.Context, m *entities.Maintenance,
 		statusPageURL := fmt.Sprintf("%s/%s", w.statusPageBaseURL, sp.Domain)
 		for _, sub := range subs {
 			unsubscribeURL := fmt.Sprintf("%s/%s/subscribe/%s", w.statusPageBaseURL, sp.Domain, sub.Token)
-			
+
 			var template templates.Template
 			switch notificationType {
 			case "reminder":

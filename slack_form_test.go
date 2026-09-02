@@ -2,10 +2,10 @@ package main
 
 import (
 	"bytes"
+	"github.com/labstack/echo/v4"
 	"net/http"
 	"net/http/httptest"
 	"testing"
-	"github.com/labstack/echo/v4"
 )
 
 func TestFormValue(t *testing.T) {
@@ -14,7 +14,7 @@ func TestFormValue(t *testing.T) {
 	req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationForm)
 	rec := httptest.NewRecorder()
 	c := e.NewContext(req, rec)
-	
+
 	if c.FormValue("payload") != `{"type":"block_actions"}` {
 		t.Errorf("expected parsed payload, got %s", c.FormValue("payload"))
 	}
