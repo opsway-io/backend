@@ -180,7 +180,7 @@ func (r *RepositoryImpl) GetMonitorStatsByMonitorID(ctx context.Context, monitor
 	err := r.db.WithContext(
 		ctx,
 	).Table("checks").Select(`
-		if(count() = 0, 0, (countIf(status_code < 400) / count()) * 100) as uptime_percentage,
+		if(count() = 0, 0, (countIf(status_code > 0 AND status_code < 400) / count()) * 100) as uptime_percentage,
 		if(count() = 0, 0, avg(timing_total/1000000)) as average_response_time`).
 		Where("monitor_id = ?", monitorID).
 		Where("created_at BETWEEN DATE_SUB(NOW(), INTERVAL 1 DAY) AND NOW()").
@@ -211,7 +211,7 @@ func (r *RepositoryImpl) GetMonitorOverviewsByTeamID(ctx context.Context, teamID
 	).Table("checks").Select(`
 		monitor_id,
 		max(created_at) as latest, 
-		(countIf(status_code < 400) / count()) * 100 as uptime_percentage,
+		(countIf(status_code > 0 AND status_code < 400) / count()) * 100 as uptime_percentage,
 		avg(timing_total/1000000) as average_response_time,
 		quantile(0.99)(timing_total)/1000000 as p99, 
 		quantile(0.95)(timing_total)/1000000 as p95`).

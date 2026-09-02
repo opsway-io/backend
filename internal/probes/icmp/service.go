@@ -32,7 +32,8 @@ func (s *ServiceImpl) Probe(ctx context.Context, target string, timeout time.Dur
 	res := &probeHttp.Result{
 		Timing: probeHttp.Timing{
 			Phases: probeHttp.TimingPhases{
-				Total: duration,
+				Total:            duration,
+				ServerProcessing: duration,
 			},
 		},
 		Response: probeHttp.Response{

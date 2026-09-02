@@ -207,7 +207,8 @@ func handleTask(ctx context.Context, logger *logrus.Logger, httpProber http.Serv
 			},
 			Timing: http.Timing{
 				Phases: http.TimingPhases{
-					Total: timeout,
+					Total:            timeout,
+					ServerProcessing: timeout,
 				},
 			},
 		}
