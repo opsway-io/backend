@@ -20,7 +20,7 @@ type Repository interface {
 	GetMonitorMetricsByMonitorID(ctx context.Context, monitorID uint, start *string, end *string) (*[]AggMetric, error)
 	GetMonitorOverviewsByTeamID(ctx context.Context, teamID uint) (*[]MonitorOverviews, error)
 	GetMonitorOverviewStatsByTeamID(ctx context.Context, teamID uint) (*[]MonitorOverviewStats, error)
-	GetMonitorUptimesByMonitorIDs(ctx context.Context, monitorIDs []uint) (map[uint]float32, error)
+	GetMonitorUptimesByMonitorIDs(ctx context.Context, monitorIDs []uint) (map[uint]MonitorUptimeResult, error)
 	GetMonitorIDAndAssertions(ctx context.Context, monitorID uint, assertions []string) (*[]Check, error)
 	GetByTeamIDMonitorsUptime(ctx context.Context, teamID uint, start, end string) (*[]MonitorUptime, error)
 	GetByTeamIDMonitorsPerformance(ctx context.Context, teamID uint, start, end string) (*[]MonitorPerformance, error)
@@ -250,31 +250,47 @@ func (r *RepositoryImpl) GetMonitorOverviewStatsByTeamID(ctx context.Context, te
 	return &overviews, err
 }
 
-func (r *RepositoryImpl) GetMonitorUptimesByMonitorIDs(ctx context.Context, monitorIDs []uint) (map[uint]float32, error) {
-	var results []struct {
-		MonitorID        uint
-		UptimePercentage float32
-	}
+type MonitorUptimeResult struct {
+	MonitorID        uint
+	UptimePercentage float32
+	DailyUptimes     []float32 `gorm:"type:float"`
+}
+
+func (r *RepositoryImpl) GetMonitorUptimesByMonitorIDs(ctx context.Context, monitorIDs []uint) (map[uint]MonitorUptimeResult, error) {
+	var results []MonitorUptimeResult
 
 	if len(monitorIDs) == 0 {
-		return make(map[uint]float32), nil
+		return make(map[uint]MonitorUptimeResult), nil
 	}
 
-	err := r.db.WithContext(ctx).Table("checks").Select(`
-		monitor_id,
-		if(count() = 0, 0, (countIf(status_code > 0 AND status_code < 400) / count()) * 100) as uptime_percentage
-	`).Where("monitor_id IN ?", monitorIDs).
-		Where("created_at BETWEEN DATE_SUB(NOW(), INTERVAL 90 DAY) AND NOW()").
-		Group("monitor_id").
-		Scan(&results).Error
+	// Calculate overall 90-day uptime and daily uptimes using ClickHouse array aggregation
+	err := r.db.WithContext(ctx).Raw(`
+		SELECT 
+			m.monitor_id as monitor_id,
+			if(sum(m.total_count) = 0, 0, (sum(m.up_count) / sum(m.total_count)) * 100) as uptime_percentage,
+			groupArray(m.daily_uptime) as daily_uptimes
+		FROM (
+			SELECT 
+				monitor_id,
+				toDate(created_at) as day,
+				count() as total_count,
+				countIf(status_code > 0 AND status_code < 400) as up_count,
+				if(count() = 0, 0, (countIf(status_code > 0 AND status_code < 400) / count()) * 100) as daily_uptime
+			FROM checks
+			WHERE monitor_id IN ? AND created_at >= DATE_SUB(NOW(), INTERVAL 90 DAY)
+			GROUP BY monitor_id, day
+			ORDER BY monitor_id, day ASC
+		) m
+		GROUP BY m.monitor_id
+	`, monitorIDs).Scan(&results).Error
 
 	if err != nil {
 		return nil, err
 	}
 
-	uptimes := make(map[uint]float32)
+	uptimes := make(map[uint]MonitorUptimeResult)
 	for _, r := range results {
-		uptimes[r.MonitorID] = r.UptimePercentage
+		uptimes[r.MonitorID] = r
 	}
 	return uptimes, nil
 }

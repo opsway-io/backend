@@ -64,6 +64,7 @@ type PublicMonitor struct {
 	Status           string    `json:"status"` // "OPERATIONAL" or "OUTAGE"
 	CreatedAt        time.Time `json:"createdAt"`
 	UptimePercentage *float32  `json:"uptimePercentage"`
+	DailyUptimes     []float32 `json:"dailyUptimes"`
 }
 
 type PublicIncident struct {
@@ -151,8 +152,10 @@ func (h *PublicHandlers) GetPublicStatusPage(c echo.Context) error {
 		}
 		
 		var uptimePtr *float32
-		if uptime, ok := uptimes[m.ID]; ok {
-			uptimePtr = &uptime
+		var dailyUptimes []float32
+		if res, ok := uptimes[m.ID]; ok {
+			uptimePtr = &res.UptimePercentage
+			dailyUptimes = res.DailyUptimes
 		}
 
 		monitors[i] = PublicMonitor{
@@ -161,6 +164,7 @@ func (h *PublicHandlers) GetPublicStatusPage(c echo.Context) error {
 			Status:           status,
 			CreatedAt:        m.CreatedAt,
 			UptimePercentage: uptimePtr,
+			DailyUptimes:     dailyUptimes,
 		}
 	}
 
