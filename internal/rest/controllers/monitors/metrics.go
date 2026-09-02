@@ -168,7 +168,7 @@ func (h *Handlers) GetMonitorMetrics(c hs.AuthenticatedContext) error {
 		c.Log.WithError(predErr).Warn("failed to fetch predictions from forecaster")
 	}
 
-	metrics_list := []string{"DNS", "TCP", "TLS", "Processing", "Transfer"}
+	metrics_list := []string{"DNS", "TCP", "TLS", "Processing", "Transfer", "Total"}
 
 	var futureTimestamps []string
 	now := time.Now()
@@ -197,17 +197,18 @@ func (h *Handlers) GetMonitorMetrics(c hs.AuthenticatedContext) error {
 		metricResp[2].Data = append(metricResp[2].Data, MonitorMetrics{Start: c.Start, Timing: time.Duration(c.TLS)})
 		metricResp[3].Data = append(metricResp[3].Data, MonitorMetrics{Start: c.Start, Timing: time.Duration(c.Processing)})
 		metricResp[4].Data = append(metricResp[4].Data, MonitorMetrics{Start: c.Start, Timing: time.Duration(c.Transfer)})
+		metricResp[5].Data = append(metricResp[5].Data, MonitorMetrics{Start: c.Start, Timing: time.Duration(c.Total)})
 
 		if hasPredictions {
-			metricResp[5].Data = append(metricResp[5].Data, MonitorMetrics{Start: c.Start, Timing: time.Duration(predictions.Predictions[i])})
-			metricResp[6].Data = append(metricResp[6].Data, MonitorMetrics{Start: c.Start, Timing: time.Duration(predictions.UpperBounds[i])})
-			metricResp[7].Data = append(metricResp[7].Data, MonitorMetrics{Start: c.Start, Timing: time.Duration(predictions.LowerBounds[i])})
+			metricResp[6].Data = append(metricResp[6].Data, MonitorMetrics{Start: c.Start, Timing: time.Duration(predictions.Predictions[i])})
+			metricResp[7].Data = append(metricResp[7].Data, MonitorMetrics{Start: c.Start, Timing: time.Duration(predictions.UpperBounds[i])})
+			metricResp[8].Data = append(metricResp[8].Data, MonitorMetrics{Start: c.Start, Timing: time.Duration(predictions.LowerBounds[i])})
 
 			var anomalyVal float64 = -1
 			if predictions.Anomalies[i] {
 				anomalyVal = c.Total
 			}
-			metricResp[8].Data = append(metricResp[8].Data, MonitorMetrics{Start: c.Start, Timing: time.Duration(anomalyVal)})
+			metricResp[9].Data = append(metricResp[9].Data, MonitorMetrics{Start: c.Start, Timing: time.Duration(anomalyVal)})
 		}
 	}
 
