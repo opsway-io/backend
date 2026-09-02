@@ -136,7 +136,7 @@ func Register(
 	reports.Register(authRoot, logger, teamService, reportsService, checkService, eventService)
 
 	statuspages.Register(authRoot, logger, teamService, statusPageService)
-	statuspages.RegisterPublic(root, logger, statusPageBaseURL, statusPageService, incidentService, maintenanceService, emailSender)
+	statuspages.RegisterPublic(root, logger, statusPageBaseURL, statusPageService, incidentService, maintenanceService, checkService, emailSender)
 
 	// Prober
 	prober.Register(root, logger, availableLocations)

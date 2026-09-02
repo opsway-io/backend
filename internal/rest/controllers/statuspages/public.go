@@ -8,6 +8,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/labstack/echo/v4"
+	"github.com/opsway-io/backend/internal/check"
 	"github.com/opsway-io/backend/internal/incident"
 	"github.com/opsway-io/backend/internal/maintenance"
 	"github.com/opsway-io/backend/internal/notification/email"
@@ -23,6 +24,7 @@ type PublicHandlers struct {
 	StatusPageService  statuspage.Service
 	IncidentService    incident.Service
 	MaintenanceService maintenance.Service
+	CheckService       check.Service
 	EmailSender        email.Sender
 }
 
@@ -33,6 +35,7 @@ func RegisterPublic(
 	statusPageService statuspage.Service,
 	incidentService incident.Service,
 	maintenanceService maintenance.Service,
+	checkService check.Service,
 	emailSender email.Sender,
 ) {
 	h := &PublicHandlers{
@@ -40,6 +43,7 @@ func RegisterPublic(
 		StatusPageService:  statusPageService,
 		IncidentService:    incidentService,
 		MaintenanceService: maintenanceService,
+		CheckService:       checkService,
 		EmailSender:        emailSender,
 	}
 
@@ -55,10 +59,11 @@ type GetPublicStatusPageRequest struct {
 }
 
 type PublicMonitor struct {
-	ID        uint      `json:"id"`
-	Name      string    `json:"name"`
-	Status    string    `json:"status"` // "OPERATIONAL" or "OUTAGE"
-	CreatedAt time.Time `json:"createdAt"`
+	ID               uint      `json:"id"`
+	Name             string    `json:"name"`
+	Status           string    `json:"status"` // "OPERATIONAL" or "OUTAGE"
+	CreatedAt        time.Time `json:"createdAt"`
+	UptimePercentage *float32  `json:"uptimePercentage"`
 }
 
 type PublicIncident struct {
@@ -130,17 +135,32 @@ func (h *PublicHandlers) GetPublicStatusPage(c echo.Context) error {
 
 	monitors := make([]PublicMonitor, len(sp.Monitors))
 	var monitorIDs []uint
-	for i, m := range sp.Monitors {
+	for _, m := range sp.Monitors {
 		monitorIDs = append(monitorIDs, m.ID)
+	}
+
+	uptimes, err := h.CheckService.GetMonitorUptimesByMonitorIDs(c.Request().Context(), monitorIDs)
+	if err != nil {
+		logrus.WithError(err).Error("failed to get monitor uptimes")
+	}
+
+	for i, m := range sp.Monitors {
 		status := "OPERATIONAL"
 		if m.State == 0 { // Inactive
 			status = "OUTAGE"
 		}
+		
+		var uptimePtr *float32
+		if uptime, ok := uptimes[m.ID]; ok {
+			uptimePtr = &uptime
+		}
+
 		monitors[i] = PublicMonitor{
-			ID:        m.ID,
-			Name:      m.Name,
-			Status:    status,
-			CreatedAt: m.CreatedAt,
+			ID:               m.ID,
+			Name:             m.Name,
+			Status:           status,
+			CreatedAt:        m.CreatedAt,
+			UptimePercentage: uptimePtr,
 		}
 	}
 

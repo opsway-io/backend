@@ -19,8 +19,8 @@ type Repository interface {
 	GetByTeamIDAndMonitorIDPaginated(ctx context.Context, teamID, monitorID uint, offset, limit *int) (*[]Check, error)
 	GetMonitorMetricsByMonitorID(ctx context.Context, monitorID uint, start *string, end *string) (*[]AggMetric, error)
 	GetMonitorOverviewsByTeamID(ctx context.Context, teamID uint) (*[]MonitorOverviews, error)
-	GetMonitorStatsByMonitorID(ctx context.Context, monitorID uint) (*MonitorStats, error)
 	GetMonitorOverviewStatsByTeamID(ctx context.Context, teamID uint) (*[]MonitorOverviewStats, error)
+	GetMonitorUptimesByMonitorIDs(ctx context.Context, monitorIDs []uint) (map[uint]float32, error)
 	GetMonitorIDAndAssertions(ctx context.Context, monitorID uint, assertions []string) (*[]Check, error)
 	GetByTeamIDMonitorsUptime(ctx context.Context, teamID uint, start, end string) (*[]MonitorUptime, error)
 	GetByTeamIDMonitorsPerformance(ctx context.Context, teamID uint, start, end string) (*[]MonitorPerformance, error)
@@ -248,6 +248,35 @@ func (r *RepositoryImpl) GetMonitorOverviewStatsByTeamID(ctx context.Context, te
 		Find(&overviews).Error
 
 	return &overviews, err
+}
+
+func (r *RepositoryImpl) GetMonitorUptimesByMonitorIDs(ctx context.Context, monitorIDs []uint) (map[uint]float32, error) {
+	var results []struct {
+		MonitorID        uint
+		UptimePercentage float32
+	}
+
+	if len(monitorIDs) == 0 {
+		return make(map[uint]float32), nil
+	}
+
+	err := r.db.WithContext(ctx).Table("checks").Select(`
+		monitor_id,
+		if(count() = 0, 0, (countIf(status_code > 0 AND status_code < 400) / count()) * 100) as uptime_percentage
+	`).Where("monitor_id IN ?", monitorIDs).
+		Where("created_at BETWEEN DATE_SUB(NOW(), INTERVAL 90 DAY) AND NOW()").
+		Group("monitor_id").
+		Scan(&results).Error
+
+	if err != nil {
+		return nil, err
+	}
+
+	uptimes := make(map[uint]float32)
+	for _, r := range results {
+		uptimes[r.MonitorID] = r.UptimePercentage
+	}
+	return uptimes, nil
 }
 
 func (r *RepositoryImpl) GetMonitorIDAndAssertions(ctx context.Context, monitorID uint, assertions []string) (*[]Check, error) {
