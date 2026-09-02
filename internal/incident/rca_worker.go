@@ -5,9 +5,12 @@ import (
 	"encoding/json"
 	"fmt"
 
+	"github.com/opsway-io/backend/internal/check"
+	"github.com/opsway-io/backend/internal/entities"
 	"github.com/opsway-io/backend/internal/event"
 	"github.com/opsway-io/backend/internal/event/events"
 	"github.com/opsway-io/backend/internal/llm"
+	"github.com/opsway-io/backend/internal/monitor"
 	"github.com/sirupsen/logrus"
 )
 
@@ -15,24 +18,35 @@ type RCAWorker interface {
 	Start(ctx context.Context) error
 }
 
+type GetHeartbeatFunc func(ctx context.Context, teamID uint, heartbeatID uint) (*entities.Heartbeat, error)
+
 type rcaWorker struct {
-	eventService event.Service
-	incidentSvc  Service
-	llmClient    llm.Client
-	logger       *logrus.Entry
+	eventService      event.Service
+	incidentSvc       Service
+	monitorService    monitor.Service
+	checkService      check.Service
+	getHeartbeat      GetHeartbeatFunc
+	llmClient         llm.Client
+	logger            *logrus.Entry
 }
 
 func NewRCAWorker(
 	eventService event.Service,
 	incidentSvc Service,
+	monitorService monitor.Service,
+	checkService check.Service,
+	getHeartbeat GetHeartbeatFunc,
 	llmClient llm.Client,
 	logger *logrus.Entry,
 ) RCAWorker {
 	return &rcaWorker{
-		eventService: eventService,
-		incidentSvc:  incidentSvc,
-		llmClient:    llmClient,
-		logger:       logger.WithField("component", "rca_worker"),
+		eventService:      eventService,
+		incidentSvc:       incidentSvc,
+		monitorService:    monitorService,
+		checkService:      checkService,
+		getHeartbeat:      getHeartbeat,
+		llmClient:         llmClient,
+		logger:            logger.WithField("component", "rca_worker"),
 	}
 }
 
@@ -69,6 +83,36 @@ func (w *rcaWorker) processMessage(ctx context.Context, payload []byte) {
 	if incident.Description != nil {
 		prompt += fmt.Sprintf("Description: %s\n", *incident.Description)
 	}
+
+	if incident.MonitorID != nil {
+		m, err := w.monitorService.GetMonitorAndSettingsByTeamIDAndID(ctx, incident.TeamID, *incident.MonitorID)
+		if err == nil && m != nil {
+			prompt += fmt.Sprintf("Monitor URL: %s\nMonitor Method: %s\n", m.Settings.URL, m.Settings.Method)
+		}
+		
+		offset := 0
+		limit := 10
+		checks, err := w.checkService.GetByTeamIDAndMonitorIDPaginated(ctx, incident.TeamID, *incident.MonitorID, &offset, &limit)
+		if err == nil && checks != nil && len(*checks) > 0 {
+			prompt += "Recent Checks:\n"
+			for _, c := range *checks {
+				prompt += fmt.Sprintf("- [%s] Status: %d, Timing: %v ms\n", c.CreatedAt.Format("2006-01-02T15:04:05Z"), c.StatusCode, c.Timing.Total.Milliseconds())
+			}
+		}
+	}
+
+	if incident.HeartbeatID != nil && w.getHeartbeat != nil {
+		hb, err := w.getHeartbeat(ctx, incident.TeamID, *incident.HeartbeatID)
+		if err == nil && hb != nil {
+			prompt += fmt.Sprintf("Heartbeat Name: %s\nStatus: %s\nInterval: %v\nGrace: %v\n", hb.Name, hb.Status, hb.Interval, hb.Grace)
+			if hb.LastPing != nil {
+				prompt += fmt.Sprintf("Last Ping: %s\n", hb.LastPing.Format("2006-01-02T15:04:05Z"))
+			} else {
+				prompt += "Last Ping: Never\n"
+			}
+		}
+	}
+
 	prompt += "Provide a brief Root Cause Analysis."
 
 	rca, err := w.llmClient.GenerateRCA(ctx, prompt)

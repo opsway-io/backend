@@ -123,7 +123,7 @@ func (r *RepositoryImpl) GetActiveByMonitorIDs(ctx context.Context, monitorIDs [
 	var incidents []entities.Incident
 	if err := r.db.WithContext(
 		ctx,
-	).Where("monitor_id IN ? AND resolved = ?", monitorIDs, false).
+	).Where("monitor_id IN ? AND resolved = ? AND is_status_page_visible = ?", monitorIDs, false, true).
 		Order("created_at desc").
 		Find(&incidents).Error; err != nil {
 		return nil, err
@@ -144,7 +144,7 @@ func (r *RepositoryImpl) Create(ctx context.Context, incidents *[]entities.Incid
 }
 
 func (r *RepositoryImpl) Update(ctx context.Context, incident *entities.Incident) error {
-	result := r.db.WithContext(ctx).Model(incident).Updates(incident)
+	result := r.db.WithContext(ctx).Save(incident)
 	if result.Error != nil {
 		return result.Error
 	}

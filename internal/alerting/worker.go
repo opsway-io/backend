@@ -138,7 +138,9 @@ func (w *worker) processPostMortemMessage(ctx context.Context, payload []byte) {
 		return
 	}
 
-	w.notifyStatusPageSubscribersForPostMortem(ctx, incident)
+	if incident.IsStatusPageVisible {
+		w.notifyStatusPageSubscribersForPostMortem(ctx, incident)
+	}
 }
 
 func (w *worker) processAlertRuleUpdatedMessage(ctx context.Context, payload []byte) {
@@ -215,7 +217,9 @@ func (w *worker) processMessage(ctx context.Context, payload []byte) {
 		return
 	}
 
-	w.notifyStatusPageSubscribers(ctx, incident)
+	if incident.IsStatusPageVisible {
+		w.notifyStatusPageSubscribers(ctx, incident)
+	}
 
 	for _, rule := range rules {
 		if !rule.Enabled {

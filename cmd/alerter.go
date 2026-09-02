@@ -2,10 +2,13 @@ package cmd
 
 import (
 	"github.com/opsway-io/backend/internal/alerting"
+	"github.com/opsway-io/backend/internal/check"
+	"github.com/opsway-io/backend/internal/connectors/clickhouse"
 	"github.com/opsway-io/backend/internal/connectors/postgres"
 	connectorRedis "github.com/opsway-io/backend/internal/connectors/redis"
 	"github.com/opsway-io/backend/internal/escalation"
 	"github.com/opsway-io/backend/internal/event"
+	"github.com/opsway-io/backend/internal/heartbeats"
 	"github.com/opsway-io/backend/internal/incident"
 	"github.com/opsway-io/backend/internal/llm"
 	"github.com/opsway-io/backend/internal/monitor"
@@ -53,6 +56,16 @@ func runAlerter(cmd *cobra.Command, args []string) {
 	if err != nil {
 		l.WithError(err).Fatal("Failed to create Postgres client")
 	}
+
+	ch_db, err := clickhouse.NewClient(ctx, conf.Clickhouse)
+	if err != nil {
+		l.WithError(err).Fatal("Failed to create clickhouse")
+	}
+
+	checkService := check.NewService(ch_db)
+
+	heartbeatsRepo := heartbeats.NewRepository(db)
+	heartbeatsService := heartbeats.NewService(heartbeatsRepo)
 
 	eventService, err := event.NewService(redisClient, "alerter")
 	if err != nil {
@@ -116,6 +129,9 @@ func runAlerter(cmd *cobra.Command, args []string) {
 	rcaWorker := incident.NewRCAWorker(
 		eventServiceRCA,
 		incidentSvc,
+		monitorService,
+		checkService,
+		heartbeatsService.GetByIDAndTeamID,
 		llmClient,
 		l.WithField("module", "rca_worker"),
 	)
