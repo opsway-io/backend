@@ -32,6 +32,7 @@ type GetIncidentsResponseIncident struct {
 	Description         string  `json:"description"`
 	RootCauseAnalysis   *string `json:"rootCauseAnalysis,omitempty"`
 	Resolved            bool    `json:"resolved"`
+	Acknowledged        bool    `json:"acknowledged"`
 	IsStatusPageVisible bool    `json:"isStatusPageVisible"`
 	CreatedAt           string  `json:"createdAt"`
 }
@@ -78,6 +79,7 @@ func (h *Handlers) newGetIncidentResponse(incidents *[]entities.Incident) *GetIn
 			Description:         *in.Description,
 			RootCauseAnalysis:   in.RootCauseAnalysis,
 			Resolved:            in.Resolved,
+			Acknowledged:        in.Acknowledged,
 			IsStatusPageVisible: in.IsStatusPageVisible,
 			CreatedAt:           in.CreatedAt.Format("2006-01-02T15:04:05Z07:00"),
 		}
@@ -170,6 +172,8 @@ type GetMonitorIncidentsResponseIncident struct {
 	Title               string  `json:"title"`
 	Description         string  `json:"description"`
 	RootCauseAnalysis   *string `json:"rootCauseAnalysis,omitempty"`
+	Resolved            bool    `json:"resolved"`
+	Acknowledged        bool    `json:"acknowledged"`
 	IsStatusPageVisible bool    `json:"isStatusPageVisible"`
 	CreatedAt           string  `json:"createdAt"`
 	UpdatedAt           string  `json:"updatedAt"`
@@ -233,6 +237,8 @@ func (h *Handlers) GetMonitorIncidentsResponse(incidents *[]incident.IncidentAnd
 			Title:               in.Title,
 			Description:         *in.Description,
 			RootCauseAnalysis:   in.RootCauseAnalysis,
+			Resolved:            in.Resolved,
+			Acknowledged:        in.Acknowledged,
 			IsStatusPageVisible: in.IsStatusPageVisible,
 			CreatedAt:           in.CreatedAt.Format("2006-01-02T15:04:05Z07:00"),
 			UpdatedAt:           in.UpdatedAt.Format("2006-01-02T15:04:05Z07:00"),
