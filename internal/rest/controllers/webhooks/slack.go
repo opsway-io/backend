@@ -29,15 +29,19 @@ type SlackPayload struct {
 }
 
 func (h *Handlers) PostSlackInteractive(c echo.Context) error {
-	payloadStr := c.FormValue("payload")
-	if payloadStr == "" {
-		return c.String(http.StatusBadRequest, "missing payload")
-	}
-
 	var payload SlackPayload
-	if err := json.Unmarshal([]byte(payloadStr), &payload); err != nil {
-		c.Logger().Errorf("failed to unmarshal slack payload: %v", err)
-		return c.String(http.StatusBadRequest, "invalid payload")
+
+	payloadStr := c.FormValue("payload")
+	if payloadStr != "" {
+		if err := json.Unmarshal([]byte(payloadStr), &payload); err != nil {
+			c.Logger().Errorf("failed to unmarshal slack payload: %v", err)
+			return c.String(http.StatusBadRequest, "invalid payload")
+		}
+	} else {
+		if err := c.Bind(&payload); err != nil {
+			c.Logger().Errorf("failed to bind slack payload: %v", err)
+			return c.String(http.StatusBadRequest, "invalid payload")
+		}
 	}
 
 	if len(payload.Actions) == 0 {
