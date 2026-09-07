@@ -258,50 +258,66 @@ type MonitorUptimeResult struct {
 }
 
 func (r *RepositoryImpl) GetMonitorUptimesByMonitorIDs(ctx context.Context, monitorIDs []uint) (map[uint]MonitorUptimeResult, error) {
-	var results []MonitorUptimeResult
-
 	if len(monitorIDs) == 0 {
 		return make(map[uint]MonitorUptimeResult), nil
 	}
 
-	// Calculate overall 90-day uptime and daily uptimes using ClickHouse array aggregation
-	var queryResults []struct {
+	// 1. Get overall uptime percentage for each monitor
+	var overallResults []struct {
 		MonitorID        uint
 		UptimePercentage float32
-		DailyUptimes     []float32   `gorm:"type:float"`
-		DailyDates       []time.Time `gorm:"type:datetime"`
 	}
-
 	err := r.db.WithContext(ctx).Raw(`
 		SELECT 
-			m.monitor_id as monitor_id,
-			if(sum(m.total_count) = 0, 0, (sum(m.up_count) / sum(m.total_count)) * 100) as uptime_percentage,
-			groupArray(m.daily_uptime) as daily_uptimes,
-			groupArray(m.day) as daily_dates
-		FROM (
-			SELECT 
-				monitor_id,
-				toDate(created_at) as day,
-				count() as total_count,
-				countIf(status_code > 0 AND status_code < 400) as up_count,
-				if(count() = 0, 0, (countIf(status_code > 0 AND status_code < 400) / count()) * 100) as daily_uptime
-			FROM checks
-			WHERE monitor_id IN ? AND created_at >= DATE_SUB(NOW(), INTERVAL 90 DAY)
-			GROUP BY monitor_id, day
-			ORDER BY monitor_id, day ASC
-		) m
-		GROUP BY m.monitor_id
-	`, monitorIDs).Scan(&queryResults).Error
-
+			monitor_id,
+			if(count() = 0, 0, (countIf(status_code > 0 AND status_code < 400) / count()) * 100) as uptime_percentage
+		FROM checks
+		WHERE monitor_id IN ? AND created_at >= DATE_SUB(NOW(), INTERVAL 90 DAY)
+		GROUP BY monitor_id
+	`, monitorIDs).Scan(&overallResults).Error
 	if err != nil {
 		return nil, err
+	}
+
+	// 2. Get daily uptimes for each monitor
+	var dailyResults []struct {
+		MonitorID   uint
+		Day         time.Time
+		DailyUptime float32
+	}
+	err = r.db.WithContext(ctx).Raw(`
+		SELECT 
+			monitor_id,
+			toDate(created_at) as day,
+			if(count() = 0, 0, (countIf(status_code > 0 AND status_code < 400) / count()) * 100) as daily_uptime
+		FROM checks
+		WHERE monitor_id IN ? AND created_at >= DATE_SUB(NOW(), INTERVAL 90 DAY)
+		GROUP BY monitor_id, day
+		ORDER BY monitor_id, day ASC
+	`, monitorIDs).Scan(&dailyResults).Error
+	if err != nil {
+		return nil, err
+	}
+
+	// Group daily results by monitor ID
+	dailyByMonitor := make(map[uint][]struct{
+		Day time.Time
+		DailyUptime float32
+	})
+	for _, dr := range dailyResults {
+		dailyByMonitor[dr.MonitorID] = append(dailyByMonitor[dr.MonitorID], struct{
+			Day time.Time
+			DailyUptime float32
+		}{dr.Day, dr.DailyUptime})
 	}
 
 	now := time.Now().UTC()
 	// Truncate to day
 	today := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, time.UTC)
 
-	for _, qr := range queryResults {
+	uptimes := make(map[uint]MonitorUptimeResult)
+
+	for _, overall := range overallResults {
 		// Initialize exactly 90 days with -1
 		paddedUptimes := make([]float32, 90)
 		for i := 0; i < 90; i++ {
@@ -309,25 +325,24 @@ func (r *RepositoryImpl) GetMonitorUptimesByMonitorIDs(ctx context.Context, moni
 		}
 
 		// Map existing data to the correct index
-		for i, date := range qr.DailyDates {
-			// Calculate days ago (0 = today, 89 = 89 days ago)
-			daysAgo := int(today.Sub(date.UTC()).Hours() / 24)
-			if daysAgo >= 0 && daysAgo < 90 {
-				// We want index 0 to be oldest (89 days ago) and index 89 to be today (0 days ago)
-				idx := 89 - daysAgo
-				paddedUptimes[idx] = qr.DailyUptimes[i]
+		if daily, ok := dailyByMonitor[overall.MonitorID]; ok {
+			for _, dr := range daily {
+				daysAgo := int(today.Sub(dr.Day.UTC()).Hours() / 24)
+				if daysAgo >= 0 && daysAgo < 90 {
+					idx := 89 - daysAgo
+					paddedUptimes[idx] = dr.DailyUptime
+				}
 			}
 		}
 
-		results = append(results, MonitorUptimeResult{
-			MonitorID:        qr.MonitorID,
-			UptimePercentage: qr.UptimePercentage,
+		uptimes[overall.MonitorID] = MonitorUptimeResult{
+			MonitorID:        overall.MonitorID,
+			UptimePercentage: overall.UptimePercentage,
 			DailyUptimes:     paddedUptimes,
-		})
+		}
 	}
 
-	uptimes := make(map[uint]MonitorUptimeResult)
-	for _, r := range results {
+	for _, r := range uptimes {
 		uptimes[r.MonitorID] = r
 	}
 	return uptimes, nil
