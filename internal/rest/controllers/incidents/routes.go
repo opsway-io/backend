@@ -9,6 +9,7 @@ import (
 	"github.com/opsway-io/backend/internal/rest/handlers"
 	mw "github.com/opsway-io/backend/internal/rest/middleware"
 	"github.com/opsway-io/backend/internal/team"
+	"github.com/opsway-io/backend/internal/user"
 	"github.com/sirupsen/logrus"
 )
 
@@ -18,6 +19,7 @@ type Handlers struct {
 	IncidentService       incident.Service
 	EventService          event.Service
 	AlertingService       alerting.Service
+	UserService           user.Service
 }
 
 func Register(
@@ -27,11 +29,13 @@ func Register(
 	incidentService incident.Service,
 	eventService event.Service,
 	alertingService alerting.Service,
+	userService user.Service,
 ) {
 	h := &Handlers{
 		IncidentService: incidentService,
 		EventService:    eventService,
 		AlertingService: alertingService,
+		UserService:     userService,
 	}
 
 	TeamGuard := mw.TeamGuardFactory(logger, teamService)

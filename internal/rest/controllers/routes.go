@@ -124,7 +124,7 @@ func Register(
 	alertingController.Register(authRoot, logger, teamService, alertingService, eventService)
 
 	// Incidents
-	incidents.Register(authRoot, logger, teamService, incidentService, eventService, alertingService)
+	incidents.Register(authRoot, logger, teamService, incidentService, eventService, alertingService, userService)
 
 	// Heartbeats
 	heartbeatsController.Register(authRoot, logger, teamService, heartbeatService)

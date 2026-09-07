@@ -245,6 +245,12 @@ func (h *Handlers) GetMonitorIncidentsResponse(incidents *[]incident.IncidentAnd
 	return resp
 }
 
+type IncidentUserResponse struct {
+	ID          uint   `json:"id"`
+	DisplayName string `json:"displayName"`
+	Email       string `json:"email"`
+}
+
 type GetIncidentRequest struct {
 	TeamID     uint `param:"teamId" validate:"required,numeric,gte=0"`
 	IncidentID uint `param:"incidentId" validate:"required,numeric,gte=0"`
@@ -258,9 +264,10 @@ type GetIncidentResponse struct {
 	Title               string  `json:"title"`
 	Description         string  `json:"description"`
 	Resolved            bool    `json:"resolved"`
-	Acknowledged        bool    `json:"acknowledged"`
-	AcknowledgedAt      *string `json:"acknowledgedAt,omitempty"`
-	RootCauseAnalysis   *string `json:"rootCauseAnalysis,omitempty"`
+	Acknowledged        bool                  `json:"acknowledged"`
+	AcknowledgedAt      *string               `json:"acknowledgedAt,omitempty"`
+	AcknowledgedBy      *IncidentUserResponse `json:"acknowledgedBy,omitempty"`
+	RootCauseAnalysis   *string               `json:"rootCauseAnalysis,omitempty"`
 	IsStatusPageVisible bool    `json:"isStatusPageVisible"`
 	CreatedAt           string  `json:"createdAt"`
 	UpdatedAt           string  `json:"updatedAt"`
@@ -302,6 +309,21 @@ func (h *Handlers) GetIncident(c hs.AuthenticatedContext) error {
 	if in.AcknowledgedAt != nil {
 		ackAt := in.AcknowledgedAt.Format("2006-01-02T15:04:05Z07:00")
 		resp.AcknowledgedAt = &ackAt
+	}
+
+	if in.AcknowledgedBy != nil {
+		user, err := h.UserService.GetUserByID(ctx, *in.AcknowledgedBy)
+		if err == nil && user != nil {
+			displayName := user.Name
+			if user.DisplayName != nil && *user.DisplayName != "" {
+				displayName = *user.DisplayName
+			}
+			resp.AcknowledgedBy = &IncidentUserResponse{
+				ID:          user.ID,
+				DisplayName: displayName,
+				Email:       user.Email,
+			}
+		}
 	}
 
 	if in.RootCauseAnalysis != nil {
@@ -369,6 +391,7 @@ func (h *Handlers) PatchAcknowledgeIncident(c hs.AuthenticatedContext) error {
 	in.Acknowledged = true
 	now := time.Now()
 	in.AcknowledgedAt = &now
+	in.AcknowledgedBy = &c.UserID
 	if err := h.IncidentService.Update(ctx, in); err != nil {
 		c.Log.WithError(err).Error("failed to update incident")
 		return echo.ErrInternalServerError
