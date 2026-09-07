@@ -16,6 +16,7 @@ import (
 	"github.com/opsway-io/backend/internal/statuspage"
 	"github.com/opsway-io/backend/internal/storage"
 	"github.com/opsway-io/backend/internal/team"
+	"github.com/opsway-io/backend/internal/user"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 )
@@ -96,6 +97,10 @@ func runAlerter(cmd *cobra.Command, args []string) {
 	teamCache := team.NewCache(redisClient)
 	teamService := team.NewService(conf.Team, teamRepository, storageService, emailSender, teamCache)
 
+	userRepository := user.NewRepository(db)
+	userCache := user.NewCache(redisClient)
+	userService := user.NewService(userRepository, userCache, storageService, emailSender, eventService, conf.User)
+
 	monitorService := monitor.NewService(db, redisClient)
 
 	statuspageRepo := statuspage.NewRepository(db)
@@ -117,6 +122,7 @@ func runAlerter(cmd *cobra.Command, args []string) {
 		eventService,
 		alertingService,
 		teamService,
+		userService,
 		monitorService,
 		statuspageService,
 		emailSender,

@@ -14,6 +14,8 @@ type Incident struct {
 	Acknowledged       bool  `gorm:"not null;default:false"`
 	AcknowledgedBy     *uint `gorm:"index"`
 	AcknowledgedAt     *time.Time
+	ResolvedBy         *uint `gorm:"index"`
+	ResolvedAt         *time.Time
 
 	Title             string `gorm:"index;not null"`
 	Description       *string

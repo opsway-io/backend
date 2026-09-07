@@ -50,4 +50,7 @@ func Register(
 	usersGroup.DELETE("/avatar", AuthHandler(h.DeleteUserAvatar))
 
 	usersGroup.GET("/teams", AuthHandler(h.GetUserTeams))
+
+	usersGroup.GET("/notification-rules", AuthHandler(h.GetNotificationRules))
+	usersGroup.PUT("/notification-rules", AuthHandler(h.PutNotificationRules))
 }

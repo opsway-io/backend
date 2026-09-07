@@ -92,6 +92,9 @@ func runAPI(cmd *cobra.Command, args []string) {
 		entities.EscalationPolicy{},
 		entities.OnCallRotation{},
 		entities.TeamInvitation{},
+		entities.UserNotificationRule{},
+		entities.EscalationJob{},
+		entities.NotificationJob{},
 	)
 
 	ch_db, err := clickhouse.NewClient(ctx, conf.Clickhouse)

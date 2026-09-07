@@ -319,6 +319,8 @@ func handleTask(ctx context.Context, logger *logrus.Logger, httpProber http.Serv
 				if inc.Incident.MonitorAssertionID == nil || !failedAssertionIDs[*inc.Incident.MonitorAssertionID] {
 					l.WithField("incident_id", inc.Incident.ID).Info("auto-resolving incident")
 					inc.Incident.Resolved = true
+					now := time.Now()
+					inc.Incident.ResolvedAt = &now
 					if err := i.Update(ctx, &inc.Incident); err != nil {
 						l.WithError(err).Error("failed to resolve incident")
 					}
@@ -365,6 +367,8 @@ func handleTask(ctx context.Context, logger *logrus.Logger, httpProber http.Serv
 				if inc.Title == "Target Down" && !inc.Resolved {
 					l.Info("target is now responding, resolving open Target Down incident")
 					inc.Incident.Resolved = true
+					now := time.Now()
+					inc.Incident.ResolvedAt = &now
 					if err := i.Update(ctx, &inc.Incident); err != nil {
 						l.WithError(err).Error("failed to resolve target down incident")
 					}
@@ -467,6 +471,8 @@ func handleTask(ctx context.Context, logger *logrus.Logger, httpProber http.Serv
 					if inc.Title == "SSL/TLS Cert Expiry" {
 						l.Info("SSL/TLS certificate is now valid, resolving open incident")
 						inc.Incident.Resolved = true
+						now := time.Now()
+						inc.Incident.ResolvedAt = &now
 						if err := i.Update(ctx, &inc.Incident); err != nil {
 							l.WithError(err).Error("failed to resolve SSL/TLS cert expiry incident")
 						}

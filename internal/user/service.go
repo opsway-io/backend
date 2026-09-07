@@ -39,6 +39,9 @@ type Service interface {
 	ChangePasswordWithOldPassword(ctx context.Context, userID uint, oldPassword string, newPassword string) error
 	ChangePasswordWithResetToken(ctx context.Context, token string, newPassword string) (err error)
 	RequestPasswordReset(ctx context.Context, userId uint) error
+
+	GetNotificationRules(ctx context.Context, userID uint) ([]entities.UserNotificationRule, error)
+	SetNotificationRules(ctx context.Context, userID uint, rules []entities.UserNotificationRule) error
 }
 
 type ServiceImpl struct {
@@ -333,3 +336,16 @@ func (s *ServiceImpl) ChangePasswordWithResetToken(ctx context.Context, token st
 
 	return nil
 }
+
+func (s *ServiceImpl) GetNotificationRules(ctx context.Context, userID uint) ([]entities.UserNotificationRule, error) {
+	return s.repository.GetNotificationRules(ctx, userID)
+}
+
+func (s *ServiceImpl) SetNotificationRules(ctx context.Context, userID uint, rules []entities.UserNotificationRule) error {
+	// Add user IDs to rules
+	for i := range rules {
+		rules[i].UserID = userID
+	}
+	return s.repository.SetNotificationRules(ctx, userID, rules)
+}
+

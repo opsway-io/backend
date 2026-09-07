@@ -32,9 +32,13 @@ type GetIncidentsResponseIncident struct {
 	Title               string  `json:"title"`
 	Description         string  `json:"description"`
 	RootCauseAnalysis   *string `json:"rootCauseAnalysis,omitempty"`
-	Resolved            bool    `json:"resolved"`
-	Acknowledged        bool    `json:"acknowledged"`
-	IsStatusPageVisible bool    `json:"isStatusPageVisible"`
+	Resolved            bool                  `json:"resolved"`
+	ResolvedAt          *string               `json:"resolvedAt,omitempty"`
+	ResolvedBy          *IncidentUserResponse `json:"resolvedBy,omitempty"`
+	Acknowledged        bool                  `json:"acknowledged"`
+	AcknowledgedAt      *string               `json:"acknowledgedAt,omitempty"`
+	AcknowledgedBy      *IncidentUserResponse `json:"acknowledgedBy,omitempty"`
+	IsStatusPageVisible bool                  `json:"isStatusPageVisible"`
 	CreatedAt           string  `json:"createdAt"`
 }
 
@@ -71,6 +75,53 @@ func (h *Handlers) newGetIncidentResponse(incidents *[]entities.Incident) *GetIn
 	}
 
 	for i, in := range *incidents {
+		var ackAt *string
+		if in.AcknowledgedAt != nil {
+			a := in.AcknowledgedAt.Format("2006-01-02T15:04:05Z07:00")
+			ackAt = &a
+		}
+
+		var ackBy *IncidentUserResponse
+		if in.AcknowledgedBy != nil {
+			// Get user by ID. To avoid modifying the function signature recursively,
+			// we pass context.Background() since this is an overview call.
+			// Ideally we would pass ctx down from the handler.
+			user, err := h.UserService.GetUserByID(context.Background(), *in.AcknowledgedBy)
+			if err == nil && user != nil {
+				displayName := user.Name
+				if user.DisplayName != nil && *user.DisplayName != "" {
+					displayName = *user.DisplayName
+				}
+				ackBy = &IncidentUserResponse{
+					ID:          user.ID,
+					DisplayName: displayName,
+					Email:       user.Email,
+				}
+			}
+		}
+
+		var resAt *string
+		if in.ResolvedAt != nil {
+			a := in.ResolvedAt.Format("2006-01-02T15:04:05Z07:00")
+			resAt = &a
+		}
+
+		var resBy *IncidentUserResponse
+		if in.ResolvedBy != nil {
+			user, err := h.UserService.GetUserByID(context.Background(), *in.ResolvedBy)
+			if err == nil && user != nil {
+				displayName := user.Name
+				if user.DisplayName != nil && *user.DisplayName != "" {
+					displayName = *user.DisplayName
+				}
+				resBy = &IncidentUserResponse{
+					ID:          user.ID,
+					DisplayName: displayName,
+					Email:       user.Email,
+				}
+			}
+		}
+
 		resp.Incidents[i] = GetIncidentsResponseIncident{
 			ID:                  in.ID,
 			TeamID:              in.TeamID,
@@ -80,7 +131,11 @@ func (h *Handlers) newGetIncidentResponse(incidents *[]entities.Incident) *GetIn
 			Description:         *in.Description,
 			RootCauseAnalysis:   in.RootCauseAnalysis,
 			Resolved:            in.Resolved,
+			ResolvedAt:          resAt,
+			ResolvedBy:          resBy,
 			Acknowledged:        in.Acknowledged,
+			AcknowledgedAt:      ackAt,
+			AcknowledgedBy:      ackBy,
 			IsStatusPageVisible: in.IsStatusPageVisible,
 			CreatedAt:           in.CreatedAt.Format("2006-01-02T15:04:05Z07:00"),
 		}
@@ -174,6 +229,8 @@ type GetMonitorIncidentsResponseIncident struct {
 	Description         string  `json:"description"`
 	RootCauseAnalysis   *string `json:"rootCauseAnalysis,omitempty"`
 	Resolved            bool                  `json:"resolved"`
+	ResolvedAt          *string               `json:"resolvedAt,omitempty"`
+	ResolvedBy          *IncidentUserResponse `json:"resolvedBy,omitempty"`
 	Acknowledged        bool                  `json:"acknowledged"`
 	AcknowledgedAt      *string               `json:"acknowledgedAt,omitempty"`
 	AcknowledgedBy      *IncidentUserResponse `json:"acknowledgedBy,omitempty"`
@@ -254,6 +311,28 @@ func (h *Handlers) GetMonitorIncidentsResponse(ctx context.Context, incidents *[
 			}
 		}
 
+		var resAt *string
+		if in.ResolvedAt != nil {
+			a := in.ResolvedAt.Format("2006-01-02T15:04:05Z07:00")
+			resAt = &a
+		}
+
+		var resBy *IncidentUserResponse
+		if in.ResolvedBy != nil {
+			user, err := h.UserService.GetUserByID(ctx, *in.ResolvedBy)
+			if err == nil && user != nil {
+				displayName := user.Name
+				if user.DisplayName != nil && *user.DisplayName != "" {
+					displayName = *user.DisplayName
+				}
+				resBy = &IncidentUserResponse{
+					ID:          user.ID,
+					DisplayName: displayName,
+					Email:       user.Email,
+				}
+			}
+		}
+
 		resp.Incidents[i] = GetMonitorIncidentsResponseIncident{
 			ID:                  in.ID,
 			TeamID:              in.TeamID,
@@ -263,6 +342,8 @@ func (h *Handlers) GetMonitorIncidentsResponse(ctx context.Context, incidents *[
 			Description:         *in.Description,
 			RootCauseAnalysis:   in.RootCauseAnalysis,
 			Resolved:            in.Resolved,
+			ResolvedAt:          resAt,
+			ResolvedBy:          resBy,
 			Acknowledged:        in.Acknowledged,
 			AcknowledgedAt:      ackAt,
 			AcknowledgedBy:      ackBy,
@@ -297,6 +378,8 @@ type GetIncidentResponse struct {
 	Title               string  `json:"title"`
 	Description         string  `json:"description"`
 	Resolved            bool    `json:"resolved"`
+	ResolvedAt          *string               `json:"resolvedAt,omitempty"`
+	ResolvedBy          *IncidentUserResponse `json:"resolvedBy,omitempty"`
 	Acknowledged        bool                  `json:"acknowledged"`
 	AcknowledgedAt      *string               `json:"acknowledgedAt,omitempty"`
 	AcknowledgedBy      *IncidentUserResponse `json:"acknowledgedBy,omitempty"`
@@ -359,6 +442,26 @@ func (h *Handlers) GetIncident(c hs.AuthenticatedContext) error {
 		}
 	}
 
+	if in.ResolvedAt != nil {
+		resAt := in.ResolvedAt.Format("2006-01-02T15:04:05Z07:00")
+		resp.ResolvedAt = &resAt
+	}
+
+	if in.ResolvedBy != nil {
+		user, err := h.UserService.GetUserByID(ctx, *in.ResolvedBy)
+		if err == nil && user != nil {
+			displayName := user.Name
+			if user.DisplayName != nil && *user.DisplayName != "" {
+				displayName = *user.DisplayName
+			}
+			resp.ResolvedBy = &IncidentUserResponse{
+				ID:          user.ID,
+				DisplayName: displayName,
+				Email:       user.Email,
+			}
+		}
+	}
+
 	if in.RootCauseAnalysis != nil {
 		resp.RootCauseAnalysis = in.RootCauseAnalysis
 	}
@@ -395,6 +498,12 @@ func (h *Handlers) PatchSolveIncident(c hs.AuthenticatedContext) error {
 	}
 
 	in.Resolved = req.Resolved
+	if req.Resolved {
+		now := time.Now()
+		in.ResolvedAt = &now
+		in.ResolvedBy = &c.UserID
+	}
+	
 	if err := h.IncidentService.Update(ctx, in); err != nil {
 		c.Log.WithError(err).Error("failed to update incident")
 		return echo.ErrInternalServerError

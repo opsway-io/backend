@@ -20,6 +20,7 @@ import (
 	"github.com/opsway-io/backend/internal/notification/email/templates"
 	"github.com/opsway-io/backend/internal/statuspage"
 	"github.com/opsway-io/backend/internal/team"
+	"github.com/opsway-io/backend/internal/user"
 	"github.com/sirupsen/logrus"
 )
 
@@ -37,6 +38,7 @@ type worker struct {
 	eventService  event.Service
 	alertService  Service
 	teamService   team.Service
+	userService   user.Service
 	monitorSvc    monitor.Service
 	statusPageSvc statuspage.Service
 	emailSender   email.Sender
@@ -50,6 +52,7 @@ func NewWorker(
 	eventService event.Service,
 	alertService Service,
 	teamService team.Service,
+	userService user.Service,
 	monitorSvc monitor.Service,
 	statusPageSvc statuspage.Service,
 	emailSender email.Sender,
@@ -62,6 +65,7 @@ func NewWorker(
 		eventService:  eventService,
 		alertService:  alertService,
 		teamService:   teamService,
+		userService:   userService,
 		monitorSvc:    monitorSvc,
 		statusPageSvc: statusPageSvc,
 		emailSender:   emailSender,
@@ -571,31 +575,70 @@ func (w *worker) sendEmailAlert(ctx context.Context, incident *entities.Incident
 			continue
 		}
 
+		userRules, _ := w.userService.GetNotificationRules(ctx, u.ID)
+		hasCustomRules := len(userRules) > 0
+		var emailRule *entities.UserNotificationRule
+
+		if hasCustomRules {
+			for _, r := range userRules {
+				if r.Channel == entities.ChannelEmail {
+					ruleCopy := r
+					emailRule = &ruleCopy
+					break
+				}
+			}
+			if emailRule == nil {
+				continue // User has custom rules but didn't select email
+			}
+		}
+
+		delay := 0
+		if emailRule != nil {
+			delay = emailRule.Delay
+		}
+
 		userName := "Team Member"
 		if u.DisplayName != nil {
 			userName = *u.DisplayName
 		}
 
-		if incident.Title == "Anomaly Detected" {
-			tpl := &templates.PerformanceDegradationTemplate{
-				MonitorName:    monitorName,
-				CurrentLatency: "Unexpected Spike",
-				Threshold:      "Normal Baseline",
-				DashboardURL:   dashboardURL,
+		sendFunc := func(usr team.TeamUser, un string) {
+			// If delayed, check if incident is still active
+			if delay > 0 {
+				time.Sleep(time.Duration(delay) * time.Minute)
+				inc, err := w.incidentSvc.GetByID(context.Background(), incident.ID)
+				if err != nil || inc.Acknowledged || inc.Resolved {
+					return
+				}
 			}
-			err = w.emailSender.Send(ctx, "", u.Email, tpl)
-		} else {
-			tpl := &templates.IncidentAlertTemplate{
-				Name:          userName,
-				MonitorName:   monitorName,
-				IncidentTitle: incident.Title,
-				DashboardURL:  dashboardURL,
+
+			if incident.Title == "Anomaly Detected" {
+				tpl := &templates.PerformanceDegradationTemplate{
+					MonitorName:    monitorName,
+					CurrentLatency: "Unexpected Spike",
+					Threshold:      "Normal Baseline",
+					DashboardURL:   dashboardURL,
+				}
+				err = w.emailSender.Send(context.Background(), "", usr.Email, tpl)
+			} else {
+				tpl := &templates.IncidentAlertTemplate{
+					Name:          un,
+					MonitorName:   monitorName,
+					IncidentTitle: incident.Title,
+					DashboardURL:  dashboardURL,
+				}
+				err = w.emailSender.Send(context.Background(), "", usr.Email, tpl)
 			}
-			err = w.emailSender.Send(ctx, "", u.Email, tpl)
+
+			if err != nil {
+				w.logger.WithError(err).Error("failed to send incident alert email")
+			}
 		}
 
-		if err != nil {
-			w.logger.WithError(err).Error("failed to send incident alert email")
+		if delay > 0 {
+			go sendFunc(u, userName)
+		} else {
+			sendFunc(u, userName)
 		}
 	}
 }
@@ -846,9 +889,44 @@ func (w *worker) sendSmsAlert(ctx context.Context, incident *entities.Incident, 
 			continue
 		}
 
-		w.logger.WithField("phone", *u.PhoneNumber).Info("mock sending SMS alert")
-		// In production, we would use the Twilio Go SDK or HTTP request here
-		// twilioClient.SendMessage("mock_twilio_from", *u.PhoneNumber, "Incident Alert: "+incident.Title)
+		userRules, _ := w.userService.GetNotificationRules(ctx, u.ID)
+		hasCustomRules := len(userRules) > 0
+		var smsRule *entities.UserNotificationRule
+
+		if hasCustomRules {
+			for _, r := range userRules {
+				if r.Channel == entities.ChannelSMS {
+					ruleCopy := r
+					smsRule = &ruleCopy
+					break
+				}
+			}
+			if smsRule == nil {
+				continue
+			}
+		}
+
+		delay := 0
+		if smsRule != nil {
+			delay = smsRule.Delay
+		}
+
+		sendFunc := func(usr team.TeamUser) {
+			if delay > 0 {
+				time.Sleep(time.Duration(delay) * time.Minute)
+				inc, err := w.incidentSvc.GetByID(context.Background(), incident.ID)
+				if err != nil || inc.Acknowledged || inc.Resolved {
+					return
+				}
+			}
+			w.logger.WithField("phone", *usr.PhoneNumber).Info("mock sending SMS alert")
+		}
+
+		if delay > 0 {
+			go sendFunc(u)
+		} else {
+			sendFunc(u)
+		}
 	}
 }
 
@@ -877,9 +955,44 @@ func (w *worker) sendVoiceAlert(ctx context.Context, incident *entities.Incident
 			continue
 		}
 
-		w.logger.WithField("phone", *u.PhoneNumber).Info("mock sending Voice alert")
-		// In production, we would use the Twilio Go SDK or HTTP request here
-		// twilioClient.MakeCall("mock_twilio_from", *u.PhoneNumber, "<twiml>url</twiml>")
+		userRules, _ := w.userService.GetNotificationRules(ctx, u.ID)
+		hasCustomRules := len(userRules) > 0
+		var voiceRule *entities.UserNotificationRule
+
+		if hasCustomRules {
+			for _, r := range userRules {
+				if r.Channel == entities.ChannelVoice {
+					ruleCopy := r
+					voiceRule = &ruleCopy
+					break
+				}
+			}
+			if voiceRule == nil {
+				continue
+			}
+		}
+
+		delay := 0
+		if voiceRule != nil {
+			delay = voiceRule.Delay
+		}
+
+		sendFunc := func(usr team.TeamUser) {
+			if delay > 0 {
+				time.Sleep(time.Duration(delay) * time.Minute)
+				inc, err := w.incidentSvc.GetByID(context.Background(), incident.ID)
+				if err != nil || inc.Acknowledged || inc.Resolved {
+					return
+				}
+			}
+			w.logger.WithField("phone", *usr.PhoneNumber).Info("mock sending Voice alert")
+		}
+
+		if delay > 0 {
+			go sendFunc(u)
+		} else {
+			sendFunc(u)
+		}
 	}
 }
 
