@@ -1,6 +1,7 @@
 package incidents
 
 import (
+	"context"
 	"net/http"
 	"time"
 
@@ -172,9 +173,11 @@ type GetMonitorIncidentsResponseIncident struct {
 	Title               string  `json:"title"`
 	Description         string  `json:"description"`
 	RootCauseAnalysis   *string `json:"rootCauseAnalysis,omitempty"`
-	Resolved            bool    `json:"resolved"`
-	Acknowledged        bool    `json:"acknowledged"`
-	IsStatusPageVisible bool    `json:"isStatusPageVisible"`
+	Resolved            bool                  `json:"resolved"`
+	Acknowledged        bool                  `json:"acknowledged"`
+	AcknowledgedAt      *string               `json:"acknowledgedAt,omitempty"`
+	AcknowledgedBy      *IncidentUserResponse `json:"acknowledgedBy,omitempty"`
+	IsStatusPageVisible bool                  `json:"isStatusPageVisible"`
 	CreatedAt           string  `json:"createdAt"`
 	UpdatedAt           string  `json:"updatedAt"`
 	Property            string  `json:"property"`
@@ -203,12 +206,12 @@ func (h *Handlers) GetMonitorIncidents(c hs.AuthenticatedContext) error {
 		return echo.ErrInternalServerError
 	}
 
-	resp := h.GetMonitorIncidentsResponse(incidents)
+	resp := h.GetMonitorIncidentsResponse(ctx, incidents)
 
 	return c.JSON(http.StatusOK, resp)
 }
 
-func (h *Handlers) GetMonitorIncidentsResponse(incidents *[]incident.IncidentAndAssertion) *GetMonitorIncidentsResponse {
+func (h *Handlers) GetMonitorIncidentsResponse(ctx context.Context, incidents *[]incident.IncidentAndAssertion) *GetMonitorIncidentsResponse {
 	resp := &GetMonitorIncidentsResponse{
 		Incidents: make([]GetMonitorIncidentsResponseIncident, len(*incidents)),
 	}
@@ -229,6 +232,28 @@ func (h *Handlers) GetMonitorIncidentsResponse(incidents *[]incident.IncidentAnd
 			operator = *in.Operator
 		}
 
+		var ackAt *string
+		if in.AcknowledgedAt != nil {
+			a := in.AcknowledgedAt.Format("2006-01-02T15:04:05Z07:00")
+			ackAt = &a
+		}
+
+		var ackBy *IncidentUserResponse
+		if in.AcknowledgedBy != nil {
+			user, err := h.UserService.GetUserByID(ctx, *in.AcknowledgedBy)
+			if err == nil && user != nil {
+				displayName := user.Name
+				if user.DisplayName != nil && *user.DisplayName != "" {
+					displayName = *user.DisplayName
+				}
+				ackBy = &IncidentUserResponse{
+					ID:          user.ID,
+					DisplayName: displayName,
+					Email:       user.Email,
+				}
+			}
+		}
+
 		resp.Incidents[i] = GetMonitorIncidentsResponseIncident{
 			ID:                  in.ID,
 			TeamID:              in.TeamID,
@@ -239,6 +264,8 @@ func (h *Handlers) GetMonitorIncidentsResponse(incidents *[]incident.IncidentAnd
 			RootCauseAnalysis:   in.RootCauseAnalysis,
 			Resolved:            in.Resolved,
 			Acknowledged:        in.Acknowledged,
+			AcknowledgedAt:      ackAt,
+			AcknowledgedBy:      ackBy,
 			IsStatusPageVisible: in.IsStatusPageVisible,
 			CreatedAt:           in.CreatedAt.Format("2006-01-02T15:04:05Z07:00"),
 			UpdatedAt:           in.UpdatedAt.Format("2006-01-02T15:04:05Z07:00"),
