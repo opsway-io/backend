@@ -102,7 +102,7 @@ func (r *RepositoryImpl) GetMonitorsAndIncidentsByTeamID(ctx context.Context, te
 	var monitors []entities.Monitor
 	err := r.db.WithContext(
 		ctx,
-	).Preload("Incidents", "resolved = ? OR acknowledged = ?", false, false).
+	).Preload("Incidents", "resolved = ?", false).
 		Where(entities.Monitor{
 			TeamID: teamID,
 		}).Find(&monitors).Error
