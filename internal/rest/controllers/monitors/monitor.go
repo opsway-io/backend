@@ -453,6 +453,8 @@ type Incident struct {
 	CreatedAt          time.Time `json:"createdAt"`
 	UpdatedAt          time.Time `json:"updatedAt"`
 	MonitorAssertionID *uint     `json:"monitorAssertionId"`
+	Resolved           bool      `json:"resolved"`
+	Acknowledged       bool      `json:"acknowledged"`
 }
 
 func (h *Handlers) GetMonitorIncidents(c hs.AuthenticatedContext) error {
@@ -506,6 +508,8 @@ func newGetMonitorWithIncidentsResponse(monitors *[]entities.Monitor) (*GetMonit
 				CreatedAt:          incident.CreatedAt,
 				UpdatedAt:          incident.UpdatedAt,
 				MonitorAssertionID: incident.MonitorAssertionID,
+				Resolved:           incident.Resolved,
+				Acknowledged:       incident.Acknowledged,
 			}
 		}
 		res[i] = monitorWithIncidents
