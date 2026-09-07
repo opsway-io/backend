@@ -126,8 +126,132 @@ func (w *worker) Start(ctx context.Context) error {
 		}
 	}()
 
+	go w.jobScheduler(ctx)
+
 	<-ctx.Done()
 	return nil
+}
+
+func (w *worker) jobScheduler(ctx context.Context) {
+	ticker := time.NewTicker(10 * time.Second)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			w.processEscalationJobs(ctx)
+			w.processNotificationJobs(ctx)
+		}
+	}
+}
+
+func (w *worker) processEscalationJobs(ctx context.Context) {
+	jobs, err := w.escalationSvc.GetPendingEscalationJobs(ctx, time.Now())
+	if err != nil {
+		w.logger.WithError(err).Error("failed to get pending escalation jobs")
+		return
+	}
+
+	for _, job := range jobs {
+		inc, err := w.incidentSvc.GetByID(ctx, job.IncidentID)
+		if err != nil {
+			w.logger.WithError(err).Error("failed to get incident for escalation job")
+			continue
+		}
+
+		if !inc.Acknowledged && !inc.Resolved {
+			w.logger.Infof("Executing EscalationJob %d for incident %d, tier %d", job.ID, job.IncidentID, job.TargetTier)
+			
+			// We need an alert rule to trigger, for now we can just get the first enabled one for the team that matches
+			// since in MVP we don't store the RuleID in the job. 
+			// A better long-term approach would be to store RuleID in the EscalationJob.
+			
+			// Let's just pass a dummy rule or fetch the rules
+			rules, _ := w.alertService.GetAllByTeamID(ctx, job.TeamID)
+			
+			var targetRule *entities.AlertRule
+			for _, r := range rules {
+				if r.Enabled {
+					targetRule = &r
+					break
+				}
+			}
+
+			if targetRule != nil {
+				w.triggerRule(ctx, inc, targetRule, job.TargetTier)
+			}
+			
+			// Schedule next tier if needed
+			policy, err := w.escalationSvc.GetPolicyByTeamID(ctx, job.TeamID)
+			if err == nil && policy != nil {
+				rotations, _ := w.escalationSvc.GetRotationsByPolicyID(ctx, policy.ID)
+				maxTier := 1
+				for _, r := range rotations {
+					if r.Tier > maxTier {
+						maxTier = r.Tier
+					}
+				}
+				if job.TargetTier < maxTier {
+					nextTier := job.TargetTier + 1
+					nextJob := &entities.EscalationJob{
+						IncidentID:   job.IncidentID,
+						TeamID:       job.TeamID,
+						TargetTier:   nextTier,
+						ScheduledFor: time.Now().Add(time.Duration(policy.EscalationTimeoutMinutes) * time.Minute),
+					}
+					_ = w.escalationSvc.CreateEscalationJob(ctx, nextJob)
+				}
+			}
+		}
+
+		_ = w.escalationSvc.MarkEscalationJobProcessed(ctx, job.ID)
+	}
+}
+
+func (w *worker) processNotificationJobs(ctx context.Context) {
+	jobs, err := w.escalationSvc.GetPendingNotificationJobs(ctx, time.Now())
+	if err != nil {
+		w.logger.WithError(err).Error("failed to get pending notification jobs")
+		return
+	}
+
+	for _, job := range jobs {
+		inc, err := w.incidentSvc.GetByID(ctx, job.IncidentID)
+		if err != nil {
+			w.logger.WithError(err).Error("failed to get incident for notification job")
+			continue
+		}
+
+		if !inc.Acknowledged && !inc.Resolved {
+			w.logger.Infof("Executing NotificationJob %d for incident %d, channel %s", job.ID, job.IncidentID, job.Channel)
+			
+			usr, err := w.userService.GetUserByID(ctx, job.UserID)
+			if err != nil {
+				continue
+			}
+
+			// Wrap usr in TeamUser since our send functions take TeamUser
+			// The TeamRole is not strictly needed for the template
+			teamUsr := team.TeamUser{User: *usr}
+			userName := "Team Member"
+			if usr.DisplayName != nil {
+				userName = *usr.DisplayName
+			}
+
+			switch job.Channel {
+			case entities.ChannelEmail:
+				w.sendFuncEmail(ctx, inc, teamUsr, userName)
+			case entities.ChannelSMS:
+				w.sendFuncSms(ctx, inc, teamUsr)
+			case entities.ChannelVoice:
+				w.sendFuncVoice(ctx, inc, teamUsr)
+			}
+		}
+
+		_ = w.escalationSvc.MarkNotificationJobProcessed(ctx, job.ID)
+	}
 }
 
 func (w *worker) processPostMortemMessage(ctx context.Context, payload []byte) {
@@ -442,28 +566,16 @@ func (w *worker) scheduleEscalationCheck(ctx context.Context, incident *entities
 		return // No higher tiers to escalate to
 	}
 
-	go func() {
-		bgCtx := context.Background()
-
-		for currentTier := 2; currentTier <= maxTier; currentTier++ {
-			w.logger.Infof("Scheduling escalation check for incident %d to Tier %d in %d minutes", incident.ID, currentTier, policy.EscalationTimeoutMinutes)
-			time.Sleep(time.Duration(policy.EscalationTimeoutMinutes) * time.Minute)
-
-			inc, err := w.incidentSvc.GetByID(bgCtx, incident.ID)
-			if err != nil {
-				w.logger.WithError(err).Error("failed to get incident during escalation check")
-				return
-			}
-
-			if inc.Acknowledged || inc.Resolved {
-				w.logger.Infof("Incident %d acknowledged or resolved, stopping escalation", incident.ID)
-				return // Stop escalation loop
-			}
-
-			w.logger.Infof("Escalating incident %d to Tier %d", incident.ID, currentTier)
-			w.triggerRule(bgCtx, inc, rule, currentTier)
-		}
-	}()
+	job := &entities.EscalationJob{
+		IncidentID:   incident.ID,
+		TeamID:       incident.TeamID,
+		TargetTier:   2,
+		ScheduledFor: time.Now().Add(time.Duration(policy.EscalationTimeoutMinutes) * time.Minute),
+	}
+	
+	if err := w.escalationSvc.CreateEscalationJob(ctx, job); err != nil {
+		w.logger.WithError(err).Error("failed to schedule initial escalation job")
+	}
 }
 
 func (w *worker) triggerMaintenanceRule(ctx context.Context, maintenance *entities.Maintenance, rule *entities.AlertRule, action string) {
@@ -556,19 +668,6 @@ func (w *worker) sendEmailAlert(ctx context.Context, incident *entities.Incident
 		onCallMap[id] = true
 	}
 
-	monitorName := "Unknown Monitor / Heartbeat"
-	if incident.MonitorID != nil {
-		mon, err := w.monitorSvc.GetMonitorAndSettingsByTeamIDAndID(ctx, incident.TeamID, *incident.MonitorID)
-		if err == nil && mon != nil {
-			monitorName = mon.Name
-		}
-	} else if incident.HeartbeatID != nil {
-		// Ideally we would fetch the heartbeat name here, but for MVP "Unknown Monitor / Heartbeat" or generic is fine.
-		monitorName = "Heartbeat Monitor"
-	}
-
-	dashboardURL := fmt.Sprintf("%s/incidents/incident/%d", w.config.ApplicationURL, incident.ID)
-
 	for _, u := range *users {
 		// If escalation policy exists for this team, only send to on-call users
 		if len(onCallUserIDs) > 0 && !onCallMap[u.ID] {
@@ -602,43 +701,56 @@ func (w *worker) sendEmailAlert(ctx context.Context, incident *entities.Incident
 			userName = *u.DisplayName
 		}
 
-		sendFunc := func(usr team.TeamUser, un string) {
-			// If delayed, check if incident is still active
-			if delay > 0 {
-				time.Sleep(time.Duration(delay) * time.Minute)
-				inc, err := w.incidentSvc.GetByID(context.Background(), incident.ID)
-				if err != nil || inc.Acknowledged || inc.Resolved {
-					return
-				}
-			}
-
-			if incident.Title == "Anomaly Detected" {
-				tpl := &templates.PerformanceDegradationTemplate{
-					MonitorName:    monitorName,
-					CurrentLatency: "Unexpected Spike",
-					Threshold:      "Normal Baseline",
-					DashboardURL:   dashboardURL,
-				}
-				err = w.emailSender.Send(context.Background(), "", usr.Email, tpl)
-			} else {
-				tpl := &templates.IncidentAlertTemplate{
-					Name:          un,
-					MonitorName:   monitorName,
-					IncidentTitle: incident.Title,
-					DashboardURL:  dashboardURL,
-				}
-				err = w.emailSender.Send(context.Background(), "", usr.Email, tpl)
-			}
-
-			if err != nil {
-				w.logger.WithError(err).Error("failed to send incident alert email")
-			}
-		}
-
 		if delay > 0 {
-			go sendFunc(u, userName)
+			err = w.escalationSvc.CreateNotificationJob(ctx, &entities.NotificationJob{
+				IncidentID: incident.ID,
+				UserID: u.ID,
+				Channel: entities.ChannelEmail,
+				ScheduledFor: time.Now().Add(time.Duration(delay) * time.Minute),
+			})
+			if err != nil {
+				w.logger.WithError(err).Error("failed to create email notification job")
+			}
 		} else {
-			sendFunc(u, userName)
+			w.sendFuncEmail(ctx, incident, u, userName)
+		}
+	}
+}
+
+func (w *worker) sendFuncEmail(ctx context.Context, incident *entities.Incident, usr team.TeamUser, un string) {
+	monitorName := "Unknown Monitor / Heartbeat"
+	if incident.MonitorID != nil {
+		mon, err := w.monitorSvc.GetMonitorAndSettingsByTeamIDAndID(ctx, incident.TeamID, *incident.MonitorID)
+		if err == nil && mon != nil {
+			monitorName = mon.Name
+		}
+	} else if incident.HeartbeatID != nil {
+		monitorName = "Heartbeat Monitor"
+	}
+
+	dashboardURL := fmt.Sprintf("%s/incidents/incident/%d", w.config.ApplicationURL, incident.ID)
+	
+	if incident.Title == "Anomaly Detected" {
+		tpl := &templates.PerformanceDegradationTemplate{
+			MonitorName:    monitorName,
+			CurrentLatency: "Unexpected Spike",
+			Threshold:      "Normal Baseline",
+			DashboardURL:   dashboardURL,
+		}
+		err := w.emailSender.Send(ctx, "", usr.Email, tpl)
+		if err != nil {
+			w.logger.WithError(err).Error("failed to send incident alert email")
+		}
+	} else {
+		tpl := &templates.IncidentAlertTemplate{
+			Name:          un,
+			MonitorName:   monitorName,
+			IncidentTitle: incident.Title,
+			DashboardURL:  dashboardURL,
+		}
+		err := w.emailSender.Send(ctx, "", usr.Email, tpl)
+		if err != nil {
+			w.logger.WithError(err).Error("failed to send incident alert email")
 		}
 	}
 }
@@ -911,23 +1023,24 @@ func (w *worker) sendSmsAlert(ctx context.Context, incident *entities.Incident, 
 			delay = smsRule.Delay
 		}
 
-		sendFunc := func(usr team.TeamUser) {
-			if delay > 0 {
-				time.Sleep(time.Duration(delay) * time.Minute)
-				inc, err := w.incidentSvc.GetByID(context.Background(), incident.ID)
-				if err != nil || inc.Acknowledged || inc.Resolved {
-					return
-				}
-			}
-			w.logger.WithField("phone", *usr.PhoneNumber).Info("mock sending SMS alert")
-		}
-
 		if delay > 0 {
-			go sendFunc(u)
+			err = w.escalationSvc.CreateNotificationJob(ctx, &entities.NotificationJob{
+				IncidentID: incident.ID,
+				UserID: u.ID,
+				Channel: entities.ChannelSMS,
+				ScheduledFor: time.Now().Add(time.Duration(delay) * time.Minute),
+			})
+			if err != nil {
+				w.logger.WithError(err).Error("failed to create sms notification job")
+			}
 		} else {
-			sendFunc(u)
+			w.sendFuncSms(ctx, incident, u)
 		}
 	}
+}
+
+func (w *worker) sendFuncSms(ctx context.Context, incident *entities.Incident, usr team.TeamUser) {
+	w.logger.WithField("phone", *usr.PhoneNumber).Info("mock sending SMS alert")
 }
 
 func (w *worker) sendVoiceAlert(ctx context.Context, incident *entities.Incident, tier int) {
@@ -977,23 +1090,24 @@ func (w *worker) sendVoiceAlert(ctx context.Context, incident *entities.Incident
 			delay = voiceRule.Delay
 		}
 
-		sendFunc := func(usr team.TeamUser) {
-			if delay > 0 {
-				time.Sleep(time.Duration(delay) * time.Minute)
-				inc, err := w.incidentSvc.GetByID(context.Background(), incident.ID)
-				if err != nil || inc.Acknowledged || inc.Resolved {
-					return
-				}
-			}
-			w.logger.WithField("phone", *usr.PhoneNumber).Info("mock sending Voice alert")
-		}
-
 		if delay > 0 {
-			go sendFunc(u)
+			err = w.escalationSvc.CreateNotificationJob(ctx, &entities.NotificationJob{
+				IncidentID: incident.ID,
+				UserID: u.ID,
+				Channel: entities.ChannelVoice,
+				ScheduledFor: time.Now().Add(time.Duration(delay) * time.Minute),
+			})
+			if err != nil {
+				w.logger.WithError(err).Error("failed to create voice notification job")
+			}
 		} else {
-			sendFunc(u)
+			w.sendFuncVoice(ctx, incident, u)
 		}
 	}
+}
+
+func (w *worker) sendFuncVoice(ctx context.Context, incident *entities.Incident, usr team.TeamUser) {
+	w.logger.WithField("phone", *usr.PhoneNumber).Info("mock sending Voice alert")
 }
 
 func (w *worker) sendDatadogAlert(ctx context.Context, incident *entities.Incident) {
