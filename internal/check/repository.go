@@ -184,7 +184,7 @@ func (r *RepositoryImpl) GetMonitorStatsByMonitorID(ctx context.Context, monitor
 		if(count() = 0, 0, (countIf(status_code > 0 AND status_code < 400) / count()) * 100) as uptime_percentage,
 		if(count() = 0, 0, avg(timing_total/1000000)) as average_response_time`).
 		Where("monitor_id = ?", monitorID).
-		Where("created_at BETWEEN DATE_SUB(NOW(), INTERVAL 1 DAY) AND NOW()").
+		Where("created_at BETWEEN DATE_SUB(NOW(), INTERVAL 30 DAY) AND NOW()").
 		Scan(&stats).Error
 
 	return &stats, err
@@ -218,7 +218,7 @@ func (r *RepositoryImpl) GetMonitorOverviewsByTeamID(ctx context.Context, teamID
 		quantile(0.95)(timing_total)/1000000 as p95`).
 		Where("team_id = ?", teamID).
 		Group("monitor_id").
-		Where("created_at BETWEEN DATE_SUB(NOW(), INTERVAL 1 DAY) AND NOW()").
+		Where("created_at BETWEEN DATE_SUB(NOW(), INTERVAL 30 DAY) AND NOW()").
 		Order("latest ASC").
 		Find(&overviews).Error
 
