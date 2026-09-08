@@ -80,6 +80,7 @@ type MonitorSettings struct {
 
 	Headers   []MonitorSettingsHeader `gorm:"serializer:json"`
 	Body      MonitorSettingsBody     `gorm:"embedded;embeddedPrefix:body_"`
+	Auth      MonitorSettingsAuth     `gorm:"embedded;embeddedPrefix:auth_"`
 	TLS       MonitorSettingsTLS      `gorm:"embedded;embeddedPrefix:tls_"`
 	Locations []string                `gorm:"serializer:json"`
 
@@ -125,6 +126,15 @@ type MonitorSettingsTLS struct {
 	VerifyHostname          *bool `gorm:"default:null"`
 	CheckExpiration         *bool `gorm:"default:null"`
 	ExpirationThresholdDays *uint `gorm:"default:null"`
+}
+
+type MonitorSettingsAuth struct {
+	Method       string `gorm:"not null;default:'NONE'"` // NONE, BASIC, OAUTH2_CLIENT_CREDENTIALS
+	TokenURL     string
+	ClientID     string
+	ClientSecret string
+	Username     string
+	Password     string
 }
 
 func (MonitorSettings) TableName() string {

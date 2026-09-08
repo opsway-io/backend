@@ -35,6 +35,7 @@ type MonitorSettings struct {
 	Headers          []MonitorSettingsHeader `json:"headers" validate:"dive"`
 	Body             MonitorSettingsBody     `json:"body" validate:"required,dive"`
 	TLS              MonitorSettingsTLS      `json:"tls" validate:"required,dive"`
+	Auth             MonitorSettingsAuth     `json:"auth" validate:"required,dive"`
 	Locations        []string                `json:"locations" validate:"omitempty,dive,required,max=255"`
 }
 
@@ -60,6 +61,15 @@ type MonitorSettingsTLS struct {
 	VerifyHostname          *bool `json:"verifyHostname"`
 	CheckExpiration         *bool `json:"checkExpiration"`
 	ExpirationThresholdDays *uint `json:"expirationThresholdDays"`
+}
+
+type MonitorSettingsAuth struct {
+	Method       string `json:"method" validate:"required"`
+	TokenURL     string `json:"tokenUrl"`
+	ClientID     string `json:"clientId"`
+	ClientSecret string `json:"clientSecret"`
+	Username     string `json:"username"`
+	Password     string `json:"password"`
 }
 
 /*
@@ -175,6 +185,14 @@ func newGetMonitorsResponse(monitors *[]monitor.MonitorWithTotalCount, stats *[]
 						VerifyHostname:          m.Settings.TLS.VerifyHostname,
 						CheckExpiration:         m.Settings.TLS.CheckExpiration,
 						ExpirationThresholdDays: m.Settings.TLS.ExpirationThresholdDays,
+					},
+					Auth: MonitorSettingsAuth{
+						Method:       m.Settings.Auth.Method,
+						TokenURL:     m.Settings.Auth.TokenURL,
+						ClientID:     m.Settings.Auth.ClientID,
+						ClientSecret: m.Settings.Auth.ClientSecret,
+						Username:     m.Settings.Auth.Username,
+						Password:     m.Settings.Auth.Password,
 					},
 					Locations: locations,
 				},
@@ -300,6 +318,14 @@ func newGetMonitorResponse(m *entities.Monitor, stats *check.MonitorStats) (*Get
 					CheckExpiration:         m.Settings.TLS.CheckExpiration,
 					ExpirationThresholdDays: m.Settings.TLS.ExpirationThresholdDays,
 				},
+				Auth: MonitorSettingsAuth{
+					Method:       m.Settings.Auth.Method,
+					TokenURL:     m.Settings.Auth.TokenURL,
+					ClientID:     m.Settings.Auth.ClientID,
+					ClientSecret: m.Settings.Auth.ClientSecret,
+					Username:     m.Settings.Auth.Username,
+					Password:     m.Settings.Auth.Password,
+				},
 				Locations: locations,
 			},
 			Assertions: assertions,
@@ -412,6 +438,14 @@ func (h *Handlers) PostMonitor(c hs.AuthenticatedContext) error {
 				VerifyHostname:          req.Settings.TLS.VerifyHostname,
 				CheckExpiration:         req.Settings.TLS.CheckExpiration,
 				ExpirationThresholdDays: req.Settings.TLS.ExpirationThresholdDays,
+			},
+			Auth: entities.MonitorSettingsAuth{
+				Method:       req.Settings.Auth.Method,
+				TokenURL:     req.Settings.Auth.TokenURL,
+				ClientID:     req.Settings.Auth.ClientID,
+				ClientSecret: req.Settings.Auth.ClientSecret,
+				Username:     req.Settings.Auth.Username,
+				Password:     req.Settings.Auth.Password,
 			},
 			Locations: req.Settings.Locations,
 		},
@@ -572,6 +606,14 @@ func (h *Handlers) PutMonitor(c hs.AuthenticatedContext) error {
 				VerifyHostname:          req.Settings.TLS.VerifyHostname,
 				CheckExpiration:         req.Settings.TLS.CheckExpiration,
 				ExpirationThresholdDays: req.Settings.TLS.ExpirationThresholdDays,
+			},
+			Auth: entities.MonitorSettingsAuth{
+				Method:       req.Settings.Auth.Method,
+				TokenURL:     req.Settings.Auth.TokenURL,
+				ClientID:     req.Settings.Auth.ClientID,
+				ClientSecret: req.Settings.Auth.ClientSecret,
+				Username:     req.Settings.Auth.Username,
+				Password:     req.Settings.Auth.Password,
 			},
 			Locations: req.Settings.Locations,
 		},

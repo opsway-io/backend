@@ -2,10 +2,12 @@ package cmd
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io"
 	xhttp "net/http"
+	"net/url"
 	"strings"
 	"time"
 
@@ -183,14 +185,38 @@ func handleTask(ctx context.Context, logger *logrus.Logger, httpProber http.Serv
 		browserTimeout := time.Duration(time.Second * 15)
 		res, err = browserProber.Probe(ctx, m.Settings.URL, scriptJSON, browserTimeout)
 	default:
-		res, err = httpProber.Probe(
-			ctx,
-			m.Settings.Method,
-			m.Settings.URL,
-			nil,
-			nil,
-			timeout,
-		)
+		headers := make(map[string]string)
+		for _, h := range m.Settings.Headers {
+			headers[h.Key] = h.Value
+		}
+
+		var bodyReader io.Reader
+		if m.Settings.Body.Content != nil {
+			bodyReader = strings.NewReader(string(*m.Settings.Body.Content))
+		}
+
+		if m.Settings.Auth.Method == "BASIC" {
+			auth := m.Settings.Auth.Username + ":" + m.Settings.Auth.Password
+			headers["Authorization"] = "Basic " + base64.StdEncoding.EncodeToString([]byte(auth))
+		} else if m.Settings.Auth.Method == "OAUTH2_CLIENT_CREDENTIALS" {
+			token, authErr := fetchOAuth2Token(ctx, m.Settings.Auth.TokenURL, m.Settings.Auth.ClientID, m.Settings.Auth.ClientSecret)
+			if authErr != nil {
+				err = fmt.Errorf("failed to fetch oauth2 token: %w", authErr)
+			} else {
+				headers["Authorization"] = "Bearer " + token
+			}
+		}
+
+		if err == nil {
+			res, err = httpProber.Probe(
+				ctx,
+				m.Settings.Method,
+				m.Settings.URL,
+				headers,
+				bodyReader,
+				timeout,
+			)
+		}
 	}
 
 	targetDown := false
@@ -521,6 +547,43 @@ func checkAnomaly(monitorID uint, res *http.Result) (*ForecasterPredictResponse,
 	}
 
 	return &parsed, nil
+}
+
+func fetchOAuth2Token(ctx context.Context, tokenURL, clientID, clientSecret string) (string, error) {
+	data := url.Values{}
+	data.Set("grant_type", "client_credentials")
+
+	req, err := xhttp.NewRequestWithContext(ctx, "POST", tokenURL, strings.NewReader(data.Encode()))
+	if err != nil {
+		return "", err
+	}
+	req.SetBasicAuth(clientID, clientSecret)
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+
+	client := &xhttp.Client{Timeout: 5 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return "", fmt.Errorf("token endpoint returned status %d", resp.StatusCode)
+	}
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return "", err
+	}
+
+	var result struct {
+		AccessToken string `json:"access_token"`
+	}
+	if err := json.Unmarshal(body, &result); err != nil {
+		return "", err
+	}
+
+	return result.AccessToken, nil
 }
 
 func assertResult(httpResult *http.Result, assertions []entities.MonitorAssertion) ([]entities.MonitorAssertion, []entities.MonitorAssertion, error) {
