@@ -22,12 +22,12 @@ type Service struct {
 	mock.Mock
 }
 
-// CancelSubscribtion provides a mock function with given fields: team
-func (_m *Service) CancelSubscribtion(team *entities.Team) (*stripe.Subscription, error) {
+// CancelSubscription provides a mock function with given fields: team
+func (_m *Service) CancelSubscription(team *entities.Team) (*stripe.Subscription, error) {
 	ret := _m.Called(team)
 
 	if len(ret) == 0 {
-		panic("no return value specified for CancelSubscribtion")
+		panic("no return value specified for CancelSubscription")
 	}
 
 	var r0 *stripe.Subscription
@@ -230,12 +230,12 @@ func (_m *Service) GetCustomerSession(team *entities.Team) (*stripe.CustomerSess
 	return r0, r1
 }
 
-// GetCustomerSubscribtion provides a mock function with given fields: customerID
-func (_m *Service) GetCustomerSubscribtion(customerID string) *subscription.Iter {
+// GetCustomerSubscription provides a mock function with given fields: customerID
+func (_m *Service) GetCustomerSubscription(customerID string) *subscription.Iter {
 	ret := _m.Called(customerID)
 
 	if len(ret) == 0 {
-		panic("no return value specified for GetCustomerSubscribtion")
+		panic("no return value specified for GetCustomerSubscription")
 	}
 
 	var r0 *subscription.Iter
@@ -350,12 +350,12 @@ func (_m *Service) GetProducts() *product.Iter {
 	return r0
 }
 
-// GetSubscribtion provides a mock function with given fields: subID
-func (_m *Service) GetSubscribtion(subID string) (*stripe.Subscription, error) {
+// GetSubscription provides a mock function with given fields: subID
+func (_m *Service) GetSubscription(subID string) (*stripe.Subscription, error) {
 	ret := _m.Called(subID)
 
 	if len(ret) == 0 {
-		panic("no return value specified for GetSubscribtion")
+		panic("no return value specified for GetSubscription")
 	}
 
 	var r0 *stripe.Subscription
@@ -398,12 +398,12 @@ func (_m *Service) PostConfig() billing.StripeConfig {
 	return r0
 }
 
-// UpdateSubscribtion provides a mock function with given fields: team, priceID
-func (_m *Service) UpdateSubscribtion(team *entities.Team, priceID string) (*stripe.Subscription, error) {
+// UpdateSubscription provides a mock function with given fields: team, priceID
+func (_m *Service) UpdateSubscription(team *entities.Team, priceID string) (*stripe.Subscription, error) {
 	ret := _m.Called(team, priceID)
 
 	if len(ret) == 0 {
-		panic("no return value specified for UpdateSubscribtion")
+		panic("no return value specified for UpdateSubscription")
 	}
 
 	var r0 *stripe.Subscription

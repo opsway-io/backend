@@ -40,17 +40,13 @@ func (h *Handlers) handleWebhook(c hs.StripeContext) error {
 			return echo.ErrBadRequest
 		}
 
-		subscription, err := h.BillingService.GetSubscribtion(session.Subscription.ID)
+		subscription, err := h.BillingService.GetSubscription(session.Subscription.ID)
 		if err != nil {
 			c.Log.WithError(err).Debug("Error getting subscription")
 			return c.NoContent(http.StatusInternalServerError)
 		}
 
-		product, err := h.BillingService.GetProduct(subscription.Items.Data[0].Price.Product.ID)
-		if err != nil {
-			c.Log.WithError(err).Debug("Error getting product")
-			return c.NoContent(http.StatusInternalServerError)
-		}
+
 
 		teamID, err := strconv.ParseUint(session.ClientReferenceID, 10, 32)
 		if err != nil {
@@ -64,7 +60,7 @@ func (h *Handlers) handleWebhook(c hs.StripeContext) error {
 			return c.NoContent(http.StatusInternalServerError)
 		}
 
-		customerTeam.PaymentPlan = entities.PaymentPlan(strings.ToUpper(product.Name))
+		customerTeam.PaymentPlan = entities.PaymentPlan(strings.ToUpper(subscription.Items.Data[0].Price.LookupKey))
 		if customerTeam.StripeCustomerID == nil || *customerTeam.StripeCustomerID == "" {
 			customerTeam.StripeCustomerID = &session.Customer.ID
 		}
@@ -88,13 +84,9 @@ func (h *Handlers) handleWebhook(c hs.StripeContext) error {
 			return c.NoContent(http.StatusInternalServerError)
 		}
 
-		product, err := h.BillingService.GetProduct(subscription.Items.Data[0].Price.Product.ID)
-		if err != nil {
-			c.Log.WithError(err).Debug("Error getting product")
-			return c.NoContent(http.StatusInternalServerError)
-		}
 
-		team.PaymentPlan = entities.PaymentPlan(strings.ToUpper(product.Name))
+
+		team.PaymentPlan = entities.PaymentPlan(strings.ToUpper(subscription.Items.Data[0].Price.LookupKey))
 
 		if subscription.Status == "canceled" {
 			team.PaymentPlan = "FREE"
@@ -119,7 +111,7 @@ func (h *Handlers) handleWebhook(c hs.StripeContext) error {
 			c.Log.WithError(err).Debug("Error getting team by stripe id")
 			return c.NoContent(http.StatusInternalServerError)
 		}
-		team.PaymentPlan = entities.PaymentPlan(subscription.Items.Data[0].Price.LookupKey)
+		team.PaymentPlan = entities.PaymentPlan(strings.ToUpper(subscription.Items.Data[0].Price.LookupKey))
 
 		if subscription.Status == "canceled" {
 			team.PaymentPlan = "FREE"

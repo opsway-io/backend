@@ -28,13 +28,13 @@ type Config struct {
 type Service interface {
 	PostConfig() StripeConfig
 	CreateCheckoutSession(team *entities.Team, priceID string) (*stripe.CheckoutSession, error)
-	UpdateSubscribtion(team *entities.Team, priceID string) (*stripe.Subscription, error)
-	CancelSubscribtion(team *entities.Team) (*stripe.Subscription, error)
+	UpdateSubscription(team *entities.Team, priceID string) (*stripe.Subscription, error)
+	CancelSubscription(team *entities.Team) (*stripe.Subscription, error)
 	GetCheckoutSession(sessionID string) (*stripe.CheckoutSession, error)
 	GetLineItems(sessionID string) *session.LineItemIter
 	GetPrices(priceLookupKeys []string) ([]*stripe.Price, error)
-	GetCustomerSubscribtion(customerID string) *subscription.Iter
-	GetSubscribtion(subID string) (*stripe.Subscription, error)
+	GetCustomerSubscription(customerID string) *subscription.Iter
+	GetSubscription(subID string) (*stripe.Subscription, error)
 	GetProduct(productID string) (*stripe.Product, error)
 	GetProducts() *product.Iter
 	CreateCustomerPortal(team *entities.Team) (*stripe.BillingPortalSession, error)
@@ -90,12 +90,18 @@ func (s *ServiceImpl) CreateCheckoutSession(team *entities.Team, priceID string)
 	return session.New(params)
 }
 
-func (s *ServiceImpl) UpdateSubscribtion(team *entities.Team, priceID string) (*stripe.Subscription, error) {
+func (s *ServiceImpl) UpdateSubscription(team *entities.Team, priceID string) (*stripe.Subscription, error) {
 	// Set Customer on session if already a customer
 
-	sub := s.GetCustomerSubscribtion(*team.StripeCustomerID)
-	sub.Next()
+	sub := s.GetCustomerSubscription(*team.StripeCustomerID)
+	if !sub.Next() {
+		return nil, errors.New("no active subscription found for customer")
+	}
 	teamSubscription := sub.Subscription()
+
+	if len(teamSubscription.Items.Data) == 0 {
+		return nil, errors.New("subscription has no items")
+	}
 
 	params := &stripe.SubscriptionParams{
 		Items: []*stripe.SubscriptionItemsParams{
@@ -113,11 +119,13 @@ func (s *ServiceImpl) UpdateSubscribtion(team *entities.Team, priceID string) (*
 	return result, nil
 }
 
-func (s *ServiceImpl) CancelSubscribtion(team *entities.Team) (*stripe.Subscription, error) {
+func (s *ServiceImpl) CancelSubscription(team *entities.Team) (*stripe.Subscription, error) {
 	// Set Customer on session if already a customer
 
-	sub := s.GetCustomerSubscribtion(*team.StripeCustomerID)
-	sub.Next()
+	sub := s.GetCustomerSubscription(*team.StripeCustomerID)
+	if !sub.Next() {
+		return nil, errors.New("no active subscription found for customer")
+	}
 	teamSubscription := sub.Subscription()
 
 	params := &stripe.SubscriptionCancelParams{}
@@ -159,12 +167,12 @@ func (s *ServiceImpl) GetPrices(priceLookupKeys []string) ([]*stripe.Price, erro
 	return prices, nil
 }
 
-func (s *ServiceImpl) GetCustomerSubscribtion(customerID string) *subscription.Iter {
+func (s *ServiceImpl) GetCustomerSubscription(customerID string) *subscription.Iter {
 	params := &stripe.SubscriptionListParams{Customer: stripe.String(customerID)}
 	return subscription.List(params)
 }
 
-func (s *ServiceImpl) GetSubscribtion(subID string) (*stripe.Subscription, error) {
+func (s *ServiceImpl) GetSubscription(subID string) (*stripe.Subscription, error) {
 	params := &stripe.SubscriptionParams{}
 	return subscription.Get(subID, params)
 
