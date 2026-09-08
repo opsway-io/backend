@@ -38,6 +38,7 @@ type GetIncidentsResponseIncident struct {
 	Acknowledged        bool                  `json:"acknowledged"`
 	AcknowledgedAt      *string               `json:"acknowledgedAt,omitempty"`
 	AcknowledgedBy      *IncidentUserResponse `json:"acknowledgedBy,omitempty"`
+	AcknowledgedByIntegration *string              `json:"acknowledgedByIntegration,omitempty"`
 	IsStatusPageVisible bool                  `json:"isStatusPageVisible"`
 	CreatedAt           string  `json:"createdAt"`
 }
@@ -136,6 +137,7 @@ func (h *Handlers) newGetIncidentResponse(incidents *[]entities.Incident) *GetIn
 			Acknowledged:        in.Acknowledged,
 			AcknowledgedAt:      ackAt,
 			AcknowledgedBy:      ackBy,
+			AcknowledgedByIntegration: in.AcknowledgedByIntegration,
 			IsStatusPageVisible: in.IsStatusPageVisible,
 			CreatedAt:           in.CreatedAt.Format("2006-01-02T15:04:05Z07:00"),
 		}
@@ -234,6 +236,7 @@ type GetMonitorIncidentsResponseIncident struct {
 	Acknowledged        bool                  `json:"acknowledged"`
 	AcknowledgedAt      *string               `json:"acknowledgedAt,omitempty"`
 	AcknowledgedBy      *IncidentUserResponse `json:"acknowledgedBy,omitempty"`
+	AcknowledgedByIntegration *string              `json:"acknowledgedByIntegration,omitempty"`
 	IsStatusPageVisible bool                  `json:"isStatusPageVisible"`
 	CreatedAt           string  `json:"createdAt"`
 	UpdatedAt           string  `json:"updatedAt"`
@@ -347,6 +350,7 @@ func (h *Handlers) GetMonitorIncidentsResponse(ctx context.Context, incidents *[
 			Acknowledged:        in.Acknowledged,
 			AcknowledgedAt:      ackAt,
 			AcknowledgedBy:      ackBy,
+			AcknowledgedByIntegration: in.AcknowledgedByIntegration,
 			IsStatusPageVisible: in.IsStatusPageVisible,
 			CreatedAt:           in.CreatedAt.Format("2006-01-02T15:04:05Z07:00"),
 			UpdatedAt:           in.UpdatedAt.Format("2006-01-02T15:04:05Z07:00"),
@@ -383,6 +387,7 @@ type GetIncidentResponse struct {
 	Acknowledged        bool                  `json:"acknowledged"`
 	AcknowledgedAt      *string               `json:"acknowledgedAt,omitempty"`
 	AcknowledgedBy      *IncidentUserResponse `json:"acknowledgedBy,omitempty"`
+	AcknowledgedByIntegration *string              `json:"acknowledgedByIntegration,omitempty"`
 	RootCauseAnalysis   *string               `json:"rootCauseAnalysis,omitempty"`
 	IsStatusPageVisible bool    `json:"isStatusPageVisible"`
 	CreatedAt           string  `json:"createdAt"`
@@ -426,6 +431,8 @@ func (h *Handlers) GetIncident(c hs.AuthenticatedContext) error {
 		ackAt := in.AcknowledgedAt.Format("2006-01-02T15:04:05Z07:00")
 		resp.AcknowledgedAt = &ackAt
 	}
+
+	resp.AcknowledgedByIntegration = in.AcknowledgedByIntegration
 
 	if in.AcknowledgedBy != nil {
 		user, err := h.UserService.GetUserByID(ctx, *in.AcknowledgedBy)

@@ -21,11 +21,18 @@ type SlackMessage struct {
 	Blocks []map[string]interface{} `json:"blocks"`
 }
 
+type SlackUser struct {
+	ID       string `json:"id"`
+	Username string `json:"username"`
+	Name     string `json:"name"`
+}
+
 type SlackPayload struct {
 	Type        string        `json:"type"`
 	Actions     []SlackAction `json:"actions"`
 	ResponseURL string        `json:"response_url"`
 	Message     SlackMessage  `json:"message"`
+	User        SlackUser     `json:"user"`
 }
 
 func (h *Handlers) PostSlackInteractive(c echo.Context) error {
@@ -78,6 +85,13 @@ func (h *Handlers) PostSlackInteractive(c echo.Context) error {
 		incident.Acknowledged = true
 		now := time.Now()
 		incident.AcknowledgedAt = &now
+		if payload.User.Name != "" {
+			val := fmt.Sprintf("%s (via Slack)", payload.User.Name)
+			incident.AcknowledgedByIntegration = &val
+		} else if payload.User.Username != "" {
+			val := fmt.Sprintf("%s (via Slack)", payload.User.Username)
+			incident.AcknowledgedByIntegration = &val
+		}
 		if err := h.IncidentService.Update(c.Request().Context(), incident); err != nil {
 			c.Logger().Errorf("failed to update incident %d: %v", incidentID, err)
 		}
