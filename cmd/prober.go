@@ -158,6 +158,7 @@ func handleTask(ctx context.Context, logger *logrus.Logger, httpProber http.Serv
 	var err error
 
 	timeout := time.Duration(time.Second * 5)
+	var authFailed bool = false
 
 	switch m.Settings.Method {
 	case "TCP":
@@ -202,6 +203,7 @@ func handleTask(ctx context.Context, logger *logrus.Logger, httpProber http.Serv
 			token, authErr := fetchOAuth2Token(ctx, m.Settings.Auth.TokenURL, m.Settings.Auth.ClientID, m.Settings.Auth.ClientSecret)
 			if authErr != nil {
 				err = fmt.Errorf("failed to fetch oauth2 token: %w", authErr)
+				authFailed = true
 			} else {
 				headers["Authorization"] = "Bearer " + token
 			}
@@ -222,7 +224,9 @@ func handleTask(ctx context.Context, logger *logrus.Logger, httpProber http.Serv
 	targetDown := false
 	if err != nil && res == nil {
 		l.WithError(err).Error("failed to probe")
-		targetDown = true
+		if !authFailed {
+			targetDown = true
+		}
 
 		// Create a dummy result for dead targets so assertions fail gracefully
 		res = &http.Result{
@@ -272,8 +276,8 @@ func handleTask(ctx context.Context, logger *logrus.Logger, httpProber http.Serv
 	failKey := fmt.Sprintf("monitor:%d:failures", m.ID)
 	var failCount int64 = 0
 
-	if failedCount > 0 || targetDown {
-		l.Info("monitor failed (assertions or target down), incrementing failure counter")
+	if failedCount > 0 || targetDown || authFailed {
+		l.Info("monitor failed (assertions, target down, or auth), incrementing failure counter")
 		val, err := rc.Incr(ctx, failKey).Result()
 		if err != nil {
 			l.WithError(err).Error("failed to increment failure counter")
@@ -314,7 +318,7 @@ func handleTask(ctx context.Context, logger *logrus.Logger, httpProber http.Serv
 			openIncidents, err = i.GetByMonitorIDWithAssertionPaginated(ctx, m.ID, nil, nil)
 			if err == nil && openIncidents != nil {
 				for _, inc := range *openIncidents {
-					if !inc.Incident.Resolved && inc.Incident.Title != "Anomaly Detected" && inc.Incident.Title != "SSL/TLS Cert Expiry" && inc.Incident.Title != "Target Down" {
+					if !inc.Incident.Resolved && inc.Incident.Title != "Anomaly Detected" && inc.Incident.Title != "SSL/TLS Cert Expiry" && inc.Incident.Title != "Target Down" && inc.Incident.Title != "Authentication Failed" {
 						for _, assertion := range failed {
 							if inc.Incident.MonitorAssertionID != nil && *inc.Incident.MonitorAssertionID == assertion.ID {
 								inc.Incident.UpdatedAt = time.Now()
@@ -333,7 +337,9 @@ func handleTask(ctx context.Context, logger *logrus.Logger, httpProber http.Serv
 		l.Info("all assertions passed")
 
 		// Reset counter
-		rc.Del(ctx, failKey)
+		if !authFailed && !targetDown {
+			rc.Del(ctx, failKey)
+		}
 	}
 
 	// Auto-resolve any open incidents for this monitor whose assertion is not currently failing
@@ -345,7 +351,7 @@ func handleTask(ctx context.Context, logger *logrus.Logger, httpProber http.Serv
 		}
 
 		for _, inc := range *openIncidents {
-			if !inc.Incident.Resolved && inc.Incident.Title != "Anomaly Detected" && inc.Incident.Title != "SSL/TLS Cert Expiry" && inc.Incident.Title != "Target Down" {
+			if !inc.Incident.Resolved && inc.Incident.Title != "Anomaly Detected" && inc.Incident.Title != "SSL/TLS Cert Expiry" && inc.Incident.Title != "Target Down" && inc.Incident.Title != "Authentication Failed" {
 				if inc.Incident.MonitorAssertionID == nil || !failedAssertionIDs[*inc.Incident.MonitorAssertionID] {
 					l.WithField("incident_id", inc.Incident.ID).Info("auto-resolving incident")
 					inc.Incident.Resolved = true
@@ -414,7 +420,7 @@ func handleTask(ctx context.Context, logger *logrus.Logger, httpProber http.Serv
 			hasOpenAnomalyIncident := false
 			if openIncidents != nil {
 				for _, inc := range *openIncidents {
-					if inc.Title == "Anomaly Detected" {
+					if inc.Title == "Anomaly Detected" && !inc.Resolved {
 						hasOpenAnomalyIncident = true
 						break
 					}
@@ -435,7 +441,7 @@ func handleTask(ctx context.Context, logger *logrus.Logger, httpProber http.Serv
 				}
 			} else {
 				for _, inc := range *openIncidents {
-					if inc.Title == "Anomaly Detected" {
+					if inc.Title == "Anomaly Detected" && !inc.Resolved {
 						inc.Incident.UpdatedAt = time.Now()
 						inc.Incident.Occurrences++
 						if err := i.Update(ctx, &inc.Incident); err != nil {
@@ -443,6 +449,57 @@ func handleTask(ctx context.Context, logger *logrus.Logger, httpProber http.Serv
 						}
 						_ = i.CreateOccurrence(ctx, &entities.IncidentOccurrence{IncidentID: inc.Incident.ID, CreatedAt: time.Now()})
 						break
+					}
+				}
+			}
+		}
+	}
+
+	if authFailed {
+		hasOpenAuthIncident := false
+		openIncidents, err := i.GetByMonitorIDWithAssertionPaginated(ctx, m.ID, nil, nil)
+		if err == nil && openIncidents != nil {
+			for _, inc := range *openIncidents {
+				if inc.Title == "Authentication Failed" && !inc.Resolved {
+					hasOpenAuthIncident = true
+					inc.Incident.UpdatedAt = time.Now()
+					inc.Incident.Occurrences++
+					if err := i.Update(ctx, &inc.Incident); err != nil {
+						l.WithError(err).Error("failed to update auth failed incident occurrence")
+					}
+					_ = i.CreateOccurrence(ctx, &entities.IncidentOccurrence{IncidentID: inc.Incident.ID, CreatedAt: time.Now()})
+					break
+				}
+			}
+		}
+
+		if !hasOpenAuthIncident && failCount >= 3 {
+			l.Info("authentication failed and threshold reached, triggering incident")
+			descStr := "Authentication failed"
+			if err != nil {
+				descStr = fmt.Sprintf("Authentication failed: %v", err)
+			}
+			authIncident := entities.Incident{
+				MonitorID:   &m.ID,
+				TeamID:      m.TeamID,
+				Title:       "Authentication Failed",
+				Description: &descStr,
+			}
+			if err := i.Create(ctx, &[]entities.Incident{authIncident}); err != nil {
+				l.WithError(err).Error("failed to trigger auth failed incident")
+			}
+		}
+	} else {
+		openIncidents, err := i.GetByMonitorIDWithAssertionPaginated(ctx, m.ID, nil, nil)
+		if err == nil && openIncidents != nil {
+			for _, inc := range *openIncidents {
+				if inc.Title == "Authentication Failed" && !inc.Resolved {
+					l.Info("authentication is now succeeding, resolving open Authentication Failed incident")
+					inc.Incident.Resolved = true
+					now := time.Now()
+					inc.Incident.ResolvedAt = &now
+					if err := i.Update(ctx, &inc.Incident); err != nil {
+						l.WithError(err).Error("failed to resolve auth failed incident")
 					}
 				}
 			}
