@@ -83,9 +83,9 @@ func (s *RepositoryImpl) GetByStripeID(ctx context.Context, stripeID string) (*e
 }
 
 type TeamUser struct {
-	entities.User
-	Role       entities.TeamRole
-	TotalCount int
+	entities.User `gorm:"embedded"`
+	Role          entities.TeamRole
+	TotalCount    int
 }
 
 func (s *RepositoryImpl) GetUsersByID(ctx context.Context, teamId uint, offset *int, limit *int, query *string, role *entities.TeamRole) (*[]TeamUser, error) {

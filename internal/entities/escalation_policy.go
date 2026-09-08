@@ -12,6 +12,9 @@ type EscalationPolicy struct {
 	// How many minutes to wait before escalating from Tier 1 to Tier 2
 	EscalationTimeoutMinutes int `gorm:"not null;default:5"`
 
+	// If set, forces all notifications in this policy to use this channel (e.g. "email", "sms", "voice")
+	EnforcedChannel string `gorm:"default:''"`
+
 	CreatedAt time.Time `gorm:"index"`
 	UpdatedAt time.Time `gorm:"index"`
 }

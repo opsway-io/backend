@@ -608,6 +608,22 @@ func (w *worker) triggerRule(ctx context.Context, incident *entities.Incident, r
 		return
 	}
 
+	if incident != nil {
+		policy, err := w.escalationSvc.GetPolicyByTeamID(ctx, incident.TeamID)
+		if err == nil && policy != nil && policy.EnforcedChannel != "" {
+			found := false
+			for _, c := range channels {
+				if c == policy.EnforcedChannel {
+					found = true
+					break
+				}
+			}
+			if !found {
+				channels = append(channels, policy.EnforcedChannel)
+			}
+		}
+	}
+
 	// Log trigger
 	trigger := &entities.AlertTrigger{
 		TeamID:      rule.TeamID,
@@ -658,6 +674,9 @@ func (w *worker) sendEmailAlert(ctx context.Context, incident *entities.Incident
 		return
 	}
 
+	policy, _ := w.escalationSvc.GetPolicyByTeamID(ctx, incident.TeamID)
+	hasPolicy := policy != nil
+
 	onCallUserIDs, err := w.escalationSvc.GetOnCallUsersByTeamID(ctx, incident.TeamID, tier)
 	if err != nil {
 		w.logger.WithError(err).Error("failed to get on call users")
@@ -670,30 +689,38 @@ func (w *worker) sendEmailAlert(ctx context.Context, incident *entities.Incident
 
 	for _, u := range *users {
 		// If escalation policy exists for this team, only send to on-call users
-		if len(onCallUserIDs) > 0 && !onCallMap[u.ID] {
+		if hasPolicy && !onCallMap[u.ID] {
 			continue
 		}
 
-		userRules, _ := w.userService.GetNotificationRules(ctx, u.ID)
-		hasCustomRules := len(userRules) > 0
-		var emailRule *entities.UserNotificationRule
+		delay := 0
+		if hasPolicy && policy.EnforcedChannel != "" {
+			if policy.EnforcedChannel == string(entities.ChannelEmail) {
+				delay = 0
+			} else {
+				continue // Enforced to another channel, skip this one
+			}
+		} else {
+			userRules, _ := w.userService.GetNotificationRules(ctx, u.ID)
+			hasCustomRules := len(userRules) > 0
+			var emailRule *entities.UserNotificationRule
 
-		if hasCustomRules {
-			for _, r := range userRules {
-				if r.Channel == entities.ChannelEmail {
-					ruleCopy := r
-					emailRule = &ruleCopy
-					break
+			if hasCustomRules {
+				for _, r := range userRules {
+					if r.Channel == entities.ChannelEmail {
+						ruleCopy := r
+						emailRule = &ruleCopy
+						break
+					}
+				}
+				if emailRule == nil {
+					continue // User has custom rules but didn't select email
 				}
 			}
-			if emailRule == nil {
-				continue // User has custom rules but didn't select email
+			
+			if emailRule != nil {
+				delay = emailRule.Delay
 			}
-		}
-
-		delay := 0
-		if emailRule != nil {
-			delay = emailRule.Delay
 		}
 
 		userName := "Team Member"
@@ -987,6 +1014,9 @@ func (w *worker) sendSmsAlert(ctx context.Context, incident *entities.Incident, 
 		return
 	}
 
+	policy, _ := w.escalationSvc.GetPolicyByTeamID(ctx, incident.TeamID)
+	hasPolicy := policy != nil
+
 	onCallUserIDs, _ := w.escalationSvc.GetOnCallUsersByTeamID(ctx, incident.TeamID, tier)
 	onCallMap := make(map[uint]bool)
 	for _, id := range onCallUserIDs {
@@ -994,33 +1024,41 @@ func (w *worker) sendSmsAlert(ctx context.Context, incident *entities.Incident, 
 	}
 
 	for _, u := range *users {
-		if len(onCallUserIDs) > 0 && !onCallMap[u.ID] {
+		if hasPolicy && !onCallMap[u.ID] {
 			continue
 		}
 		if u.PhoneNumber == nil || *u.PhoneNumber == "" {
 			continue
 		}
 
-		userRules, _ := w.userService.GetNotificationRules(ctx, u.ID)
-		hasCustomRules := len(userRules) > 0
-		var smsRule *entities.UserNotificationRule
+		delay := 0
+		if hasPolicy && policy.EnforcedChannel != "" {
+			if policy.EnforcedChannel == string(entities.ChannelSMS) {
+				delay = 0
+			} else {
+				continue // Enforced to another channel, skip this one
+			}
+		} else {
+			userRules, _ := w.userService.GetNotificationRules(ctx, u.ID)
+			hasCustomRules := len(userRules) > 0
+			var smsRule *entities.UserNotificationRule
 
-		if hasCustomRules {
-			for _, r := range userRules {
-				if r.Channel == entities.ChannelSMS {
-					ruleCopy := r
-					smsRule = &ruleCopy
-					break
+			if hasCustomRules {
+				for _, r := range userRules {
+					if r.Channel == entities.ChannelSMS {
+						ruleCopy := r
+						smsRule = &ruleCopy
+						break
+					}
+				}
+				if smsRule == nil {
+					continue
 				}
 			}
-			if smsRule == nil {
-				continue
-			}
-		}
 
-		delay := 0
-		if smsRule != nil {
-			delay = smsRule.Delay
+			if smsRule != nil {
+				delay = smsRule.Delay
+			}
 		}
 
 		if delay > 0 {
@@ -1054,6 +1092,9 @@ func (w *worker) sendVoiceAlert(ctx context.Context, incident *entities.Incident
 		return
 	}
 
+	policy, _ := w.escalationSvc.GetPolicyByTeamID(ctx, incident.TeamID)
+	hasPolicy := policy != nil
+
 	onCallUserIDs, _ := w.escalationSvc.GetOnCallUsersByTeamID(ctx, incident.TeamID, tier)
 	onCallMap := make(map[uint]bool)
 	for _, id := range onCallUserIDs {
@@ -1061,33 +1102,41 @@ func (w *worker) sendVoiceAlert(ctx context.Context, incident *entities.Incident
 	}
 
 	for _, u := range *users {
-		if len(onCallUserIDs) > 0 && !onCallMap[u.ID] {
+		if hasPolicy && !onCallMap[u.ID] {
 			continue
 		}
 		if u.PhoneNumber == nil || *u.PhoneNumber == "" {
 			continue
 		}
 
-		userRules, _ := w.userService.GetNotificationRules(ctx, u.ID)
-		hasCustomRules := len(userRules) > 0
-		var voiceRule *entities.UserNotificationRule
+		delay := 0
+		if hasPolicy && policy.EnforcedChannel != "" {
+			if policy.EnforcedChannel == string(entities.ChannelVoice) {
+				delay = 0
+			} else {
+				continue // Enforced to another channel, skip this one
+			}
+		} else {
+			userRules, _ := w.userService.GetNotificationRules(ctx, u.ID)
+			hasCustomRules := len(userRules) > 0
+			var voiceRule *entities.UserNotificationRule
 
-		if hasCustomRules {
-			for _, r := range userRules {
-				if r.Channel == entities.ChannelVoice {
-					ruleCopy := r
-					voiceRule = &ruleCopy
-					break
+			if hasCustomRules {
+				for _, r := range userRules {
+					if r.Channel == entities.ChannelVoice {
+						ruleCopy := r
+						voiceRule = &ruleCopy
+						break
+					}
+				}
+				if voiceRule == nil {
+					continue
 				}
 			}
-			if voiceRule == nil {
-				continue
-			}
-		}
 
-		delay := 0
-		if voiceRule != nil {
-			delay = voiceRule.Delay
+			if voiceRule != nil {
+				delay = voiceRule.Delay
+			}
 		}
 
 		if delay > 0 {

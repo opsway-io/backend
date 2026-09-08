@@ -23,6 +23,7 @@ type OnCallRotationResponse struct {
 type EscalationPolicyResponse struct {
 	Name                     string                   `json:"name"`
 	EscalationTimeoutMinutes int                      `json:"escalationTimeoutMinutes"`
+	EnforcedChannel          string                   `json:"enforcedChannel"`
 	Rotations                []OnCallRotationResponse `json:"rotations"`
 }
 
@@ -41,6 +42,7 @@ func (h *Handlers) GetEscalationPolicy(c hs.AuthenticatedContext) error {
 			return c.JSON(http.StatusOK, EscalationPolicyResponse{
 				Name:                     "Default Escalation",
 				EscalationTimeoutMinutes: 15,
+				EnforcedChannel:          "",
 				Rotations:                []OnCallRotationResponse{},
 			})
 		}
@@ -65,6 +67,7 @@ func (h *Handlers) GetEscalationPolicy(c hs.AuthenticatedContext) error {
 	return c.JSON(http.StatusOK, EscalationPolicyResponse{
 		Name:                     policy.Name,
 		EscalationTimeoutMinutes: policy.EscalationTimeoutMinutes,
+		EnforcedChannel:          policy.EnforcedChannel,
 		Rotations:                rotationResps,
 	})
 }
@@ -73,6 +76,7 @@ type PutEscalationPolicyRequest struct {
 	TeamID                   uint                     `param:"teamId" validate:"required,numeric,gte=0"`
 	Name                     string                   `json:"name" validate:"required"`
 	EscalationTimeoutMinutes int                      `json:"escalationTimeoutMinutes" validate:"required,min=1"`
+	EnforcedChannel          string                   `json:"enforcedChannel" validate:"omitempty,oneof=email sms voice"`
 	Rotations                []OnCallRotationResponse `json:"rotations"`
 }
 
@@ -85,6 +89,24 @@ func (h *Handlers) PutEscalationPolicy(c hs.AuthenticatedContext) error {
 
 	ctx := c.Request().Context()
 
+	if req.EnforcedChannel != "" {
+		for _, r := range req.Rotations {
+			u, err := h.UserService.GetUserByID(ctx, r.UserID)
+			if err != nil {
+				return echo.NewHTTPError(http.StatusBadRequest, "invalid user in rotation")
+			}
+			if req.EnforcedChannel == string(entities.ChannelEmail) {
+				if u.Email == "" {
+					return echo.NewHTTPError(http.StatusBadRequest, "user "+u.Name+" does not have an email address")
+				}
+			} else if req.EnforcedChannel == string(entities.ChannelSMS) || req.EnforcedChannel == string(entities.ChannelVoice) {
+				if u.PhoneNumber == nil || *u.PhoneNumber == "" {
+					return echo.NewHTTPError(http.StatusBadRequest, "user "+u.Name+" does not have a phone number configured")
+				}
+			}
+		}
+	}
+
 	policy, err := h.EscalationService.GetPolicyByTeamID(ctx, req.TeamID)
 	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
 		c.Log.WithError(err).Error("failed to get escalation policy")
@@ -96,6 +118,7 @@ func (h *Handlers) PutEscalationPolicy(c hs.AuthenticatedContext) error {
 			TeamID:                   req.TeamID,
 			Name:                     req.Name,
 			EscalationTimeoutMinutes: req.EscalationTimeoutMinutes,
+			EnforcedChannel:          req.EnforcedChannel,
 		}
 		if err := h.EscalationService.CreatePolicy(ctx, policy); err != nil {
 			c.Log.WithError(err).Error("failed to create escalation policy")
@@ -104,6 +127,7 @@ func (h *Handlers) PutEscalationPolicy(c hs.AuthenticatedContext) error {
 	} else {
 		policy.Name = req.Name
 		policy.EscalationTimeoutMinutes = req.EscalationTimeoutMinutes
+		policy.EnforcedChannel = req.EnforcedChannel
 		if err := h.EscalationService.UpdatePolicy(ctx, policy); err != nil {
 			c.Log.WithError(err).Error("failed to update escalation policy")
 			return echo.ErrInternalServerError
