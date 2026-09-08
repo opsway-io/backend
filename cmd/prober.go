@@ -270,21 +270,25 @@ func handleTask(ctx context.Context, logger *logrus.Logger, httpProber http.Serv
 	})
 
 	failKey := fmt.Sprintf("monitor:%d:failures", m.ID)
+	var failCount int64 = 0
 
-	if failedCount > 0 {
-		l.Info("some assertions failed, incrementing failure counter")
+	if failedCount > 0 || targetDown {
+		l.Info("monitor failed (assertions or target down), incrementing failure counter")
 		val, err := rc.Incr(ctx, failKey).Result()
 		if err != nil {
 			l.WithError(err).Error("failed to increment failure counter")
 		}
+		failCount = val
+	}
 
+	if failedCount > 0 {
 		// Hardcoded threshold of 3 for MVP
-		if val == 3 {
+		if failCount == 3 {
 			l.Info("failure threshold reached, triggering incident")
 			if err = triggerIncident(ctx, m, res, &failed, i); err != nil {
 				l.WithError(err).Error("failed to trigger incident")
 			}
-		} else if val > 3 {
+		} else if failCount > 3 {
 			openIncidents, err := i.GetByMonitorIDWithAssertionPaginated(ctx, m.ID, nil, nil)
 			if err == nil && openIncidents != nil {
 				var unhandledFailures []entities.MonitorAssertion
@@ -373,8 +377,8 @@ func handleTask(ctx context.Context, logger *logrus.Logger, httpProber http.Serv
 			}
 		}
 
-		if !hasOpenDownIncident {
-			l.Info("target is down, triggering incident")
+		if !hasOpenDownIncident && failCount >= 3 {
+			l.Info("target is down and failure threshold reached, triggering incident")
 			desc := fmt.Sprintf("Target %s is unreachable or not responding.", m.Settings.URL)
 			downIncident := entities.Incident{
 				MonitorID:   &m.ID,
