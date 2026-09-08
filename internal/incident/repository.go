@@ -24,7 +24,7 @@ type Repository interface {
 	Delete(ctx context.Context, incident *entities.Incident) error
 	GetByTeamIDMonitorsIncidentStats(ctx context.Context, teamID uint, start, end string) (*[]entities.MonitorIncident, error)
 	CreateOccurrence(ctx context.Context, occurrence *entities.IncidentOccurrence) error
-	GetOccurrencesPaginated(ctx context.Context, incidentID uint, offset, limit *int) (*[]entities.IncidentOccurrence, error)
+	GetOccurrencesPaginated(ctx context.Context, incidentID uint, offset, limit *int) (int, *[]entities.IncidentOccurrence, error)
 }
 
 type RepositoryImpl struct {
@@ -106,8 +106,8 @@ func (r *RepositoryImpl) GetByMonitorIDWithAssertionPaginated(ctx context.Contex
 		"LEFT JOIN monitor_assertions as ma ON ma.id = incidents.monitor_assertion_id",
 	).Order(
 		"created_at desc",
-	// ).Scopes(
-	// 	postgres.Paginated(offset, limit),
+		).Scopes(
+			postgres.Paginated(offset, limit),
 	).Find(&incidents).Error; err != nil {
 		return nil, err
 	}
@@ -191,11 +191,19 @@ func (r *RepositoryImpl) CreateOccurrence(ctx context.Context, occurrence *entit
 	return r.db.WithContext(ctx).Create(occurrence).Error
 }
 
-func (r *RepositoryImpl) GetOccurrencesPaginated(ctx context.Context, incidentID uint, offset, limit *int) (*[]entities.IncidentOccurrence, error) {
+func (r *RepositoryImpl) GetOccurrencesPaginated(ctx context.Context, incidentID uint, offset, limit *int) (int, *[]entities.IncidentOccurrence, error) {
 	var occurrences []entities.IncidentOccurrence
-	err := r.db.WithContext(ctx).Where("incident_id = ?", incidentID).Order("created_at desc").Scopes(postgres.Paginated(offset, limit)).Find(&occurrences).Error
-	if err != nil {
-		return nil, err
+	var totalCount int64
+
+	baseQuery := r.db.WithContext(ctx).Model(&entities.IncidentOccurrence{}).Where("incident_id = ?", incidentID)
+
+	if err := baseQuery.Count(&totalCount).Error; err != nil {
+		return 0, nil, err
 	}
-	return &occurrences, nil
+
+	err := baseQuery.Order("created_at desc").Scopes(postgres.Paginated(offset, limit)).Find(&occurrences).Error
+	if err != nil {
+		return 0, nil, err
+	}
+	return int(totalCount), &occurrences, nil
 }

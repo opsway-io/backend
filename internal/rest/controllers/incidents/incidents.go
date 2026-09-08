@@ -590,6 +590,7 @@ type GetIncidentOccurrencesRequest struct {
 }
 
 type GetIncidentOccurrencesResponse struct {
+	TotalCount  int                          `json:"totalCount"`
 	Occurrences []IncidentOccurrenceResponse `json:"occurrences"`
 }
 
@@ -617,13 +618,14 @@ func (h *Handlers) GetIncidentOccurrences(c hs.AuthenticatedContext) error {
 		return echo.ErrForbidden
 	}
 
-	occurrences, err := h.IncidentService.GetOccurrencesPaginated(ctx, req.IncidentID, req.Offset, req.Limit)
+	totalCount, occurrences, err := h.IncidentService.GetOccurrencesPaginated(ctx, req.IncidentID, req.Offset, req.Limit)
 	if err != nil {
 		c.Log.WithError(err).Error("failed to get incident occurrences")
 		return echo.ErrInternalServerError
 	}
 
 	resp := GetIncidentOccurrencesResponse{
+		TotalCount:  totalCount,
 		Occurrences: make([]IncidentOccurrenceResponse, len(*occurrences)),
 	}
 
