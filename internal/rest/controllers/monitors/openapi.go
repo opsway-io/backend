@@ -47,7 +47,7 @@ func (h *Handlers) PreviewOpenAPI(c hs.AuthenticatedContext) error {
 	doc, err := loader.LoadFromURI(parsedURL)
 	if err != nil {
 		c.Log.WithError(err).Error("failed to load openapi spec")
-		return echo.NewHTTPError(http.StatusBadRequest, "Failed to fetch or parse OpenAPI spec")
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Failed to fetch or parse OpenAPI spec: %v", err))
 	}
 
 	endpoints := make([]PreviewOpenAPIEndpoint, 0)
