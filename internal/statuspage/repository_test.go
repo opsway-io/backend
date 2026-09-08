@@ -54,7 +54,7 @@ func TestRepositoryIntegration(t *testing.T) {
 	require.NoError(t, err)
 
 	// Migrate schema
-	err = db.AutoMigrate(&entities.Team{}, &entities.StatusPage{}, &entities.StatusPageSubscriber{})
+	err = db.AutoMigrate(&entities.Team{}, &entities.Monitor{}, &entities.StatusPage{}, &entities.StatusPageGroup{}, &entities.StatusPageSubscriber{})
 	require.NoError(t, err)
 
 	// 3. Test Repository

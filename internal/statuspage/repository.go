@@ -21,6 +21,7 @@ type Repository interface {
 	Unsubscribe(ctx context.Context, token string) error
 	GetVerifiedSubscribers(ctx context.Context, statusPageID uint) ([]entities.StatusPageSubscriber, error)
 	ReplaceMonitors(ctx context.Context, statusPage *entities.StatusPage, monitors []entities.Monitor) error
+	ReplaceGroups(ctx context.Context, statusPage *entities.StatusPage, groups []entities.StatusPageGroup) error
 }
 
 type RepositoryImpl struct {
@@ -35,19 +36,19 @@ func NewRepository(db *gorm.DB) Repository {
 
 func (r *RepositoryImpl) GetByTeamID(ctx context.Context, teamID uint) ([]*entities.StatusPage, error) {
 	var statusPages []*entities.StatusPage
-	err := r.db.WithContext(ctx).Where("team_id = ?", teamID).Preload("Monitors").Find(&statusPages).Error
+	err := r.db.WithContext(ctx).Where("team_id = ?", teamID).Preload("Monitors").Preload("Groups").Preload("Groups.Monitors").Find(&statusPages).Error
 	return statusPages, err
 }
 
 func (r *RepositoryImpl) GetByIDAndTeamID(ctx context.Context, id, teamID uint) (*entities.StatusPage, error) {
 	var statusPage entities.StatusPage
-	err := r.db.WithContext(ctx).Where("id = ? AND team_id = ?", id, teamID).Preload("Monitors").First(&statusPage).Error
+	err := r.db.WithContext(ctx).Where("id = ? AND team_id = ?", id, teamID).Preload("Monitors").Preload("Groups").Preload("Groups.Monitors").First(&statusPage).Error
 	return &statusPage, err
 }
 
 func (r *RepositoryImpl) GetByDomain(ctx context.Context, domain string) (*entities.StatusPage, error) {
 	var statusPage entities.StatusPage
-	err := r.db.WithContext(ctx).Where("domain = ?", domain).Preload("Monitors").First(&statusPage).Error
+	err := r.db.WithContext(ctx).Where("domain = ?", domain).Preload("Monitors").Preload("Groups").Preload("Groups.Monitors").First(&statusPage).Error
 	return &statusPage, err
 }
 
@@ -98,4 +99,18 @@ func (r *RepositoryImpl) GetVerifiedSubscribers(ctx context.Context, statusPageI
 
 func (r *RepositoryImpl) ReplaceMonitors(ctx context.Context, statusPage *entities.StatusPage, monitors []entities.Monitor) error {
 	return r.db.WithContext(ctx).Model(statusPage).Association("Monitors").Replace(monitors)
+}
+
+func (r *RepositoryImpl) ReplaceGroups(ctx context.Context, statusPage *entities.StatusPage, groups []entities.StatusPageGroup) error {
+	err := r.db.WithContext(ctx).Where("status_page_id = ?", statusPage.ID).Delete(&entities.StatusPageGroup{}).Error
+	if err != nil {
+		return err
+	}
+	for i := range groups {
+		groups[i].StatusPageID = statusPage.ID
+	}
+	if len(groups) > 0 {
+		return r.db.WithContext(ctx).Create(&groups).Error
+	}
+	return nil
 }

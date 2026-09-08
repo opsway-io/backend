@@ -52,6 +52,13 @@ type GetStatusPagesRequest struct {
 	TeamID uint `param:"teamId" validate:"required,numeric,gt=0"`
 }
 
+type GetStatusPageGroupResponse struct {
+	ID         uint   `json:"id"`
+	Name       string `json:"name"`
+	Order      int    `json:"order"`
+	MonitorIDs []uint `json:"monitorIds"`
+}
+
 type GetStatusPagesResponse struct {
 	StatusPages []GetStatusPageResponse `json:"statusPages"`
 }
@@ -69,9 +76,10 @@ type GetStatusPageResponse struct {
 	FooterHTML           string `json:"footerHtml"`
 	CustomComponentsHTML string `json:"customComponentsHtml"`
 	ShowBranding         bool   `json:"showBranding"`
-	IsPrivate            bool   `json:"isPrivate"`
-	MonitorIDs           []uint `json:"monitorIds"`
-	CreatedAt            string `json:"createdAt"`
+	IsPrivate            bool                         `json:"isPrivate"`
+	MonitorIDs           []uint                       `json:"monitorIds"`
+	Groups               []GetStatusPageGroupResponse `json:"groups"`
+	CreatedAt            string                       `json:"createdAt"`
 	UpdatedAt            string `json:"updatedAt"`
 }
 
@@ -113,6 +121,25 @@ func (h *Handlers) GetStatusPages(c handlers.AuthenticatedContext) error {
 			ShowBranding:         sp.ShowBranding,
 			IsPrivate:            sp.IsPrivate,
 			MonitorIDs:           monitorIDs,
+			Groups:               func() []GetStatusPageGroupResponse {
+				var groups []GetStatusPageGroupResponse
+				for _, g := range sp.Groups {
+					var gm []uint
+					for _, m := range g.Monitors {
+						gm = append(gm, m.ID)
+					}
+					groups = append(groups, GetStatusPageGroupResponse{
+						ID:         g.ID,
+						Name:       g.Name,
+						Order:      g.Order,
+						MonitorIDs: gm,
+					})
+				}
+				if groups == nil {
+					groups = []GetStatusPageGroupResponse{}
+				}
+				return groups
+			}(),
 			CreatedAt:            sp.CreatedAt.String(),
 			UpdatedAt:            sp.UpdatedAt.String(),
 		}
@@ -216,6 +243,25 @@ func (h *Handlers) GetStatusPage(c handlers.AuthenticatedContext) error {
 		ShowBranding:         sp.ShowBranding,
 		IsPrivate:            sp.IsPrivate,
 		MonitorIDs:           monitorIDs,
+		Groups:               func() []GetStatusPageGroupResponse {
+			var groups []GetStatusPageGroupResponse
+			for _, g := range sp.Groups {
+				var gm []uint
+				for _, m := range g.Monitors {
+					gm = append(gm, m.ID)
+				}
+				groups = append(groups, GetStatusPageGroupResponse{
+					ID:         g.ID,
+					Name:       g.Name,
+					Order:      g.Order,
+					MonitorIDs: gm,
+				})
+			}
+			if groups == nil {
+				groups = []GetStatusPageGroupResponse{}
+			}
+			return groups
+		}(),
 		CreatedAt:            sp.CreatedAt.String(),
 		UpdatedAt:            sp.UpdatedAt.String(),
 	})
@@ -235,9 +281,16 @@ type PutStatusPageRequest struct {
 	FooterHTML           string `json:"footerHtml"`
 	CustomComponentsHTML string `json:"customComponentsHtml"`
 	ShowBranding         *bool  `json:"showBranding"`
-	IsPrivate            *bool  `json:"isPrivate"`
-	Password             string `json:"password"`
-	MonitorIDs           []uint `json:"monitorIds"`
+	IsPrivate            *bool                       `json:"isPrivate"`
+	Password             string                      `json:"password"`
+	MonitorIDs           []uint                      `json:"monitorIds"`
+	Groups               []PutStatusPageGroupRequest `json:"groups"`
+}
+
+type PutStatusPageGroupRequest struct {
+	Name       string `json:"name" validate:"required,max=255"`
+	Order      int    `json:"order"`
+	MonitorIDs []uint `json:"monitorIds"`
 }
 
 func (h *Handlers) PutStatusPage(c handlers.AuthenticatedContext) error {
@@ -304,6 +357,25 @@ func (h *Handlers) PutStatusPage(c handlers.AuthenticatedContext) error {
 		}
 	}
 
+	if req.Groups != nil {
+		var groups []entities.StatusPageGroup
+		for _, reqGroup := range req.Groups {
+			var monitors []entities.Monitor
+			for _, mID := range reqGroup.MonitorIDs {
+				monitors = append(monitors, entities.Monitor{ID: mID})
+			}
+			groups = append(groups, entities.StatusPageGroup{
+				Name:     reqGroup.Name,
+				Order:    reqGroup.Order,
+				Monitors: monitors,
+			})
+		}
+		if err := h.StatusPageService.ReplaceGroups(c.Request().Context(), sp, groups); err != nil {
+			c.Log.WithError(err).Error("failed to update status page groups")
+			return echo.ErrInternalServerError
+		}
+	}
+
 	// Refetch to get updated relations
 	sp, _ = h.StatusPageService.GetByIDAndTeamID(c.Request().Context(), req.StatusPageID, req.TeamID)
 
@@ -327,6 +399,25 @@ func (h *Handlers) PutStatusPage(c handlers.AuthenticatedContext) error {
 		ShowBranding:         sp.ShowBranding,
 		IsPrivate:            sp.IsPrivate,
 		MonitorIDs:           monitorIDs,
+		Groups:               func() []GetStatusPageGroupResponse {
+			var groups []GetStatusPageGroupResponse
+			for _, g := range sp.Groups {
+				var gm []uint
+				for _, m := range g.Monitors {
+					gm = append(gm, m.ID)
+				}
+				groups = append(groups, GetStatusPageGroupResponse{
+					ID:         g.ID,
+					Name:       g.Name,
+					Order:      g.Order,
+					MonitorIDs: gm,
+				})
+			}
+			if groups == nil {
+				groups = []GetStatusPageGroupResponse{}
+			}
+			return groups
+		}(),
 		CreatedAt:            sp.CreatedAt.String(),
 		UpdatedAt:            sp.UpdatedAt.String(),
 	})

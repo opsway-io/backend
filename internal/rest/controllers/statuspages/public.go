@@ -82,6 +82,13 @@ type PublicMaintenance struct {
 	EndAt       time.Time `json:"endAt"`
 }
 
+type PublicGroup struct {
+	ID         uint   `json:"id"`
+	Name       string `json:"name"`
+	Order      int    `json:"order"`
+	MonitorIDs []uint `json:"monitorIds"`
+}
+
 type GetPublicStatusPageResponse struct {
 	Name                 string              `json:"name"`
 	LogoURL              string              `json:"logoUrl"`
@@ -95,6 +102,7 @@ type GetPublicStatusPageResponse struct {
 	ShowBranding         bool                `json:"showBranding"`
 	IsPrivate            bool                `json:"isPrivate"`
 	Monitors             []PublicMonitor     `json:"monitors"`
+	Groups               []PublicGroup       `json:"groups"`
 	ActiveIncidents      []PublicIncident    `json:"activeIncidents"`
 	ActiveMaintenance    []PublicMaintenance `json:"activeMaintenance"`
 	MaintenanceEvents    []PublicMaintenance `json:"maintenanceEvents"`
@@ -234,6 +242,25 @@ func (h *PublicHandlers) GetPublicStatusPage(c echo.Context) error {
 		ShowBranding:         sp.ShowBranding,
 		IsPrivate:            sp.IsPrivate,
 		Monitors:             monitors,
+		Groups:               func() []PublicGroup {
+			var groups []PublicGroup
+			for _, g := range sp.Groups {
+				var gm []uint
+				for _, m := range g.Monitors {
+					gm = append(gm, m.ID)
+				}
+				groups = append(groups, PublicGroup{
+					ID:         g.ID,
+					Name:       g.Name,
+					Order:      g.Order,
+					MonitorIDs: gm,
+				})
+			}
+			if groups == nil {
+				groups = []PublicGroup{}
+			}
+			return groups
+		}(),
 		ActiveIncidents:      activeIncidents,
 		ActiveMaintenance:    activeMaintenance,
 		MaintenanceEvents:    maintenanceEvents,

@@ -21,7 +21,8 @@ type StatusPage struct {
 	IsPrivate            bool   `gorm:"default:false"`
 	PasswordHash         string `gorm:"default:''"`
 
-	Monitors []Monitor `gorm:"many2many:status_page_monitors;constraint:OnDelete:CASCADE"`
+	Groups   []StatusPageGroup `gorm:"constraint:OnDelete:CASCADE"`
+	Monitors []Monitor         `gorm:"many2many:status_page_monitors;constraint:OnDelete:CASCADE"`
 
 	CreatedAt time.Time `gorm:"index"`
 	UpdatedAt time.Time `gorm:"index"`
