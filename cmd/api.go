@@ -170,6 +170,11 @@ func runAPI(cmd *cobra.Command, args []string) {
 	escalationRepo := escalation.NewRepository(db)
 	escalationService := escalation.NewService(escalationRepo)
 
+	availableLocations := conf.Prober.AvailableLocations
+	if len(availableLocations) == 0 {
+		availableLocations = []string{"global"}
+	}
+
 	srv, err := rest.NewServer(
 		conf.REST,
 		conf.OAuth,
@@ -192,7 +197,7 @@ func runAPI(cmd *cobra.Command, args []string) {
 		eventService,
 		apiKeyService,
 		emailSender,
-		conf.Prober.AvailableLocations,
+		availableLocations,
 		db,
 		ch_db,
 		conf.StatusPage.BaseURL,
