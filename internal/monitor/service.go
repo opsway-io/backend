@@ -3,6 +3,7 @@ package monitor
 import (
 	"context"
 	"errors"
+	"fmt"
 
 	"github.com/opsway-io/backend/internal/entities"
 	"github.com/opsway-io/boomerang"
@@ -19,6 +20,7 @@ type Service interface {
 	GetMonitorAssertionByID(ctx context.Context, monitorAssertionID uint) (*entities.MonitorAssertion, error)
 	SetState(ctx context.Context, teamID, monitorID uint, state entities.MonitorState) error
 	Create(ctx context.Context, monitor *entities.Monitor) error
+	CreateBulk(ctx context.Context, monitors []*entities.Monitor) error
 	Update(ctx context.Context, teamID, monitorID uint, monitor *entities.Monitor) error
 	Delete(ctx context.Context, teamID, monitorID uint) error
 }
@@ -103,6 +105,19 @@ func (s *ServiceImpl) Create(ctx context.Context, m *entities.Monitor) error {
 	}
 
 	return s.schedule.Add(ctx, m)
+}
+
+func (s *ServiceImpl) CreateBulk(ctx context.Context, monitors []*entities.Monitor) error {
+	if err := s.repository.CreateBulk(ctx, monitors); err != nil {
+		return err
+	}
+	for _, m := range monitors {
+		if err := s.schedule.Add(ctx, m); err != nil {
+			// Log error but continue
+			fmt.Printf("failed to schedule monitor %d: %v\n", m.ID, err)
+		}
+	}
+	return nil
 }
 
 func (s *ServiceImpl) Update(ctx context.Context, teamID, monitorID uint, m *entities.Monitor) error {

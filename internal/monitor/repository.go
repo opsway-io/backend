@@ -20,6 +20,7 @@ type Repository interface {
 	GetMonitorAssertionByID(ctx context.Context, monitorAssertionID uint) (*entities.MonitorAssertion, error)
 	SetState(ctx context.Context, teamID, monitorID uint, state entities.MonitorState) error
 	Create(ctx context.Context, monitor *entities.Monitor) error
+	CreateBulk(ctx context.Context, monitors []*entities.Monitor) error
 	Update(ctx context.Context, teamID, monitorID uint, monitor *entities.Monitor) error
 	Delete(ctx context.Context, teamID, monitorID uint) error
 }
@@ -145,8 +146,15 @@ func (r *RepositoryImpl) SetState(ctx context.Context, teamID, monitorID uint, s
 	return err
 }
 
-func (r *RepositoryImpl) Create(ctx context.Context, m *entities.Monitor) error {
-	return r.db.WithContext(ctx).Create(m).Error
+func (r *RepositoryImpl) Create(ctx context.Context, monitor *entities.Monitor) error {
+	return r.db.WithContext(ctx).Create(monitor).Error
+}
+
+func (r *RepositoryImpl) CreateBulk(ctx context.Context, monitors []*entities.Monitor) error {
+	if len(monitors) == 0 {
+		return nil
+	}
+	return r.db.WithContext(ctx).Create(&monitors).Error
 }
 
 func (r *RepositoryImpl) Update(ctx context.Context, teamID, monitorID uint, m *entities.Monitor) error {

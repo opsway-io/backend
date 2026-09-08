@@ -47,6 +47,8 @@ func Register(
 
 	monitorsGroup.GET("", AuthHandler(h.GetMonitors))
 	monitorsGroup.POST("", AuthHandler(h.PostMonitor), AllowedRoles(mw.UserRoleOwner, mw.UserRoleAdmin))
+	monitorsGroup.POST("/bulk", AuthHandler(h.PostMonitorsBulk), AllowedRoles(mw.UserRoleOwner, mw.UserRoleAdmin))
+	monitorsGroup.POST("/openapi/preview", AuthHandler(h.PreviewOpenAPI), AllowedRoles(mw.UserRoleOwner, mw.UserRoleAdmin))
 
 	monitorsGroup.GET("/incidents", AuthHandler(h.GetMonitorIncidents))
 
