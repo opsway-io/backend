@@ -158,6 +158,54 @@ func (_m *Repository) Update(ctx context.Context, _a1 *entities.User) error {
 	return r0
 }
 
+// GetNotificationRules provides a mock function with given fields: ctx, userID
+func (_m *Repository) GetNotificationRules(ctx context.Context, userID uint) ([]entities.UserNotificationRule, error) {
+	ret := _m.Called(ctx, userID)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetNotificationRules")
+	}
+
+	var r0 []entities.UserNotificationRule
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, uint) ([]entities.UserNotificationRule, error)); ok {
+		return rf(ctx, userID)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, uint) []entities.UserNotificationRule); ok {
+		r0 = rf(ctx, userID)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]entities.UserNotificationRule)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, uint) error); ok {
+		r1 = rf(ctx, userID)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// SetNotificationRules provides a mock function with given fields: ctx, userID, rules
+func (_m *Repository) SetNotificationRules(ctx context.Context, userID uint, rules []entities.UserNotificationRule) error {
+	ret := _m.Called(ctx, userID, rules)
+
+	if len(ret) == 0 {
+		panic("no return value specified for SetNotificationRules")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, uint, []entities.UserNotificationRule) error); ok {
+		r0 = rf(ctx, userID, rules)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
 // NewRepository creates a new instance of Repository. It also registers a testing interface on the mock and a cleanup function to assert the mocks expectations.
 // The first argument is typically a *testing.T value.
 func NewRepository(t interface {
