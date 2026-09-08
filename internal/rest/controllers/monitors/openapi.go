@@ -19,6 +19,12 @@ type PreviewOpenAPIRequest struct {
 
 type PreviewOpenAPIResponse struct {
 	Endpoints []PreviewOpenAPIEndpoint `json:"endpoints"`
+	Auth      *PreviewOpenAPIAuth      `json:"auth,omitempty"`
+}
+
+type PreviewOpenAPIAuth struct {
+	Method   string `json:"method"`
+	TokenURL string `json:"tokenUrl,omitempty"`
 }
 
 type PreviewOpenAPIEndpoint struct {
@@ -48,6 +54,26 @@ func (h *Handlers) PreviewOpenAPI(c hs.AuthenticatedContext) error {
 	if err != nil {
 		c.Log.WithError(err).Error("failed to load openapi spec")
 		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Failed to fetch or parse OpenAPI spec: %v", err))
+	}
+
+	var auth *PreviewOpenAPIAuth
+	if doc.Components != nil && doc.Components.SecuritySchemes != nil {
+		for _, schemeRef := range doc.Components.SecuritySchemes {
+			if schemeRef.Value != nil {
+				if schemeRef.Value.Type == "oauth2" && schemeRef.Value.Flows != nil && schemeRef.Value.Flows.ClientCredentials != nil {
+					auth = &PreviewOpenAPIAuth{
+						Method:   "OAUTH2_CLIENT_CREDENTIALS",
+						TokenURL: schemeRef.Value.Flows.ClientCredentials.TokenURL,
+					}
+					break
+				} else if schemeRef.Value.Type == "http" && schemeRef.Value.Scheme == "basic" {
+					auth = &PreviewOpenAPIAuth{
+						Method: "BASIC",
+					}
+					break
+				}
+			}
+		}
 	}
 
 	endpoints := make([]PreviewOpenAPIEndpoint, 0)
@@ -85,6 +111,7 @@ func (h *Handlers) PreviewOpenAPI(c hs.AuthenticatedContext) error {
 
 	return c.JSON(http.StatusOK, PreviewOpenAPIResponse{
 		Endpoints: endpoints,
+		Auth:      auth,
 	})
 }
 
