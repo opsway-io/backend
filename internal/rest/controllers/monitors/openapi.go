@@ -115,9 +115,15 @@ func (h *Handlers) PreviewOpenAPI(c hs.AuthenticatedContext) error {
 	})
 }
 
+type PostMonitorsBulkMonitorRequest struct {
+	Name       string             `json:"name" validate:"required,max=255"`
+	Settings   MonitorSettings    `json:"settings" validate:"required,dive"`
+	Assertions []MonitorAssertion `json:"assertions" validate:"required,dive"`
+}
+
 type PostMonitorsBulkRequest struct {
-	TeamID   uint                 `param:"teamId" validate:"required,numeric,gte=0"`
-	Monitors []PostMonitorRequest `json:"monitors" validate:"required,dive"`
+	TeamID   uint                             `param:"teamId" validate:"required,numeric,gte=0"`
+	Monitors []PostMonitorsBulkMonitorRequest `json:"monitors" validate:"required,dive"`
 }
 
 func (h *Handlers) PostMonitorsBulk(c hs.AuthenticatedContext) error {
