@@ -617,6 +617,8 @@ func fetchOAuth2Token(ctx context.Context, tokenURL, clientID, clientSecret stri
 
 	data := url.Values{}
 	data.Set("grant_type", "client_credentials")
+	data.Set("client_id", clientID)
+	data.Set("client_secret", clientSecret)
 
 	req, err := xhttp.NewRequestWithContext(ctx, "POST", tokenURL, strings.NewReader(data.Encode()))
 	if err != nil {
