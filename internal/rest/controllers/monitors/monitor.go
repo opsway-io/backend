@@ -65,7 +65,7 @@ type MonitorSettingsTLS struct {
 
 type MonitorSettingsAuth struct {
 	Method       string `json:"method" validate:"required"`
-	TokenURL     string `json:"tokenUrl"`
+	TokenURL     string `json:"tokenUrl" validate:"omitempty,url"`
 	ClientID     string `json:"clientId"`
 	ClientSecret string `json:"clientSecret"`
 	Username     string `json:"username"`

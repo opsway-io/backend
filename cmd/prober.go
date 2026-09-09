@@ -611,6 +611,10 @@ func checkAnomaly(monitorID uint, res *http.Result) (*ForecasterPredictResponse,
 }
 
 func fetchOAuth2Token(ctx context.Context, tokenURL, clientID, clientSecret string) (string, error) {
+	if !strings.HasPrefix(tokenURL, "http://") && !strings.HasPrefix(tokenURL, "https://") {
+		tokenURL = "https://" + tokenURL
+	}
+
 	data := url.Values{}
 	data.Set("grant_type", "client_credentials")
 
