@@ -13,6 +13,7 @@ import (
 	"github.com/opsway-io/backend/internal/maintenance"
 	"github.com/opsway-io/backend/internal/notification/email"
 	"github.com/opsway-io/backend/internal/notification/email/templates"
+	"github.com/opsway-io/backend/internal/entities"
 	"github.com/opsway-io/backend/internal/rest/helpers"
 	"github.com/opsway-io/backend/internal/statuspage"
 	"github.com/sirupsen/logrus"
@@ -142,9 +143,26 @@ func (h *PublicHandlers) GetPublicStatusPage(c echo.Context) error {
 		}
 	}
 
-	monitors := make([]PublicMonitor, len(sp.Monitors))
-	var monitorIDs []uint
+	uniqueMonitors := make(map[uint]bool)
+	var orderedMonitors []entities.Monitor
+
 	for _, m := range sp.Monitors {
+		if !uniqueMonitors[m.ID] {
+			uniqueMonitors[m.ID] = true
+			orderedMonitors = append(orderedMonitors, m)
+		}
+	}
+	for _, g := range sp.Groups {
+		for _, m := range g.Monitors {
+			if !uniqueMonitors[m.ID] {
+				uniqueMonitors[m.ID] = true
+				orderedMonitors = append(orderedMonitors, m)
+			}
+		}
+	}
+
+	var monitorIDs []uint
+	for _, m := range orderedMonitors {
 		monitorIDs = append(monitorIDs, m.ID)
 	}
 
@@ -153,7 +171,8 @@ func (h *PublicHandlers) GetPublicStatusPage(c echo.Context) error {
 		logrus.WithError(err).Error("failed to get monitor uptimes")
 	}
 
-	for i, m := range sp.Monitors {
+	monitors := make([]PublicMonitor, len(orderedMonitors))
+	for i, m := range orderedMonitors {
 		status := "OPERATIONAL"
 		if m.State == 0 { // Inactive
 			status = "OUTAGE"
