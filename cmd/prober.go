@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"io"
 	xhttp "net/http"
-	"net/url"
 	"strings"
 	"time"
 
@@ -33,6 +32,8 @@ import (
 	"github.com/opsway-io/backend/internal/probes/websocket"
 	"github.com/redis/go-redis/v9"
 	"github.com/sirupsen/logrus"
+	"golang.org/x/oauth2"
+	"golang.org/x/oauth2/clientcredentials"
 
 	"github.com/spf13/cobra"
 )
@@ -615,42 +616,21 @@ func fetchOAuth2Token(ctx context.Context, tokenURL, clientID, clientSecret stri
 		tokenURL = "https://" + tokenURL
 	}
 
-	data := url.Values{}
-	data.Set("grant_type", "client_credentials")
-	data.Set("client_id", clientID)
-	data.Set("client_secret", clientSecret)
-
-	req, err := xhttp.NewRequestWithContext(ctx, "POST", tokenURL, strings.NewReader(data.Encode()))
-	if err != nil {
-		return "", err
+	conf := &clientcredentials.Config{
+		ClientID:     clientID,
+		ClientSecret: clientSecret,
+		TokenURL:     tokenURL,
 	}
-	req.SetBasicAuth(clientID, clientSecret)
-	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 
 	client := &xhttp.Client{Timeout: 5 * time.Second}
-	resp, err := client.Do(req)
-	if err != nil {
-		return "", err
-	}
-	defer resp.Body.Close()
+	ctxWithClient := context.WithValue(ctx, oauth2.HTTPClient, client)
 
-	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return "", fmt.Errorf("token endpoint returned status %d", resp.StatusCode)
-	}
-
-	body, err := io.ReadAll(resp.Body)
+	token, err := conf.Token(ctxWithClient)
 	if err != nil {
 		return "", err
 	}
 
-	var result struct {
-		AccessToken string `json:"access_token"`
-	}
-	if err := json.Unmarshal(body, &result); err != nil {
-		return "", err
-	}
-
-	return result.AccessToken, nil
+	return token.AccessToken, nil
 }
 
 func assertResult(httpResult *http.Result, assertions []entities.MonitorAssertion) ([]entities.MonitorAssertion, []entities.MonitorAssertion, error) {
