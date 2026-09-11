@@ -74,6 +74,7 @@ func runAPI(cmd *cobra.Command, args []string) {
 		entities.Team{},
 		entities.Monitor{},
 		entities.MonitorSettings{},
+		entities.MonitorStep{},
 		entities.MonitorAssertion{},
 		entities.MonitorVariable{},
 		entities.AlertRule{},
@@ -98,6 +99,49 @@ func runAPI(cmd *cobra.Command, args []string) {
 		entities.EscalationJob{},
 		entities.NotificationJob{},
 	)
+
+	// --- DATA MIGRATION ---
+	// Migrate existing single-step config into monitor_steps
+	err = db.Exec(`
+		INSERT INTO monitor_steps (monitor_id, order_index, name, method, url, headers, body_type, body_content, updated_at)
+		SELECT 
+			monitor_id, 0, 'Step 1', method, url, headers, body_type, body_content, updated_at
+		FROM monitor_settings
+		WHERE method IS NOT NULL AND NOT EXISTS (SELECT 1 FROM monitor_steps WHERE monitor_steps.monitor_id = monitor_settings.monitor_id AND order_index = 0)
+	`).Error
+	if err != nil {
+		l.WithError(err).Fatal("Failed to migrate monitor settings to monitor steps")
+	}
+
+	err = db.Exec(`
+		INSERT INTO monitor_steps (monitor_id, order_index, name, method, url, headers, body_type, body_content, updated_at)
+		SELECT 
+			monitor_id, 1, 'Teardown', teardown_method, teardown_url, '[]', teardown_body_type, teardown_body_content, updated_at
+		FROM monitor_settings
+		WHERE teardown_enabled = true AND NOT EXISTS (SELECT 1 FROM monitor_steps WHERE monitor_steps.monitor_id = monitor_settings.monitor_id AND order_index = 1)
+	`).Error
+	if err != nil {
+		l.WithError(err).Fatal("Failed to migrate teardown settings to monitor steps")
+	}
+
+	err = db.Exec(`
+		UPDATE monitor_assertions SET monitor_step_id = (
+			SELECT id FROM monitor_steps WHERE monitor_steps.monitor_id = monitor_assertions.monitor_id AND order_index = 0 LIMIT 1
+		) WHERE (monitor_step_id IS NULL OR monitor_step_id = 0) AND monitor_id IS NOT NULL
+	`).Error
+	if err != nil {
+		l.WithError(err).Fatal("Failed to migrate monitor assertions")
+	}
+
+	err = db.Exec(`
+		UPDATE monitor_variables SET monitor_step_id = (
+			SELECT id FROM monitor_steps WHERE monitor_steps.monitor_id = monitor_variables.monitor_id AND order_index = 0 LIMIT 1
+		) WHERE (monitor_step_id IS NULL OR monitor_step_id = 0) AND monitor_id IS NOT NULL
+	`).Error
+	if err != nil {
+		l.WithError(err).Fatal("Failed to migrate monitor variables")
+	}
+	// ----------------------
 
 	ch_db, err := clickhouse.NewClient(ctx, conf.Clickhouse)
 	if err != nil {

@@ -42,7 +42,11 @@ func (r *RepositoryImpl) GetMonitorAndSettingsByTeamIDAndID(ctx context.Context,
 	).Preload(
 		"Settings",
 	).Preload(
-		"Assertions",
+		"Steps",
+	).Preload(
+		"Steps.Assertions",
+	).Preload(
+		"Steps.Variables",
 	).Where(entities.Monitor{
 		ID:     monitorID,
 		TeamID: teamID,
@@ -76,7 +80,11 @@ func (r *RepositoryImpl) GetMonitorsAndSettingsByTeamID(ctx context.Context, tea
 	).Preload(
 		"Settings",
 	).Preload(
-		"Assertions",
+		"Steps",
+	).Preload(
+		"Steps.Assertions",
+	).Preload(
+		"Steps.Variables",
 	).Where(entities.Monitor{
 		TeamID: teamID,
 	}).Order(
@@ -95,7 +103,7 @@ func (r *RepositoryImpl) GetMonitorsAndSettingsByTeamID(ctx context.Context, tea
 
 func (r *RepositoryImpl) GetMonitorsByStates(ctx context.Context, states []entities.MonitorState) (*[]entities.Monitor, error) {
 	var monitors []entities.Monitor
-	err := r.db.WithContext(ctx).Preload("Settings").Where("state IN ?", states).Find(&monitors).Error
+	err := r.db.WithContext(ctx).Preload("Settings").Preload("Steps").Preload("Steps.Assertions").Preload("Steps.Variables").Where("state IN ?", states).Find(&monitors).Error
 	return &monitors, err
 }
 
@@ -186,20 +194,19 @@ func (r *RepositoryImpl) Update(ctx context.Context, teamID, monitorID uint, m *
 		return err
 	}
 
-	// Replace assertions
-	if err := tx.Delete(&entities.MonitorAssertion{}, "monitor_id = ?", monitorID).Error; err != nil {
+	// Replace steps
+	if err := tx.Delete(&entities.MonitorStep{}, "monitor_id = ?", monitorID).Error; err != nil {
 		tx.Rollback()
-
 		return err
 	}
 
-	if len(m.Assertions) > 0 {
-		for i := range m.Assertions {
-			m.Assertions[i].MonitorID = monitorID
+	if len(m.Steps) > 0 {
+		for i := range m.Steps {
+			m.Steps[i].MonitorID = monitorID
+			m.Steps[i].OrderIndex = i
 		}
-		if err := tx.Create(&m.Assertions).Error; err != nil {
+		if err := tx.Create(&m.Steps).Error; err != nil {
 			tx.Rollback()
-
 			return err
 		}
 	}

@@ -23,21 +23,25 @@ type Monitor struct {
 	State      string             `json:"state" validate:"required,monitorState"`
 	Name       string             `json:"name" validate:"required,max=255"`
 	Settings   MonitorSettings    `json:"settings" validate:"required,dive"`
-	Assertions []MonitorAssertion `json:"assertions" validate:"required,monitorAssertions"`
-	Variables  []MonitorVariable  `json:"variables" validate:"dive"`
+	Steps      []MonitorStep      `json:"steps" validate:"required,dive"`
 	CreatedAt  time.Time          `json:"createdAt"`
 	UpdatedAt  time.Time          `json:"updatedAt"`
 }
 
+type MonitorStep struct {
+	Name       string             `json:"name" validate:"required,max=255"`
+	Method     string             `json:"method" validate:"required,monitorMethod"`
+	URL        string             `json:"url" validate:"required,url"`
+	Headers    []MonitorSettingsHeader `json:"headers" validate:"dive"`
+	Body       MonitorSettingsBody     `json:"body" validate:"dive"`
+	Assertions []MonitorAssertion `json:"assertions" validate:"dive,monitorAssertions"`
+	Variables  []MonitorVariable  `json:"variables" validate:"dive"`
+}
+
 type MonitorSettings struct {
-	Method           string                  `json:"method" validate:"required,monitorMethod"`
-	URL              string                  `json:"url" validate:"required,url"`
 	FrequencySeconds uint64                  `json:"frequencySeconds" validate:"required,numeric,gte=10"`
-	Headers          []MonitorSettingsHeader `json:"headers" validate:"required,dive"`
-	Body             MonitorSettingsBody     `json:"body" validate:"required"`
 	Auth             MonitorSettingsAuth     `json:"auth" validate:"required"`
 	TLS              MonitorSettingsTLS      `json:"tls" validate:"required"`
-	Teardown         MonitorSettingsTeardown `json:"teardown"`
 	Locations        []string                `json:"locations" validate:"required,dive,location"`
 }
 
@@ -159,34 +163,50 @@ func newGetMonitorsResponse(monitors *[]monitor.MonitorWithTotalCount, stats *[]
 	}
 
 	for i, m := range *monitors {
-		headers := make([]MonitorSettingsHeader, len(m.Settings.Headers))
-		for j, h := range m.Settings.Headers {
-			headers[j] = MonitorSettingsHeader{
-				Key:   h.Key,
-				Value: h.Value,
-			}
-		}
-
-		assertions := make([]MonitorAssertion, len(m.Assertions))
-		for j, a := range m.Assertions {
-			assertions[j] = MonitorAssertion{
-				Source:   a.Source,
-				Operator: a.Operator,
-				Target:   a.Target,
-				Property: a.Property,
-			}
-		}
 		locations := m.Settings.Locations
 		if locations == nil {
 			locations = []string{}
 		}
 
-		variables := make([]MonitorVariable, len(m.Variables))
-		for j, v := range m.Variables {
-			variables[j] = MonitorVariable{
-				Name:     v.Name,
-				Source:   v.Source,
-				Property: v.Property,
+		steps := make([]MonitorStep, len(m.Steps))
+		for j, s := range m.Steps {
+			headers := make([]MonitorSettingsHeader, len(s.Headers))
+			for k, h := range s.Headers {
+				headers[k] = MonitorSettingsHeader{
+					Key:   h.Key,
+					Value: h.Value,
+				}
+			}
+
+			assertions := make([]MonitorAssertion, len(s.Assertions))
+			for k, a := range s.Assertions {
+				assertions[k] = MonitorAssertion{
+					Source:   a.Source,
+					Operator: a.Operator,
+					Target:   a.Target,
+					Property: a.Property,
+				}
+			}
+
+			variables := make([]MonitorVariable, len(s.Variables))
+			for k, v := range s.Variables {
+				variables[k] = MonitorVariable{
+					Name:     v.Name,
+					Source:   v.Source,
+					Property: v.Property,
+				}
+			}
+			steps[j] = MonitorStep{
+				Name:       s.Name,
+				Method:     s.Method,
+				URL:        s.URL,
+				Headers:    headers,
+				Body: MonitorSettingsBody{
+					Type:    s.Body.Type,
+					Content: s.Body.GetContentString(),
+				},
+				Assertions: assertions,
+				Variables:  variables,
 			}
 		}
 
@@ -198,14 +218,7 @@ func newGetMonitorsResponse(monitors *[]monitor.MonitorWithTotalCount, stats *[]
 				CreatedAt: m.CreatedAt,
 				UpdatedAt: m.UpdatedAt,
 				Settings: MonitorSettings{
-					Method:           m.Settings.Method,
-					URL:              m.Settings.URL,
 					FrequencySeconds: m.Settings.GetFrequencySeconds(),
-					Headers:          headers,
-					Body: MonitorSettingsBody{
-						Type:    m.Settings.Body.Type,
-						Content: m.Settings.Body.GetContentString(),
-					},
 					TLS: MonitorSettingsTLS{
 						Enabled:                 m.Settings.TLS.Enabled,
 						VerifyHostname:          m.Settings.TLS.VerifyHostname,
@@ -220,19 +233,9 @@ func newGetMonitorsResponse(monitors *[]monitor.MonitorWithTotalCount, stats *[]
 						Username:     m.Settings.Auth.Username,
 						Password:     m.Settings.Auth.Password,
 					},
-					Teardown: MonitorSettingsTeardown{
-						Enabled: m.Settings.Teardown.Enabled,
-						Method:  m.Settings.Teardown.Method,
-						URL:     m.Settings.Teardown.URL,
-						Body: MonitorSettingsBody{
-							Type:    m.Settings.Teardown.Body.Type,
-							Content: m.Settings.Teardown.Body.GetContentString(),
-						},
-					},
 					Locations: locations,
 				},
-				Assertions: assertions,
-				Variables:  variables,
+				Steps: steps,
 			},
 		}
 
@@ -310,34 +313,50 @@ func (h *Handlers) GetMonitor(c hs.AuthenticatedContext) error {
 }
 
 func newGetMonitorResponse(m *entities.Monitor, stats *check.MonitorStats) (*GetMonitorResponse, error) {
-	headers := make([]MonitorSettingsHeader, len(m.Settings.Headers))
-	for j, h := range m.Settings.Headers {
-		headers[j] = MonitorSettingsHeader{
-			Key:   h.Key,
-			Value: h.Value,
-		}
-	}
 	locations := m.Settings.Locations
 	if locations == nil {
 		locations = []string{}
 	}
 
-	assertions := make([]MonitorAssertion, len(m.Assertions))
-	for j, a := range m.Assertions {
-		assertions[j] = MonitorAssertion{
-			Source:   a.Source,
-			Operator: a.Operator,
-			Target:   a.Target,
-			Property: a.Property,
+	steps := make([]MonitorStep, len(m.Steps))
+	for j, s := range m.Steps {
+		headers := make([]MonitorSettingsHeader, len(s.Headers))
+		for k, h := range s.Headers {
+			headers[k] = MonitorSettingsHeader{
+				Key:   h.Key,
+				Value: h.Value,
+			}
 		}
-	}
 
-	variables := make([]MonitorVariable, len(m.Variables))
-	for j, v := range m.Variables {
-		variables[j] = MonitorVariable{
-			Name:     v.Name,
-			Source:   v.Source,
-			Property: v.Property,
+		assertions := make([]MonitorAssertion, len(s.Assertions))
+		for k, a := range s.Assertions {
+			assertions[k] = MonitorAssertion{
+				Source:   a.Source,
+				Operator: a.Operator,
+				Target:   a.Target,
+				Property: a.Property,
+			}
+		}
+
+		variables := make([]MonitorVariable, len(s.Variables))
+		for k, v := range s.Variables {
+			variables[k] = MonitorVariable{
+				Name:     v.Name,
+				Source:   v.Source,
+				Property: v.Property,
+			}
+		}
+		steps[j] = MonitorStep{
+			Name:       s.Name,
+			Method:     s.Method,
+			URL:        s.URL,
+			Headers:    headers,
+			Body: MonitorSettingsBody{
+				Type:    s.Body.Type,
+				Content: s.Body.GetContentString(),
+			},
+			Assertions: assertions,
+			Variables:  variables,
 		}
 	}
 
@@ -349,14 +368,7 @@ func newGetMonitorResponse(m *entities.Monitor, stats *check.MonitorStats) (*Get
 			CreatedAt: m.CreatedAt,
 			UpdatedAt: m.UpdatedAt,
 			Settings: MonitorSettings{
-				Method:           m.Settings.Method,
-				URL:              m.Settings.URL,
 				FrequencySeconds: m.Settings.GetFrequencySeconds(),
-				Headers:          headers,
-				Body: MonitorSettingsBody{
-					Type:    m.Settings.Body.Type,
-					Content: m.Settings.Body.GetContentString(),
-				},
 				TLS: MonitorSettingsTLS{
 					Enabled:                 m.Settings.TLS.Enabled,
 					VerifyHostname:          m.Settings.TLS.VerifyHostname,
@@ -371,19 +383,9 @@ func newGetMonitorResponse(m *entities.Monitor, stats *check.MonitorStats) (*Get
 					Username:     m.Settings.Auth.Username,
 					Password:     m.Settings.Auth.Password,
 				},
-				Teardown: MonitorSettingsTeardown{
-					Enabled: m.Settings.Teardown.Enabled,
-					Method:  m.Settings.Teardown.Method,
-					URL:     m.Settings.Teardown.URL,
-					Body: MonitorSettingsBody{
-						Type:    m.Settings.Teardown.Body.Type,
-						Content: m.Settings.Teardown.Body.GetContentString(),
-					},
-				},
 				Locations: locations,
 			},
-			Assertions: assertions,
-			Variables:  variables,
+			Steps: steps,
 		},
 		Stats: GetMonitorResponseStats{
 			UptimePercentage:    float64(stats.UptimePercentage),
@@ -430,8 +432,7 @@ type PostMonitorRequest struct {
 	TeamID     uint               `param:"teamId" validate:"required,numeric,gte=0"`
 	Name       string             `json:"name" validate:"required,max=255"`
 	Settings   MonitorSettings    `json:"settings" validate:"required,dive"`
-	Assertions []MonitorAssertion `json:"assertions" validate:"required,dive"`
-	Variables  []MonitorVariable  `json:"variables" validate:"dive"`
+	Steps      []MonitorStep      `json:"steps" validate:"required,dive"`
 }
 
 func (h *Handlers) PostMonitor(c hs.AuthenticatedContext) error {
@@ -461,30 +462,49 @@ func (h *Handlers) PostMonitor(c hs.AuthenticatedContext) error {
 		}
 	}
 
-	headers := make([]entities.MonitorSettingsHeader, len(req.Settings.Headers))
-	for j, h := range req.Settings.Headers {
-		headers[j] = entities.MonitorSettingsHeader{
-			Key:   h.Key,
-			Value: h.Value,
+	steps := make([]entities.MonitorStep, len(req.Steps))
+	for i, s := range req.Steps {
+		headers := make([]entities.MonitorStepHeader, len(s.Headers))
+		for j, h := range s.Headers {
+			headers[j] = entities.MonitorStepHeader{
+				Key:   h.Key,
+				Value: h.Value,
+			}
 		}
-	}
 
-	assertions := make([]entities.MonitorAssertion, len(req.Assertions))
-	for j, a := range req.Assertions {
-		assertions[j] = entities.MonitorAssertion{
-			Source:   a.Source,
-			Operator: a.Operator,
-			Target:   a.Target,
-			Property: a.Property,
+		assertions := make([]entities.MonitorAssertion, len(s.Assertions))
+		for j, a := range s.Assertions {
+			assertions[j] = entities.MonitorAssertion{
+				Source:   a.Source,
+				Operator: a.Operator,
+				Target:   a.Target,
+				Property: a.Property,
+			}
 		}
-	}
 
-	variables := make([]entities.MonitorVariable, len(req.Variables))
-	for j, v := range req.Variables {
-		variables[j] = entities.MonitorVariable{
-			Name:     v.Name,
-			Source:   v.Source,
-			Property: v.Property,
+		variables := make([]entities.MonitorVariable, len(s.Variables))
+		for j, v := range s.Variables {
+			variables[j] = entities.MonitorVariable{
+				Name:     v.Name,
+				Source:   v.Source,
+				Property: v.Property,
+			}
+		}
+		
+		body := entities.MonitorStepBody{
+			Type: s.Body.Type,
+		}
+		body.SetContentString(s.Body.Content)
+
+		steps[i] = entities.MonitorStep{
+			Name:       s.Name,
+			OrderIndex: i,
+			Method:     s.Method,
+			URL:        s.URL,
+			Headers:    headers,
+			Body:       body,
+			Assertions: assertions,
+			Variables:  variables,
 		}
 	}
 
@@ -492,12 +512,6 @@ func (h *Handlers) PostMonitor(c hs.AuthenticatedContext) error {
 		TeamID: req.TeamID,
 		Name:   req.Name,
 		Settings: entities.MonitorSettings{
-			Method:  req.Settings.Method,
-			URL:     req.Settings.URL,
-			Headers: headers,
-			Body: entities.MonitorSettingsBody{
-				Type: req.Settings.Body.Type,
-			},
 			TLS: entities.MonitorSettingsTLS{
 				Enabled:                 req.Settings.TLS.Enabled,
 				VerifyHostname:          req.Settings.TLS.VerifyHostname,
@@ -512,23 +526,12 @@ func (h *Handlers) PostMonitor(c hs.AuthenticatedContext) error {
 				Username:     req.Settings.Auth.Username,
 				Password:     req.Settings.Auth.Password,
 			},
-			Teardown: entities.MonitorSettingsTeardown{
-				Enabled: req.Settings.Teardown.Enabled,
-				Method:  req.Settings.Teardown.Method,
-				URL:     req.Settings.Teardown.URL,
-				Body: entities.MonitorSettingsBody{
-					Type: req.Settings.Teardown.Body.Type,
-				},
-			},
 			Locations: req.Settings.Locations,
 		},
-		Assertions: assertions,
-		Variables:  variables,
+		Steps: steps,
 	}
 
 	m.Settings.SetFrequencySeconds(req.Settings.FrequencySeconds)
-	m.Settings.Body.SetContentString(req.Settings.Body.Content)
-	m.Settings.Teardown.Body.SetContentString(req.Settings.Teardown.Body.Content)
 
 	if err := h.MonitorService.Create(c.Request().Context(), m); err != nil {
 		c.Log.WithError(err).Error("failed to create monitor")
@@ -635,8 +638,7 @@ type PutMonitorRequest struct {
 	Name       string             `json:"name" validate:"required,max=255"`
 	State      string             `json:"state" validate:"required,monitorState"`
 	Settings   MonitorSettings    `json:"settings" validate:"required,dive"`
-	Assertions []MonitorAssertion `json:"assertions" validate:"required,dive"`
-	Variables  []MonitorVariable  `json:"variables" validate:"dive"`
+	Steps      []MonitorStep      `json:"steps" validate:"required,dive"`
 }
 
 func (h *Handlers) PutMonitor(c hs.AuthenticatedContext) error {
@@ -649,30 +651,49 @@ func (h *Handlers) PutMonitor(c hs.AuthenticatedContext) error {
 		return echo.ErrBadRequest
 	}
 
-	headers := make([]entities.MonitorSettingsHeader, len(req.Settings.Headers))
-	for j, h := range req.Settings.Headers {
-		headers[j] = entities.MonitorSettingsHeader{
-			Key:   h.Key,
-			Value: h.Value,
+	steps := make([]entities.MonitorStep, len(req.Steps))
+	for i, s := range req.Steps {
+		headers := make([]entities.MonitorStepHeader, len(s.Headers))
+		for j, h := range s.Headers {
+			headers[j] = entities.MonitorStepHeader{
+				Key:   h.Key,
+				Value: h.Value,
+			}
 		}
-	}
 
-	assertions := make([]entities.MonitorAssertion, len(req.Assertions))
-	for j, a := range req.Assertions {
-		assertions[j] = entities.MonitorAssertion{
-			Source:   a.Source,
-			Operator: a.Operator,
-			Target:   a.Target,
-			Property: a.Property,
+		assertions := make([]entities.MonitorAssertion, len(s.Assertions))
+		for j, a := range s.Assertions {
+			assertions[j] = entities.MonitorAssertion{
+				Source:   a.Source,
+				Operator: a.Operator,
+				Target:   a.Target,
+				Property: a.Property,
+			}
 		}
-	}
 
-	variables := make([]entities.MonitorVariable, len(req.Variables))
-	for j, v := range req.Variables {
-		variables[j] = entities.MonitorVariable{
-			Name:     v.Name,
-			Source:   v.Source,
-			Property: v.Property,
+		variables := make([]entities.MonitorVariable, len(s.Variables))
+		for j, v := range s.Variables {
+			variables[j] = entities.MonitorVariable{
+				Name:     v.Name,
+				Source:   v.Source,
+				Property: v.Property,
+			}
+		}
+
+		body := entities.MonitorStepBody{
+			Type: s.Body.Type,
+		}
+		body.SetContentString(s.Body.Content)
+		
+		steps[i] = entities.MonitorStep{
+			Name:       s.Name,
+			OrderIndex: i,
+			Method:     s.Method,
+			URL:        s.URL,
+			Headers:    headers,
+			Body:       body,
+			Assertions: assertions,
+			Variables:  variables,
 		}
 	}
 
@@ -680,12 +701,6 @@ func (h *Handlers) PutMonitor(c hs.AuthenticatedContext) error {
 		TeamID: req.TeamID,
 		Name:   req.Name,
 		Settings: entities.MonitorSettings{
-			Method:  req.Settings.Method,
-			URL:     req.Settings.URL,
-			Headers: headers,
-			Body: entities.MonitorSettingsBody{
-				Type: req.Settings.Body.Type,
-			},
 			TLS: entities.MonitorSettingsTLS{
 				Enabled:                 req.Settings.TLS.Enabled,
 				VerifyHostname:          req.Settings.TLS.VerifyHostname,
@@ -700,24 +715,13 @@ func (h *Handlers) PutMonitor(c hs.AuthenticatedContext) error {
 				Username:     req.Settings.Auth.Username,
 				Password:     req.Settings.Auth.Password,
 			},
-			Teardown: entities.MonitorSettingsTeardown{
-				Enabled: req.Settings.Teardown.Enabled,
-				Method:  req.Settings.Teardown.Method,
-				URL:     req.Settings.Teardown.URL,
-				Body: entities.MonitorSettingsBody{
-					Type: req.Settings.Teardown.Body.Type,
-				},
-			},
 			Locations: req.Settings.Locations,
 		},
-		Assertions: assertions,
-		Variables:  variables,
+		Steps: steps,
 	}
 
 	m.SetStateString(req.State)
 	m.Settings.SetFrequencySeconds(req.Settings.FrequencySeconds)
-	m.Settings.Body.SetContentString(req.Settings.Body.Content)
-	m.Settings.Teardown.Body.SetContentString(req.Settings.Teardown.Body.Content)
 
 	if req.State == "ACTIVE" {
 		activeMaintenances, err := h.MaintenanceService.GetActive(ctx, time.Now())

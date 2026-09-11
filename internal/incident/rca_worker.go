@@ -87,7 +87,9 @@ func (w *rcaWorker) processMessage(ctx context.Context, payload []byte) {
 	if incident.MonitorID != nil {
 		m, err := w.monitorService.GetMonitorAndSettingsByTeamIDAndID(ctx, incident.TeamID, *incident.MonitorID)
 		if err == nil && m != nil {
-			prompt += fmt.Sprintf("Monitor URL: %s\nMonitor Method: %s\n", m.Settings.URL, m.Settings.Method)
+			if len(m.Steps) > 0 {
+				prompt += fmt.Sprintf("Monitor URL: %s\nMonitor Method: %s\n", m.Steps[0].URL, m.Steps[0].Method)
+			}
 		}
 		
 		offset := 0

@@ -20,8 +20,7 @@ type Monitor struct {
 	Name  string       `gorm:"index;not null" json:"name"`
 
 	Settings   MonitorSettings    `gorm:"not null;constraint:OnDelete:CASCADE" json:"settings"`
-	Assertions []MonitorAssertion `gorm:"constraint:OnDelete:CASCADE" json:"assertions"`
-	Variables  []MonitorVariable  `gorm:"constraint:OnDelete:CASCADE" json:"variables"`
+	Steps      []MonitorStep      `gorm:"constraint:OnDelete:CASCADE" json:"steps"`
 	Incidents  []Incident         `gorm:"constraint:OnDelete:CASCADE" json:"incidents"`
 
 	CreatedAt time.Time `gorm:"index" json:"createdAt"`
@@ -75,15 +74,9 @@ type MonitorSettings struct {
 	ID        uint
 	MonitorID uint `gorm:"uniqueIndex;not null"`
 
-	Method    string        `gorm:"not null"`
-	URL       string        `gorm:"not null"`
-	Frequency time.Duration `gorm:"not null;serializer:timeDurationSeconds"`
-
-	Headers   []MonitorSettingsHeader `gorm:"serializer:json"`
-	Body      MonitorSettingsBody     `gorm:"embedded;embeddedPrefix:body_"`
 	Auth      MonitorSettingsAuth     `gorm:"embedded;embeddedPrefix:auth_"`
 	TLS       MonitorSettingsTLS      `gorm:"embedded;embeddedPrefix:tls_"`
-	Teardown  MonitorSettingsTeardown `gorm:"embedded;embeddedPrefix:teardown_"`
+	Frequency time.Duration           `gorm:"not null;serializer:timeDurationSeconds"`
 	Locations []string                `gorm:"serializer:json"`
 
 	SslExpiryNotifiedAt    *time.Time `gorm:"index"`
@@ -92,17 +85,39 @@ type MonitorSettings struct {
 	UpdatedAt time.Time `gorm:"index"`
 }
 
-type MonitorSettingsHeader struct {
+type MonitorStep struct {
+	ID        uint
+	MonitorID uint `gorm:"index;not null"`
+
+	OrderIndex int    `gorm:"not null;default:0"`
+	Name       string `gorm:"not null;default:'Step'"`
+
+	Method  string              `gorm:"not null"`
+	URL     string              `gorm:"not null"`
+	Headers []MonitorStepHeader `gorm:"serializer:json"`
+	Body    MonitorStepBody     `gorm:"embedded;embeddedPrefix:body_"`
+
+	Assertions []MonitorAssertion `gorm:"constraint:OnDelete:CASCADE"`
+	Variables  []MonitorVariable  `gorm:"constraint:OnDelete:CASCADE"`
+
+	UpdatedAt time.Time `gorm:"index"`
+}
+
+func (MonitorStep) TableName() string {
+	return "monitor_steps"
+}
+
+type MonitorStepHeader struct {
 	Key   string `gorm:"not null"`
 	Value string `gorm:"not null"`
 }
 
-type MonitorSettingsBody struct {
+type MonitorStepBody struct {
 	Content *[]byte `gorm:"type:bytea"`
 	Type    string  `gorm:"not null;default:'NONE'"`
 }
 
-func (m *MonitorSettingsBody) SetContentString(body *string) {
+func (m *MonitorStepBody) SetContentString(body *string) {
 	if body == nil {
 		m.Content = nil
 
@@ -113,7 +128,7 @@ func (m *MonitorSettingsBody) SetContentString(body *string) {
 	m.Content = &b
 }
 
-func (m *MonitorSettingsBody) GetContentString() *string {
+func (m *MonitorStepBody) GetContentString() *string {
 	if m.Content == nil {
 		return nil
 	}
@@ -152,8 +167,9 @@ func (ms *MonitorSettings) SetFrequencySeconds(seconds uint64) {
 }
 
 type MonitorAssertion struct {
-	ID        uint
-	MonitorID uint `gorm:"index;not null"`
+	ID            uint
+	MonitorID     uint `gorm:"index;not null"`
+	MonitorStepID uint `gorm:"index;not null"`
 
 	Source   string `gorm:"not null"`
 	Property string
@@ -167,16 +183,10 @@ func (MonitorAssertion) TableName() string {
 	return "monitor_assertions"
 }
 
-type MonitorSettingsTeardown struct {
-	Enabled bool                `gorm:"not null;default:false"`
-	Method  string              `gorm:"not null;default:'GET'"`
-	URL     string              `gorm:"not null;default:''"`
-	Body    MonitorSettingsBody `gorm:"embedded;embeddedPrefix:body_"`
-}
-
 type MonitorVariable struct {
-	ID        uint
-	MonitorID uint `gorm:"index;not null"`
+	ID            uint
+	MonitorID     uint `gorm:"index;not null"`
+	MonitorStepID uint `gorm:"index;not null"`
 
 	Name     string `gorm:"not null"`
 	Source   string `gorm:"not null"`

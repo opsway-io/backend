@@ -162,7 +162,7 @@ func (h *Handlers) PreviewOpenAPI(c hs.AuthenticatedContext) error {
 type PostMonitorsBulkMonitorRequest struct {
 	Name       string             `json:"name" validate:"required,max=255"`
 	Settings   MonitorSettings    `json:"settings" validate:"required,dive"`
-	Assertions []MonitorAssertion `json:"assertions" validate:"required,dive"`
+	Steps      []MonitorStep      `json:"steps" validate:"required,dive"`
 }
 
 type PostMonitorsBulkRequest struct {
@@ -199,21 +199,49 @@ func (h *Handlers) PostMonitorsBulk(c hs.AuthenticatedContext) error {
 	entitiesToCreate := make([]*entities.Monitor, 0, len(req.Monitors))
 
 	for _, mReq := range req.Monitors {
-		headers := make([]entities.MonitorSettingsHeader, len(mReq.Settings.Headers))
-		for j, h := range mReq.Settings.Headers {
-			headers[j] = entities.MonitorSettingsHeader{
-				Key:   h.Key,
-				Value: h.Value,
+		steps := make([]entities.MonitorStep, len(mReq.Steps))
+		for i, s := range mReq.Steps {
+			headers := make([]entities.MonitorStepHeader, len(s.Headers))
+			for j, h := range s.Headers {
+				headers[j] = entities.MonitorStepHeader{
+					Key:   h.Key,
+					Value: h.Value,
+				}
 			}
-		}
 
-		assertions := make([]entities.MonitorAssertion, len(mReq.Assertions))
-		for j, a := range mReq.Assertions {
-			assertions[j] = entities.MonitorAssertion{
-				Source:   a.Source,
-				Operator: a.Operator,
-				Target:   a.Target,
-				Property: a.Property,
+			assertions := make([]entities.MonitorAssertion, len(s.Assertions))
+			for j, a := range s.Assertions {
+				assertions[j] = entities.MonitorAssertion{
+					Source:   a.Source,
+					Operator: a.Operator,
+					Target:   a.Target,
+					Property: a.Property,
+				}
+			}
+
+			variables := make([]entities.MonitorVariable, len(s.Variables))
+			for j, v := range s.Variables {
+				variables[j] = entities.MonitorVariable{
+					Name:     v.Name,
+					Source:   v.Source,
+					Property: v.Property,
+				}
+			}
+			
+			body := entities.MonitorStepBody{
+				Type: s.Body.Type,
+			}
+			body.SetContentString(s.Body.Content)
+			
+			steps[i] = entities.MonitorStep{
+				Name:       s.Name,
+				OrderIndex: i,
+				Method:     s.Method,
+				URL:        s.URL,
+				Headers:    headers,
+				Body:       body,
+				Assertions: assertions,
+				Variables:  variables,
 			}
 		}
 
@@ -221,12 +249,6 @@ func (h *Handlers) PostMonitorsBulk(c hs.AuthenticatedContext) error {
 			TeamID: req.TeamID,
 			Name:   mReq.Name,
 			Settings: entities.MonitorSettings{
-				Method:  mReq.Settings.Method,
-				URL:     mReq.Settings.URL,
-				Headers: headers,
-				Body: entities.MonitorSettingsBody{
-					Type: mReq.Settings.Body.Type,
-				},
 				TLS: entities.MonitorSettingsTLS{
 					Enabled:                 mReq.Settings.TLS.Enabled,
 					VerifyHostname:          mReq.Settings.TLS.VerifyHostname,
@@ -243,11 +265,10 @@ func (h *Handlers) PostMonitorsBulk(c hs.AuthenticatedContext) error {
 				},
 				Locations: mReq.Settings.Locations,
 			},
-			Assertions: assertions,
+			Steps: steps,
 		}
 
 		m.Settings.SetFrequencySeconds(mReq.Settings.FrequencySeconds)
-		m.Settings.Body.SetContentString(mReq.Settings.Body.Content)
 
 		entitiesToCreate = append(entitiesToCreate, m)
 	}

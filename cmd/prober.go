@@ -157,225 +157,203 @@ func handleTask(ctx context.Context, logger *logrus.Logger, httpProber http.Serv
 		"location":   location,
 	})
 
-	var res *http.Result
-	var err error
+	if len(m.Steps) == 0 {
+		l.Error("monitor has no steps")
+		return
+	}
 
 	timeout := time.Duration(time.Second * 5)
+	extractedVariables := make(map[string]string)
+
+	var overallRes *http.Result
+	var err error
 	var authFailed bool = false
+	var targetDown bool = false
+	var anyAssertionsFailed bool = false
+	var allFailedAssertions []entities.MonitorAssertion
+	
+	// Create a combined timing accumulator
+	totalDNSLookup := time.Duration(0)
+	totalTCPConnection := time.Duration(0)
+	totalTLSHandshake := time.Duration(0)
+	totalServerProcessing := time.Duration(0)
+	totalContentTransfer := time.Duration(0)
+	totalTime := time.Duration(0)
 
-	maxRetries := 3
-	for attempt := 0; attempt < maxRetries; attempt++ {
-		err = nil
-		authFailed = false
+	for stepIdx, step := range m.Steps {
+		var res *http.Result
 
-		switch m.Settings.Method {
-		case "TCP":
-			res, err = tcpProber.Probe(ctx, m.Settings.URL, timeout)
-		case "WEBSOCKET":
-			res, err = websocketProber.Probe(ctx, m.Settings.URL, timeout)
-		case "UDP":
-			res, err = udpProber.Probe(ctx, m.Settings.URL, timeout)
-		case "ICMP":
-			res, err = icmpProber.Probe(ctx, m.Settings.URL, timeout)
-		case "DNS":
-			res, err = dnsProber.Probe(ctx, m.Settings.URL, timeout)
-		case "POSTGRES":
-			res, err = postgresProber.Probe(ctx, m.Settings.URL, timeout)
-		case "MYSQL":
-			res, err = mysqlProber.Probe(ctx, m.Settings.URL, timeout)
-		case "REDIS":
-			res, err = redisProber.Probe(ctx, m.Settings.URL, timeout)
-		case "BROWSER":
-			var scriptJSON string
-			if m.Settings.Body.Content != nil {
-				scriptJSON = string(*m.Settings.Body.Content)
+		maxRetries := 3
+		for attempt := 0; attempt < maxRetries; attempt++ {
+			err = nil
+			authFailed = false
+
+			stepURL := step.URL
+			var stepBodyStr string
+			if step.Body.Content != nil {
+				stepBodyStr = string(*step.Body.Content)
 			}
-			// Browser needs longer timeout, give it 15 seconds
-			browserTimeout := time.Duration(time.Second * 15)
-			res, err = browserProber.Probe(ctx, m.Settings.URL, scriptJSON, browserTimeout)
-		default:
-			headers := make(map[string]string)
-			for _, h := range m.Settings.Headers {
-				headers[h.Key] = h.Value
+			
+			for k, v := range extractedVariables {
+				placeholder := fmt.Sprintf("{{%s}}", k)
+				stepURL = strings.ReplaceAll(stepURL, placeholder, v)
+				stepBodyStr = strings.ReplaceAll(stepBodyStr, placeholder, v)
 			}
-
+			
 			var bodyReader io.Reader
-			if m.Settings.Body.Content != nil {
-				bodyReader = strings.NewReader(string(*m.Settings.Body.Content))
+			if stepBodyStr != "" {
+				bodyReader = strings.NewReader(stepBodyStr)
 			}
 
-			if m.Settings.Auth.Method == "BASIC" {
-				auth := m.Settings.Auth.Username + ":" + m.Settings.Auth.Password
-				headers["Authorization"] = "Basic " + base64.StdEncoding.EncodeToString([]byte(auth))
-			} else if m.Settings.Auth.Method == "OAUTH2_CLIENT_CREDENTIALS" {
-				token, authErr := fetchOAuth2Token(ctx, m.Settings.Auth.TokenURL, m.Settings.Auth.ClientID, m.Settings.Auth.ClientSecret)
-				if authErr != nil {
-					err = fmt.Errorf("failed to fetch oauth2 token: %w", authErr)
-					authFailed = true
-				} else {
-					headers["Authorization"] = "Bearer " + token
+			switch step.Method {
+			case "TCP":
+				res, err = tcpProber.Probe(ctx, stepURL, timeout)
+			case "WEBSOCKET":
+				res, err = websocketProber.Probe(ctx, stepURL, timeout)
+			case "UDP":
+				res, err = udpProber.Probe(ctx, stepURL, timeout)
+			case "ICMP":
+				res, err = icmpProber.Probe(ctx, stepURL, timeout)
+			case "DNS":
+				res, err = dnsProber.Probe(ctx, stepURL, timeout)
+			case "POSTGRES":
+				res, err = postgresProber.Probe(ctx, stepURL, timeout)
+			case "MYSQL":
+				res, err = mysqlProber.Probe(ctx, stepURL, timeout)
+			case "REDIS":
+				res, err = redisProber.Probe(ctx, stepURL, timeout)
+			case "BROWSER":
+				browserTimeout := time.Duration(time.Second * 15)
+				res, err = browserProber.Probe(ctx, stepURL, stepBodyStr, browserTimeout)
+			default:
+				headers := make(map[string]string)
+				for _, h := range step.Headers {
+					headers[h.Key] = h.Value
+				}
+
+				if m.Settings.Auth.Method == "BASIC" {
+					auth := m.Settings.Auth.Username + ":" + m.Settings.Auth.Password
+					headers["Authorization"] = "Basic " + base64.StdEncoding.EncodeToString([]byte(auth))
+				} else if m.Settings.Auth.Method == "OAUTH2_CLIENT_CREDENTIALS" {
+					token, authErr := fetchOAuth2Token(ctx, m.Settings.Auth.TokenURL, m.Settings.Auth.ClientID, m.Settings.Auth.ClientSecret)
+					if authErr != nil {
+						err = fmt.Errorf("failed to fetch oauth2 token: %w", authErr)
+						authFailed = true
+					} else {
+						headers["Authorization"] = "Bearer " + token
+					}
+				}
+
+				if err == nil {
+					res, err = httpProber.Probe(
+						ctx,
+						step.Method,
+						stepURL,
+						headers,
+						bodyReader,
+						timeout,
+					)
 				}
 			}
 
 			if err == nil {
-				res, err = httpProber.Probe(
-					ctx,
-					m.Settings.Method,
-					m.Settings.URL,
-					headers,
-					bodyReader,
-					timeout,
-				)
+				break
+			}
+
+			if attempt < maxRetries-1 {
+				time.Sleep(1 * time.Second)
 			}
 		}
 
-		if err == nil {
+		if err != nil && res == nil {
+			l.WithError(err).Error("failed to probe step")
+			if !authFailed {
+				targetDown = true
+			}
+
+			res = &http.Result{
+				Response: http.Response{
+					StatusCode: 0,
+					Header:     make(xhttp.Header),
+					Body:       []byte{},
+				},
+				Timing: http.Timing{
+					Phases: http.TimingPhases{
+						Total:            timeout,
+						ServerProcessing: timeout,
+					},
+				},
+			}
+		}
+
+		overallRes = res
+
+		// Accumulate timings
+		totalDNSLookup += res.Timing.Phases.DNSLookup
+		totalTCPConnection += res.Timing.Phases.TCPConnection
+		totalTLSHandshake += res.Timing.Phases.TLSHandshake
+		totalServerProcessing += res.Timing.Phases.ServerProcessing
+		totalContentTransfer += res.Timing.Phases.ContentTransfer
+		totalTime += res.Timing.Phases.Total
+
+		if !targetDown && len(step.Variables) > 0 {
+			var unmarshalData interface{}
+			_ = json.Unmarshal(res.Response.Body, &unmarshalData)
+
+			for _, v := range step.Variables {
+				if v.Source == "JSON_BODY" && unmarshalData != nil {
+					val, err := jsonpath.Read(unmarshalData, v.Property)
+					if err == nil {
+						extractedVariables[v.Name] = fmt.Sprintf("%v", val)
+					}
+				} else if v.Source == "HEADER" {
+					val := res.Response.Header.Get(v.Property)
+					if val != "" {
+						extractedVariables[v.Name] = val
+					}
+				}
+			}
+		}
+
+		var failed []entities.MonitorAssertion
+		if !authFailed {
+			failed, _, err = assertResult(res, step.Assertions)
+			if err != nil {
+				l.WithError(err).Error("failed to assert result")
+			} else if len(failed) > 0 {
+				anyAssertionsFailed = true
+				allFailedAssertions = append(allFailedAssertions, failed...)
+			}
+		}
+
+		// Abort subsequent steps if this step failed in any way
+		if targetDown || authFailed || anyAssertionsFailed {
+			l.WithField("failed_step_index", stepIdx).Info("Step failed, aborting sequence")
 			break
 		}
-
-		if attempt < maxRetries-1 {
-			time.Sleep(1 * time.Second)
-		}
 	}
 
-	targetDown := false
-	if err != nil && res == nil {
-		l.WithError(err).Error("failed to probe")
-		if !authFailed {
-			targetDown = true
-		}
-
-		// Create a dummy result for dead targets so assertions fail gracefully
-		res = &http.Result{
-			Response: http.Response{
-				StatusCode: 0,
-				Header:     make(xhttp.Header),
-				Body:       []byte{},
-			},
-			Timing: http.Timing{
-				Phases: http.TimingPhases{
-					Total:            timeout,
-					ServerProcessing: timeout,
-				},
-			},
-		}
+	// Update overallRes timings to the sum
+	if overallRes != nil {
+		overallRes.Timing.Phases.DNSLookup = totalDNSLookup
+		overallRes.Timing.Phases.TCPConnection = totalTCPConnection
+		overallRes.Timing.Phases.TLSHandshake = totalTLSHandshake
+		overallRes.Timing.Phases.ServerProcessing = totalServerProcessing
+		overallRes.Timing.Phases.ContentTransfer = totalContentTransfer
+		overallRes.Timing.Phases.Total = totalTime
+	} else {
+		// Should never happen if steps > 0
+		return 
 	}
+
+	res := overallRes
 
 	l = l.WithFields(logrus.Fields{
 		"status":     res.Response.StatusCode,
 		"total_time": fmt.Sprintf("%v", res.Timing.Phases.Total),
 	})
 
-	extractedVariables := make(map[string]string)
-	if !targetDown && len(m.Variables) > 0 {
-		var unmarshalData interface{}
-		_ = json.Unmarshal(res.Response.Body, &unmarshalData)
-
-		for _, v := range m.Variables {
-			if v.Source == "JSON_BODY" && unmarshalData != nil {
-				val, err := jsonpath.Read(unmarshalData, v.Property)
-				if err == nil {
-					extractedVariables[v.Name] = fmt.Sprintf("%v", val)
-				}
-			} else if v.Source == "HEADER" {
-				val := res.Response.Header.Get(v.Property)
-				if val != "" {
-					extractedVariables[v.Name] = val
-				}
-			}
-		}
-	}
-
-	if !targetDown && m.Settings.Teardown.Enabled {
-		teardownURL := m.Settings.Teardown.URL
-		var teardownBodyReader io.Reader
-		var teardownBodyStr string
-		
-		if m.Settings.Teardown.Body.Content != nil {
-			teardownBodyStr = string(*m.Settings.Teardown.Body.Content)
-		}
-
-		for k, v := range extractedVariables {
-			placeholder := fmt.Sprintf("{{%s}}", k)
-			teardownURL = strings.ReplaceAll(teardownURL, placeholder, v)
-			teardownBodyStr = strings.ReplaceAll(teardownBodyStr, placeholder, v)
-		}
-
-		if teardownBodyStr != "" {
-			teardownBodyReader = strings.NewReader(teardownBodyStr)
-		}
-
-		teardownHeaders := make(map[string]string)
-		for _, h := range m.Settings.Headers {
-			teardownHeaders[h.Key] = h.Value
-		}
-		
-		if m.Settings.Auth.Method == "BASIC" {
-			auth := m.Settings.Auth.Username + ":" + m.Settings.Auth.Password
-			teardownHeaders["Authorization"] = "Basic " + base64.StdEncoding.EncodeToString([]byte(auth))
-		} else if m.Settings.Auth.Method == "OAUTH2_CLIENT_CREDENTIALS" {
-			// token should still be valid from the main request, but we could fetch again if needed.
-			// Let's assume the authFailed check earlier covered this, and we can't easily re-use the exact token without storing it.
-			// Re-fetching or just passing an empty string if it fails.
-			token, _ := fetchOAuth2Token(ctx, m.Settings.Auth.TokenURL, m.Settings.Auth.ClientID, m.Settings.Auth.ClientSecret)
-			if token != "" {
-				teardownHeaders["Authorization"] = "Bearer " + token
-			}
-		}
-
-		_, teardownErr := httpProber.Probe(
-			ctx,
-			m.Settings.Teardown.Method,
-			teardownURL,
-			teardownHeaders,
-			teardownBodyReader,
-			timeout,
-		)
-		
-		if teardownErr != nil {
-			l.WithError(teardownErr).Error("failed to execute teardown request")
-			
-			// Trigger a Teardown Failed incident
-			desc := fmt.Sprintf("Teardown request failed: %v", teardownErr)
-			teardownIncident := entities.Incident{
-				MonitorID:   &m.ID,
-				TeamID:      m.TeamID,
-				Title:       "Teardown Failed",
-				Description: &desc,
-			}
-			if err := i.Create(ctx, &[]entities.Incident{teardownIncident}); err != nil {
-				l.WithError(err).Error("failed to trigger teardown incident")
-			}
-		} else {
-			// Auto-resolve any open Teardown Failed incident
-			openIncidents, err := i.GetByMonitorIDWithAssertionPaginated(ctx, m.ID, nil, nil)
-			if err == nil && openIncidents != nil {
-				for _, inc := range *openIncidents {
-					if inc.Title == "Teardown Failed" && !inc.Resolved {
-						l.Info("teardown is now succeeding, resolving open Teardown Failed incident")
-						inc.Incident.Resolved = true
-						now := time.Now()
-						inc.Incident.ResolvedAt = &now
-						if err := i.Update(ctx, &inc.Incident); err != nil {
-							l.WithError(err).Error("failed to resolve teardown failed incident")
-						}
-					}
-				}
-			}
-		}
-	}
-
-	var failed, passed []entities.MonitorAssertion
-	if !authFailed {
-		failed, passed, err = assertResult(res, m.Assertions)
-		if err != nil {
-			l.WithError(err).Error("failed to assert result")
-			return
-		}
-	}
-
-	failedCount := len(failed)
-	passedCount := len(passed)
+	failedCount := len(allFailedAssertions)
 
 	if !authFailed {
 		newCheck := mapResultToCheck(m, res, location)
@@ -389,16 +367,11 @@ func handleTask(ctx context.Context, logger *logrus.Logger, httpProber http.Serv
 		}
 	}
 
-	l = l.WithFields(logrus.Fields{
-		"assertions_passed": passedCount,
-		"assertions_failed": failedCount,
-	})
-
 	failKey := fmt.Sprintf("monitor:%d:failures", m.ID)
 	var failCount int64 = 0
 
 	if failedCount > 0 || targetDown || authFailed {
-		l.Info("monitor failed (assertions, target down, or auth), incrementing failure counter")
+		l.Info("monitor failed, incrementing failure counter")
 		val, err := rc.Incr(ctx, failKey).Result()
 		if err != nil {
 			l.WithError(err).Error("failed to increment failure counter")
@@ -407,10 +380,9 @@ func handleTask(ctx context.Context, logger *logrus.Logger, httpProber http.Serv
 	}
 
 	if failedCount > 0 {
-		// Hardcoded threshold of 3 for MVP
 		if failCount == 3 {
 			l.Info("failure threshold reached, triggering incident")
-			if err = triggerIncident(ctx, m, res, &failed, i); err != nil {
+			if err = triggerIncident(ctx, m, res, &allFailedAssertions, i); err != nil {
 				l.WithError(err).Error("failed to trigger incident")
 			}
 		} else if failCount > 3 {
@@ -423,7 +395,7 @@ func handleTask(ctx context.Context, logger *logrus.Logger, httpProber http.Serv
 						openAssertionIDs[*inc.MonitorAssertionID] = true
 					}
 				}
-				for _, f := range failed {
+				for _, f := range allFailedAssertions {
 					if !openAssertionIDs[f.ID] {
 						unhandledFailures = append(unhandledFailures, f)
 					}
@@ -435,12 +407,11 @@ func handleTask(ctx context.Context, logger *logrus.Logger, httpProber http.Serv
 					}
 				}
 			}
-			// Already triggered, update the incident's updated_at occurrence time
 			openIncidents, err = i.GetByMonitorIDWithAssertionPaginated(ctx, m.ID, nil, nil)
 			if err == nil && openIncidents != nil {
 				for _, inc := range *openIncidents {
-					if !inc.Incident.Resolved && inc.Incident.Title != "Anomaly Detected" && inc.Incident.Title != "SSL/TLS Cert Expiry" && inc.Incident.Title != "Target Down" && inc.Incident.Title != "Authentication Failed" && inc.Incident.Title != "Teardown Failed" {
-						for _, assertion := range failed {
+					if !inc.Incident.Resolved && inc.Incident.Title != "Anomaly Detected" && inc.Incident.Title != "SSL/TLS Cert Expiry" && inc.Incident.Title != "Target Down" && inc.Incident.Title != "Authentication Failed" {
+						for _, assertion := range allFailedAssertions {
 							if inc.Incident.MonitorAssertionID != nil && *inc.Incident.MonitorAssertionID == assertion.ID {
 								inc.Incident.UpdatedAt = time.Now()
 								inc.Incident.Occurrences++
@@ -456,23 +427,20 @@ func handleTask(ctx context.Context, logger *logrus.Logger, httpProber http.Serv
 		}
 	} else {
 		l.Info("all assertions passed")
-
-		// Reset counter
 		if !authFailed && !targetDown {
 			rc.Del(ctx, failKey)
 		}
 	}
 
-	// Auto-resolve any open incidents for this monitor whose assertion is not currently failing
 	openIncidents, err := i.GetByMonitorIDWithAssertionPaginated(ctx, m.ID, nil, nil)
 	if err == nil && openIncidents != nil {
 		failedAssertionIDs := make(map[uint]bool)
-		for _, f := range failed {
+		for _, f := range allFailedAssertions {
 			failedAssertionIDs[f.ID] = true
 		}
 
 		for _, inc := range *openIncidents {
-			if !inc.Incident.Resolved && inc.Incident.Title != "Anomaly Detected" && inc.Incident.Title != "SSL/TLS Cert Expiry" && inc.Incident.Title != "Target Down" && inc.Incident.Title != "Authentication Failed" && inc.Incident.Title != "Teardown Failed" {
+			if !inc.Incident.Resolved && inc.Incident.Title != "Anomaly Detected" && inc.Incident.Title != "SSL/TLS Cert Expiry" && inc.Incident.Title != "Target Down" && inc.Incident.Title != "Authentication Failed" {
 				if inc.Incident.MonitorAssertionID == nil || !failedAssertionIDs[*inc.Incident.MonitorAssertionID] {
 					l.WithField("incident_id", inc.Incident.ID).Info("auto-resolving incident")
 					inc.Incident.Resolved = true
@@ -506,7 +474,7 @@ func handleTask(ctx context.Context, logger *logrus.Logger, httpProber http.Serv
 
 		if !hasOpenDownIncident && failCount >= 3 {
 			l.Info("target is down and failure threshold reached, triggering incident")
-			desc := fmt.Sprintf("Target %s is unreachable or not responding.", m.Settings.URL)
+			desc := "Target is unreachable or not responding."
 			downIncident := entities.Incident{
 				MonitorID:   &m.ID,
 				TeamID:      m.TeamID,
@@ -533,7 +501,6 @@ func handleTask(ctx context.Context, logger *logrus.Logger, httpProber http.Serv
 			}
 		}
 
-		// Check for anomalies
 		anomalyResp, err := checkAnomaly(m.ID, res)
 		if err != nil {
 			l.WithError(err).Error("failed to check for anomaly")
@@ -597,9 +564,6 @@ func handleTask(ctx context.Context, logger *logrus.Logger, httpProber http.Serv
 		if !hasOpenAuthIncident && failCount >= 3 {
 			l.Info("authentication failed and threshold reached, triggering incident")
 			descStr := "Authentication failed"
-			if err != nil {
-				descStr = fmt.Sprintf("Authentication failed: %v", err)
-			}
 			authIncident := entities.Incident{
 				MonitorID:   &m.ID,
 				TeamID:      m.TeamID,
@@ -627,7 +591,6 @@ func handleTask(ctx context.Context, logger *logrus.Logger, httpProber http.Serv
 		}
 	}
 
-	// SSL/TLS Certificate Expiration Monitoring
 	if res.TLS != nil {
 		expiry := res.TLS.Certificate.NotAfter
 		timeRemaining := time.Until(expiry)
@@ -646,11 +609,8 @@ func handleTask(ctx context.Context, logger *logrus.Logger, httpProber http.Serv
 
 			if !hasOpenSSLIncident {
 				l.Warn("SSL/TLS certificate is expiring soon, triggering incident")
-				desc := fmt.Sprintf("SSL/TLS certificate for %s expires in %.1f days (on %s)",
-					m.Settings.URL,
-					timeRemaining.Hours()/24,
-					expiry.Format(time.RFC822),
-				)
+				// just simple desc
+				desc := "SSL/TLS certificate is expiring soon"
 				sslIncident := entities.Incident{
 					MonitorID:   &m.ID,
 					TeamID:      m.TeamID,
@@ -672,7 +632,6 @@ func handleTask(ctx context.Context, logger *logrus.Logger, httpProber http.Serv
 				}
 			}
 		} else {
-			// Auto-resolve any open SSL/TLS cert expiry incidents if the cert is now valid for >= 30 days
 			openIncidents, err := i.GetByMonitorIDWithAssertionPaginated(ctx, m.ID, nil, nil)
 			if err == nil && openIncidents != nil {
 				for _, inc := range *openIncidents {
@@ -690,6 +649,7 @@ func handleTask(ctx context.Context, logger *logrus.Logger, httpProber http.Serv
 		}
 	}
 }
+
 
 type ForecasterPredictResponse struct {
 	Anomalies   []bool    `json:"anomalies"`
@@ -799,8 +759,8 @@ func mapResultToCheck(m *entities.Monitor, res *http.Result, location string) *c
 		MonitorID:  uint64(m.ID),
 		TeamID:     uint64(m.TeamID),
 		StatusCode: uint64(res.Response.StatusCode),
-		Method:     m.Settings.Method,
-		URL:        m.Settings.URL,
+		Method:     m.Steps[0].Method,
+		URL:        m.Steps[0].URL,
 		Location:   location,
 		Timing: check.Timing{
 			DNSLookup:        res.Timing.Phases.DNSLookup,

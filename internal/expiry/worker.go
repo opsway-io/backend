@@ -126,7 +126,7 @@ func (w *worker) notifySSLExpiry(ctx context.Context, m *entities.Monitor, daysR
 	for _, u := range *users {
 		tpl := &templates.SSLExpiryTemplate{
 			MonitorName:    m.Name,
-			MonitorURL:     m.Settings.URL,
+			MonitorURL:     m.Steps[0].URL,
 			DashboardURL:   dashboardURL,
 			DaysRemaining:  daysRemaining,
 			ExpirationDate: expirationDate.Format(time.RFC1123),
