@@ -27,12 +27,20 @@ type PreviewOpenAPIAuth struct {
 	TokenURL string `json:"tokenUrl,omitempty"`
 }
 
+type PreviewOpenAPIAssertion struct {
+	Source   string `json:"source"`
+	Property string `json:"property,omitempty"`
+	Operator string `json:"operator"`
+	Target   string `json:"target,omitempty"`
+}
+
 type PreviewOpenAPIEndpoint struct {
-	Method      string `json:"method"`
-	Path        string `json:"path"`
-	Summary     string `json:"summary"`
-	RequestBody string `json:"requestBody,omitempty"`
-	StatusCode  string `json:"statusCode"`
+	Method      string                    `json:"method"`
+	Path        string                    `json:"path"`
+	Summary     string                    `json:"summary"`
+	RequestBody string                    `json:"requestBody,omitempty"`
+	StatusCode  string                    `json:"statusCode"`
+	Assertions  []PreviewOpenAPIAssertion `json:"assertions"`
 }
 
 func (h *Handlers) PreviewOpenAPI(c hs.AuthenticatedContext) error {
@@ -105,6 +113,42 @@ func (h *Handlers) PreviewOpenAPI(c hs.AuthenticatedContext) error {
 				}
 			}
 
+			assertions := []PreviewOpenAPIAssertion{}
+			assertions = append(assertions, PreviewOpenAPIAssertion{
+				Source:   "STATUS_CODE",
+				Operator: "EQUAL",
+				Target:   statusCode,
+			})
+
+			responseRef := operation.Responses.Map()[statusCode]
+			if responseRef != nil && responseRef.Value != nil {
+				if content, ok := responseRef.Value.Content["application/json"]; ok {
+					if content.Schema != nil && content.Schema.Value != nil {
+						schema := content.Schema.Value
+						if schema.Properties != nil {
+							for propName, propRef := range schema.Properties {
+								assertions = append(assertions, PreviewOpenAPIAssertion{
+									Source:   "JSON_BODY",
+									Property: "$." + propName,
+									Operator: "HAS_KEY",
+								})
+
+								if propRef.Value != nil && propRef.Value.Properties != nil {
+									for subPropName := range propRef.Value.Properties {
+										assertions = append(assertions, PreviewOpenAPIAssertion{
+											Source:   "JSON_BODY",
+											Property: "$." + propName + "." + subPropName,
+											Operator: "HAS_KEY",
+										})
+									}
+								}
+							}
+						}
+					}
+				}
+			}
+
+			endpoint.Assertions = assertions
 			endpoints = append(endpoints, endpoint)
 		}
 	}
