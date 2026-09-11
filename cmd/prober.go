@@ -10,6 +10,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/yalp/jsonpath"
+
 	"github.com/gammazero/workerpool"
 	"github.com/opsway-io/backend/internal/check"
 	"github.com/opsway-io/backend/internal/connectors/clickhouse"
@@ -161,64 +163,78 @@ func handleTask(ctx context.Context, logger *logrus.Logger, httpProber http.Serv
 	timeout := time.Duration(time.Second * 5)
 	var authFailed bool = false
 
-	switch m.Settings.Method {
-	case "TCP":
-		res, err = tcpProber.Probe(ctx, m.Settings.URL, timeout)
-	case "WEBSOCKET":
-		res, err = websocketProber.Probe(ctx, m.Settings.URL, timeout)
-	case "UDP":
-		res, err = udpProber.Probe(ctx, m.Settings.URL, timeout)
-	case "ICMP":
-		res, err = icmpProber.Probe(ctx, m.Settings.URL, timeout)
-	case "DNS":
-		res, err = dnsProber.Probe(ctx, m.Settings.URL, timeout)
-	case "POSTGRES":
-		res, err = postgresProber.Probe(ctx, m.Settings.URL, timeout)
-	case "MYSQL":
-		res, err = mysqlProber.Probe(ctx, m.Settings.URL, timeout)
-	case "REDIS":
-		res, err = redisProber.Probe(ctx, m.Settings.URL, timeout)
-	case "BROWSER":
-		var scriptJSON string
-		if m.Settings.Body.Content != nil {
-			scriptJSON = string(*m.Settings.Body.Content)
-		}
-		// Browser needs longer timeout, give it 15 seconds
-		browserTimeout := time.Duration(time.Second * 15)
-		res, err = browserProber.Probe(ctx, m.Settings.URL, scriptJSON, browserTimeout)
-	default:
-		headers := make(map[string]string)
-		for _, h := range m.Settings.Headers {
-			headers[h.Key] = h.Value
-		}
+	maxRetries := 3
+	for attempt := 0; attempt < maxRetries; attempt++ {
+		err = nil
+		authFailed = false
 
-		var bodyReader io.Reader
-		if m.Settings.Body.Content != nil {
-			bodyReader = strings.NewReader(string(*m.Settings.Body.Content))
-		}
+		switch m.Settings.Method {
+		case "TCP":
+			res, err = tcpProber.Probe(ctx, m.Settings.URL, timeout)
+		case "WEBSOCKET":
+			res, err = websocketProber.Probe(ctx, m.Settings.URL, timeout)
+		case "UDP":
+			res, err = udpProber.Probe(ctx, m.Settings.URL, timeout)
+		case "ICMP":
+			res, err = icmpProber.Probe(ctx, m.Settings.URL, timeout)
+		case "DNS":
+			res, err = dnsProber.Probe(ctx, m.Settings.URL, timeout)
+		case "POSTGRES":
+			res, err = postgresProber.Probe(ctx, m.Settings.URL, timeout)
+		case "MYSQL":
+			res, err = mysqlProber.Probe(ctx, m.Settings.URL, timeout)
+		case "REDIS":
+			res, err = redisProber.Probe(ctx, m.Settings.URL, timeout)
+		case "BROWSER":
+			var scriptJSON string
+			if m.Settings.Body.Content != nil {
+				scriptJSON = string(*m.Settings.Body.Content)
+			}
+			// Browser needs longer timeout, give it 15 seconds
+			browserTimeout := time.Duration(time.Second * 15)
+			res, err = browserProber.Probe(ctx, m.Settings.URL, scriptJSON, browserTimeout)
+		default:
+			headers := make(map[string]string)
+			for _, h := range m.Settings.Headers {
+				headers[h.Key] = h.Value
+			}
 
-		if m.Settings.Auth.Method == "BASIC" {
-			auth := m.Settings.Auth.Username + ":" + m.Settings.Auth.Password
-			headers["Authorization"] = "Basic " + base64.StdEncoding.EncodeToString([]byte(auth))
-		} else if m.Settings.Auth.Method == "OAUTH2_CLIENT_CREDENTIALS" {
-			token, authErr := fetchOAuth2Token(ctx, m.Settings.Auth.TokenURL, m.Settings.Auth.ClientID, m.Settings.Auth.ClientSecret)
-			if authErr != nil {
-				err = fmt.Errorf("failed to fetch oauth2 token: %w", authErr)
-				authFailed = true
-			} else {
-				headers["Authorization"] = "Bearer " + token
+			var bodyReader io.Reader
+			if m.Settings.Body.Content != nil {
+				bodyReader = strings.NewReader(string(*m.Settings.Body.Content))
+			}
+
+			if m.Settings.Auth.Method == "BASIC" {
+				auth := m.Settings.Auth.Username + ":" + m.Settings.Auth.Password
+				headers["Authorization"] = "Basic " + base64.StdEncoding.EncodeToString([]byte(auth))
+			} else if m.Settings.Auth.Method == "OAUTH2_CLIENT_CREDENTIALS" {
+				token, authErr := fetchOAuth2Token(ctx, m.Settings.Auth.TokenURL, m.Settings.Auth.ClientID, m.Settings.Auth.ClientSecret)
+				if authErr != nil {
+					err = fmt.Errorf("failed to fetch oauth2 token: %w", authErr)
+					authFailed = true
+				} else {
+					headers["Authorization"] = "Bearer " + token
+				}
+			}
+
+			if err == nil {
+				res, err = httpProber.Probe(
+					ctx,
+					m.Settings.Method,
+					m.Settings.URL,
+					headers,
+					bodyReader,
+					timeout,
+				)
 			}
 		}
 
 		if err == nil {
-			res, err = httpProber.Probe(
-				ctx,
-				m.Settings.Method,
-				m.Settings.URL,
-				headers,
-				bodyReader,
-				timeout,
-			)
+			break
+		}
+
+		if attempt < maxRetries-1 {
+			time.Sleep(1 * time.Second)
 		}
 	}
 
@@ -249,6 +265,105 @@ func handleTask(ctx context.Context, logger *logrus.Logger, httpProber http.Serv
 		"status":     res.Response.StatusCode,
 		"total_time": fmt.Sprintf("%v", res.Timing.Phases.Total),
 	})
+
+	extractedVariables := make(map[string]string)
+	if !targetDown && len(m.Variables) > 0 {
+		var unmarshalData interface{}
+		_ = json.Unmarshal(res.Response.Body, &unmarshalData)
+
+		for _, v := range m.Variables {
+			if v.Source == "JSON_BODY" && unmarshalData != nil {
+				val, err := jsonpath.Read(unmarshalData, v.Property)
+				if err == nil {
+					extractedVariables[v.Name] = fmt.Sprintf("%v", val)
+				}
+			} else if v.Source == "HEADER" {
+				val := res.Response.Header.Get(v.Property)
+				if val != "" {
+					extractedVariables[v.Name] = val
+				}
+			}
+		}
+	}
+
+	if !targetDown && m.Settings.Teardown.Enabled {
+		teardownURL := m.Settings.Teardown.URL
+		var teardownBodyReader io.Reader
+		var teardownBodyStr string
+		
+		if m.Settings.Teardown.Body.Content != nil {
+			teardownBodyStr = string(*m.Settings.Teardown.Body.Content)
+		}
+
+		for k, v := range extractedVariables {
+			placeholder := fmt.Sprintf("{{%s}}", k)
+			teardownURL = strings.ReplaceAll(teardownURL, placeholder, v)
+			teardownBodyStr = strings.ReplaceAll(teardownBodyStr, placeholder, v)
+		}
+
+		if teardownBodyStr != "" {
+			teardownBodyReader = strings.NewReader(teardownBodyStr)
+		}
+
+		teardownHeaders := make(map[string]string)
+		for _, h := range m.Settings.Headers {
+			teardownHeaders[h.Key] = h.Value
+		}
+		
+		if m.Settings.Auth.Method == "BASIC" {
+			auth := m.Settings.Auth.Username + ":" + m.Settings.Auth.Password
+			teardownHeaders["Authorization"] = "Basic " + base64.StdEncoding.EncodeToString([]byte(auth))
+		} else if m.Settings.Auth.Method == "OAUTH2_CLIENT_CREDENTIALS" {
+			// token should still be valid from the main request, but we could fetch again if needed.
+			// Let's assume the authFailed check earlier covered this, and we can't easily re-use the exact token without storing it.
+			// Re-fetching or just passing an empty string if it fails.
+			token, _ := fetchOAuth2Token(ctx, m.Settings.Auth.TokenURL, m.Settings.Auth.ClientID, m.Settings.Auth.ClientSecret)
+			if token != "" {
+				teardownHeaders["Authorization"] = "Bearer " + token
+			}
+		}
+
+		_, teardownErr := httpProber.Probe(
+			ctx,
+			m.Settings.Teardown.Method,
+			teardownURL,
+			teardownHeaders,
+			teardownBodyReader,
+			timeout,
+		)
+		
+		if teardownErr != nil {
+			l.WithError(teardownErr).Error("failed to execute teardown request")
+			
+			// Trigger a Teardown Failed incident
+			desc := fmt.Sprintf("Teardown request failed: %v", teardownErr)
+			teardownIncident := entities.Incident{
+				MonitorID:   &m.ID,
+				TeamID:      m.TeamID,
+				Title:       "Teardown Failed",
+				Description: &desc,
+			}
+			if err := i.Create(ctx, &[]entities.Incident{teardownIncident}); err != nil {
+				l.WithError(err).Error("failed to trigger teardown incident")
+			}
+		} else {
+			// Auto-resolve any open Teardown Failed incident
+			openIncidents, err := i.GetByMonitorIDWithAssertionPaginated(ctx, m.ID, nil, nil)
+			if err == nil && openIncidents != nil {
+				for _, inc := range *openIncidents {
+					if inc.Title == "Teardown Failed" && !inc.Resolved {
+						l.Info("teardown is now succeeding, resolving open Teardown Failed incident")
+						inc.Incident.Resolved = true
+						now := time.Now()
+						inc.Incident.ResolvedAt = &now
+						if err := i.Update(ctx, &inc.Incident); err != nil {
+							l.WithError(err).Error("failed to resolve teardown failed incident")
+						}
+					}
+				}
+			}
+		}
+	}
 
 	var failed, passed []entities.MonitorAssertion
 	if !authFailed {
@@ -324,7 +439,7 @@ func handleTask(ctx context.Context, logger *logrus.Logger, httpProber http.Serv
 			openIncidents, err = i.GetByMonitorIDWithAssertionPaginated(ctx, m.ID, nil, nil)
 			if err == nil && openIncidents != nil {
 				for _, inc := range *openIncidents {
-					if !inc.Incident.Resolved && inc.Incident.Title != "Anomaly Detected" && inc.Incident.Title != "SSL/TLS Cert Expiry" && inc.Incident.Title != "Target Down" && inc.Incident.Title != "Authentication Failed" {
+					if !inc.Incident.Resolved && inc.Incident.Title != "Anomaly Detected" && inc.Incident.Title != "SSL/TLS Cert Expiry" && inc.Incident.Title != "Target Down" && inc.Incident.Title != "Authentication Failed" && inc.Incident.Title != "Teardown Failed" {
 						for _, assertion := range failed {
 							if inc.Incident.MonitorAssertionID != nil && *inc.Incident.MonitorAssertionID == assertion.ID {
 								inc.Incident.UpdatedAt = time.Now()
@@ -357,7 +472,7 @@ func handleTask(ctx context.Context, logger *logrus.Logger, httpProber http.Serv
 		}
 
 		for _, inc := range *openIncidents {
-			if !inc.Incident.Resolved && inc.Incident.Title != "Anomaly Detected" && inc.Incident.Title != "SSL/TLS Cert Expiry" && inc.Incident.Title != "Target Down" && inc.Incident.Title != "Authentication Failed" {
+			if !inc.Incident.Resolved && inc.Incident.Title != "Anomaly Detected" && inc.Incident.Title != "SSL/TLS Cert Expiry" && inc.Incident.Title != "Target Down" && inc.Incident.Title != "Authentication Failed" && inc.Incident.Title != "Teardown Failed" {
 				if inc.Incident.MonitorAssertionID == nil || !failedAssertionIDs[*inc.Incident.MonitorAssertionID] {
 					l.WithField("incident_id", inc.Incident.ID).Info("auto-resolving incident")
 					inc.Incident.Resolved = true
