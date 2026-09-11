@@ -20,6 +20,7 @@ type StatusPage struct {
 	ShowBranding         bool   `gorm:"default:true"`
 	IsPrivate            bool   `gorm:"default:false"`
 	PasswordHash         string `gorm:"default:''"`
+	SupportURL           string `gorm:"default:''"`
 
 	Groups   []StatusPageGroup `gorm:"constraint:OnDelete:CASCADE"`
 	Monitors []Monitor         `gorm:"many2many:status_page_monitors;constraint:OnDelete:CASCADE"`

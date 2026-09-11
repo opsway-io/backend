@@ -77,6 +77,7 @@ type GetStatusPageResponse struct {
 	CustomComponentsHTML string `json:"customComponentsHtml"`
 	ShowBranding         bool   `json:"showBranding"`
 	IsPrivate            bool                         `json:"isPrivate"`
+	SupportURL           string                       `json:"supportUrl"`
 	MonitorIDs           []uint                       `json:"monitorIds"`
 	Groups               []GetStatusPageGroupResponse `json:"groups"`
 	CreatedAt            string                       `json:"createdAt"`
@@ -120,6 +121,7 @@ func (h *Handlers) GetStatusPages(c handlers.AuthenticatedContext) error {
 			CustomComponentsHTML: sp.CustomComponentsHTML,
 			ShowBranding:         sp.ShowBranding,
 			IsPrivate:            sp.IsPrivate,
+			SupportURL:           sp.SupportURL,
 			MonitorIDs:           monitorIDs,
 			Groups:               func() []GetStatusPageGroupResponse {
 				var groups []GetStatusPageGroupResponse
@@ -197,6 +199,7 @@ func (h *Handlers) PostStatusPage(c handlers.AuthenticatedContext) error {
 		Domain:       sp.Domain,
 		ShowBranding: sp.ShowBranding,
 		IsPrivate:    sp.IsPrivate,
+		SupportURL:   sp.SupportURL,
 		CreatedAt:    sp.CreatedAt.String(),
 		UpdatedAt:    sp.UpdatedAt.String(),
 	})
@@ -242,6 +245,7 @@ func (h *Handlers) GetStatusPage(c handlers.AuthenticatedContext) error {
 		CustomComponentsHTML: sp.CustomComponentsHTML,
 		ShowBranding:         sp.ShowBranding,
 		IsPrivate:            sp.IsPrivate,
+		SupportURL:           sp.SupportURL,
 		MonitorIDs:           monitorIDs,
 		Groups:               func() []GetStatusPageGroupResponse {
 			var groups []GetStatusPageGroupResponse
@@ -282,6 +286,7 @@ type PutStatusPageRequest struct {
 	CustomComponentsHTML string `json:"customComponentsHtml"`
 	ShowBranding         *bool  `json:"showBranding"`
 	IsPrivate            *bool                       `json:"isPrivate"`
+	SupportURL           *string                     `json:"supportUrl"`
 	Password             string                      `json:"password"`
 	MonitorIDs           []uint                      `json:"monitorIds"`
 	Groups               []PutStatusPageGroupRequest `json:"groups"`
@@ -323,6 +328,9 @@ func (h *Handlers) PutStatusPage(c handlers.AuthenticatedContext) error {
 	}
 	if req.IsPrivate != nil {
 		sp.IsPrivate = *req.IsPrivate
+	}
+	if req.SupportURL != nil {
+		sp.SupportURL = *req.SupportURL
 	}
 	if req.Password != "" {
 		hash, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
@@ -398,6 +406,7 @@ func (h *Handlers) PutStatusPage(c handlers.AuthenticatedContext) error {
 		CustomComponentsHTML: sp.CustomComponentsHTML,
 		ShowBranding:         sp.ShowBranding,
 		IsPrivate:            sp.IsPrivate,
+		SupportURL:           sp.SupportURL,
 		MonitorIDs:           monitorIDs,
 		Groups:               func() []GetStatusPageGroupResponse {
 			var groups []GetStatusPageGroupResponse

@@ -21,6 +21,7 @@ type Monitor struct {
 
 	Settings   MonitorSettings    `gorm:"not null;constraint:OnDelete:CASCADE" json:"settings"`
 	Assertions []MonitorAssertion `gorm:"constraint:OnDelete:CASCADE" json:"assertions"`
+	Variables  []MonitorVariable  `gorm:"constraint:OnDelete:CASCADE" json:"variables"`
 	Incidents  []Incident         `gorm:"constraint:OnDelete:CASCADE" json:"incidents"`
 
 	CreatedAt time.Time `gorm:"index" json:"createdAt"`
@@ -82,6 +83,7 @@ type MonitorSettings struct {
 	Body      MonitorSettingsBody     `gorm:"embedded;embeddedPrefix:body_"`
 	Auth      MonitorSettingsAuth     `gorm:"embedded;embeddedPrefix:auth_"`
 	TLS       MonitorSettingsTLS      `gorm:"embedded;embeddedPrefix:tls_"`
+	Teardown  MonitorSettingsTeardown `gorm:"embedded;embeddedPrefix:teardown_"`
 	Locations []string                `gorm:"serializer:json"`
 
 	SslExpiryNotifiedAt    *time.Time `gorm:"index"`
@@ -164,3 +166,26 @@ type MonitorAssertion struct {
 func (MonitorAssertion) TableName() string {
 	return "monitor_assertions"
 }
+
+type MonitorSettingsTeardown struct {
+	Enabled bool                `gorm:"not null;default:false"`
+	Method  string              `gorm:"not null;default:'GET'"`
+	URL     string              `gorm:"not null;default:''"`
+	Body    MonitorSettingsBody `gorm:"embedded;embeddedPrefix:body_"`
+}
+
+type MonitorVariable struct {
+	ID        uint
+	MonitorID uint `gorm:"index;not null"`
+
+	Name     string `gorm:"not null"`
+	Source   string `gorm:"not null"`
+	Property string `gorm:"not null"`
+
+	UpdatedAt time.Time `gorm:"index"`
+}
+
+func (MonitorVariable) TableName() string {
+	return "monitor_variables"
+}
+

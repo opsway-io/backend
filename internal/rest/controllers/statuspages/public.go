@@ -102,6 +102,7 @@ type GetPublicStatusPageResponse struct {
 	CustomComponentsHTML string              `json:"customComponentsHtml"`
 	ShowBranding         bool                `json:"showBranding"`
 	IsPrivate            bool                `json:"isPrivate"`
+	SupportURL           string              `json:"supportUrl"`
 	Monitors             []PublicMonitor     `json:"monitors"`
 	Groups               []PublicGroup       `json:"groups"`
 	ActiveIncidents      []PublicIncident    `json:"activeIncidents"`
@@ -260,6 +261,7 @@ func (h *PublicHandlers) GetPublicStatusPage(c echo.Context) error {
 		CustomComponentsHTML: sp.CustomComponentsHTML,
 		ShowBranding:         sp.ShowBranding,
 		IsPrivate:            sp.IsPrivate,
+		SupportURL:           sp.SupportURL,
 		Monitors:             monitors,
 		Groups:               func() []PublicGroup {
 			var groups []PublicGroup

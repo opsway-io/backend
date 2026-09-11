@@ -24,20 +24,37 @@ type Monitor struct {
 	Name       string             `json:"name" validate:"required,max=255"`
 	Settings   MonitorSettings    `json:"settings" validate:"required,dive"`
 	Assertions []MonitorAssertion `json:"assertions" validate:"required,monitorAssertions"`
+	Variables  []MonitorVariable  `json:"variables" validate:"dive"`
 	CreatedAt  time.Time          `json:"createdAt"`
 	UpdatedAt  time.Time          `json:"updatedAt"`
 }
 
 type MonitorSettings struct {
 	Method           string                  `json:"method" validate:"required,monitorMethod"`
-	URL              string                  `json:"url" validate:"required,max=2048"`
-	FrequencySeconds uint64                  `json:"frequencySeconds" validate:"required,monitorFrequency"`
-	Headers          []MonitorSettingsHeader `json:"headers" validate:"dive"`
-	Body             MonitorSettingsBody     `json:"body" validate:"required,dive"`
-	TLS              MonitorSettingsTLS      `json:"tls" validate:"required,dive"`
-	Auth             MonitorSettingsAuth     `json:"auth" validate:"required,dive"`
-	Locations        []string                `json:"locations" validate:"omitempty,dive,required,max=255"`
+	URL              string                  `json:"url" validate:"required,url"`
+	FrequencySeconds uint64                  `json:"frequencySeconds" validate:"required,numeric,gte=10"`
+	Headers          []MonitorSettingsHeader `json:"headers" validate:"required,dive"`
+	Body             MonitorSettingsBody     `json:"body" validate:"required"`
+	Auth             MonitorSettingsAuth     `json:"auth" validate:"required"`
+	TLS              MonitorSettingsTLS      `json:"tls" validate:"required"`
+	Teardown         MonitorSettingsTeardown `json:"teardown"`
+	Locations        []string                `json:"locations" validate:"required,dive,location"`
 }
+
+type MonitorSettingsTeardown struct {
+	Enabled bool                `json:"enabled"`
+	Method  string              `json:"method"`
+	URL     string              `json:"url"`
+	Body    MonitorSettingsBody `json:"body"`
+}
+
+type MonitorVariable struct {
+	Name     string `json:"name" validate:"required"`
+	Source   string `json:"source" validate:"required"`
+	Property string `json:"property" validate:"required"`
+}
+
+
 
 type MonitorAssertion struct {
 	Source   string `json:"source"`
@@ -164,6 +181,15 @@ func newGetMonitorsResponse(monitors *[]monitor.MonitorWithTotalCount, stats *[]
 			locations = []string{}
 		}
 
+		variables := make([]MonitorVariable, len(m.Variables))
+		for j, v := range m.Variables {
+			variables[j] = MonitorVariable{
+				Name:     v.Name,
+				Source:   v.Source,
+				Property: v.Property,
+			}
+		}
+
 		res[i] = GetMonitorsResponseMonitor{
 			Monitor: Monitor{
 				ID:        m.ID,
@@ -194,9 +220,19 @@ func newGetMonitorsResponse(monitors *[]monitor.MonitorWithTotalCount, stats *[]
 						Username:     m.Settings.Auth.Username,
 						Password:     m.Settings.Auth.Password,
 					},
+					Teardown: MonitorSettingsTeardown{
+						Enabled: m.Settings.Teardown.Enabled,
+						Method:  m.Settings.Teardown.Method,
+						URL:     m.Settings.Teardown.URL,
+						Body: MonitorSettingsBody{
+							Type:    m.Settings.Teardown.Body.Type,
+							Content: m.Settings.Teardown.Body.GetContentString(),
+						},
+					},
 					Locations: locations,
 				},
 				Assertions: assertions,
+				Variables:  variables,
 			},
 		}
 
@@ -296,6 +332,15 @@ func newGetMonitorResponse(m *entities.Monitor, stats *check.MonitorStats) (*Get
 		}
 	}
 
+	variables := make([]MonitorVariable, len(m.Variables))
+	for j, v := range m.Variables {
+		variables[j] = MonitorVariable{
+			Name:     v.Name,
+			Source:   v.Source,
+			Property: v.Property,
+		}
+	}
+
 	resp := GetMonitorResponse{
 		Monitor: Monitor{
 			ID:        m.ID,
@@ -326,9 +371,19 @@ func newGetMonitorResponse(m *entities.Monitor, stats *check.MonitorStats) (*Get
 					Username:     m.Settings.Auth.Username,
 					Password:     m.Settings.Auth.Password,
 				},
+				Teardown: MonitorSettingsTeardown{
+					Enabled: m.Settings.Teardown.Enabled,
+					Method:  m.Settings.Teardown.Method,
+					URL:     m.Settings.Teardown.URL,
+					Body: MonitorSettingsBody{
+						Type:    m.Settings.Teardown.Body.Type,
+						Content: m.Settings.Teardown.Body.GetContentString(),
+					},
+				},
 				Locations: locations,
 			},
 			Assertions: assertions,
+			Variables:  variables,
 		},
 		Stats: GetMonitorResponseStats{
 			UptimePercentage:    float64(stats.UptimePercentage),
@@ -376,6 +431,7 @@ type PostMonitorRequest struct {
 	Name       string             `json:"name" validate:"required,max=255"`
 	Settings   MonitorSettings    `json:"settings" validate:"required,dive"`
 	Assertions []MonitorAssertion `json:"assertions" validate:"required,dive"`
+	Variables  []MonitorVariable  `json:"variables" validate:"dive"`
 }
 
 func (h *Handlers) PostMonitor(c hs.AuthenticatedContext) error {
@@ -423,6 +479,15 @@ func (h *Handlers) PostMonitor(c hs.AuthenticatedContext) error {
 		}
 	}
 
+	variables := make([]entities.MonitorVariable, len(req.Variables))
+	for j, v := range req.Variables {
+		variables[j] = entities.MonitorVariable{
+			Name:     v.Name,
+			Source:   v.Source,
+			Property: v.Property,
+		}
+	}
+
 	m := &entities.Monitor{
 		TeamID: req.TeamID,
 		Name:   req.Name,
@@ -447,13 +512,23 @@ func (h *Handlers) PostMonitor(c hs.AuthenticatedContext) error {
 				Username:     req.Settings.Auth.Username,
 				Password:     req.Settings.Auth.Password,
 			},
+			Teardown: entities.MonitorSettingsTeardown{
+				Enabled: req.Settings.Teardown.Enabled,
+				Method:  req.Settings.Teardown.Method,
+				URL:     req.Settings.Teardown.URL,
+				Body: entities.MonitorSettingsBody{
+					Type: req.Settings.Teardown.Body.Type,
+				},
+			},
 			Locations: req.Settings.Locations,
 		},
 		Assertions: assertions,
+		Variables:  variables,
 	}
 
 	m.Settings.SetFrequencySeconds(req.Settings.FrequencySeconds)
 	m.Settings.Body.SetContentString(req.Settings.Body.Content)
+	m.Settings.Teardown.Body.SetContentString(req.Settings.Teardown.Body.Content)
 
 	if err := h.MonitorService.Create(c.Request().Context(), m); err != nil {
 		c.Log.WithError(err).Error("failed to create monitor")
@@ -561,6 +636,7 @@ type PutMonitorRequest struct {
 	State      string             `json:"state" validate:"required,monitorState"`
 	Settings   MonitorSettings    `json:"settings" validate:"required,dive"`
 	Assertions []MonitorAssertion `json:"assertions" validate:"required,dive"`
+	Variables  []MonitorVariable  `json:"variables" validate:"dive"`
 }
 
 func (h *Handlers) PutMonitor(c hs.AuthenticatedContext) error {
@@ -591,6 +667,15 @@ func (h *Handlers) PutMonitor(c hs.AuthenticatedContext) error {
 		}
 	}
 
+	variables := make([]entities.MonitorVariable, len(req.Variables))
+	for j, v := range req.Variables {
+		variables[j] = entities.MonitorVariable{
+			Name:     v.Name,
+			Source:   v.Source,
+			Property: v.Property,
+		}
+	}
+
 	m := &entities.Monitor{
 		TeamID: req.TeamID,
 		Name:   req.Name,
@@ -615,14 +700,24 @@ func (h *Handlers) PutMonitor(c hs.AuthenticatedContext) error {
 				Username:     req.Settings.Auth.Username,
 				Password:     req.Settings.Auth.Password,
 			},
+			Teardown: entities.MonitorSettingsTeardown{
+				Enabled: req.Settings.Teardown.Enabled,
+				Method:  req.Settings.Teardown.Method,
+				URL:     req.Settings.Teardown.URL,
+				Body: entities.MonitorSettingsBody{
+					Type: req.Settings.Teardown.Body.Type,
+				},
+			},
 			Locations: req.Settings.Locations,
 		},
 		Assertions: assertions,
+		Variables:  variables,
 	}
 
 	m.SetStateString(req.State)
 	m.Settings.SetFrequencySeconds(req.Settings.FrequencySeconds)
 	m.Settings.Body.SetContentString(req.Settings.Body.Content)
+	m.Settings.Teardown.Body.SetContentString(req.Settings.Teardown.Body.Content)
 
 	if req.State == "ACTIVE" {
 		activeMaintenances, err := h.MaintenanceService.GetActive(ctx, time.Now())
