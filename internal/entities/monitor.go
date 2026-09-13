@@ -169,7 +169,7 @@ func (ms *MonitorSettings) SetFrequencySeconds(seconds uint64) {
 type MonitorAssertion struct {
 	ID            uint
 	MonitorID     uint `gorm:"index;not null"`
-	MonitorStepID uint `gorm:"index;not null"`
+	MonitorStepID uint `gorm:"index"`
 
 	Source   string `gorm:"not null"`
 	Property string
@@ -186,7 +186,7 @@ func (MonitorAssertion) TableName() string {
 type MonitorVariable struct {
 	ID            uint
 	MonitorID     uint `gorm:"index;not null"`
-	MonitorStepID uint `gorm:"index;not null"`
+	MonitorStepID uint `gorm:"index"`
 
 	Name     string `gorm:"not null"`
 	Source   string `gorm:"not null"`

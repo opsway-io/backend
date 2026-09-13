@@ -141,6 +141,9 @@ func runAPI(cmd *cobra.Command, args []string) {
 	if err != nil {
 		l.WithError(err).Fatal("Failed to migrate monitor variables")
 	}
+
+	db.Exec(`ALTER TABLE monitor_assertions ALTER COLUMN monitor_step_id SET NOT NULL`)
+	db.Exec(`ALTER TABLE monitor_variables ALTER COLUMN monitor_step_id SET NOT NULL`)
 	// ----------------------
 
 	ch_db, err := clickhouse.NewClient(ctx, conf.Clickhouse)
