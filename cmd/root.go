@@ -17,6 +17,7 @@ import (
 	"github.com/opsway-io/backend/internal/storage"
 	"github.com/opsway-io/backend/internal/team"
 	"github.com/opsway-io/backend/internal/user"
+	logger_pkg "github.com/opsway-io/backend/internal/logger"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -129,6 +130,10 @@ func getLogger(config LogConfig) *logrus.Logger {
 		logger.Warn("Unknown log format, setting log format to text")
 		logger.SetFormatter(&logrus.TextFormatter{})
 	}
+
+	// Hook into log-search
+	hook := logger_pkg.NewLogSearchHook("http://log-search.default.svc.cluster.local:3000/v1/logs", "valid_token_billing")
+	logger.AddHook(hook)
 
 	return logger
 }
