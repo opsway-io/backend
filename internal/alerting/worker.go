@@ -164,23 +164,17 @@ func (w *worker) processEscalationJobs(ctx context.Context) {
 		if !inc.Acknowledged && !inc.Resolved {
 			w.logger.Infof("Executing EscalationJob %d for incident %d, tier %d", job.ID, job.IncidentID, job.TargetTier)
 			
-			// We need an alert rule to trigger, for now we can just get the first enabled one for the team that matches
-			// since in MVP we don't store the RuleID in the job. 
-			// A better long-term approach would be to store RuleID in the EscalationJob.
-			
-			// Let's just pass a dummy rule or fetch the rules
+			// Evaluate all rules that match the incident to determine channels
 			rules, _ := w.alertService.GetAllByTeamID(ctx, job.TeamID)
 			
-			var targetRule *entities.AlertRule
 			for _, r := range rules {
-				if r.Enabled {
-					targetRule = &r
-					break
+				if !r.Enabled {
+					continue
 				}
-			}
-
-			if targetRule != nil {
-				w.triggerRule(ctx, inc, targetRule, job.TargetTier)
+				if r.Condition == "*" || strings.Contains(strings.ToLower(inc.Title), strings.ToLower(r.Condition)) {
+					rule := r
+					w.triggerRule(ctx, inc, &rule, job.TargetTier)
+				}
 			}
 			
 			// Schedule next tier if needed
@@ -674,8 +668,8 @@ func (w *worker) sendEmailAlert(ctx context.Context, incident *entities.Incident
 		return
 	}
 
-	policy, _ := w.escalationSvc.GetPolicyByTeamID(ctx, incident.TeamID)
-	hasPolicy := policy != nil
+	policy, err := w.escalationSvc.GetPolicyByTeamID(ctx, incident.TeamID)
+	hasPolicy := err == nil && policy != nil
 
 	onCallUserIDs, err := w.escalationSvc.GetOnCallUsersByTeamID(ctx, incident.TeamID, tier)
 	if err != nil {
@@ -1014,8 +1008,8 @@ func (w *worker) sendSmsAlert(ctx context.Context, incident *entities.Incident, 
 		return
 	}
 
-	policy, _ := w.escalationSvc.GetPolicyByTeamID(ctx, incident.TeamID)
-	hasPolicy := policy != nil
+	policy, err := w.escalationSvc.GetPolicyByTeamID(ctx, incident.TeamID)
+	hasPolicy := err == nil && policy != nil
 
 	onCallUserIDs, _ := w.escalationSvc.GetOnCallUsersByTeamID(ctx, incident.TeamID, tier)
 	onCallMap := make(map[uint]bool)
@@ -1092,8 +1086,8 @@ func (w *worker) sendVoiceAlert(ctx context.Context, incident *entities.Incident
 		return
 	}
 
-	policy, _ := w.escalationSvc.GetPolicyByTeamID(ctx, incident.TeamID)
-	hasPolicy := policy != nil
+	policy, err := w.escalationSvc.GetPolicyByTeamID(ctx, incident.TeamID)
+	hasPolicy := err == nil && policy != nil
 
 	onCallUserIDs, _ := w.escalationSvc.GetOnCallUsersByTeamID(ctx, incident.TeamID, tier)
 	onCallMap := make(map[uint]bool)
