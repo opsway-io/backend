@@ -160,9 +160,9 @@ func (h *Handlers) PreviewOpenAPI(c hs.AuthenticatedContext) error {
 }
 
 type PostMonitorsBulkMonitorRequest struct {
-	Name       string             `json:"name" validate:"required,max=255"`
-	Settings   MonitorSettings    `json:"settings" validate:"required,dive"`
-	Steps      []MonitorStep      `json:"steps" validate:"required,dive"`
+	Name     string          `json:"name" validate:"required,max=255"`
+	Settings MonitorSettings `json:"settings" validate:"required,dive"`
+	Steps    []MonitorStep   `json:"steps" validate:"required,dive"`
 }
 
 type PostMonitorsBulkRequest struct {
@@ -227,12 +227,12 @@ func (h *Handlers) PostMonitorsBulk(c hs.AuthenticatedContext) error {
 					Property: v.Property,
 				}
 			}
-			
+
 			body := entities.MonitorStepBody{
 				Type: s.Body.Type,
 			}
 			body.SetContentString(s.Body.Content)
-			
+
 			steps[i] = entities.MonitorStep{
 				Name:       s.Name,
 				OrderIndex: i,
@@ -248,6 +248,7 @@ func (h *Handlers) PostMonitorsBulk(c hs.AuthenticatedContext) error {
 		m := &entities.Monitor{
 			TeamID: req.TeamID,
 			Name:   mReq.Name,
+			State:  entities.MonitorStateActive,
 			Settings: entities.MonitorSettings{
 				TLS: entities.MonitorSettingsTLS{
 					Enabled:                 mReq.Settings.TLS.Enabled,

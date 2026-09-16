@@ -162,7 +162,15 @@ func (r *RepositoryImpl) CreateBulk(ctx context.Context, monitors []*entities.Mo
 	if len(monitors) == 0 {
 		return nil
 	}
-	return r.db.WithContext(ctx).Create(&monitors).Error
+
+	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		for _, m := range monitors {
+			if err := tx.Create(m).Error; err != nil {
+				return err
+			}
+		}
+		return nil
+	})
 }
 
 func (r *RepositoryImpl) Update(ctx context.Context, teamID, monitorID uint, m *entities.Monitor) error {
