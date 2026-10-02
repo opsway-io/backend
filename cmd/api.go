@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"context"
+	"strings"
 
 	"github.com/opsway-io/backend/internal/alerting"
 	"github.com/opsway-io/backend/internal/apikey"
@@ -109,7 +110,7 @@ func runAPI(cmd *cobra.Command, args []string) {
 		FROM monitor_settings
 		WHERE method IS NOT NULL AND NOT EXISTS (SELECT 1 FROM monitor_steps WHERE monitor_steps.monitor_id = monitor_settings.monitor_id AND order_index = 0)
 	`).Error
-	if err != nil {
+	if err != nil && !strings.Contains(err.Error(), "does not exist") {
 		l.WithError(err).Fatal("Failed to migrate monitor settings to monitor steps")
 	}
 
@@ -120,7 +121,7 @@ func runAPI(cmd *cobra.Command, args []string) {
 		FROM monitor_settings
 		WHERE teardown_enabled = true AND NOT EXISTS (SELECT 1 FROM monitor_steps WHERE monitor_steps.monitor_id = monitor_settings.monitor_id AND order_index = 1)
 	`).Error
-	if err != nil {
+	if err != nil && !strings.Contains(err.Error(), "does not exist") {
 		l.WithError(err).Fatal("Failed to migrate teardown settings to monitor steps")
 	}
 
