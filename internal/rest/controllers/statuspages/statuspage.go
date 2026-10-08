@@ -64,24 +64,24 @@ type GetStatusPagesResponse struct {
 }
 
 type GetStatusPageResponse struct {
-	ID                   uint   `json:"id"`
-	Name                 string `json:"name"`
-	Domain               string `json:"domain"`
-	LogoURL              string `json:"logoUrl"`
-	LogoLink             string `json:"logoLink"`
-	FaviconURL           string `json:"faviconUrl"`
-	Layout               string `json:"layout"`
-	CustomCSS            string `json:"customCss"`
-	HeaderHTML           string `json:"headerHtml"`
-	FooterHTML           string `json:"footerHtml"`
-	CustomComponentsHTML string `json:"customComponentsHtml"`
-	ShowBranding         bool   `json:"showBranding"`
+	ID                   uint                         `json:"id"`
+	Name                 string                       `json:"name"`
+	Domain               string                       `json:"domain"`
+	LogoURL              string                       `json:"logoUrl"`
+	LogoLink             string                       `json:"logoLink"`
+	FaviconURL           string                       `json:"faviconUrl"`
+	Layout               string                       `json:"layout"`
+	CustomCSS            string                       `json:"customCss"`
+	HeaderHTML           string                       `json:"headerHtml"`
+	FooterHTML           string                       `json:"footerHtml"`
+	CustomComponentsHTML string                       `json:"customComponentsHtml"`
+	ShowBranding         bool                         `json:"showBranding"`
 	IsPrivate            bool                         `json:"isPrivate"`
 	SupportURL           string                       `json:"supportUrl"`
 	MonitorIDs           []uint                       `json:"monitorIds"`
 	Groups               []GetStatusPageGroupResponse `json:"groups"`
 	CreatedAt            string                       `json:"createdAt"`
-	UpdatedAt            string `json:"updatedAt"`
+	UpdatedAt            string                       `json:"updatedAt"`
 }
 
 func (h *Handlers) GetStatusPages(c handlers.AuthenticatedContext) error {
@@ -123,7 +123,7 @@ func (h *Handlers) GetStatusPages(c handlers.AuthenticatedContext) error {
 			IsPrivate:            sp.IsPrivate,
 			SupportURL:           sp.SupportURL,
 			MonitorIDs:           monitorIDs,
-			Groups:               func() []GetStatusPageGroupResponse {
+			Groups: func() []GetStatusPageGroupResponse {
 				var groups []GetStatusPageGroupResponse
 				for _, g := range sp.Groups {
 					var gm []uint
@@ -142,8 +142,8 @@ func (h *Handlers) GetStatusPages(c handlers.AuthenticatedContext) error {
 				}
 				return groups
 			}(),
-			CreatedAt:            sp.CreatedAt.String(),
-			UpdatedAt:            sp.UpdatedAt.String(),
+			CreatedAt: sp.CreatedAt.String(),
+			UpdatedAt: sp.UpdatedAt.String(),
 		}
 	}
 
@@ -247,7 +247,7 @@ func (h *Handlers) GetStatusPage(c handlers.AuthenticatedContext) error {
 		IsPrivate:            sp.IsPrivate,
 		SupportURL:           sp.SupportURL,
 		MonitorIDs:           monitorIDs,
-		Groups:               func() []GetStatusPageGroupResponse {
+		Groups: func() []GetStatusPageGroupResponse {
 			var groups []GetStatusPageGroupResponse
 			for _, g := range sp.Groups {
 				var gm []uint
@@ -266,25 +266,25 @@ func (h *Handlers) GetStatusPage(c handlers.AuthenticatedContext) error {
 			}
 			return groups
 		}(),
-		CreatedAt:            sp.CreatedAt.String(),
-		UpdatedAt:            sp.UpdatedAt.String(),
+		CreatedAt: sp.CreatedAt.String(),
+		UpdatedAt: sp.UpdatedAt.String(),
 	})
 }
 
 type PutStatusPageRequest struct {
-	TeamID               uint   `param:"teamId" validate:"required,numeric,gt=0"`
-	StatusPageID         uint   `param:"statusPageId" validate:"required,numeric,gt=0"`
-	Name                 string `json:"name" validate:"required,max=255"`
-	Domain               string `json:"domain" validate:"required,max=255,fqdn"`
-	LogoURL              string `json:"logoUrl"`
-	LogoLink             string `json:"logoLink"`
-	FaviconURL           string `json:"faviconUrl"`
-	Layout               string `json:"layout"`
-	CustomCSS            string `json:"customCss"`
-	HeaderHTML           string `json:"headerHtml"`
-	FooterHTML           string `json:"footerHtml"`
-	CustomComponentsHTML string `json:"customComponentsHtml"`
-	ShowBranding         *bool  `json:"showBranding"`
+	TeamID               uint                        `param:"teamId" validate:"required,numeric,gt=0"`
+	StatusPageID         uint                        `param:"statusPageId" validate:"required,numeric,gt=0"`
+	Name                 string                      `json:"name" validate:"required,max=255"`
+	Domain               string                      `json:"domain" validate:"required,max=255,fqdn"`
+	LogoURL              string                      `json:"logoUrl"`
+	LogoLink             string                      `json:"logoLink"`
+	FaviconURL           string                      `json:"faviconUrl"`
+	Layout               string                      `json:"layout"`
+	CustomCSS            string                      `json:"customCss"`
+	HeaderHTML           string                      `json:"headerHtml"`
+	FooterHTML           string                      `json:"footerHtml"`
+	CustomComponentsHTML string                      `json:"customComponentsHtml"`
+	ShowBranding         *bool                       `json:"showBranding"`
 	IsPrivate            *bool                       `json:"isPrivate"`
 	SupportURL           *string                     `json:"supportUrl"`
 	Password             string                      `json:"password"`
@@ -408,7 +408,7 @@ func (h *Handlers) PutStatusPage(c handlers.AuthenticatedContext) error {
 		IsPrivate:            sp.IsPrivate,
 		SupportURL:           sp.SupportURL,
 		MonitorIDs:           monitorIDs,
-		Groups:               func() []GetStatusPageGroupResponse {
+		Groups: func() []GetStatusPageGroupResponse {
 			var groups []GetStatusPageGroupResponse
 			for _, g := range sp.Groups {
 				var gm []uint
@@ -427,8 +427,8 @@ func (h *Handlers) PutStatusPage(c handlers.AuthenticatedContext) error {
 			}
 			return groups
 		}(),
-		CreatedAt:            sp.CreatedAt.String(),
-		UpdatedAt:            sp.UpdatedAt.String(),
+		CreatedAt: sp.CreatedAt.String(),
+		UpdatedAt: sp.UpdatedAt.String(),
 	})
 }
 

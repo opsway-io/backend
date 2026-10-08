@@ -46,8 +46,6 @@ func (h *Handlers) handleWebhook(c hs.StripeContext) error {
 			return c.NoContent(http.StatusInternalServerError)
 		}
 
-
-
 		teamID, err := strconv.ParseUint(session.ClientReferenceID, 10, 32)
 		if err != nil {
 			c.Log.WithError(err).Debug("Error parsing team id", session.ClientReferenceID)
@@ -83,8 +81,6 @@ func (h *Handlers) handleWebhook(c hs.StripeContext) error {
 			c.Log.WithError(err).Debug("Error getting team by stripe id")
 			return c.NoContent(http.StatusInternalServerError)
 		}
-
-
 
 		team.PaymentPlan = entities.PaymentPlan(strings.ToUpper(subscription.Items.Data[0].Price.LookupKey))
 

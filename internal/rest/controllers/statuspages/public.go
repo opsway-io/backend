@@ -9,11 +9,11 @@ import (
 	"github.com/google/uuid"
 	"github.com/labstack/echo/v4"
 	"github.com/opsway-io/backend/internal/check"
+	"github.com/opsway-io/backend/internal/entities"
 	"github.com/opsway-io/backend/internal/incident"
 	"github.com/opsway-io/backend/internal/maintenance"
 	"github.com/opsway-io/backend/internal/notification/email"
 	"github.com/opsway-io/backend/internal/notification/email/templates"
-	"github.com/opsway-io/backend/internal/entities"
 	"github.com/opsway-io/backend/internal/rest/helpers"
 	"github.com/opsway-io/backend/internal/statuspage"
 	"github.com/sirupsen/logrus"
@@ -263,7 +263,7 @@ func (h *PublicHandlers) GetPublicStatusPage(c echo.Context) error {
 		IsPrivate:            sp.IsPrivate,
 		SupportURL:           sp.SupportURL,
 		Monitors:             monitors,
-		Groups:               func() []PublicGroup {
+		Groups: func() []PublicGroup {
 			var groups []PublicGroup
 			for _, g := range sp.Groups {
 				var gm []uint
@@ -282,9 +282,9 @@ func (h *PublicHandlers) GetPublicStatusPage(c echo.Context) error {
 			}
 			return groups
 		}(),
-		ActiveIncidents:      activeIncidents,
-		ActiveMaintenance:    activeMaintenance,
-		MaintenanceEvents:    maintenanceEvents,
+		ActiveIncidents:   activeIncidents,
+		ActiveMaintenance: activeMaintenance,
+		MaintenanceEvents: maintenanceEvents,
 	})
 }
 

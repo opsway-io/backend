@@ -37,11 +37,11 @@ email:
   smtp_password: ""
 
 object_storage:
-  endpoint_url: "http://storage:9001"
+  endpoint_url: "http://storage:9000"
   access_key: "guest"
   secret_key: "supersecret"
   region: "eu-central-1"
-  public_url: "http://localhost:9001"
+  public_url: "http://localhost:9000"
 
 prober:
   concurrency: 1

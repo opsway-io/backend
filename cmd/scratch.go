@@ -56,7 +56,7 @@ func runScratch(cmd *cobra.Command, args []string) {
 		if len(m.Steps) == 0 {
 			fmt.Printf("Monitor %d has no steps in DB!\n", m.ID)
 		} else {
-            fmt.Printf("Rescheduling monitor %d\n", m.ID)
+			fmt.Printf("Rescheduling monitor %d\n", m.ID)
 			mCopy := m
 			_ = schedule.Remove(ctx, &mCopy)
 			if err := schedule.Add(ctx, &mCopy); err != nil {

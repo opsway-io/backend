@@ -106,8 +106,8 @@ func (r *RepositoryImpl) GetByMonitorIDWithAssertionPaginated(ctx context.Contex
 		"LEFT JOIN monitor_assertions as ma ON ma.id = incidents.monitor_assertion_id",
 	).Order(
 		"created_at desc",
-		).Scopes(
-			postgres.Paginated(offset, limit),
+	).Scopes(
+		postgres.Paginated(offset, limit),
 	).Find(&incidents).Error; err != nil {
 		return nil, err
 	}

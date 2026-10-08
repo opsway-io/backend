@@ -300,13 +300,13 @@ func (r *RepositoryImpl) GetMonitorUptimesByMonitorIDs(ctx context.Context, moni
 	}
 
 	// Group daily results by monitor ID
-	dailyByMonitor := make(map[uint][]struct{
-		Day time.Time
+	dailyByMonitor := make(map[uint][]struct {
+		Day         time.Time
 		DailyUptime float32
 	})
 	for _, dr := range dailyResults {
-		dailyByMonitor[dr.MonitorID] = append(dailyByMonitor[dr.MonitorID], struct{
-			Day time.Time
+		dailyByMonitor[dr.MonitorID] = append(dailyByMonitor[dr.MonitorID], struct {
+			Day         time.Time
 			DailyUptime float32
 		}{dr.Day, dr.DailyUptime})
 	}

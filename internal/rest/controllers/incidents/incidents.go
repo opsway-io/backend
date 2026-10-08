@@ -25,22 +25,22 @@ type GetIncidentsResponse struct {
 }
 
 type GetIncidentsResponseIncident struct {
-	ID                  uint    `json:"id"`
-	TeamID              uint    `json:"teamId"`
-	MonitorID           *uint   `json:"monitorId"`
-	HeartbeatID         *uint   `json:"heartbeatId"`
-	Title               string  `json:"title"`
-	Description         string  `json:"description"`
-	RootCauseAnalysis   *string `json:"rootCauseAnalysis,omitempty"`
-	Resolved            bool                  `json:"resolved"`
-	ResolvedAt          *string               `json:"resolvedAt,omitempty"`
-	ResolvedBy          *IncidentUserResponse `json:"resolvedBy,omitempty"`
-	Acknowledged        bool                  `json:"acknowledged"`
-	AcknowledgedAt      *string               `json:"acknowledgedAt,omitempty"`
-	AcknowledgedBy      *IncidentUserResponse `json:"acknowledgedBy,omitempty"`
-	AcknowledgedByIntegration *string              `json:"acknowledgedByIntegration,omitempty"`
-	IsStatusPageVisible bool                  `json:"isStatusPageVisible"`
-	CreatedAt           string  `json:"createdAt"`
+	ID                        uint                  `json:"id"`
+	TeamID                    uint                  `json:"teamId"`
+	MonitorID                 *uint                 `json:"monitorId"`
+	HeartbeatID               *uint                 `json:"heartbeatId"`
+	Title                     string                `json:"title"`
+	Description               string                `json:"description"`
+	RootCauseAnalysis         *string               `json:"rootCauseAnalysis,omitempty"`
+	Resolved                  bool                  `json:"resolved"`
+	ResolvedAt                *string               `json:"resolvedAt,omitempty"`
+	ResolvedBy                *IncidentUserResponse `json:"resolvedBy,omitempty"`
+	Acknowledged              bool                  `json:"acknowledged"`
+	AcknowledgedAt            *string               `json:"acknowledgedAt,omitempty"`
+	AcknowledgedBy            *IncidentUserResponse `json:"acknowledgedBy,omitempty"`
+	AcknowledgedByIntegration *string               `json:"acknowledgedByIntegration,omitempty"`
+	IsStatusPageVisible       bool                  `json:"isStatusPageVisible"`
+	CreatedAt                 string                `json:"createdAt"`
 }
 
 func (h *Handlers) GetIncidents(c hs.AuthenticatedContext) error {
@@ -124,22 +124,22 @@ func (h *Handlers) newGetIncidentResponse(incidents *[]entities.Incident) *GetIn
 		}
 
 		resp.Incidents[i] = GetIncidentsResponseIncident{
-			ID:                  in.ID,
-			TeamID:              in.TeamID,
-			MonitorID:           in.MonitorID,
-			HeartbeatID:         in.HeartbeatID,
-			Title:               in.Title,
-			Description:         *in.Description,
-			RootCauseAnalysis:   in.RootCauseAnalysis,
-			Resolved:            in.Resolved,
-			ResolvedAt:          resAt,
-			ResolvedBy:          resBy,
-			Acknowledged:        in.Acknowledged,
-			AcknowledgedAt:      ackAt,
-			AcknowledgedBy:      ackBy,
+			ID:                        in.ID,
+			TeamID:                    in.TeamID,
+			MonitorID:                 in.MonitorID,
+			HeartbeatID:               in.HeartbeatID,
+			Title:                     in.Title,
+			Description:               *in.Description,
+			RootCauseAnalysis:         in.RootCauseAnalysis,
+			Resolved:                  in.Resolved,
+			ResolvedAt:                resAt,
+			ResolvedBy:                resBy,
+			Acknowledged:              in.Acknowledged,
+			AcknowledgedAt:            ackAt,
+			AcknowledgedBy:            ackBy,
 			AcknowledgedByIntegration: in.AcknowledgedByIntegration,
-			IsStatusPageVisible: in.IsStatusPageVisible,
-			CreatedAt:           in.CreatedAt.Format("2006-01-02T15:04:05Z07:00"),
+			IsStatusPageVisible:       in.IsStatusPageVisible,
+			CreatedAt:                 in.CreatedAt.Format("2006-01-02T15:04:05Z07:00"),
 		}
 	}
 
@@ -223,26 +223,26 @@ type GetMonitorIncidentsResponse struct {
 }
 
 type GetMonitorIncidentsResponseIncident struct {
-	ID                  uint    `json:"id"`
-	TeamID              uint    `json:"teamId"`
-	MonitorID           *uint   `json:"monitorId"`
-	HeartbeatID         *uint   `json:"heartbeatId"`
-	Title               string  `json:"title"`
-	Description         string  `json:"description"`
-	RootCauseAnalysis   *string `json:"rootCauseAnalysis,omitempty"`
-	Resolved            bool                  `json:"resolved"`
-	ResolvedAt          *string               `json:"resolvedAt,omitempty"`
-	ResolvedBy          *IncidentUserResponse `json:"resolvedBy,omitempty"`
-	Acknowledged        bool                  `json:"acknowledged"`
-	AcknowledgedAt      *string               `json:"acknowledgedAt,omitempty"`
-	AcknowledgedBy      *IncidentUserResponse `json:"acknowledgedBy,omitempty"`
-	AcknowledgedByIntegration *string              `json:"acknowledgedByIntegration,omitempty"`
-	IsStatusPageVisible bool                  `json:"isStatusPageVisible"`
-	CreatedAt           string  `json:"createdAt"`
-	UpdatedAt           string  `json:"updatedAt"`
-	Property            string  `json:"property"`
-	Target              string  `json:"target"`
-	Operator            string  `json:"operator"`
+	ID                        uint                  `json:"id"`
+	TeamID                    uint                  `json:"teamId"`
+	MonitorID                 *uint                 `json:"monitorId"`
+	HeartbeatID               *uint                 `json:"heartbeatId"`
+	Title                     string                `json:"title"`
+	Description               string                `json:"description"`
+	RootCauseAnalysis         *string               `json:"rootCauseAnalysis,omitempty"`
+	Resolved                  bool                  `json:"resolved"`
+	ResolvedAt                *string               `json:"resolvedAt,omitempty"`
+	ResolvedBy                *IncidentUserResponse `json:"resolvedBy,omitempty"`
+	Acknowledged              bool                  `json:"acknowledged"`
+	AcknowledgedAt            *string               `json:"acknowledgedAt,omitempty"`
+	AcknowledgedBy            *IncidentUserResponse `json:"acknowledgedBy,omitempty"`
+	AcknowledgedByIntegration *string               `json:"acknowledgedByIntegration,omitempty"`
+	IsStatusPageVisible       bool                  `json:"isStatusPageVisible"`
+	CreatedAt                 string                `json:"createdAt"`
+	UpdatedAt                 string                `json:"updatedAt"`
+	Property                  string                `json:"property"`
+	Target                    string                `json:"target"`
+	Operator                  string                `json:"operator"`
 }
 
 func (h *Handlers) GetMonitorIncidents(c hs.AuthenticatedContext) error {
@@ -337,26 +337,26 @@ func (h *Handlers) GetMonitorIncidentsResponse(ctx context.Context, incidents *[
 		}
 
 		resp.Incidents[i] = GetMonitorIncidentsResponseIncident{
-			ID:                  in.ID,
-			TeamID:              in.TeamID,
-			MonitorID:           in.MonitorID,
-			HeartbeatID:         in.HeartbeatID,
-			Title:               in.Title,
-			Description:         *in.Description,
-			RootCauseAnalysis:   in.RootCauseAnalysis,
-			Resolved:            in.Resolved,
-			ResolvedAt:          resAt,
-			ResolvedBy:          resBy,
-			Acknowledged:        in.Acknowledged,
-			AcknowledgedAt:      ackAt,
-			AcknowledgedBy:      ackBy,
+			ID:                        in.ID,
+			TeamID:                    in.TeamID,
+			MonitorID:                 in.MonitorID,
+			HeartbeatID:               in.HeartbeatID,
+			Title:                     in.Title,
+			Description:               *in.Description,
+			RootCauseAnalysis:         in.RootCauseAnalysis,
+			Resolved:                  in.Resolved,
+			ResolvedAt:                resAt,
+			ResolvedBy:                resBy,
+			Acknowledged:              in.Acknowledged,
+			AcknowledgedAt:            ackAt,
+			AcknowledgedBy:            ackBy,
 			AcknowledgedByIntegration: in.AcknowledgedByIntegration,
-			IsStatusPageVisible: in.IsStatusPageVisible,
-			CreatedAt:           in.CreatedAt.Format("2006-01-02T15:04:05Z07:00"),
-			UpdatedAt:           in.UpdatedAt.Format("2006-01-02T15:04:05Z07:00"),
-			Property:            property,
-			Target:              target,
-			Operator:            operator,
+			IsStatusPageVisible:       in.IsStatusPageVisible,
+			CreatedAt:                 in.CreatedAt.Format("2006-01-02T15:04:05Z07:00"),
+			UpdatedAt:                 in.UpdatedAt.Format("2006-01-02T15:04:05Z07:00"),
+			Property:                  property,
+			Target:                    target,
+			Operator:                  operator,
 		}
 	}
 
@@ -375,24 +375,24 @@ type GetIncidentRequest struct {
 }
 
 type GetIncidentResponse struct {
-	ID                  uint    `json:"id"`
-	TeamID              uint    `json:"teamId"`
-	MonitorID           *uint   `json:"monitorId"`
-	HeartbeatID         *uint   `json:"heartbeatId"`
-	Title               string  `json:"title"`
-	Description         string  `json:"description"`
-	Resolved            bool    `json:"resolved"`
-	ResolvedAt          *string               `json:"resolvedAt,omitempty"`
-	ResolvedBy          *IncidentUserResponse `json:"resolvedBy,omitempty"`
-	Acknowledged        bool                  `json:"acknowledged"`
-	AcknowledgedAt      *string               `json:"acknowledgedAt,omitempty"`
-	AcknowledgedBy      *IncidentUserResponse `json:"acknowledgedBy,omitempty"`
-	AcknowledgedByIntegration *string              `json:"acknowledgedByIntegration,omitempty"`
-	RootCauseAnalysis   *string               `json:"rootCauseAnalysis,omitempty"`
-	IsStatusPageVisible bool    `json:"isStatusPageVisible"`
-	CreatedAt           string  `json:"createdAt"`
-	UpdatedAt           string  `json:"updatedAt"`
-	Occurrences         int     `json:"occurrences"`
+	ID                        uint                  `json:"id"`
+	TeamID                    uint                  `json:"teamId"`
+	MonitorID                 *uint                 `json:"monitorId"`
+	HeartbeatID               *uint                 `json:"heartbeatId"`
+	Title                     string                `json:"title"`
+	Description               string                `json:"description"`
+	Resolved                  bool                  `json:"resolved"`
+	ResolvedAt                *string               `json:"resolvedAt,omitempty"`
+	ResolvedBy                *IncidentUserResponse `json:"resolvedBy,omitempty"`
+	Acknowledged              bool                  `json:"acknowledged"`
+	AcknowledgedAt            *string               `json:"acknowledgedAt,omitempty"`
+	AcknowledgedBy            *IncidentUserResponse `json:"acknowledgedBy,omitempty"`
+	AcknowledgedByIntegration *string               `json:"acknowledgedByIntegration,omitempty"`
+	RootCauseAnalysis         *string               `json:"rootCauseAnalysis,omitempty"`
+	IsStatusPageVisible       bool                  `json:"isStatusPageVisible"`
+	CreatedAt                 string                `json:"createdAt"`
+	UpdatedAt                 string                `json:"updatedAt"`
+	Occurrences               int                   `json:"occurrences"`
 }
 
 func (h *Handlers) GetIncident(c hs.AuthenticatedContext) error {
@@ -510,7 +510,7 @@ func (h *Handlers) PatchSolveIncident(c hs.AuthenticatedContext) error {
 		in.ResolvedAt = &now
 		in.ResolvedBy = &c.UserID
 	}
-	
+
 	if err := h.IncidentService.Update(ctx, in); err != nil {
 		c.Log.WithError(err).Error("failed to update incident")
 		return echo.ErrInternalServerError

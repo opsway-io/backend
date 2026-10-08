@@ -214,17 +214,17 @@ services:
       VITE_CLICKHOUSE_USER: "default"
       VITE_CLICKHOUSE_PASS: ""
   storage:
-    image: minio/minio
+    image: rustfs/rustfs:latest
     restart: unless-stopped
     ports:
-      - '127.0.0.1:9001:9001'
-      - '127.0.0.1:5566:5566'
+      - '127.0.0.1:9000:9000'
+      - '127.0.0.1:5566:9001'
     volumes:
-      - './.data/minio:/data'
+      - './.data/rustfs:/data'
     environment:
-      MINIO_ACCESS_KEY: guest
-      MINIO_SECRET_KEY: supersecret
-    command: 'server --address 0.0.0.0:9001 --console-address 0.0.0.0:5566 /data'
+      RUSTFS_ACCESS_KEY: guest
+      RUSTFS_SECRET_KEY: supersecret
+    command: '/data'
 
   mailhog:
     image: mailhog/mailhog
@@ -234,9 +234,9 @@ services:
       - '127.0.0.1:8025:8025'
 
   storage_init:
-    image: minio/mc:latest
+    image: quay.io/minio/mc:latest
     depends_on:
       - storage
     entrypoint: >
-      /bin/sh -c " /usr/bin/mc config host rm local; /usr/bin/mc config host add --quiet --api s3v4 local http://storage:9001 guest supersecret;
+      /bin/sh -c " /usr/bin/mc config host rm local; /usr/bin/mc config host add --quiet --api s3v4 local http://storage:9000 guest supersecret;
       /usr/bin/mc mb --quiet local/avatars/; /usr/bin/mc anonymous set download local/avatars; "

@@ -31,7 +31,7 @@ The local environment is fully dockerized and hot-reloaded using `reflex`:
     ```bash
     docker-compose up
     ```
-    This spins up PostgreSQL, Redis-Stack, ClickHouse, MinIO, and hot-reloads the `api` (port `8001`) and `prober` binaries.
+    This spins up PostgreSQL, Redis-Stack, ClickHouse, RustFS, and hot-reloads the `api` (port `8001`) and `prober` binaries.
 *   **Stop Infrastructure**:
     ```bash
     docker-compose down

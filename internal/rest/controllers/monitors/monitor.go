@@ -19,30 +19,30 @@ import (
 */
 
 type Monitor struct {
-	ID         uint               `json:"id"`
-	State      string             `json:"state" validate:"required,monitorState"`
-	Name       string             `json:"name" validate:"required,max=255"`
-	Settings   MonitorSettings    `json:"settings" validate:"required,dive"`
-	Steps      []MonitorStep      `json:"steps" validate:"required,dive"`
-	CreatedAt  time.Time          `json:"createdAt"`
-	UpdatedAt  time.Time          `json:"updatedAt"`
+	ID        uint            `json:"id"`
+	State     string          `json:"state" validate:"required,monitorState"`
+	Name      string          `json:"name" validate:"required,max=255"`
+	Settings  MonitorSettings `json:"settings" validate:"required,dive"`
+	Steps     []MonitorStep   `json:"steps" validate:"required,dive"`
+	CreatedAt time.Time       `json:"createdAt"`
+	UpdatedAt time.Time       `json:"updatedAt"`
 }
 
 type MonitorStep struct {
-	Name       string             `json:"name" validate:"required,max=255"`
-	Method     string             `json:"method" validate:"required,monitorMethod"`
-	URL        string             `json:"url" validate:"required,url"`
+	Name       string                  `json:"name" validate:"required,max=255"`
+	Method     string                  `json:"method" validate:"required,monitorMethod"`
+	URL        string                  `json:"url" validate:"required,url"`
 	Headers    []MonitorSettingsHeader `json:"headers" validate:"dive"`
 	Body       MonitorSettingsBody     `json:"body" validate:"dive"`
-	Assertions []MonitorAssertion `json:"assertions" validate:"dive,monitorAssertions"`
-	Variables  []MonitorVariable  `json:"variables" validate:"dive"`
+	Assertions []MonitorAssertion      `json:"assertions" validate:"dive,monitorAssertions"`
+	Variables  []MonitorVariable       `json:"variables" validate:"dive"`
 }
 
 type MonitorSettings struct {
-	FrequencySeconds uint64                  `json:"frequencySeconds" validate:"required,numeric,gte=10"`
-	Auth             MonitorSettingsAuth     `json:"auth" validate:"required"`
-	TLS              MonitorSettingsTLS      `json:"tls" validate:"required"`
-	Locations        []string                `json:"locations" validate:"required,dive,location"`
+	FrequencySeconds uint64              `json:"frequencySeconds" validate:"required,numeric,gte=10"`
+	Auth             MonitorSettingsAuth `json:"auth" validate:"required"`
+	TLS              MonitorSettingsTLS  `json:"tls" validate:"required"`
+	Locations        []string            `json:"locations" validate:"required,dive,location"`
 }
 
 type MonitorSettingsTeardown struct {
@@ -57,8 +57,6 @@ type MonitorVariable struct {
 	Source   string `json:"source" validate:"required"`
 	Property string `json:"property" validate:"required"`
 }
-
-
 
 type MonitorAssertion struct {
 	Source   string `json:"source"`
@@ -197,10 +195,10 @@ func newGetMonitorsResponse(monitors *[]monitor.MonitorWithTotalCount, stats *[]
 				}
 			}
 			steps[j] = MonitorStep{
-				Name:       s.Name,
-				Method:     s.Method,
-				URL:        s.URL,
-				Headers:    headers,
+				Name:    s.Name,
+				Method:  s.Method,
+				URL:     s.URL,
+				Headers: headers,
 				Body: MonitorSettingsBody{
 					Type:    s.Body.Type,
 					Content: s.Body.GetContentString(),
@@ -347,10 +345,10 @@ func newGetMonitorResponse(m *entities.Monitor, stats *check.MonitorStats) (*Get
 			}
 		}
 		steps[j] = MonitorStep{
-			Name:       s.Name,
-			Method:     s.Method,
-			URL:        s.URL,
-			Headers:    headers,
+			Name:    s.Name,
+			Method:  s.Method,
+			URL:     s.URL,
+			Headers: headers,
 			Body: MonitorSettingsBody{
 				Type:    s.Body.Type,
 				Content: s.Body.GetContentString(),
@@ -429,10 +427,10 @@ func (h *Handlers) DeleteMonitor(c hs.AuthenticatedContext) error {
 }
 
 type PostMonitorRequest struct {
-	TeamID     uint               `param:"teamId" validate:"required,numeric,gte=0"`
-	Name       string             `json:"name" validate:"required,max=255"`
-	Settings   MonitorSettings    `json:"settings" validate:"required,dive"`
-	Steps      []MonitorStep      `json:"steps" validate:"required,dive"`
+	TeamID   uint            `param:"teamId" validate:"required,numeric,gte=0"`
+	Name     string          `json:"name" validate:"required,max=255"`
+	Settings MonitorSettings `json:"settings" validate:"required,dive"`
+	Steps    []MonitorStep   `json:"steps" validate:"required,dive"`
 }
 
 func (h *Handlers) PostMonitor(c hs.AuthenticatedContext) error {
@@ -490,7 +488,7 @@ func (h *Handlers) PostMonitor(c hs.AuthenticatedContext) error {
 				Property: v.Property,
 			}
 		}
-		
+
 		body := entities.MonitorStepBody{
 			Type: s.Body.Type,
 		}
@@ -633,12 +631,12 @@ func newGetMonitorWithIncidentsResponse(monitors *[]entities.Monitor) (*GetMonit
 }
 
 type PutMonitorRequest struct {
-	TeamID     uint               `param:"teamId" validate:"required,numeric,gte=0"`
-	MonitorID  uint               `param:"monitorId" validate:"required,numeric,gte=0"`
-	Name       string             `json:"name" validate:"required,max=255"`
-	State      string             `json:"state" validate:"required,monitorState"`
-	Settings   MonitorSettings    `json:"settings" validate:"required,dive"`
-	Steps      []MonitorStep      `json:"steps" validate:"required,dive"`
+	TeamID    uint            `param:"teamId" validate:"required,numeric,gte=0"`
+	MonitorID uint            `param:"monitorId" validate:"required,numeric,gte=0"`
+	Name      string          `json:"name" validate:"required,max=255"`
+	State     string          `json:"state" validate:"required,monitorState"`
+	Settings  MonitorSettings `json:"settings" validate:"required,dive"`
+	Steps     []MonitorStep   `json:"steps" validate:"required,dive"`
 }
 
 func (h *Handlers) PutMonitor(c hs.AuthenticatedContext) error {
@@ -684,7 +682,7 @@ func (h *Handlers) PutMonitor(c hs.AuthenticatedContext) error {
 			Type: s.Body.Type,
 		}
 		body.SetContentString(s.Body.Content)
-		
+
 		steps[i] = entities.MonitorStep{
 			Name:       s.Name,
 			OrderIndex: i,

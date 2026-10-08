@@ -21,13 +21,13 @@ type RCAWorker interface {
 type GetHeartbeatFunc func(ctx context.Context, teamID uint, heartbeatID uint) (*entities.Heartbeat, error)
 
 type rcaWorker struct {
-	eventService      event.Service
-	incidentSvc       Service
-	monitorService    monitor.Service
-	checkService      check.Service
-	getHeartbeat      GetHeartbeatFunc
-	llmClient         llm.Client
-	logger            *logrus.Entry
+	eventService   event.Service
+	incidentSvc    Service
+	monitorService monitor.Service
+	checkService   check.Service
+	getHeartbeat   GetHeartbeatFunc
+	llmClient      llm.Client
+	logger         *logrus.Entry
 }
 
 func NewRCAWorker(
@@ -40,13 +40,13 @@ func NewRCAWorker(
 	logger *logrus.Entry,
 ) RCAWorker {
 	return &rcaWorker{
-		eventService:      eventService,
-		incidentSvc:       incidentSvc,
-		monitorService:    monitorService,
-		checkService:      checkService,
-		getHeartbeat:      getHeartbeat,
-		llmClient:         llmClient,
-		logger:            logger.WithField("component", "rca_worker"),
+		eventService:   eventService,
+		incidentSvc:    incidentSvc,
+		monitorService: monitorService,
+		checkService:   checkService,
+		getHeartbeat:   getHeartbeat,
+		llmClient:      llmClient,
+		logger:         logger.WithField("component", "rca_worker"),
 	}
 }
 
@@ -91,7 +91,7 @@ func (w *rcaWorker) processMessage(ctx context.Context, payload []byte) {
 				prompt += fmt.Sprintf("Monitor URL: %s\nMonitor Method: %s\n", m.Steps[0].URL, m.Steps[0].Method)
 			}
 		}
-		
+
 		offset := 0
 		limit := 10
 		checks, err := w.checkService.GetByTeamIDAndMonitorIDPaginated(ctx, incident.TeamID, *incident.MonitorID, &offset, &limit)

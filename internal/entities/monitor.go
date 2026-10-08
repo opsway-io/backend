@@ -19,9 +19,9 @@ type Monitor struct {
 	State MonitorState `gorm:"not null;default:0" json:"state"`
 	Name  string       `gorm:"index;not null" json:"name"`
 
-	Settings   MonitorSettings    `gorm:"not null;constraint:OnDelete:CASCADE" json:"settings"`
-	Steps      []MonitorStep      `gorm:"constraint:OnDelete:CASCADE" json:"steps"`
-	Incidents  []Incident         `gorm:"constraint:OnDelete:CASCADE" json:"incidents"`
+	Settings  MonitorSettings `gorm:"not null;constraint:OnDelete:CASCADE" json:"settings"`
+	Steps     []MonitorStep   `gorm:"constraint:OnDelete:CASCADE" json:"steps"`
+	Incidents []Incident      `gorm:"constraint:OnDelete:CASCADE" json:"incidents"`
 
 	CreatedAt time.Time `gorm:"index" json:"createdAt"`
 	UpdatedAt time.Time `gorm:"index" json:"updatedAt"`
@@ -74,10 +74,10 @@ type MonitorSettings struct {
 	ID        uint
 	MonitorID uint `gorm:"uniqueIndex;not null"`
 
-	Auth      MonitorSettingsAuth     `gorm:"embedded;embeddedPrefix:auth_"`
-	TLS       MonitorSettingsTLS      `gorm:"embedded;embeddedPrefix:tls_"`
-	Frequency time.Duration           `gorm:"not null;serializer:timeDurationSeconds"`
-	Locations []string                `gorm:"serializer:json"`
+	Auth      MonitorSettingsAuth `gorm:"embedded;embeddedPrefix:auth_"`
+	TLS       MonitorSettingsTLS  `gorm:"embedded;embeddedPrefix:tls_"`
+	Frequency time.Duration       `gorm:"not null;serializer:timeDurationSeconds"`
+	Locations []string            `gorm:"serializer:json"`
 
 	SslExpiryNotifiedAt    *time.Time `gorm:"index"`
 	DomainExpiryNotifiedAt *time.Time `gorm:"index"`
@@ -198,4 +198,3 @@ type MonitorVariable struct {
 func (MonitorVariable) TableName() string {
 	return "monitor_variables"
 }
-

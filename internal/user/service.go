@@ -348,4 +348,3 @@ func (s *ServiceImpl) SetNotificationRules(ctx context.Context, userID uint, rul
 	}
 	return s.repository.SetNotificationRules(ctx, userID, rules)
 }
-

@@ -171,7 +171,7 @@ func handleTask(ctx context.Context, logger *logrus.Logger, httpProber http.Serv
 	var targetDown bool = false
 	var anyAssertionsFailed bool = false
 	var allFailedAssertions []entities.MonitorAssertion
-	
+
 	// Create a combined timing accumulator
 	totalDNSLookup := time.Duration(0)
 	totalTCPConnection := time.Duration(0)
@@ -193,13 +193,13 @@ func handleTask(ctx context.Context, logger *logrus.Logger, httpProber http.Serv
 			if step.Body.Content != nil {
 				stepBodyStr = string(*step.Body.Content)
 			}
-			
+
 			for k, v := range extractedVariables {
 				placeholder := fmt.Sprintf("{{%s}}", k)
 				stepURL = strings.ReplaceAll(stepURL, placeholder, v)
 				stepBodyStr = strings.ReplaceAll(stepBodyStr, placeholder, v)
 			}
-			
+
 			var bodyReader io.Reader
 			if stepBodyStr != "" {
 				bodyReader = strings.NewReader(stepBodyStr)
@@ -343,7 +343,7 @@ func handleTask(ctx context.Context, logger *logrus.Logger, httpProber http.Serv
 		overallRes.Timing.Phases.Total = totalTime
 	} else {
 		// Should never happen if steps > 0
-		return 
+		return
 	}
 
 	res := overallRes
@@ -649,7 +649,6 @@ func handleTask(ctx context.Context, logger *logrus.Logger, httpProber http.Serv
 		}
 	}
 }
-
 
 type ForecasterPredictResponse struct {
 	Anomalies   []bool    `json:"anomalies"`

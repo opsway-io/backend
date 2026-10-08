@@ -163,10 +163,10 @@ func (w *worker) processEscalationJobs(ctx context.Context) {
 
 		if !inc.Acknowledged && !inc.Resolved {
 			w.logger.Infof("Executing EscalationJob %d for incident %d, tier %d", job.ID, job.IncidentID, job.TargetTier)
-			
+
 			// Evaluate all rules that match the incident to determine channels
 			rules, _ := w.alertService.GetAllByTeamID(ctx, job.TeamID)
-			
+
 			for _, r := range rules {
 				if !r.Enabled {
 					continue
@@ -176,7 +176,7 @@ func (w *worker) processEscalationJobs(ctx context.Context) {
 					w.triggerRule(ctx, inc, &rule, job.TargetTier)
 				}
 			}
-			
+
 			// Schedule next tier if needed
 			policy, err := w.escalationSvc.GetPolicyByTeamID(ctx, job.TeamID)
 			if err == nil && policy != nil {
@@ -220,7 +220,7 @@ func (w *worker) processNotificationJobs(ctx context.Context) {
 
 		if !inc.Acknowledged && !inc.Resolved {
 			w.logger.Infof("Executing NotificationJob %d for incident %d, channel %s", job.ID, job.IncidentID, job.Channel)
-			
+
 			usr, err := w.userService.GetUserByID(ctx, job.UserID)
 			if err != nil {
 				continue
@@ -566,7 +566,7 @@ func (w *worker) scheduleEscalationCheck(ctx context.Context, incident *entities
 		TargetTier:   2,
 		ScheduledFor: time.Now().Add(time.Duration(policy.EscalationTimeoutMinutes) * time.Minute),
 	}
-	
+
 	if err := w.escalationSvc.CreateEscalationJob(ctx, job); err != nil {
 		w.logger.WithError(err).Error("failed to schedule initial escalation job")
 	}
@@ -711,7 +711,7 @@ func (w *worker) sendEmailAlert(ctx context.Context, incident *entities.Incident
 					continue // User has custom rules but didn't select email
 				}
 			}
-			
+
 			if emailRule != nil {
 				delay = emailRule.Delay
 			}
@@ -724,9 +724,9 @@ func (w *worker) sendEmailAlert(ctx context.Context, incident *entities.Incident
 
 		if delay > 0 {
 			err = w.escalationSvc.CreateNotificationJob(ctx, &entities.NotificationJob{
-				IncidentID: incident.ID,
-				UserID: u.ID,
-				Channel: entities.ChannelEmail,
+				IncidentID:   incident.ID,
+				UserID:       u.ID,
+				Channel:      entities.ChannelEmail,
 				ScheduledFor: time.Now().Add(time.Duration(delay) * time.Minute),
 			})
 			if err != nil {
@@ -750,7 +750,7 @@ func (w *worker) sendFuncEmail(ctx context.Context, incident *entities.Incident,
 	}
 
 	dashboardURL := fmt.Sprintf("%s/incidents/incident/%d", w.config.ApplicationURL, incident.ID)
-	
+
 	if incident.Title == "Anomaly Detected" {
 		tpl := &templates.PerformanceDegradationTemplate{
 			MonitorName:    monitorName,
@@ -1057,9 +1057,9 @@ func (w *worker) sendSmsAlert(ctx context.Context, incident *entities.Incident, 
 
 		if delay > 0 {
 			err = w.escalationSvc.CreateNotificationJob(ctx, &entities.NotificationJob{
-				IncidentID: incident.ID,
-				UserID: u.ID,
-				Channel: entities.ChannelSMS,
+				IncidentID:   incident.ID,
+				UserID:       u.ID,
+				Channel:      entities.ChannelSMS,
 				ScheduledFor: time.Now().Add(time.Duration(delay) * time.Minute),
 			})
 			if err != nil {
@@ -1135,9 +1135,9 @@ func (w *worker) sendVoiceAlert(ctx context.Context, incident *entities.Incident
 
 		if delay > 0 {
 			err = w.escalationSvc.CreateNotificationJob(ctx, &entities.NotificationJob{
-				IncidentID: incident.ID,
-				UserID: u.ID,
-				Channel: entities.ChannelVoice,
+				IncidentID:   incident.ID,
+				UserID:       u.ID,
+				Channel:      entities.ChannelVoice,
 				ScheduledFor: time.Now().Add(time.Duration(delay) * time.Minute),
 			})
 			if err != nil {

@@ -134,4 +134,3 @@ func (s *RepositoryImpl) SetNotificationRules(ctx context.Context, userID uint, 
 		return nil
 	})
 }
-

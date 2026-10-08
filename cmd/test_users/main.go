@@ -6,8 +6,8 @@ import (
 	"log"
 
 	"github.com/opsway-io/backend/internal/team"
-	"gorm.io/gorm"
 	pg "gorm.io/driver/postgres"
+	"gorm.io/gorm"
 )
 
 func main() {
@@ -20,7 +20,7 @@ func main() {
 	repo := team.NewRepository(db)
 	offset, limit := 0, 10
 	q := ""
-	
+
 	users, err := repo.GetUsersByID(context.Background(), 1, &offset, &limit, &q, nil)
 	if err != nil {
 		log.Fatal(err)
