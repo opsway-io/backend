@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -292,8 +293,10 @@ func (h *PublicHandlers) GetPublicStatusPage(c echo.Context) error {
 }
 
 type SubscribeRequest struct {
-	Domain string `param:"domain" validate:"required"`
-	Email  string `json:"email" validate:"required,email"`
+	Domain      string `param:"domain" validate:"required"`
+	Email       string `json:"email" validate:"required"`
+	Channel     string `json:"channel"`     // EMAIL (default), WEBHOOK, SMS, SLACK
+	Destination string `json:"destination"` // target URL or phone number
 }
 
 func (h *PublicHandlers) Subscribe(c echo.Context) error {
@@ -311,29 +314,40 @@ func (h *PublicHandlers) Subscribe(c echo.Context) error {
 		return echo.ErrInternalServerError
 	}
 
+	channel := strings.ToUpper(req.Channel)
+	if channel == "" {
+		channel = "EMAIL"
+	}
+
 	token := uuid.New().String()
-	err = h.StatusPageService.Subscribe(c.Request().Context(), sp.ID, req.Email, token)
+	err = h.StatusPageService.SubscribeChannel(c.Request().Context(), sp.ID, req.Email, channel, req.Destination, token)
 	if err != nil {
 		logrus.WithError(err).Error("failed to create subscriber")
 		return echo.ErrInternalServerError
 	}
 
-	// Dispatch verification email
-	verificationURL := fmt.Sprintf("%s/%s/subscribe/verify/%s", h.StatusPageBaseURL, req.Domain, token)
-	err = h.EmailSender.Send(c.Request().Context(), "", req.Email, &templates.StatuspageVerifyTemplate{
-		StatusPageName:  sp.Name,
-		VerificationURL: verificationURL,
-	})
-	if err != nil {
-		logrus.WithError(err).Error("failed to dispatch verification email")
+	// Dispatch verification email only for EMAIL channel if email sender configured
+	if channel == "EMAIL" && h.EmailSender != nil {
+		verificationURL := fmt.Sprintf("%s/%s/subscribe/verify/%s", h.StatusPageBaseURL, req.Domain, token)
+		err = h.EmailSender.Send(c.Request().Context(), "", req.Email, &templates.StatuspageVerifyTemplate{
+			StatusPageName:  sp.Name,
+			VerificationURL: verificationURL,
+		})
+		if err != nil {
+			logrus.WithError(err).Error("failed to dispatch verification email")
+		}
+
+		logrus.WithFields(logrus.Fields{
+			"email": req.Email,
+			"token": token,
+		}).Info("Dispatched verification email")
 	}
 
-	logrus.WithFields(logrus.Fields{
-		"email": req.Email,
-		"token": token,
-	}).Info("Dispatched verification email")
-
-	return c.NoContent(http.StatusOK)
+	return c.JSON(http.StatusOK, map[string]interface{}{
+		"success":  true,
+		"channel":  channel,
+		"verified": channel != "EMAIL",
+	})
 }
 
 type VerifySubscriberRequest struct {

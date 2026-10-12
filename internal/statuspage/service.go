@@ -24,6 +24,7 @@ type Service interface {
 	ReplaceMonitors(ctx context.Context, statusPage *entities.StatusPage, monitors []entities.Monitor) error
 	ReplaceGroups(ctx context.Context, statusPage *entities.StatusPage, groups []entities.StatusPageGroup) error
 	Subscribe(ctx context.Context, statusPageID uint, email string, token string) error
+	SubscribeChannel(ctx context.Context, statusPageID uint, email string, channel string, destination string, token string) error
 	GetSubscriberByToken(ctx context.Context, token string) (*entities.StatusPageSubscriber, error)
 	VerifySubscriber(ctx context.Context, token string) error
 	Unsubscribe(ctx context.Context, token string) error
@@ -125,11 +126,17 @@ func (s *ServiceImpl) ReplaceGroups(ctx context.Context, statusPage *entities.St
 }
 
 func (s *ServiceImpl) Subscribe(ctx context.Context, statusPageID uint, email string, token string) error {
+	return s.SubscribeChannel(ctx, statusPageID, email, "EMAIL", "", token)
+}
+
+func (s *ServiceImpl) SubscribeChannel(ctx context.Context, statusPageID uint, email string, channel string, destination string, token string) error {
 	sub := &entities.StatusPageSubscriber{
 		StatusPageID: statusPageID,
 		Email:        email,
+		Channel:      channel,
+		Destination:  destination,
 		Token:        token,
-		Verified:     false, // explicitly set false though it's default
+		Verified:     channel != "EMAIL", // Non-email channels like webhooks/Slack can be verified immediately
 	}
 	return s.repository.CreateSubscriber(ctx, sub)
 }

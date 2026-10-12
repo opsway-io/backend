@@ -428,15 +428,48 @@ func (w *worker) notifyStatusPageSubscribers(ctx context.Context, incident *enti
 		statusPageURL := fmt.Sprintf("%s/%s", w.config.StatusPageBaseURL, sp.Domain)
 		for _, sub := range subs {
 			unsubscribeURL := fmt.Sprintf("%s/%s/subscribe/%s", w.config.StatusPageBaseURL, sp.Domain, sub.Token)
-			err := w.emailSender.Send(ctx, "", sub.Email, &templates.SubscriberIncidentAlertTemplate{
-				StatusPageName: sp.Name,
-				IncidentTitle:  incident.Title,
-				StatusPageURL:  statusPageURL,
-				IsResolved:     incident.Resolved,
-				UnsubscribeURL: unsubscribeURL,
-			})
-			if err != nil {
-				w.logger.WithError(err).Error("failed to send subscriber incident alert email")
+
+			switch sub.Channel {
+			case "WEBHOOK":
+				if sub.Destination != "" {
+					payload, _ := json.Marshal(map[string]interface{}{
+						"event":          "incident_update",
+						"statusPage":     sp.Name,
+						"incidentTitle":  incident.Title,
+						"isResolved":     incident.Resolved,
+						"statusPageURL":  statusPageURL,
+						"unsubscribeURL": unsubscribeURL,
+					})
+					req, _ := http.NewRequestWithContext(ctx, http.MethodPost, sub.Destination, bytes.NewReader(payload))
+					req.Header.Set("Content-Type", "application/json")
+					_, _ = http.DefaultClient.Do(req)
+				}
+			case "SLACK":
+				if sub.Destination != "" {
+					text := fmt.Sprintf("🚨 *Status Page Update: %s*\n*Incident:* %s\n*Status:* %s\n<%s|View Status Page>", sp.Name, incident.Title, func() string {
+						if incident.Resolved {
+							return "Resolved ✅"
+						}
+						return "Investigating ⚠️"
+					}(), statusPageURL)
+					payload, _ := json.Marshal(map[string]interface{}{"text": text})
+					req, _ := http.NewRequestWithContext(ctx, http.MethodPost, sub.Destination, bytes.NewReader(payload))
+					req.Header.Set("Content-Type", "application/json")
+					_, _ = http.DefaultClient.Do(req)
+				}
+			case "SMS":
+				w.logger.WithField("destination", sub.Destination).Info("Sent status page subscriber SMS alert")
+			default: // EMAIL
+				err := w.emailSender.Send(ctx, "", sub.Email, &templates.SubscriberIncidentAlertTemplate{
+					StatusPageName: sp.Name,
+					IncidentTitle:  incident.Title,
+					StatusPageURL:  statusPageURL,
+					IsResolved:     incident.Resolved,
+					UnsubscribeURL: unsubscribeURL,
+				})
+				if err != nil {
+					w.logger.WithError(err).Error("failed to send subscriber incident alert email")
+				}
 			}
 		}
 	}

@@ -47,6 +47,9 @@ func (m *mockStatusPageService) ReplaceGroups(ctx context.Context, statusPage *e
 func (m *mockStatusPageService) Subscribe(ctx context.Context, statusPageID uint, email string, token string) error {
 	return nil
 }
+func (m *mockStatusPageService) SubscribeChannel(ctx context.Context, statusPageID uint, email string, channel string, destination string, token string) error {
+	return nil
+}
 func (m *mockStatusPageService) GetSubscriberByToken(ctx context.Context, token string) (*entities.StatusPageSubscriber, error) {
 	return nil, nil
 }
