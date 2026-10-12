@@ -52,4 +52,7 @@ func Register(
 	// APM Integrations
 	root.POST("/datadog/:teamId", h.PostDatadogWebhook)
 	root.POST("/new_relic/:teamId", h.PostNewRelicWebhook)
+	root.POST("/prometheus/:teamId", h.PostPrometheusWebhook)
+	root.POST("/cloudwatch/:teamId", h.PostCloudWatchWebhook)
+	root.POST("/inbound/:teamId", h.PostGenericInboundWebhook)
 }
