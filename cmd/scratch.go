@@ -3,6 +3,8 @@ package cmd
 import (
 	"context"
 	"fmt"
+	"os"
+	"strconv"
 
 	"github.com/opsway-io/backend/internal/connectors/postgres"
 	"github.com/opsway-io/backend/internal/connectors/redis"
@@ -23,8 +25,12 @@ func init() {
 func runScratch(cmd *cobra.Command, args []string) {
 	ctx := context.Background()
 
+	dsn := "host=localhost user=postgres password=pass dbname=opsway port=5432 sslmode=disable"
+	if envDsn := os.Getenv("PG_DSN"); envDsn != "" {
+		dsn = envDsn
+	}
 	cfg := postgres.Config{
-		DSN: "host=localhost user=postgres password=pass dbname=opsway port=5432 sslmode=disable",
+		DSN: dsn,
 	}
 
 	db, err := postgres.NewClient(ctx, cfg)
@@ -33,9 +39,20 @@ func runScratch(cmd *cobra.Command, args []string) {
 		return
 	}
 
+	redisHost := "localhost"
+	if envHost := os.Getenv("REDIS_HOST"); envHost != "" {
+		redisHost = envHost
+	}
+	redisPort := uint32(6379)
+	if envPort := os.Getenv("REDIS_PORT"); envPort != "" {
+		if p, err := strconv.ParseUint(envPort, 10, 32); err == nil {
+			redisPort = uint32(p)
+		}
+	}
+
 	redisCfg := redis.Config{
-		Host: "localhost",
-		Port: 6379,
+		Host: redisHost,
+		Port: redisPort,
 	}
 	rdb, err := redis.NewClient(ctx, redisCfg)
 	if err != nil {
