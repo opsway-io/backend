@@ -50,6 +50,9 @@ func RegisterPublic(
 
 	publicGroup := e.Group("/public/status-pages")
 	publicGroup.GET("/:domain", h.GetPublicStatusPage)
+	publicGroup.GET("/:domain/badge.svg", h.GetBadgeSVG)
+	publicGroup.GET("/:domain/widget.json", h.GetWidgetSummary)
+	publicGroup.GET("/:domain/widget.js", h.GetWidgetScript)
 	publicGroup.POST("/:domain/subscribe", h.Subscribe)
 	publicGroup.GET("/:domain/subscribe/verify/:token", h.VerifySubscriber)
 	publicGroup.DELETE("/:domain/subscribe/:token", h.Unsubscribe)
