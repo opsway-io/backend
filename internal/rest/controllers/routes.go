@@ -98,7 +98,7 @@ func Register(
 
 	// Authentication
 
-	authentication.Register(root, logger, cookieService, oAuthConfig, authConfig, authenticationService, teamService, userService)
+	authentication.Register(root, authRoot, logger, cookieService, oAuthConfig, authConfig, authenticationService, teamService, userService)
 
 	// Users
 

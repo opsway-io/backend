@@ -9,26 +9,28 @@ import (
 )
 
 type PostRefreshTokenRequest struct {
-	RefreshToken string `json:"refreshToken" validate:"required"`
+	RefreshToken string `json:"refreshToken"`
 }
 
 type PostRefreshTokenResponse struct {
+	AccessToken  string `json:"accessToken,omitempty"`
+	RefreshToken string `json:"refreshToken,omitempty"`
 }
 
 func (h *Handlers) PostRefreshToken(c hs.BaseContext) error {
-	if _, err := helpers.Bind[PostRefreshTokenRequest](c); err != nil {
-		c.Log.WithError(err).Debug("failed to bind PostRefreshTokenRequest")
+	req, _ := helpers.Bind[PostRefreshTokenRequest](c)
 
-		return echo.ErrBadRequest
+	var refreshTokenStr string
+	if cookie, err := h.CookieService.GetRefreshToken(c); err == nil && cookie.Value != "" {
+		refreshTokenStr = cookie.Value
+	} else if req != nil && req.RefreshToken != "" {
+		refreshTokenStr = req.RefreshToken
 	}
 
-	cookie, err := h.CookieService.GetRefreshToken(c)
-	if err != nil {
-		c.Log.WithError(err).Debug("missing refresh token cookie")
+	if refreshTokenStr == "" {
+		c.Log.Debug("missing refresh token in cookie or request body")
 		return echo.ErrUnauthorized
 	}
-
-	refreshTokenStr := cookie.Value
 
 	accessToken, refreshToken, err := h.AuthenticationService.Refresh(c.Request().Context(), refreshTokenStr)
 	if err != nil {
@@ -42,5 +44,8 @@ func (h *Handlers) PostRefreshToken(c hs.BaseContext) error {
 	h.CookieService.SetAccessToken(c, accessToken)
 	h.CookieService.SetRefreshToken(c, refreshToken)
 
-	return c.JSON(http.StatusOK, PostRefreshTokenResponse{})
+	return c.JSON(http.StatusOK, PostRefreshTokenResponse{
+		AccessToken:  accessToken,
+		RefreshToken: refreshToken,
+	})
 }

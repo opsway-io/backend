@@ -28,6 +28,7 @@ type Handlers struct {
 
 func Register(
 	e *echo.Group,
+	authRoot *echo.Group,
 	logger *logrus.Entry,
 	cookieService helpers.CookieService,
 	oAuthConfig *OAuthConfig,
@@ -46,6 +47,11 @@ func Register(
 	}
 
 	BaseHandler := handlers.BaseHandlerFactory(logger)
+	AuthHandler := handlers.AuthenticatedHandlerFactory(logger)
+
+	if authRoot != nil {
+		authRoot.GET("/auth/me", AuthHandler(h.GetAuthMe))
+	}
 
 	authGroup := e.Group("/auth")
 	authGroup.Use(middleware.RateLimiterWithConfig(middleware.RateLimiterConfig{

@@ -240,3 +240,18 @@ func (h *Handlers) PostLogout(c hs.BaseContext) error {
 
 	return c.NoContent(http.StatusOK)
 }
+
+func (h *Handlers) GetAuthMe(c hs.AuthenticatedContext) error {
+	u, err := h.UserService.GetUserAndTeamsByUserID(c.Request().Context(), c.UserID)
+	if err != nil {
+		c.Log.WithError(err).Error("failed to get current user and teams")
+
+		return echo.ErrInternalServerError
+	}
+
+	return c.JSON(http.StatusOK, newPostLoginResponse(
+		u,
+		h.UserService,
+		h.TeamService,
+	))
+}

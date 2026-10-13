@@ -1,6 +1,7 @@
 package seeds
 
 import (
+	"errors"
 	"time"
 
 	"github.com/opsway-io/backend/internal/entities"
@@ -20,9 +21,6 @@ func TeamOpsway(db *gorm.DB) {
 		Email:       "admin@opsway.eu",
 		Name:        "Douglas Adams",
 		DisplayName: pointer.String("Ford Prefect"),
-		Teams: []entities.Team{
-			t,
-		},
 	}
 
 	_ = user.SetPassword("pass")
@@ -32,11 +30,19 @@ func TeamOpsway(db *gorm.DB) {
 		panic(result.Error)
 	}
 
-	db.Where(entities.TeamUser{UserID: user.ID, TeamID: t.ID}).FirstOrCreate(&entities.TeamUser{
-		UserID: user.ID,
-		TeamID: t.ID,
-		Role:   entities.TeamRoleAdmin,
-	})
+	var teamUser entities.TeamUser
+	if err := db.Where("user_id = ? AND team_id = ?", user.ID, t.ID).First(&teamUser).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			db.Create(&entities.TeamUser{
+				UserID: user.ID,
+				TeamID: t.ID,
+				Role:   entities.TeamRoleOwner,
+			})
+		}
+	} else if teamUser.Role == "" || teamUser.Role != entities.TeamRoleOwner {
+		teamUser.Role = entities.TeamRoleOwner
+		db.Save(&teamUser)
+	}
 
 	// Monitors
 	monitorsToSeed := []entities.Monitor{
