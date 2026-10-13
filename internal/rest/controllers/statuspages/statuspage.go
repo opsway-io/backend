@@ -55,6 +55,7 @@ type GetStatusPagesRequest struct {
 type GetStatusPageGroupResponse struct {
 	ID         uint   `json:"id"`
 	Name       string `json:"name"`
+	Container  string `json:"container"`
 	Order      int    `json:"order"`
 	MonitorIDs []uint `json:"monitorIds"`
 }
@@ -257,6 +258,7 @@ func (h *Handlers) GetStatusPage(c handlers.AuthenticatedContext) error {
 				groups = append(groups, GetStatusPageGroupResponse{
 					ID:         g.ID,
 					Name:       g.Name,
+					Container:  g.Container,
 					Order:      g.Order,
 					MonitorIDs: gm,
 				})
@@ -294,6 +296,7 @@ type PutStatusPageRequest struct {
 
 type PutStatusPageGroupRequest struct {
 	Name       string `json:"name" validate:"required,max=255"`
+	Container  string `json:"container"`
 	Order      int    `json:"order"`
 	MonitorIDs []uint `json:"monitorIds"`
 }
@@ -373,9 +376,10 @@ func (h *Handlers) PutStatusPage(c handlers.AuthenticatedContext) error {
 				monitors = append(monitors, entities.Monitor{ID: mID})
 			}
 			groups = append(groups, entities.StatusPageGroup{
-				Name:     reqGroup.Name,
-				Order:    reqGroup.Order,
-				Monitors: monitors,
+				Name:      reqGroup.Name,
+				Container: reqGroup.Container,
+				Order:     reqGroup.Order,
+				Monitors:  monitors,
 			})
 		}
 		if err := h.StatusPageService.ReplaceGroups(c.Request().Context(), sp, groups); err != nil {

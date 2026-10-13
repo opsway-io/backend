@@ -54,6 +54,8 @@ func RegisterPublic(
 	publicGroup.GET("/:domain/badge.svg", h.GetBadgeSVG)
 	publicGroup.GET("/:domain/widget.json", h.GetWidgetSummary)
 	publicGroup.GET("/:domain/widget.js", h.GetWidgetScript)
+	publicGroup.GET("/:domain/calendar.ics", h.GetMaintenanceCalendar)
+	publicGroup.GET("/:domain/metrics", h.GetPublicMetrics)
 	publicGroup.POST("/:domain/subscribe", h.Subscribe)
 	publicGroup.GET("/:domain/subscribe/verify/:token", h.VerifySubscriber)
 	publicGroup.DELETE("/:domain/subscribe/:token", h.Unsubscribe)
@@ -90,7 +92,9 @@ type PublicMaintenance struct {
 type PublicGroup struct {
 	ID         uint   `json:"id"`
 	Name       string `json:"name"`
+	Container  string `json:"container"`
 	Order      int    `json:"order"`
+	Status     string `json:"status"` // "OPERATIONAL", "DEGRADED", "OUTAGE"
 	MonitorIDs []uint `json:"monitorIds"`
 }
 
@@ -171,9 +175,13 @@ func (h *PublicHandlers) GetPublicStatusPage(c echo.Context) error {
 		monitorIDs = append(monitorIDs, m.ID)
 	}
 
-	uptimes, err := h.CheckService.GetMonitorUptimesByMonitorIDs(c.Request().Context(), monitorIDs)
-	if err != nil {
-		logrus.WithError(err).Error("failed to get monitor uptimes")
+	var uptimes map[uint]check.MonitorUptimeResult
+	if h.CheckService != nil {
+		var err error
+		uptimes, err = h.CheckService.GetMonitorUptimesByMonitorIDs(c.Request().Context(), monitorIDs)
+		if err != nil {
+			logrus.WithError(err).Error("failed to get monitor uptimes")
+		}
 	}
 
 	monitors := make([]PublicMonitor, len(orderedMonitors))
@@ -201,55 +209,61 @@ func (h *PublicHandlers) GetPublicStatusPage(c echo.Context) error {
 	}
 
 	activeIncidents := []PublicIncident{}
-	incidents, err := h.IncidentService.GetActiveByMonitorIDs(c.Request().Context(), monitorIDs)
-	if err == nil {
-		for _, inc := range incidents {
-			desc := ""
-			if inc.Description != nil {
-				desc = *inc.Description
+	if h.IncidentService != nil {
+		incidents, err := h.IncidentService.GetActiveByMonitorIDs(c.Request().Context(), monitorIDs)
+		if err == nil {
+			for _, inc := range incidents {
+				desc := ""
+				if inc.Description != nil {
+					desc = *inc.Description
+				}
+				activeIncidents = append(activeIncidents, PublicIncident{
+					ID:          inc.ID,
+					Title:       inc.Title,
+					Description: desc,
+					MonitorID:   inc.MonitorID,
+				})
 			}
-			activeIncidents = append(activeIncidents, PublicIncident{
-				ID:          inc.ID,
-				Title:       inc.Title,
-				Description: desc,
-				MonitorID:   inc.MonitorID,
-			})
 		}
 	}
 
 	activeMaintenance := []PublicMaintenance{}
-	maintenances, err := h.MaintenanceService.GetActiveByMonitorIDs(c.Request().Context(), time.Now(), monitorIDs)
-	if err == nil {
-		for _, mnt := range maintenances {
-			desc := ""
-			if mnt.Description != nil {
-				desc = *mnt.Description
+	if h.MaintenanceService != nil {
+		maintenances, err := h.MaintenanceService.GetActiveByMonitorIDs(c.Request().Context(), time.Now(), monitorIDs)
+		if err == nil {
+			for _, mnt := range maintenances {
+				desc := ""
+				if mnt.Description != nil {
+					desc = *mnt.Description
+				}
+				activeMaintenance = append(activeMaintenance, PublicMaintenance{
+					ID:          mnt.ID,
+					Title:       mnt.Title,
+					Description: desc,
+					StartAt:     mnt.Settings.StartAt,
+					EndAt:       mnt.Settings.EndAt,
+				})
 			}
-			activeMaintenance = append(activeMaintenance, PublicMaintenance{
-				ID:          mnt.ID,
-				Title:       mnt.Title,
-				Description: desc,
-				StartAt:     mnt.Settings.StartAt,
-				EndAt:       mnt.Settings.EndAt,
-			})
 		}
 	}
 
 	maintenanceEvents := []PublicMaintenance{}
-	allMaintenances, err := h.MaintenanceService.GetAllByMonitorIDs(c.Request().Context(), monitorIDs)
-	if err == nil {
-		for _, mnt := range allMaintenances {
-			desc := ""
-			if mnt.Description != nil {
-				desc = *mnt.Description
+	if h.MaintenanceService != nil {
+		allMaintenances, err := h.MaintenanceService.GetAllByMonitorIDs(c.Request().Context(), monitorIDs)
+		if err == nil {
+			for _, mnt := range allMaintenances {
+				desc := ""
+				if mnt.Description != nil {
+					desc = *mnt.Description
+				}
+				maintenanceEvents = append(maintenanceEvents, PublicMaintenance{
+					ID:          mnt.ID,
+					Title:       mnt.Title,
+					Description: desc,
+					StartAt:     mnt.Settings.StartAt,
+					EndAt:       mnt.Settings.EndAt,
+				})
 			}
-			maintenanceEvents = append(maintenanceEvents, PublicMaintenance{
-				ID:          mnt.ID,
-				Title:       mnt.Title,
-				Description: desc,
-				StartAt:     mnt.Settings.StartAt,
-				EndAt:       mnt.Settings.EndAt,
-			})
 		}
 	}
 
@@ -274,10 +288,32 @@ func (h *PublicHandlers) GetPublicStatusPage(c echo.Context) error {
 				for _, m := range g.Monitors {
 					gm = append(gm, m.ID)
 				}
+
+				groupStatus := "OPERATIONAL"
+				outageCount := 0
+				totalCount := len(gm)
+				for _, mID := range gm {
+					for _, pm := range monitors {
+						if pm.ID == mID && pm.Status != "OPERATIONAL" {
+							outageCount++
+							break
+						}
+					}
+				}
+				if totalCount > 0 {
+					if outageCount == totalCount {
+						groupStatus = "OUTAGE"
+					} else if outageCount > 0 {
+						groupStatus = "DEGRADED"
+					}
+				}
+
 				groups = append(groups, PublicGroup{
 					ID:         g.ID,
 					Name:       g.Name,
+					Container:  g.Container,
 					Order:      g.Order,
+					Status:     groupStatus,
 					MonitorIDs: gm,
 				})
 			}
