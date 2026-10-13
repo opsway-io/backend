@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"io"
 	xhttp "net/http"
+	"regexp"
+	"strconv"
 	"strings"
 	"time"
 
@@ -140,7 +142,7 @@ func runProber(cmd *cobra.Command, args []string) {
 					return
 				}
 
-				handleTask(ctx, l, httpProber, tcpProber, icmpProber, dnsProber, postgresProber, mysqlProber, redisProber, browserProber, websocketProber, udpProber, task.Monitor, httpResultService, incidentService, conf.Prober.Location, redisClient)
+				handleTask(ctx, l, httpProber, tcpProber, icmpProber, dnsProber, postgresProber, mysqlProber, redisProber, browserProber, websocketProber, udpProber, task.Monitor, httpResultService, incidentService, conf.Prober.Location, conf.Prober.AvailableLocations, redisClient)
 				msg.Ack()
 			})
 		}
@@ -151,7 +153,7 @@ func runProber(cmd *cobra.Command, args []string) {
 	l.Info("Goodbye!")
 }
 
-func handleTask(ctx context.Context, logger *logrus.Logger, httpProber http.Service, tcpProber tcp.Service, icmpProber icmp.Service, dnsProber dns.Service, postgresProber probePostgres.Service, mysqlProber probeMysql.Service, redisProber probeRedis.Service, browserProber browser.Service, websocketProber websocket.Service, udpProber udp.Service, m *entities.Monitor, c check.Service, i incident.Service, location string, rc *redis.Client) {
+func handleTask(ctx context.Context, logger *logrus.Logger, httpProber http.Service, tcpProber tcp.Service, icmpProber icmp.Service, dnsProber dns.Service, postgresProber probePostgres.Service, mysqlProber probeMysql.Service, redisProber probeRedis.Service, browserProber browser.Service, websocketProber websocket.Service, udpProber udp.Service, m *entities.Monitor, c check.Service, i incident.Service, location string, availableLocations []string, rc *redis.Client) {
 	l := logger.WithFields(logrus.Fields{
 		"monitor_id": m.ID,
 		"location":   location,
@@ -228,7 +230,12 @@ func handleTask(ctx context.Context, logger *logrus.Logger, httpProber http.Serv
 			default:
 				headers := make(map[string]string)
 				for _, h := range step.Headers {
-					headers[h.Key] = h.Value
+					hVal := h.Value
+					for k, v := range extractedVariables {
+						placeholder := fmt.Sprintf("{{%s}}", k)
+						hVal = strings.ReplaceAll(hVal, placeholder, v)
+					}
+					headers[h.Key] = hVal
 				}
 
 				if m.Settings.Auth.Method == "BASIC" {
@@ -311,6 +318,17 @@ func handleTask(ctx context.Context, logger *logrus.Logger, httpProber http.Serv
 					if val != "" {
 						extractedVariables[v.Name] = val
 					}
+				} else if v.Source == "REGEX" {
+					if re, err := regexp.Compile(v.Property); err == nil {
+						matches := re.FindStringSubmatch(string(res.Response.Body))
+						if len(matches) > 1 {
+							extractedVariables[v.Name] = matches[1]
+						} else if len(matches) == 1 {
+							extractedVariables[v.Name] = matches[0]
+						}
+					}
+				} else if v.Source == "STATUS_CODE" {
+					extractedVariables[v.Name] = strconv.Itoa(res.Response.StatusCode)
 				}
 			}
 		}
@@ -368,7 +386,9 @@ func handleTask(ctx context.Context, logger *logrus.Logger, httpProber http.Serv
 	}
 
 	failKey := fmt.Sprintf("monitor:%d:failures", m.ID)
+	consensusKey := fmt.Sprintf("monitor:%d:failing_locations", m.ID)
 	var failCount int64 = 0
+	var numFailingLocations int64 = 1
 
 	if failedCount > 0 || targetDown || authFailed {
 		l.Info("monitor failed, incrementing failure counter")
@@ -377,15 +397,38 @@ func handleTask(ctx context.Context, logger *logrus.Logger, httpProber http.Serv
 			l.WithError(err).Error("failed to increment failure counter")
 		}
 		failCount = val
+
+		rc.SAdd(ctx, consensusKey, location)
+		rc.Expire(ctx, consensusKey, 3*time.Minute)
+		if n, err := rc.SCard(ctx, consensusKey).Result(); err == nil && n > 0 {
+			numFailingLocations = n
+		}
+	} else {
+		rc.SRem(ctx, consensusKey, location)
+	}
+
+	hasConsensus := true
+	if len(availableLocations) > 1 {
+		requiredConsensus := int64(2)
+		if int64(len(availableLocations)) < requiredConsensus {
+			requiredConsensus = int64(len(availableLocations))
+		}
+		if numFailingLocations < requiredConsensus {
+			hasConsensus = false
+			l.WithFields(logrus.Fields{
+				"failing_locations":  numFailingLocations,
+				"required_consensus": requiredConsensus,
+			}).Info("Failure observed, waiting for multi-location consensus before alerting")
+		}
 	}
 
 	if failedCount > 0 {
-		if failCount == 3 {
-			l.Info("failure threshold reached, triggering incident")
+		if failCount == 3 && hasConsensus {
+			l.Info("failure threshold reached with multi-location consensus, triggering incident")
 			if err = triggerIncident(ctx, m, res, &allFailedAssertions, i); err != nil {
 				l.WithError(err).Error("failed to trigger incident")
 			}
-		} else if failCount > 3 {
+		} else if failCount > 3 && hasConsensus {
 			openIncidents, err := i.GetByMonitorIDWithAssertionPaginated(ctx, m.ID, nil, nil)
 			if err == nil && openIncidents != nil {
 				var unhandledFailures []entities.MonitorAssertion
@@ -472,9 +515,15 @@ func handleTask(ctx context.Context, logger *logrus.Logger, httpProber http.Serv
 			}
 		}
 
-		if !hasOpenDownIncident && failCount >= 3 {
-			l.Info("target is down and failure threshold reached, triggering incident")
+		if !hasOpenDownIncident && failCount >= 3 && hasConsensus {
+			l.Info("target is down and failure threshold reached with consensus, triggering incident")
 			desc := "Target is unreachable or not responding."
+			if res != nil {
+				snapshot := BuildDiagnosticSnapshot(res)
+				if snapshot != "" {
+					desc += "\n\n" + snapshot
+				}
+			}
 			downIncident := entities.Incident{
 				MonitorID:   &m.ID,
 				TeamID:      m.TeamID,
@@ -561,9 +610,15 @@ func handleTask(ctx context.Context, logger *logrus.Logger, httpProber http.Serv
 			}
 		}
 
-		if !hasOpenAuthIncident && failCount >= 3 {
-			l.Info("authentication failed and threshold reached, triggering incident")
+		if !hasOpenAuthIncident && failCount >= 3 && hasConsensus {
+			l.Info("authentication failed and threshold reached with consensus, triggering incident")
 			descStr := "Authentication failed"
+			if res != nil {
+				snapshot := BuildDiagnosticSnapshot(res)
+				if snapshot != "" {
+					descStr += "\n\n" + snapshot
+				}
+			}
 			authIncident := entities.Incident{
 				MonitorID:   &m.ID,
 				TeamID:      m.TeamID,
@@ -592,15 +647,101 @@ func handleTask(ctx context.Context, logger *logrus.Logger, httpProber http.Serv
 	}
 
 	if res.TLS != nil {
+		openIncidents, _ := i.GetByMonitorIDWithAssertionPaginated(ctx, m.ID, nil, nil)
+
+		// 1. Deprecated / Insecure TLS versions (TLS 1.0, TLS 1.1)
+		if res.TLS.Version == "TLS 1.0" || res.TLS.Version == "TLS 1.1" {
+			hasOpenTLSIncident := false
+			if openIncidents != nil {
+				for _, inc := range *openIncidents {
+					if inc.Title == "Deprecated TLS Version" && !inc.Resolved {
+						hasOpenTLSIncident = true
+						break
+					}
+				}
+			}
+			if !hasOpenTLSIncident {
+				l.Warn("target server negotiated deprecated TLS version, triggering incident")
+				desc := fmt.Sprintf("Target server negotiated %s, which is deprecated and insecure (RFC 8996). Minimum TLS 1.2 or TLS 1.3 is required.", res.TLS.Version)
+				tlsInc := entities.Incident{
+					MonitorID:   &m.ID,
+					TeamID:      m.TeamID,
+					Title:       "Deprecated TLS Version",
+					Description: &desc,
+				}
+				_ = i.Create(ctx, &[]entities.Incident{tlsInc})
+			}
+		} else {
+			if openIncidents != nil {
+				for _, inc := range *openIncidents {
+					if inc.Title == "Deprecated TLS Version" && !inc.Resolved {
+						inc.Incident.Resolved = true
+						now := time.Now()
+						inc.Incident.ResolvedAt = &now
+						_ = i.Update(ctx, &inc.Incident)
+					}
+				}
+			}
+		}
+
+		// 2. Untrusted Certificate Authority or Hostname Mismatch
+		if !res.TLS.Certificate.TrustedCA || !res.TLS.Certificate.HostValid {
+			title := "SSL/TLS Certificate Chain Invalid"
+			desc := "The SSL/TLS certificate was not issued by a trusted Certificate Authority or trust chain is invalid."
+			if !res.TLS.Certificate.HostValid {
+				title = "SSL/TLS Hostname Mismatch"
+				desc = "The SSL/TLS certificate subject or SAN does not match the monitored hostname."
+			}
+			hasOpenChainIncident := false
+			if openIncidents != nil {
+				for _, inc := range *openIncidents {
+					if (inc.Title == "SSL/TLS Certificate Chain Invalid" || inc.Title == "SSL/TLS Hostname Mismatch") && !inc.Resolved {
+						hasOpenChainIncident = true
+						break
+					}
+				}
+			}
+			if !hasOpenChainIncident {
+				l.Warn("SSL/TLS trust or hostname mismatch, triggering incident")
+				chainInc := entities.Incident{
+					MonitorID:   &m.ID,
+					TeamID:      m.TeamID,
+					Title:       title,
+					Description: &desc,
+				}
+				_ = i.Create(ctx, &[]entities.Incident{chainInc})
+			}
+		}
+
+		// 3. Expiry and Near-Expiry
 		expiry := res.TLS.Certificate.NotAfter
 		timeRemaining := time.Until(expiry)
-
-		if timeRemaining > 0 && timeRemaining < 30*24*time.Hour {
-			hasOpenSSLIncident := false
-			openIncidents, err := i.GetByMonitorIDWithAssertionPaginated(ctx, m.ID, nil, nil)
-			if err == nil && openIncidents != nil {
+		if timeRemaining <= 0 {
+			hasOpenExpiredIncident := false
+			if openIncidents != nil {
 				for _, inc := range *openIncidents {
-					if inc.Title == "SSL/TLS Cert Expiry" {
+					if inc.Title == "SSL/TLS Certificate Expired" && !inc.Resolved {
+						hasOpenExpiredIncident = true
+						break
+					}
+				}
+			}
+			if !hasOpenExpiredIncident {
+				l.Warn("SSL/TLS certificate has expired, triggering incident")
+				desc := fmt.Sprintf("The SSL/TLS certificate expired on %s.", res.TLS.Certificate.NotAfter.Format(time.RFC1123))
+				expInc := entities.Incident{
+					MonitorID:   &m.ID,
+					TeamID:      m.TeamID,
+					Title:       "SSL/TLS Certificate Expired",
+					Description: &desc,
+				}
+				_ = i.Create(ctx, &[]entities.Incident{expInc})
+			}
+		} else if timeRemaining < 30*24*time.Hour {
+			hasOpenSSLIncident := false
+			if openIncidents != nil {
+				for _, inc := range *openIncidents {
+					if inc.Title == "SSL/TLS Cert Expiry" && !inc.Resolved {
 						hasOpenSSLIncident = true
 						break
 					}
@@ -609,8 +750,7 @@ func handleTask(ctx context.Context, logger *logrus.Logger, httpProber http.Serv
 
 			if !hasOpenSSLIncident {
 				l.Warn("SSL/TLS certificate is expiring soon, triggering incident")
-				// just simple desc
-				desc := "SSL/TLS certificate is expiring soon"
+				desc := fmt.Sprintf("SSL/TLS certificate expires in %d days (%s)", int(timeRemaining.Hours()/24), expiry.Format(time.RFC1123))
 				sslIncident := entities.Incident{
 					MonitorID:   &m.ID,
 					TeamID:      m.TeamID,
@@ -622,7 +762,7 @@ func handleTask(ctx context.Context, logger *logrus.Logger, httpProber http.Serv
 				}
 			} else {
 				for _, inc := range *openIncidents {
-					if inc.Title == "SSL/TLS Cert Expiry" {
+					if inc.Title == "SSL/TLS Cert Expiry" && !inc.Resolved {
 						inc.Incident.UpdatedAt = time.Now()
 						if err := i.Update(ctx, &inc.Incident); err != nil {
 							l.WithError(err).Error("failed to update ssl incident occurrence")
@@ -632,16 +772,15 @@ func handleTask(ctx context.Context, logger *logrus.Logger, httpProber http.Serv
 				}
 			}
 		} else {
-			openIncidents, err := i.GetByMonitorIDWithAssertionPaginated(ctx, m.ID, nil, nil)
-			if err == nil && openIncidents != nil {
+			if openIncidents != nil {
 				for _, inc := range *openIncidents {
-					if inc.Title == "SSL/TLS Cert Expiry" {
+					if (inc.Title == "SSL/TLS Cert Expiry" || inc.Title == "SSL/TLS Certificate Expired") && !inc.Resolved {
 						l.Info("SSL/TLS certificate is now valid, resolving open incident")
 						inc.Incident.Resolved = true
 						now := time.Now()
 						inc.Incident.ResolvedAt = &now
 						if err := i.Update(ctx, &inc.Incident); err != nil {
-							l.WithError(err).Error("failed to resolve SSL/TLS cert expiry incident")
+							l.WithError(err).Error("failed to resolve SSL/TLS incident")
 						}
 					}
 				}
@@ -785,8 +924,45 @@ func mapResultToCheck(m *entities.Monitor, res *http.Result, location string) *c
 	return c
 }
 
+func BuildDiagnosticSnapshot(hr *http.Result) string {
+	if hr == nil {
+		return ""
+	}
+	var sb strings.Builder
+	sb.WriteString("=== Diagnostic Failure Snapshot ===\n")
+	sb.WriteString(fmt.Sprintf("HTTP Status: %d\n", hr.Response.StatusCode))
+	sb.WriteString(fmt.Sprintf("Timing Breakdown:\n  Total: %v\n  DNS Lookup: %v\n  TCP Connect: %v\n  TLS Handshake: %v\n  Server Processing: %v\n  Content Transfer: %v\n",
+		hr.Timing.Phases.Total,
+		hr.Timing.Phases.DNSLookup,
+		hr.Timing.Phases.TCPConnection,
+		hr.Timing.Phases.TLSHandshake,
+		hr.Timing.Phases.ServerProcessing,
+		hr.Timing.Phases.ContentTransfer,
+	))
+
+	if len(hr.Response.Header) > 0 {
+		sb.WriteString("Response Headers:\n")
+		for k, v := range hr.Response.Header {
+			sb.WriteString(fmt.Sprintf("  %s: %s\n", k, strings.Join(v, ", ")))
+		}
+	}
+
+	if len(hr.Response.Body) > 0 {
+		bodyStr := string(hr.Response.Body)
+		if len(bodyStr) > 4096 {
+			bodyStr = bodyStr[:4096] + "\n... [truncated 4KB preview]"
+		}
+		sb.WriteString("Response Body Preview:\n")
+		sb.WriteString(bodyStr)
+		sb.WriteString("\n")
+	}
+
+	return strings.TrimSpace(sb.String())
+}
+
 func triggerIncident(ctx context.Context, m *entities.Monitor, hr *http.Result, failed *[]entities.MonitorAssertion, i incident.Service) error {
 	incidents := make([]entities.Incident, len(*failed))
+	snapshot := BuildDiagnosticSnapshot(hr)
 
 	for j := range *failed {
 		assertion := (*failed)[j]
@@ -794,6 +970,9 @@ func triggerIncident(ctx context.Context, m *entities.Monitor, hr *http.Result, 
 		desc := fmt.Sprintf("Assertion failed: %s %s %s", assertion.Source, assertion.Operator, assertion.Target)
 		if assertion.Property != "" {
 			desc = fmt.Sprintf("Assertion failed: %s (%s) %s %s", assertion.Source, assertion.Property, assertion.Operator, assertion.Target)
+		}
+		if snapshot != "" {
+			desc += "\n\n" + snapshot
 		}
 
 		incidents[j] = entities.Incident{
