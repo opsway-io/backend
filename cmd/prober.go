@@ -169,6 +169,8 @@ func handleTask(ctx context.Context, logger *logrus.Logger, httpProber http.Serv
 
 	var overallRes *http.Result
 	var err error
+	var lastProbeErr error
+	var lastAuthErr error
 	var authFailed bool = false
 	var targetDown bool = false
 	var anyAssertionsFailed bool = false
@@ -189,6 +191,7 @@ func handleTask(ctx context.Context, logger *logrus.Logger, httpProber http.Serv
 		for attempt := 0; attempt < maxRetries; attempt++ {
 			err = nil
 			authFailed = false
+			lastAuthErr = nil
 
 			stepURL := step.URL
 			var stepBodyStr string
@@ -246,6 +249,7 @@ func handleTask(ctx context.Context, logger *logrus.Logger, httpProber http.Serv
 					if authErr != nil {
 						err = fmt.Errorf("failed to fetch oauth2 token: %w", authErr)
 						authFailed = true
+						lastAuthErr = authErr
 					} else {
 						headers["Authorization"] = "Bearer " + token
 					}
@@ -276,6 +280,7 @@ func handleTask(ctx context.Context, logger *logrus.Logger, httpProber http.Serv
 			l.WithError(err).Error("failed to probe step")
 			if !authFailed {
 				targetDown = true
+				lastProbeErr = err
 			}
 
 			res = &http.Result{
@@ -517,13 +522,7 @@ func handleTask(ctx context.Context, logger *logrus.Logger, httpProber http.Serv
 
 		if !hasOpenDownIncident && failCount >= 3 && hasConsensus {
 			l.Info("target is down and failure threshold reached with consensus, triggering incident")
-			desc := "Target is unreachable or not responding."
-			if res != nil {
-				snapshot := BuildDiagnosticSnapshot(res)
-				if snapshot != "" {
-					desc += "\n\n" + snapshot
-				}
-			}
+			desc := formatTargetDownDescription(m, failCount, res, lastProbeErr)
 			downIncident := entities.Incident{
 				MonitorID:   &m.ID,
 				TeamID:      m.TeamID,
@@ -566,7 +565,7 @@ func handleTask(ctx context.Context, logger *logrus.Logger, httpProber http.Serv
 
 			if !hasOpenAnomalyIncident {
 				l.Info("anomaly detected, triggering incident")
-				desc := fmt.Sprintf("Response time anomaly detected! Expected response time was %.0fms (upper limit: %.0fms), but actual response time was %.0fms.", anomalyResp.Predictions[0], anomalyResp.UpperBounds[0], float64(res.Timing.Phases.Total.Milliseconds()))
+				desc := formatAnomalyDescription(m, res, anomalyResp)
 				anomalyIncident := entities.Incident{
 					MonitorID:   &m.ID,
 					TeamID:      m.TeamID,
@@ -612,13 +611,7 @@ func handleTask(ctx context.Context, logger *logrus.Logger, httpProber http.Serv
 
 		if !hasOpenAuthIncident && failCount >= 3 && hasConsensus {
 			l.Info("authentication failed and threshold reached with consensus, triggering incident")
-			descStr := "Authentication failed"
-			if res != nil {
-				snapshot := BuildDiagnosticSnapshot(res)
-				if snapshot != "" {
-					descStr += "\n\n" + snapshot
-				}
-			}
+			descStr := formatAuthFailedDescription(m, res, lastAuthErr)
 			authIncident := entities.Incident{
 				MonitorID:   &m.ID,
 				TeamID:      m.TeamID,
@@ -662,7 +655,7 @@ func handleTask(ctx context.Context, logger *logrus.Logger, httpProber http.Serv
 			}
 			if !hasOpenTLSIncident {
 				l.Warn("target server negotiated deprecated TLS version, triggering incident")
-				desc := fmt.Sprintf("Target server negotiated %s, which is deprecated and insecure (RFC 8996). Minimum TLS 1.2 or TLS 1.3 is required.", res.TLS.Version)
+				desc := formatDeprecatedTLSDescription(res)
 				tlsInc := entities.Incident{
 					MonitorID:   &m.ID,
 					TeamID:      m.TeamID,
@@ -687,11 +680,15 @@ func handleTask(ctx context.Context, logger *logrus.Logger, httpProber http.Serv
 		// 2. Untrusted Certificate Authority or Hostname Mismatch
 		if !res.TLS.Certificate.TrustedCA || !res.TLS.Certificate.HostValid {
 			title := "SSL/TLS Certificate Chain Invalid"
-			desc := "The SSL/TLS certificate was not issued by a trusted Certificate Authority or trust chain is invalid."
-			if !res.TLS.Certificate.HostValid {
+			isMismatch := !res.TLS.Certificate.HostValid
+			if isMismatch {
 				title = "SSL/TLS Hostname Mismatch"
-				desc = "The SSL/TLS certificate subject or SAN does not match the monitored hostname."
 			}
+			targetURL := ""
+			if len(m.Steps) > 0 {
+				targetURL = m.Steps[0].URL
+			}
+			desc := formatCertChainInvalidDescription(res, isMismatch, targetURL)
 			hasOpenChainIncident := false
 			if openIncidents != nil {
 				for _, inc := range *openIncidents {
@@ -728,7 +725,7 @@ func handleTask(ctx context.Context, logger *logrus.Logger, httpProber http.Serv
 			}
 			if !hasOpenExpiredIncident {
 				l.Warn("SSL/TLS certificate has expired, triggering incident")
-				desc := fmt.Sprintf("The SSL/TLS certificate expired on %s.", res.TLS.Certificate.NotAfter.Format(time.RFC1123))
+				desc := formatCertExpiryDescription(res, true, 0)
 				expInc := entities.Incident{
 					MonitorID:   &m.ID,
 					TeamID:      m.TeamID,
@@ -750,7 +747,8 @@ func handleTask(ctx context.Context, logger *logrus.Logger, httpProber http.Serv
 
 			if !hasOpenSSLIncident {
 				l.Warn("SSL/TLS certificate is expiring soon, triggering incident")
-				desc := fmt.Sprintf("SSL/TLS certificate expires in %d days (%s)", int(timeRemaining.Hours()/24), expiry.Format(time.RFC1123))
+				daysRemaining := int(timeRemaining.Hours() / 24)
+				desc := formatCertExpiryDescription(res, false, daysRemaining)
 				sslIncident := entities.Incident{
 					MonitorID:   &m.ID,
 					TeamID:      m.TeamID,
@@ -962,18 +960,10 @@ func BuildDiagnosticSnapshot(hr *http.Result) string {
 
 func triggerIncident(ctx context.Context, m *entities.Monitor, hr *http.Result, failed *[]entities.MonitorAssertion, i incident.Service) error {
 	incidents := make([]entities.Incident, len(*failed))
-	snapshot := BuildDiagnosticSnapshot(hr)
 
 	for j := range *failed {
 		assertion := (*failed)[j]
-
-		desc := fmt.Sprintf("Assertion failed: %s %s %s", assertion.Source, assertion.Operator, assertion.Target)
-		if assertion.Property != "" {
-			desc = fmt.Sprintf("Assertion failed: %s (%s) %s %s", assertion.Source, assertion.Property, assertion.Operator, assertion.Target)
-		}
-		if snapshot != "" {
-			desc += "\n\n" + snapshot
-		}
+		desc := formatAssertionFailureDescription(assertion, hr)
 
 		incidents[j] = entities.Incident{
 			MonitorID:          &assertion.MonitorID,

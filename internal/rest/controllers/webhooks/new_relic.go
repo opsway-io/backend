@@ -2,8 +2,10 @@ package webhooks
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/labstack/echo/v4"
 	"github.com/opsway-io/backend/internal/entities"
@@ -34,11 +36,24 @@ func (h *Handlers) PostNewRelicWebhook(c echo.Context) error {
 		return c.String(http.StatusBadRequest, "invalid payload")
 	}
 
+	var sb strings.Builder
+	sb.WriteString(fmt.Sprintf("### New Relic Alert: %s\n\n", payload.ConditionName))
+	if payload.Details != "" {
+		sb.WriteString("### Violation Details & Diagnostics\n")
+		sb.WriteString(payload.Details + "\n\n")
+	}
+	sb.WriteString("### Recommended Remediation Steps\n")
+	sb.WriteString("1. Inspect the New Relic incident violation timeline and telemetry charts for anomalies.\n")
+	sb.WriteString("2. Correlate with recent service deployments, error rates, and throughput metrics.\n")
+	sb.WriteString("3. Check downstream database queries and external service call latencies.\n")
+
+	desc := sb.String()
+
 	incidents := []entities.Incident{
 		{
 			TeamID:      uint(teamID),
 			Title:       "New Relic Alert: " + payload.ConditionName,
-			Description: &payload.Details,
+			Description: &desc,
 		},
 	}
 

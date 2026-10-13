@@ -2,8 +2,10 @@ package webhooks
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/labstack/echo/v4"
 	"github.com/opsway-io/backend/internal/entities"
@@ -34,11 +36,27 @@ func (h *Handlers) PostDatadogWebhook(c echo.Context) error {
 		return c.String(http.StatusBadRequest, "invalid payload")
 	}
 
+	var sb strings.Builder
+	sb.WriteString("### Datadog Monitor Alert\n\n")
+	if payload.Title != "" {
+		sb.WriteString(fmt.Sprintf("**Alert Title**: %s\n\n", payload.Title))
+	}
+	if payload.Body != "" {
+		sb.WriteString("### Alert Body & Diagnostics\n")
+		sb.WriteString(payload.Body + "\n\n")
+	}
+	sb.WriteString("### Recommended Remediation Steps\n")
+	sb.WriteString("1. Open the Datadog Monitors console and inspect the associated metric query graphs.\n")
+	sb.WriteString("2. Correlate with recent APM service traces, error rates, and host CPU/memory telemetry.\n")
+	sb.WriteString("3. Check for deployment markers or configuration changes around the trigger timestamp.\n")
+
+	desc := sb.String()
+
 	incidents := []entities.Incident{
 		{
 			TeamID:      uint(teamID),
 			Title:       "Datadog Alert: " + payload.Title,
-			Description: &payload.Body,
+			Description: &desc,
 		},
 	}
 

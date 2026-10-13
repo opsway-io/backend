@@ -66,14 +66,7 @@ func (h *Handlers) PostPrometheusWebhook(c echo.Context) error {
 			alertName = "Alertmanager Notification"
 		}
 
-		desc := alert.Annotations["description"]
-		if desc == "" {
-			desc = alert.Annotations["summary"]
-		}
-		if desc == "" {
-			desc = fmt.Sprintf("Alertmanager status: %s", alert.Status)
-		}
-
+		desc := formatPrometheusIncidentDescription(alert, payload.Status)
 		isResolved := strings.ToLower(alert.Status) == "resolved" || strings.ToLower(payload.Status) == "resolved"
 
 		inc := entities.Incident{
@@ -111,7 +104,7 @@ func (h *Handlers) PostCloudWatchWebhook(c echo.Context) error {
 	}
 
 	isResolved := payload.NewStateValue == "OK"
-	desc := fmt.Sprintf("%s (Reason: %s)", payload.AlarmDescription, payload.NewStateReason)
+	desc := formatCloudWatchIncidentDescription(payload)
 
 	inc := entities.Incident{
 		TeamID:      uint(teamID),
@@ -158,11 +151,12 @@ func (h *Handlers) PostGenericInboundWebhook(c echo.Context) error {
 
 	st := strings.ToLower(payload.Status)
 	isResolved := st == "up" || st == "ok" || st == "resolved"
+	desc := formatGenericInboundIncidentDescription(payload)
 
 	inc := entities.Incident{
 		TeamID:      uint(teamID),
 		Title:       fmt.Sprintf("[%s] %s", source, payload.Title),
-		Description: &payload.Description,
+		Description: &desc,
 		Resolved:    isResolved,
 	}
 
@@ -172,4 +166,116 @@ func (h *Handlers) PostGenericInboundWebhook(c echo.Context) error {
 	}
 
 	return c.String(http.StatusOK, "ok")
+}
+
+func formatPrometheusIncidentDescription(alert PrometheusAlert, payloadStatus string) string {
+	var sb strings.Builder
+	sb.WriteString("### Prometheus Alertmanager Notification\n\n")
+
+	summary := alert.Annotations["summary"]
+	description := alert.Annotations["description"]
+	if summary != "" {
+		sb.WriteString(fmt.Sprintf("**Summary**: %s\n\n", summary))
+	}
+	if description != "" {
+		sb.WriteString(fmt.Sprintf("**Description**: %s\n\n", description))
+	}
+
+	sb.WriteString("### Alert Context & Target Details\n")
+	if sev := alert.Labels["severity"]; sev != "" {
+		sb.WriteString(fmt.Sprintf("- **Severity**: `%s`\n", strings.ToUpper(sev)))
+	}
+	sb.WriteString(fmt.Sprintf("- **Alert Status**: `%s`\n", alert.Status))
+	if inst := alert.Labels["instance"]; inst != "" {
+		sb.WriteString(fmt.Sprintf("- **Target Instance**: `%s`\n", inst))
+	}
+	if pod := alert.Labels["pod"]; pod != "" {
+		sb.WriteString(fmt.Sprintf("- **Kubernetes Pod**: `%s`\n", pod))
+	}
+	if ns := alert.Labels["namespace"]; ns != "" {
+		sb.WriteString(fmt.Sprintf("- **Namespace**: `%s`\n", ns))
+	}
+	if cluster := alert.Labels["cluster"]; cluster != "" {
+		sb.WriteString(fmt.Sprintf("- **Cluster**: `%s`\n", cluster))
+	}
+	if job := alert.Labels["job"]; job != "" {
+		sb.WriteString(fmt.Sprintf("- **Scrape Job**: `%s`\n", job))
+	}
+	if alert.StartsAt != "" {
+		sb.WriteString(fmt.Sprintf("- **Triggered At**: `%s`\n", alert.StartsAt))
+	}
+	sb.WriteString("\n")
+
+	if len(alert.Labels) > 0 {
+		sb.WriteString("### Active Prometheus Labels\n")
+		sb.WriteString("```yaml\n")
+		for k, v := range alert.Labels {
+			sb.WriteString(fmt.Sprintf("%s: \"%s\"\n", k, v))
+		}
+		sb.WriteString("```\n\n")
+	}
+
+	if runbook := alert.Annotations["runbook_url"]; runbook != "" {
+		sb.WriteString(fmt.Sprintf("🔗 **Runbook**: [%s](%s)\n\n", runbook, runbook))
+	}
+	if dashboard := alert.Annotations["dashboard_url"]; dashboard != "" {
+		sb.WriteString(fmt.Sprintf("📊 **Dashboard**: [%s](%s)\n\n", dashboard, dashboard))
+	}
+
+	return sb.String()
+}
+
+func formatCloudWatchIncidentDescription(payload CloudWatchAlarmPayload) string {
+	var sb strings.Builder
+	sb.WriteString("### AWS CloudWatch Alarm Notification\n\n")
+	if payload.AlarmDescription != "" {
+		sb.WriteString(fmt.Sprintf("**Description**: %s\n\n", payload.AlarmDescription))
+	}
+
+	sb.WriteString("### Alarm Details & Threshold Breach\n")
+	sb.WriteString(fmt.Sprintf("- **Alarm Name**: `%s`\n", payload.AlarmName))
+	sb.WriteString(fmt.Sprintf("- **New State**: `%s`\n", payload.NewStateValue))
+	sb.WriteString(fmt.Sprintf("- **Trigger Reason**: %s\n", payload.NewStateReason))
+	if payload.Region != "" {
+		sb.WriteString(fmt.Sprintf("- **AWS Region**: `%s`\n", payload.Region))
+	}
+	if payload.StateChangeTime != "" {
+		sb.WriteString(fmt.Sprintf("- **State Change Time**: `%s`\n", payload.StateChangeTime))
+	}
+	sb.WriteString("\n")
+
+	sb.WriteString("### Recommended Remediation Steps\n")
+	if payload.Region != "" {
+		sb.WriteString(fmt.Sprintf("1. Open the [AWS CloudWatch Alarms Console](https://%s.console.aws.amazon.com/cloudwatch/home?region=%s#alarmsV2:) in region `%s`.\n", payload.Region, payload.Region, payload.Region))
+	} else {
+		sb.WriteString("1. Open the AWS CloudWatch Alarms Console.\n")
+	}
+	sb.WriteString(fmt.Sprintf("2. Review the metric graph and alarm history for `%s`.\n", payload.AlarmName))
+	sb.WriteString("3. Correlate with AWS CloudTrail events or recent infrastructure deployments in the region.\n")
+
+	return sb.String()
+}
+
+func formatGenericInboundIncidentDescription(payload GenericInboundAlertPayload) string {
+	var sb strings.Builder
+	sourceName := payload.Source
+	if sourceName == "" {
+		sourceName = "External Monitoring System"
+	}
+	sb.WriteString(fmt.Sprintf("### Alert Ingested from %s\n\n", sourceName))
+	if payload.Description != "" {
+		sb.WriteString(fmt.Sprintf("**Details**: %s\n\n", payload.Description))
+	}
+	sb.WriteString("### Incident Metadata\n")
+	sb.WriteString(fmt.Sprintf("- **Source**: `%s`\n", sourceName))
+	if payload.Status != "" {
+		sb.WriteString(fmt.Sprintf("- **Reported Status**: `%s`\n", payload.Status))
+	}
+	if payload.Title != "" {
+		sb.WriteString(fmt.Sprintf("- **Alert Title**: `%s`\n", payload.Title))
+	}
+	sb.WriteString("\n")
+	sb.WriteString("### Recommended Action\n")
+	sb.WriteString(fmt.Sprintf("Investigate the originating event in `%s` and review affected services.\n", sourceName))
+	return sb.String()
 }
