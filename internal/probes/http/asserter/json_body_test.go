@@ -98,6 +98,15 @@ func TestJSONBodyAsserter_assert(t *testing.T) {
 			wantOk:  []bool{false},
 			wantErr: false,
 		},
+		{
+			name: "Valid json path without leading $ EQUAL",
+			args: args{
+				result: &http.Result{Response: http.Response{Body: []byte(`{"name": "test"}`)}},
+				rules:  []Rule{{Source: "JSON_BODY", Property: "name", Operator: "EQUAL", Target: "test"}},
+			},
+			wantOk:  []bool{true},
+			wantErr: false,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -112,4 +121,14 @@ func TestJSONBodyAsserter_assert(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestNormalizeJSONPath(t *testing.T) {
+	assert.Equal(t, "$.name", NormalizeJSONPath("name"))
+	assert.Equal(t, "$.user.profile.id", NormalizeJSONPath("user.profile.id"))
+	assert.Equal(t, "$[0].item", NormalizeJSONPath("[0].item"))
+	assert.Equal(t, "$.name", NormalizeJSONPath("$.name"))
+	assert.Equal(t, "$..item", NormalizeJSONPath("$..item"))
+	assert.Equal(t, "@.item", NormalizeJSONPath("@.item"))
+	assert.Equal(t, "", NormalizeJSONPath(""))
 }

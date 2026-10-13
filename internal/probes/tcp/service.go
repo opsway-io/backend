@@ -26,6 +26,11 @@ func (s *ServiceImpl) Probe(ctx context.Context, target string, timeout time.Dur
 
 	duration := time.Since(start)
 
+	if err != nil {
+		return nil, err
+	}
+	defer conn.Close()
+
 	res := &probeHttp.Result{
 		Timing: probeHttp.Timing{
 			Phases: probeHttp.TimingPhases{
@@ -37,13 +42,6 @@ func (s *ServiceImpl) Probe(ctx context.Context, target string, timeout time.Dur
 			StatusCode: 200,
 			Body:       []byte("OK"),
 		},
-	}
-
-	if err != nil {
-		res.Response.StatusCode = 503
-		res.Response.Body = []byte(err.Error())
-	} else {
-		conn.Close()
 	}
 
 	return res, nil

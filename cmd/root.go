@@ -49,6 +49,12 @@ type Config struct {
 	Stripe         billing.Config                        `mapstructure:"stripe"`
 	Report         ReportConfig                          `mapstructure:"report"`
 	StatusPage     StatusPageConfig                      `mapstructure:"status_page"`
+	Forecaster     ForecasterConfig                      `mapstructure:"forecaster"`
+}
+
+type ForecasterConfig struct {
+	Enabled bool   `mapstructure:"enabled" default:"false"`
+	URL     string `mapstructure:"url" default:"http://forecaster-api:8000/predict"`
 }
 
 type StatusPageConfig struct {

@@ -1,6 +1,8 @@
 package cmd
 
 import (
+	"context"
+	"net"
 	xhttp "net/http"
 	"strings"
 	"testing"
@@ -85,4 +87,50 @@ func TestVariableChainingAndExtraction(t *testing.T) {
 		bodyPattern = strings.ReplaceAll(bodyPattern, "{{"+k+"}}", v)
 	}
 	assert.Equal(t, `{"user_id": 42, "auth": "eyJhGciOi..."}`, bodyPattern)
+}
+
+func TestCheckAnomaly_Disabled(t *testing.T) {
+	res := &http.Result{}
+	cfg := ForecasterConfig{
+		Enabled: false,
+		URL:     "http://localhost:9999/predict",
+	}
+
+	resp, err := checkAnomaly(context.Background(), cfg, 1, res)
+	assert.NoError(t, err)
+	assert.Nil(t, resp)
+}
+
+func TestCheckAnomaly_Timeout(t *testing.T) {
+	// Spin up a slow server that takes longer than 1s timeout
+	slowServer := xhttp.HandlerFunc(func(w xhttp.ResponseWriter, r *xhttp.Request) {
+		time.Sleep(1500 * time.Millisecond)
+		w.WriteHeader(xhttp.StatusOK)
+	})
+	s := &xhttp.Server{
+		Addr:    "127.0.0.1:0",
+		Handler: slowServer,
+	}
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	assert.NoError(t, err)
+	defer ln.Close()
+
+	go func() {
+		_ = s.Serve(ln)
+	}()
+	defer s.Close()
+
+	res := &http.Result{}
+	cfg := ForecasterConfig{
+		Enabled: true,
+		URL:     "http://" + ln.Addr().String() + "/predict",
+	}
+
+	start := time.Now()
+	resp, err := checkAnomaly(context.Background(), cfg, 1, res)
+	elapsed := time.Since(start)
+
+	assert.Error(t, err)
+	assert.Nil(t, resp)
+	assert.Less(t, elapsed, 1300*time.Millisecond)
 }

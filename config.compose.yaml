@@ -19,7 +19,7 @@ postgres:
   debug: true
 
 clickhouse:
-  dsn: clickhouse+native://default:@ch_server:9000/opsway?async_insert=1&wait_for_async_insert=1
+  dsn: clickhouse+native://default:@ch_server:9000/opsway?async_insert=1&wait_for_async_insert=0
   debug: true
 
 redis:
@@ -67,3 +67,7 @@ user:
   password_reset_url: "http://localhost:5173/login/reset-password"
 status_page:
   base_url: "http://localhost:5174"
+
+forecaster:
+  enabled: true
+  url: "http://forecaster-api:8000/predict"

@@ -142,14 +142,14 @@ func runProber(cmd *cobra.Command, args []string) {
 					return
 				}
 
-				handleTask(ctx, l, httpProber, tcpProber, icmpProber, dnsProber, postgresProber, mysqlProber, redisProber, browserProber, websocketProber, udpProber, task.Monitor, httpResultService, incidentService, conf.Prober.Location, conf.Prober.AvailableLocations, redisClient)
+				handleTask(ctx, l, httpProber, tcpProber, icmpProber, dnsProber, postgresProber, mysqlProber, redisProber, browserProber, websocketProber, udpProber, task.Monitor, httpResultService, incidentService, conf.Prober.Location, conf.Prober.AvailableLocations, redisClient, conf.Forecaster)
 				msg.Ack()
 			})
 		}
 	}
 }
 
-func handleTask(ctx context.Context, logger *logrus.Logger, httpProber http.Service, tcpProber tcp.Service, icmpProber icmp.Service, dnsProber dns.Service, postgresProber probePostgres.Service, mysqlProber probeMysql.Service, redisProber probeRedis.Service, browserProber browser.Service, websocketProber websocket.Service, udpProber udp.Service, m *entities.Monitor, c check.Service, i incident.Service, location string, availableLocations []string, rc *redis.Client) {
+func handleTask(ctx context.Context, logger *logrus.Logger, httpProber http.Service, tcpProber tcp.Service, icmpProber icmp.Service, dnsProber dns.Service, postgresProber probePostgres.Service, mysqlProber probeMysql.Service, redisProber probeRedis.Service, browserProber browser.Service, websocketProber websocket.Service, udpProber udp.Service, m *entities.Monitor, c check.Service, i incident.Service, location string, availableLocations []string, rc *redis.Client, forecasterConfig ForecasterConfig) {
 	l := logger.WithFields(logrus.Fields{
 		"monitor_id": m.ID,
 		"location":   location,
@@ -310,7 +310,7 @@ func handleTask(ctx context.Context, logger *logrus.Logger, httpProber http.Serv
 
 			for _, v := range step.Variables {
 				if v.Source == "JSON_BODY" && unmarshalData != nil {
-					val, err := jsonpath.Read(unmarshalData, v.Property)
+					val, err := jsonpath.Read(unmarshalData, asserter.NormalizeJSONPath(v.Property))
 					if err == nil {
 						extractedVariables[v.Name] = fmt.Sprintf("%v", val)
 					}
@@ -399,6 +399,8 @@ func handleTask(ctx context.Context, logger *logrus.Logger, httpProber http.Serv
 		}
 		failCount = val
 
+		rc.Expire(ctx, failKey, 15*time.Minute)
+
 		rc.SAdd(ctx, consensusKey, location)
 		rc.Expire(ctx, consensusKey, 3*time.Minute)
 		if n, err := rc.SCard(ctx, consensusKey).Result(); err == nil && n > 0 {
@@ -406,6 +408,7 @@ func handleTask(ctx context.Context, logger *logrus.Logger, httpProber http.Serv
 		}
 	} else {
 		rc.SRem(ctx, consensusKey, location)
+		rc.Del(ctx, failKey)
 	}
 
 	hasConsensus := true
@@ -545,7 +548,7 @@ func handleTask(ctx context.Context, logger *logrus.Logger, httpProber http.Serv
 			}
 		}
 
-		anomalyResp, err := checkAnomaly(m.ID, res)
+		anomalyResp, err := checkAnomaly(ctx, forecasterConfig, m.ID, res)
 		if err != nil {
 			l.WithError(err).Error("failed to check for anomaly")
 		} else if anomalyResp != nil && len(anomalyResp.Anomalies) > 0 && anomalyResp.Anomalies[0] {
@@ -821,7 +824,11 @@ type ForecasterPredictResponse struct {
 	LowerBounds []float64 `json:"lower_bounds"`
 }
 
-func checkAnomaly(monitorID uint, res *http.Result) (*ForecasterPredictResponse, error) {
+func checkAnomaly(ctx context.Context, cfg ForecasterConfig, monitorID uint, res *http.Result) (*ForecasterPredictResponse, error) {
+	if !cfg.Enabled || cfg.URL == "" {
+		return nil, nil
+	}
+
 	reqBody := fmt.Sprintf(`{"monitor_id": %d, "timings": [{"response_time": %f, "dns_lookup": %f, "tcp_connection": %f, "tls_handshake": %f, "server_processing": %f, "content_transfer": %f}]}`,
 		monitorID,
 		float64(res.Timing.Phases.Total.Milliseconds()),
@@ -831,7 +838,18 @@ func checkAnomaly(monitorID uint, res *http.Result) (*ForecasterPredictResponse,
 		float64(res.Timing.Phases.ServerProcessing.Milliseconds()),
 		float64(res.Timing.Phases.ContentTransfer.Milliseconds()),
 	)
-	resp, err := xhttp.Post("http://forecaster-api:8000/predict", "application/json", strings.NewReader(reqBody))
+
+	req, err := xhttp.NewRequestWithContext(ctx, xhttp.MethodPost, cfg.URL, strings.NewReader(reqBody))
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Content-Type", "application/json")
+
+	client := &xhttp.Client{
+		Timeout: 1 * time.Second,
+	}
+
+	resp, err := client.Do(req)
 	if err != nil {
 		return nil, err
 	}

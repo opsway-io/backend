@@ -124,8 +124,22 @@ func (a *JSONBodyAsserter) IsRuleValid(rule Rule) error {
 	return nil
 }
 
+func NormalizeJSONPath(path string) string {
+	path = strings.TrimSpace(path)
+	if path == "" {
+		return path
+	}
+	if !strings.HasPrefix(path, "$") && !strings.HasPrefix(path, "@") {
+		if strings.HasPrefix(path, "[") {
+			return "$" + path
+		}
+		return "$." + path
+	}
+	return path
+}
+
 func (a *JSONBodyAsserter) isJSONPath(path string) bool {
-	_, err := jsonpath.Prepare(path)
+	_, err := jsonpath.Prepare(NormalizeJSONPath(path))
 
 	return err == nil
 }
@@ -137,7 +151,7 @@ func (a *JSONBodyAsserter) assert(result *http.Result, rule Rule) bool {
 		return false
 	}
 
-	value, err := jsonpath.Read(unmarshalData, rule.Property)
+	value, err := jsonpath.Read(unmarshalData, NormalizeJSONPath(rule.Property))
 	if err != nil {
 		return false
 	}
