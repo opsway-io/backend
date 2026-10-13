@@ -2,24 +2,34 @@ package controllers
 
 import (
 	"github.com/labstack/echo/v4"
+	"github.com/opsway-io/backend/internal/alerting"
+	"github.com/opsway-io/backend/internal/apikey"
 	auth "github.com/opsway-io/backend/internal/authentication"
 	"github.com/opsway-io/backend/internal/billing"
 	"github.com/opsway-io/backend/internal/changelog"
 	"github.com/opsway-io/backend/internal/check"
+	"github.com/opsway-io/backend/internal/heartbeat"
 	"github.com/opsway-io/backend/internal/incident"
+	"github.com/opsway-io/backend/internal/maintenance"
 	"github.com/opsway-io/backend/internal/monitor"
 	"github.com/opsway-io/backend/internal/report"
+	alertingcontroller "github.com/opsway-io/backend/internal/rest/controllers/alerting"
+	"github.com/opsway-io/backend/internal/rest/controllers/apikeys"
 	"github.com/opsway-io/backend/internal/rest/controllers/authentication"
 	"github.com/opsway-io/backend/internal/rest/controllers/changelogs"
 	"github.com/opsway-io/backend/internal/rest/controllers/healthz"
+	"github.com/opsway-io/backend/internal/rest/controllers/heartbeats"
 	"github.com/opsway-io/backend/internal/rest/controllers/incidents"
+	maintenancecontroller "github.com/opsway-io/backend/internal/rest/controllers/maintenance"
 	"github.com/opsway-io/backend/internal/rest/controllers/monitors"
 	"github.com/opsway-io/backend/internal/rest/controllers/reports"
+	"github.com/opsway-io/backend/internal/rest/controllers/statuspages"
 	"github.com/opsway-io/backend/internal/rest/controllers/teams"
 	"github.com/opsway-io/backend/internal/rest/controllers/users"
 	"github.com/opsway-io/backend/internal/rest/controllers/webhooks"
 	"github.com/opsway-io/backend/internal/rest/helpers"
 	"github.com/opsway-io/backend/internal/rest/middleware"
+	"github.com/opsway-io/backend/internal/statuspage"
 	"github.com/opsway-io/backend/internal/team"
 	"github.com/opsway-io/backend/internal/user"
 	"github.com/sirupsen/logrus"
@@ -40,6 +50,12 @@ func Register(
 	changelogService changelog.Service,
 	incidentService incident.Service,
 	reportsService report.Service,
+	maintenanceService maintenance.Service,
+	heartbeatService heartbeat.Service,
+	statusPageService statuspage.Service,
+	alertingService alerting.Service,
+	alertingPolicyService alerting.PolicyService,
+	apiKeyService apikey.Service,
 ) {
 	AuthGuard := middleware.AuthGuardFactory(logger, authenticationService)
 
@@ -81,8 +97,25 @@ func Register(
 	changelogs.Register(authRoot, logger, teamService, changelogService)
 
 	// Incidents
-	incidents.Register(authRoot, logger, teamService, incidentService)
+	incidents.Register(authRoot, logger, teamService, incidentService, alertingService)
 
 	// Reports
 	reports.Register(authRoot, logger, teamService, reportsService, checkService)
+
+	// Maintenance
+	maintenancecontroller.Register(authRoot, logger, teamService, maintenanceService)
+
+	// Heartbeats (ping endpoint is public)
+	heartbeats.Register(authRoot, logger, teamService, heartbeatService)
+	heartbeats.RegisterPublic(root, logger, heartbeatService)
+
+	// Status pages (public page, badge, widget and subscriptions are unauthenticated)
+	statuspages.Register(authRoot, logger, teamService, statusPageService)
+	statuspages.RegisterPublic(root, logger, statusPageService)
+
+	// Alerting, escalation & notification rules
+	alertingcontroller.Register(authRoot, logger, teamService, alertingService, alertingPolicyService)
+
+	// API keys
+	apikeys.Register(authRoot, logger, teamService, apiKeyService)
 }

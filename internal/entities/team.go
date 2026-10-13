@@ -44,6 +44,15 @@ type Team struct {
 	StripeCustomerID *string     `gorm:"index"`
 	HasAvatar        bool
 
+	// Integrations used when dispatching alerts
+	SlackWebhookURL          *string
+	DiscordWebhookURL        *string
+	TelegramChatID           *string
+	DatadogWebhookURL        *string
+	NewRelicWebhookURL       *string
+	MicrosoftTeamsWebhookURL *string
+	WebhookURL               *string
+
 	Users       []User        `gorm:"many2many:team_users"`
 	Monitors    []Monitor     `gorm:"constraint:OnDelete:CASCADE"`
 	Maintenance []Maintenance `gorm:"constraint:OnDelete:CASCADE"`

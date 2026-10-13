@@ -47,6 +47,10 @@ func Register(
 
 	authGroup.POST("/login", BaseHandler(h.PostLogin))
 	authGroup.POST("/refresh", BaseHandler(h.PostRefreshToken))
+	authGroup.POST("/logout", BaseHandler(h.PostLogout))
+	authGroup.POST("/register", BaseHandler(h.PostRegister))
+	authGroup.POST("/forgot-password", BaseHandler(h.PostForgotPassword))
+	authGroup.POST("/reset-password", BaseHandler(h.PostResetPassword))
 
 	if oAuthConfig != nil {
 		goth.UseProviders(

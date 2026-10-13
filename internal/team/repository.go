@@ -3,6 +3,7 @@ package team
 import (
 	"context"
 	"errors"
+	"strings"
 
 	"github.com/opsway-io/backend/internal/connectors/postgres"
 	"github.com/opsway-io/backend/internal/entities"
@@ -15,6 +16,7 @@ var (
 	ErrUserNotFound      = errors.New("team user not found")
 	ErrNameAlreadyExists = errors.New("team name already exists")
 	ErrCannotRemoveOwner = errors.New("cannot remove owner")
+	ErrInviteNotFound    = errors.New("team invite not found")
 )
 
 type Repository interface {
@@ -40,6 +42,13 @@ type Repository interface {
 
 	IsNameAvailable(ctx context.Context, name string) (bool, error)
 	IsUserOnTeamByEmail(ctx context.Context, teamID uint, email string) (bool, error)
+
+	UpdateSettings(ctx context.Context, team *entities.Team) error
+
+	UpsertInvite(ctx context.Context, invite *entities.TeamInvite) error
+	GetInvites(ctx context.Context, teamID uint) (*[]entities.TeamInvite, error)
+	GetInvite(ctx context.Context, teamID uint, email string) (*entities.TeamInvite, error)
+	DeleteInvite(ctx context.Context, teamID uint, email string) error
 }
 
 type RepositoryImpl struct {
@@ -314,4 +323,76 @@ func (s *RepositoryImpl) IsUserOnTeamByEmail(ctx context.Context, teamID uint, e
 	}
 
 	return count > 0, nil
+}
+
+// UpdateSettings updates the display name and alerting integrations of a team.
+func (s *RepositoryImpl) UpdateSettings(ctx context.Context, team *entities.Team) error {
+	result := s.db.WithContext(ctx).
+		Model(&entities.Team{}).
+		Where("id = ?", team.ID).
+		Select(
+			"display_name",
+			"slack_webhook_url",
+			"discord_webhook_url",
+			"telegram_chat_id",
+			"datadog_webhook_url",
+			"new_relic_webhook_url",
+			"microsoft_teams_webhook_url",
+			"webhook_url",
+		).
+		Updates(team)
+	if result.Error != nil {
+		return result.Error
+	}
+	if result.RowsAffected == 0 {
+		return ErrNotFound
+	}
+
+	return nil
+}
+
+func (s *RepositoryImpl) UpsertInvite(ctx context.Context, invite *entities.TeamInvite) error {
+	return s.db.WithContext(ctx).Clauses(clause.OnConflict{
+		Columns:   []clause.Column{{Name: "team_id"}, {Name: "email"}},
+		DoUpdates: clause.AssignmentColumns([]string{"role", "invited_by_user_id", "updated_at"}),
+	}).Create(invite).Error
+}
+
+func (s *RepositoryImpl) GetInvites(ctx context.Context, teamID uint) (*[]entities.TeamInvite, error) {
+	var invites []entities.TeamInvite
+	err := s.db.WithContext(ctx).
+		Where(entities.TeamInvite{TeamID: teamID}).
+		Order("created_at desc").
+		Find(&invites).Error
+
+	return &invites, err
+}
+
+func (s *RepositoryImpl) GetInvite(ctx context.Context, teamID uint, email string) (*entities.TeamInvite, error) {
+	var invite entities.TeamInvite
+	if err := s.db.WithContext(ctx).
+		Where("team_id = ? AND email = ?", teamID, strings.ToLower(email)).
+		First(&invite).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, ErrInviteNotFound
+		}
+
+		return nil, err
+	}
+
+	return &invite, nil
+}
+
+func (s *RepositoryImpl) DeleteInvite(ctx context.Context, teamID uint, email string) error {
+	result := s.db.WithContext(ctx).
+		Where("team_id = ? AND email = ?", teamID, strings.ToLower(email)).
+		Delete(&entities.TeamInvite{})
+	if result.Error != nil {
+		return result.Error
+	}
+	if result.RowsAffected == 0 {
+		return ErrInviteNotFound
+	}
+
+	return nil
 }

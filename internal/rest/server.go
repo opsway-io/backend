@@ -6,16 +6,21 @@ import (
 
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
+	"github.com/opsway-io/backend/internal/alerting"
+	"github.com/opsway-io/backend/internal/apikey"
 	auth "github.com/opsway-io/backend/internal/authentication"
 	"github.com/opsway-io/backend/internal/billing"
 	"github.com/opsway-io/backend/internal/changelog"
 	"github.com/opsway-io/backend/internal/check"
+	"github.com/opsway-io/backend/internal/heartbeat"
 	"github.com/opsway-io/backend/internal/incident"
+	"github.com/opsway-io/backend/internal/maintenance"
 	"github.com/opsway-io/backend/internal/monitor"
 	"github.com/opsway-io/backend/internal/report"
 	"github.com/opsway-io/backend/internal/rest/controllers"
 	"github.com/opsway-io/backend/internal/rest/controllers/authentication"
 	"github.com/opsway-io/backend/internal/rest/helpers"
+	"github.com/opsway-io/backend/internal/statuspage"
 	"github.com/opsway-io/backend/internal/team"
 	"github.com/opsway-io/backend/internal/user"
 	"github.com/pkg/errors"
@@ -46,6 +51,12 @@ func NewServer(
 	changelogService changelog.Service,
 	incidentService incident.Service,
 	reportsService report.Service,
+	maintenanceService maintenance.Service,
+	heartbeatService heartbeat.Service,
+	statusPageService statuspage.Service,
+	alertingService alerting.Service,
+	alertingPolicyService alerting.PolicyService,
+	apiKeyService apikey.Service,
 ) (*Server, error) {
 	cookieService := helpers.NewCookieService(authConfig)
 
@@ -82,6 +93,12 @@ func NewServer(
 		changelogService,
 		incidentService,
 		reportsService,
+		maintenanceService,
+		heartbeatService,
+		statusPageService,
+		alertingService,
+		alertingPolicyService,
+		apiKeyService,
 	)
 
 	return &Server{

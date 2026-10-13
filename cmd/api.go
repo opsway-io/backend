@@ -2,7 +2,10 @@ package cmd
 
 import (
 	"context"
+	"time"
 
+	"github.com/opsway-io/backend/internal/alerting"
+	"github.com/opsway-io/backend/internal/apikey"
 	"github.com/opsway-io/backend/internal/authentication"
 	"github.com/opsway-io/backend/internal/billing"
 	"github.com/opsway-io/backend/internal/changelog"
@@ -12,11 +15,14 @@ import (
 	"github.com/opsway-io/backend/internal/connectors/redis"
 	"github.com/opsway-io/backend/internal/entities"
 	"github.com/opsway-io/backend/internal/event"
+	"github.com/opsway-io/backend/internal/heartbeat"
 	"github.com/opsway-io/backend/internal/incident"
+	"github.com/opsway-io/backend/internal/maintenance"
 	"github.com/opsway-io/backend/internal/monitor"
 	"github.com/opsway-io/backend/internal/notification/email"
 	"github.com/opsway-io/backend/internal/report"
 	"github.com/opsway-io/backend/internal/rest"
+	"github.com/opsway-io/backend/internal/statuspage"
 	"github.com/opsway-io/backend/internal/storage"
 	"github.com/opsway-io/backend/internal/team"
 	"github.com/opsway-io/backend/internal/user"
@@ -62,11 +68,12 @@ func runAPI(cmd *cobra.Command, args []string) {
 	db.SetupJoinTable(&entities.Team{}, "Users", &entities.TeamUser{})
 	db.SetupJoinTable(&entities.ChangelogEntry{}, "Authors", &entities.ChangelogEntryAuthor{})
 
-	db.AutoMigrate(
+	if err := db.AutoMigrate(
 		entities.User{},
 		entities.Team{},
 		entities.Monitor{},
 		entities.MonitorSettings{},
+		entities.MonitorStep{},
 		entities.MonitorAssertion{},
 		entities.Maintenance{},
 		entities.MaintenanceSettings{},
@@ -76,7 +83,21 @@ func runAPI(cmd *cobra.Command, args []string) {
 		entities.Changelog{},
 		entities.ChangelogEntry{},
 		entities.Report{},
-	)
+		entities.IncidentOccurrence{},
+		entities.AlertRule{},
+		entities.AlertTrigger{},
+		entities.EscalationPolicy{},
+		entities.EscalationRotation{},
+		entities.UserNotificationRule{},
+		entities.ApiKey{},
+		entities.TeamInvite{},
+		entities.Heartbeat{},
+		entities.StatusPage{},
+		entities.StatusPageGroup{},
+		entities.StatusPageSubscriber{},
+	); err != nil {
+		l.WithError(err).Error("Failed to auto migrate database")
+	}
 
 	ch_db, err := clickhouse.NewClient(ctx, conf.Clickhouse)
 	if err != nil {
@@ -110,12 +131,25 @@ func runAPI(cmd *cobra.Command, args []string) {
 
 	userRepository := user.NewRepository(db)
 	userCache := user.NewCache(redisClient)
-	userService := user.NewService(userRepository, userCache, storageService, emailSender, eventService)
+	userService := user.NewService(userRepository, userCache, storageService, emailSender, eventService, user.WithApplicationURL(conf.Team.ApplicationURL))
 
 	teamRepository := team.NewRepository(db)
 	teamService := team.NewService(conf.Team, teamRepository, storageService, emailSender)
 
-	monitorService := monitor.NewService(db, redisClient)
+	monitorService := monitor.NewService(db, redisClient, monitor.WithLocations(conf.Prober.Locations))
+
+	// Convert legacy single-request monitors into 1-step monitors (idempotent)
+	if migrated, err := monitor.MigrateToSteps(ctx, db); err != nil {
+		l.WithError(err).Error("Failed to migrate monitors to steps")
+	} else if migrated > 0 {
+		l.WithField("count", migrated).Info("Migrated legacy monitors to steps")
+
+		if n, err := monitorService.RescheduleActive(ctx); err != nil {
+			l.WithError(err).Error("Failed to reschedule monitors")
+		} else {
+			l.WithField("count", n).Info("Rescheduled active monitors")
+		}
+	}
 
 	httpResultService := check.NewService(ch_db)
 
@@ -123,11 +157,26 @@ func runAPI(cmd *cobra.Command, args []string) {
 
 	changelogService := changelog.NewService(db)
 
-	incidentRepository := incident.NewRepository(db)
-	incidentService := incident.NewService(incidentRepository)
+	if err := incident.Migrate(db); err != nil {
+		l.WithError(err).Error("Failed to migrate incident indexes")
+	}
 
-	reportRepository := report.NewRepository(db)
+	incidentRepository := incident.NewRepository(db)
+	incidentService := incident.NewService(incidentRepository, newIncidentSubscriberHooks(conf, l, db)...)
+
+	reportRepository := report.NewRepository(db, ch_db)
 	reportsService := report.NewService(reportRepository)
+
+	maintenanceService := maintenance.NewService(maintenance.NewRepository(db))
+
+	heartbeatService := heartbeat.NewService(db)
+	go heartbeat.RunChecker(ctx, heartbeatService, 30*time.Second, l.WithField("module", "heartbeat_checker"))
+
+	statusPageService := statuspage.NewService(db, ch_db, emailSender)
+
+	alertingService := alerting.NewService(l.WithField("module", "alerting"), alerting.NewRepository(db), nil)
+	alertingPolicyService := alerting.NewPolicyService(alerting.NewPolicyRepository(db))
+	apiKeyService := apikey.NewService(db)
 
 	srv, err := rest.NewServer(
 		conf.REST,
@@ -143,6 +192,12 @@ func runAPI(cmd *cobra.Command, args []string) {
 		changelogService,
 		incidentService,
 		reportsService,
+		maintenanceService,
+		heartbeatService,
+		statusPageService,
+		alertingService,
+		alertingPolicyService,
+		apiKeyService,
 	)
 	if err != nil {
 		l.WithError(err).Fatal("Failed to create REST server")

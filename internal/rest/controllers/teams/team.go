@@ -17,13 +17,22 @@ type GetTeamRequest struct {
 }
 
 type GetTeamResponse struct {
-	ID          uint      `json:"id"`
-	Name        string    `json:"name"`
-	DisplayName *string   `json:"displayName"`
-	PaymentPlan string    `json:"paymentPlan"`
-	AvatarURL   *string   `json:"avatarUrl"`
-	CreatedAt   time.Time `json:"createdAt"`
-	UpdatedAt   time.Time `json:"updatedAt"`
+	ID          uint    `json:"id"`
+	Name        string  `json:"name"`
+	DisplayName *string `json:"displayName"`
+	PaymentPlan string  `json:"paymentPlan"`
+	AvatarURL   *string `json:"avatarUrl"`
+
+	SlackWebhookURL          *string `json:"slackWebhookUrl,omitempty"`
+	DiscordWebhookURL        *string `json:"discordWebhookUrl,omitempty"`
+	TelegramChatID           *string `json:"telegramChatId,omitempty"`
+	DatadogWebhookURL        *string `json:"datadogWebhookUrl,omitempty"`
+	NewRelicWebhookURL       *string `json:"newRelicWebhookUrl,omitempty"`
+	MicrosoftTeamsWebhookURL *string `json:"microsoftTeamsWebhookUrl,omitempty"`
+	WebhookURL               *string `json:"webhookUrl,omitempty"`
+
+	CreatedAt time.Time `json:"createdAt"`
+	UpdatedAt time.Time `json:"updatedAt"`
 }
 
 func (h *Handlers) GetTeam(c hs.AuthenticatedContext) error {
@@ -52,6 +61,14 @@ func newGetTeamResponse(t *entities.Team, teamService team.Service) GetTeamRespo
 		PaymentPlan: string(t.PaymentPlan),
 		CreatedAt:   t.CreatedAt,
 		UpdatedAt:   t.UpdatedAt,
+
+		SlackWebhookURL:          t.SlackWebhookURL,
+		DiscordWebhookURL:        t.DiscordWebhookURL,
+		TelegramChatID:           t.TelegramChatID,
+		DatadogWebhookURL:        t.DatadogWebhookURL,
+		NewRelicWebhookURL:       t.NewRelicWebhookURL,
+		MicrosoftTeamsWebhookURL: t.MicrosoftTeamsWebhookURL,
+		WebhookURL:               t.WebhookURL,
 	}
 
 	if t.HasAvatar {
@@ -64,6 +81,23 @@ func newGetTeamResponse(t *entities.Team, teamService team.Service) GetTeamRespo
 type PutTeamRequest struct {
 	TeamID      uint   `param:"teamId" validate:"required,numeric,gt=0"`
 	DisplayName string `json:"displayName" validate:"max=255"`
+
+	SlackWebhookURL          string `json:"slackWebhookUrl" validate:"omitempty,url,max=2048"`
+	DiscordWebhookURL        string `json:"discordWebhookUrl" validate:"omitempty,url,max=2048"`
+	TelegramChatID           string `json:"telegramChatId" validate:"omitempty,max=255"`
+	DatadogWebhookURL        string `json:"datadogWebhookUrl" validate:"omitempty,url,max=2048"`
+	NewRelicWebhookURL       string `json:"newRelicWebhookUrl" validate:"omitempty,url,max=2048"`
+	MicrosoftTeamsWebhookURL string `json:"microsoftTeamsWebhookUrl" validate:"omitempty,url,max=2048"`
+	WebhookURL               string `json:"webhookUrl" validate:"omitempty,url,max=2048"`
+}
+
+// emptyToNil clears a setting when an empty string is submitted.
+func emptyToNil(s *string) *string {
+	if s == nil || *s == "" {
+		return nil
+	}
+
+	return s
 }
 
 func (h *Handlers) PutTeam(c hs.AuthenticatedContext) error {
@@ -74,11 +108,17 @@ func (h *Handlers) PutTeam(c hs.AuthenticatedContext) error {
 		return echo.ErrBadRequest
 	}
 
-	if err = h.TeamService.UpdateDisplayName(
-		c.Request().Context(),
-		req.TeamID,
-		req.DisplayName,
-	); err != nil {
+	if err = h.TeamService.UpdateSettings(c.Request().Context(), &entities.Team{
+		ID:                       req.TeamID,
+		DisplayName:              emptyToNil(&req.DisplayName),
+		SlackWebhookURL:          emptyToNil(&req.SlackWebhookURL),
+		DiscordWebhookURL:        emptyToNil(&req.DiscordWebhookURL),
+		TelegramChatID:           emptyToNil(&req.TelegramChatID),
+		DatadogWebhookURL:        emptyToNil(&req.DatadogWebhookURL),
+		NewRelicWebhookURL:       emptyToNil(&req.NewRelicWebhookURL),
+		MicrosoftTeamsWebhookURL: emptyToNil(&req.MicrosoftTeamsWebhookURL),
+		WebhookURL:               emptyToNil(&req.WebhookURL),
+	}); err != nil {
 		c.Log.WithError(err).Debug("failed to update team")
 
 		return echo.ErrInternalServerError

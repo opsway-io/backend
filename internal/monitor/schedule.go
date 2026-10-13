@@ -2,6 +2,7 @@ package monitor
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -15,6 +16,8 @@ const taskKind = "http-probe"
 
 type Schedule interface {
 	Add(ctx context.Context, monitor *entities.Monitor) error
+	// Upsert (re)schedules the monitor, replacing an existing task.
+	Upsert(ctx context.Context, monitor *entities.Monitor) error
 	Remove(ctx context.Context, monitorID uint) error
 	On(ctx context.Context, handler func(ctx context.Context, monitor *entities.Monitor)) error
 }
@@ -38,6 +41,14 @@ func (s *ScheduleImpl) Add(ctx context.Context, monitor *entities.Monitor) error
 	t := boomerang.NewTask(taskKind, fmt.Sprintf("%d", monitor.ID), data)
 
 	return s.bschedule.Add(ctx, t, monitor.Settings.Frequency, time.Now())
+}
+
+func (s *ScheduleImpl) Upsert(ctx context.Context, monitor *entities.Monitor) error {
+	if err := s.Remove(ctx, monitor.ID); err != nil && !errors.Is(err, boomerang.ErrTaskDoesNotExist) {
+		return err
+	}
+
+	return s.Add(ctx, monitor)
 }
 
 func (s *ScheduleImpl) Remove(ctx context.Context, monitorID uint) error {

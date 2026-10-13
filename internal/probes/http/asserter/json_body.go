@@ -3,6 +3,8 @@ package asserter
 import (
 	"encoding/json"
 	"fmt"
+	"strconv"
+	"strings"
 
 	"github.com/opsway-io/backend/internal/probes/http"
 	"github.com/yalp/jsonpath"
@@ -11,32 +13,68 @@ import (
 /*
 	Assertions about the JSON body of HTTP result.
 
-	The property is a JSON path to the value to be asserted.
+	The property is a JSON path to the value to be asserted (e.g. "$.data.id";
+	a missing "$." prefix is added automatically).
 
 	The following operators are supported:
-		- Equals
-		- Not equals
-		- Is empty
-		- Is not empty
-		- Greater than
-		- Less than
-		- Contains
-		- Not contains
-		- Is null
-		- Is not null
+		- EQUAL / NOT_EQUAL
+		- EMPTY / NOT_EMPTY
+		- GREATER_THAN / LESS_THAN
+		- CONTAINS / NOT_CONTAINS
+		- HAS_KEY / NOT_HAS_KEY (the property path exists / does not exist)
+		- NULL / NOT_NULL
+
+	Legacy spellings (EQUALS, NOT_EQUALS, IS_EMPTY, IS_NOT_EMPTY, IS_NULL,
+	IS_NOT_NULL) are accepted as aliases.
 */
 
 var allowedJSONBodyOperators = []string{
-	"EQUALS",
-	"NOT_EQUALS",
-	"IS_EMPTY",
-	"IS_NOT_EMPTY",
+	"EQUAL",
+	"NOT_EQUAL",
+	"EMPTY",
+	"NOT_EMPTY",
 	"GREATER_THAN",
 	"LESS_THAN",
 	"CONTAINS",
 	"NOT_CONTAINS",
-	"IS_NULL",
-	"IS_NOT_NULL",
+	"HAS_KEY",
+	"NOT_HAS_KEY",
+	"NULL",
+	"NOT_NULL",
+}
+
+var jsonBodyOperatorAliases = map[string]string{
+	"EQUALS":       "EQUAL",
+	"NOT_EQUALS":   "NOT_EQUAL",
+	"IS_EMPTY":     "EMPTY",
+	"IS_NOT_EMPTY": "NOT_EMPTY",
+	"IS_NULL":      "NULL",
+	"IS_NOT_NULL":  "NOT_NULL",
+}
+
+// JSONBodyOperatorsWithoutTarget lists the operators that take no target value.
+var JSONBodyOperatorsWithoutTarget = []string{"EMPTY", "NOT_EMPTY", "NULL", "NOT_NULL", "HAS_KEY", "NOT_HAS_KEY"}
+
+func normalizeJSONBodyOperator(op string) string {
+	if alias, ok := jsonBodyOperatorAliases[op]; ok {
+		return alias
+	}
+
+	return op
+}
+
+// NormalizeJSONPath prefixes a plain property path ("data.id") with "$.".
+func NormalizeJSONPath(path string) string {
+	path = strings.TrimSpace(path)
+	if path == "" || strings.HasPrefix(path, "$") {
+		return path
+	}
+
+	if strings.HasPrefix(path, "[") {
+		return "$" + path
+	}
+
+	return "$." + path
 }
 
 type JSONBodyAsserter struct{}
@@ -65,54 +103,33 @@ func (a *JSONBodyAsserter) Assert(result *http.Result, rules []Rule) (ok []bool,
 }
 
 func (a *JSONBodyAsserter) IsRuleValid(rule Rule) error {
-	// Source must be "JSON_BODY"
-	if ok := rule.Source == "JSON_BODY"; !ok {
+	if rule.Source != "JSON_BODY" {
 		return fmt.Errorf("invalid source: %s", rule.Source)
 	}
 
-	// The property must not be empty
-	if ok := rule.Property != ""; !ok {
+	if rule.Property == "" {
 		return fmt.Errorf("empty property")
 	}
 
-	// The property must be a valid JSON path
-	if ok := a.isJSONPath(rule.Property); !ok {
+	if _, err := jsonpath.Prepare(NormalizeJSONPath(rule.Property)); err != nil {
 		return fmt.Errorf("invalid property: %s", rule.Property)
 	}
 
-	// The operator must be one of the allowed operators
-	if ok := isStringInSlice(rule.Operator, allowedJSONBodyOperators); !ok {
+	op := normalizeJSONBodyOperator(rule.Operator)
+	if !isStringInSlice(op, allowedJSONBodyOperators) {
 		return fmt.Errorf("invalid operator: %s", rule.Operator)
 	}
 
-	// The target must be set for the following operators:
-	// - CONTAINS
-	// - NOT_CONTAINS
-	// - HAS_KEY
-	// - NOT_HAS_KEY
-	// Not for EQUAL, NOT_EQUAL, HAS_VALUE, NOT_HAS_VALUE because the target can be empty
-	if ok := rule.Operator == "CONTAINS" || rule.Operator == "NOT_CONTAINS" || rule.Operator == "HAS_KEY" || rule.Operator == "NOT_HAS_KEY"; ok {
-		if ok := rule.Target != ""; !ok {
-			return fmt.Errorf("target must be set for operator: %s", rule.Operator)
-		}
+	if (op == "CONTAINS" || op == "NOT_CONTAINS") && rule.Target == "" {
+		return fmt.Errorf("target must be set for operator: %s", rule.Operator)
 	}
 
-	// The target must be empty for the following operators:
-	// - IS_EMPTY
-	// - IS_NOT_EMPTY
-	// - IS_NULL
-	// - IS_NOT_NULL
-	if ok := rule.Operator == "IS_EMPTY" || rule.Operator == "IS_NOT_EMPTY" || rule.Operator == "IS_NULL" || rule.Operator == "IS_NOT_NULL"; ok {
-		if ok := rule.Target == ""; !ok {
-			return fmt.Errorf("target must be empty for operator: %s", rule.Operator)
-		}
+	if isStringInSlice(op, JSONBodyOperatorsWithoutTarget) && rule.Target != "" {
+		return fmt.Errorf("target must be empty for operator: %s", rule.Operator)
 	}
 
-	// The target must be a number for the following operators:
-	// - GREATER_THAN
-	// - LESS_THAN
-	if ok := rule.Operator == "GREATER_THAN" || rule.Operator == "LESS_THAN"; ok {
-		if ok := isInt(rule.Target); !ok {
+	if op == "GREATER_THAN" || op == "LESS_THAN" {
+		if _, err := strconv.ParseFloat(rule.Target, 64); err != nil {
 			return fmt.Errorf("target must be a number for operator: %s", rule.Operator)
 		}
 	}
@@ -120,110 +137,137 @@ func (a *JSONBodyAsserter) IsRuleValid(rule Rule) error {
 	return nil
 }
 
-func (a *JSONBodyAsserter) isJSONPath(path string) bool {
-	_, err := jsonpath.Prepare(path)
-
-	return err == nil
-}
-
 func (a *JSONBodyAsserter) assert(result *http.Result, rule Rule) bool {
-	var unmarshalData interface{}
-	err := json.Unmarshal(result.Response.Body, &unmarshalData)
-	if err != nil {
+	var data interface{}
+	if err := json.Unmarshal(result.Response.Body, &data); err != nil {
 		return false
 	}
 
-	value, err := jsonpath.Read(unmarshalData, rule.Property)
-	if err != nil {
-		return false
-	}
+	op := normalizeJSONBodyOperator(rule.Operator)
 
-	switch rule.Operator {
-	case "EQUALS":
-		return a.assertEquals(value, rule.Target)
-	case "NOT_EQUALS":
-		return a.assertNotEquals(value, rule.Target)
+	value, err := jsonpath.Read(data, NormalizeJSONPath(rule.Property))
+	found := err == nil
+
+	switch op {
 	case "HAS_KEY":
-		return a.assertHasKey(value, rule.Target)
+		return found
 	case "NOT_HAS_KEY":
-		return a.assertNotHasKey(value, rule.Target)
-	case "HAS_VALUE":
-		return a.assertHasValue(value, rule.Target)
-	case "NOT_HAS_VALUE":
-		return a.assertNotHasValue(value, rule.Target)
-	case "IS_EMPTY":
-		return a.assertIsEmpty(value)
-	case "IS_NOT_EMPTY":
-		return a.assertIsNotEmpty(value)
-	case "GREATER_THAN":
-		return a.assertGreaterThan(value, rule.Target)
-	case "LESS_THAN":
-		return a.assertLessThan(value, rule.Target)
+		return !found
+	}
+
+	if !found {
+		return false
+	}
+
+	switch op {
+	case "EQUAL":
+		return JSONValueToString(value) == rule.Target
+	case "NOT_EQUAL":
+		return JSONValueToString(value) != rule.Target
+	case "EMPTY":
+		return isEmptyJSONValue(value)
+	case "NOT_EMPTY":
+		return !isEmptyJSONValue(value)
+	case "GREATER_THAN", "LESS_THAN":
+		n, ok := jsonNumber(value)
+		if !ok {
+			return false
+		}
+
+		target, err := strconv.ParseFloat(rule.Target, 64)
+		if err != nil {
+			return false
+		}
+
+		if op == "GREATER_THAN" {
+			return n > target
+		}
+
+		return n < target
 	case "CONTAINS":
-		return a.assertContains(value, rule.Target)
+		return jsonContains(value, rule.Target)
 	case "NOT_CONTAINS":
-		return a.assertNotContains(value, rule.Target)
-	case "IS_NULL":
-		return a.assertIsNull(value)
-	case "IS_NOT_NULL":
-		return a.assertIsNotNull(value)
+		return !jsonContains(value, rule.Target)
+	case "NULL":
+		return value == nil
+	case "NOT_NULL":
+		return value != nil
 	default:
 		return false
 	}
 }
 
-func (a *JSONBodyAsserter) assertEquals(value interface{}, target string) bool {
-	return fmt.Sprintf("%v", value) == target
+// JSONValueToString renders a decoded JSON value the way a user would type it:
+// strings unquoted, numbers without exponent, objects/arrays as JSON.
+func JSONValueToString(value interface{}) string {
+	switch v := value.(type) {
+	case nil:
+		return "null"
+	case string:
+		return v
+	case float64:
+		return strconv.FormatFloat(v, 'f', -1, 64)
+	case bool:
+		return strconv.FormatBool(v)
+	default:
+		b, err := json.Marshal(v)
+		if err != nil {
+			return fmt.Sprintf("%v", v)
+		}
+
+		return string(b)
+	}
 }
 
-func (a *JSONBodyAsserter) assertNotEquals(value interface{}, target string) bool {
-	return fmt.Sprintf("%v", value) != target
+func isEmptyJSONValue(value interface{}) bool {
+	if value == nil {
+		return true
+	}
+
+	switch v := value.(type) {
+	case string:
+		return v == ""
+	case []interface{}:
+		return len(v) == 0
+	case map[string]interface{}:
+		return len(v) == 0
+	}
+
+	return false
 }
 
-func (a *JSONBodyAsserter) assertHasKey(value interface{}, target string) bool {
-	return value != nil
+func jsonNumber(value interface{}) (float64, bool) {
+	switch v := value.(type) {
+	case float64:
+		return v, true
+	case string:
+		f, err := strconv.ParseFloat(v, 64)
+
+		return f, err == nil
+	}
+
+	return 0, false
 }
 
-func (a *JSONBodyAsserter) assertNotHasKey(value interface{}, target string) bool {
-	return value == nil
-}
+func jsonContains(value interface{}, target string) bool {
+	switch v := value.(type) {
+	case string:
+		return strings.Contains(v, target)
+	case []interface{}:
+		for _, item := range v {
+			if JSONValueToString(item) == target {
+				return true
+			}
+		}
 
-func (a *JSONBodyAsserter) assertHasValue(value interface{}, target string) bool {
-	return false // TODO: Implement
-}
+		return false
+	case map[string]interface{}:
+		_, ok := v[target]
 
-func (a *JSONBodyAsserter) assertNotHasValue(value interface{}, target string) bool {
-	return false // TODO: Implement
-}
-
-func (a *JSONBodyAsserter) assertIsEmpty(value interface{}) bool {
-	return false // TODO: Implement
-}
-
-func (a *JSONBodyAsserter) assertIsNotEmpty(value interface{}) bool {
-	return false // TODO: Implement
-}
-
-func (a *JSONBodyAsserter) assertGreaterThan(value interface{}, target string) bool {
-	return false // TODO: Implement
-}
-
-func (a *JSONBodyAsserter) assertLessThan(value interface{}, target string) bool {
-	return false // TODO: Implement
-}
-
-func (a *JSONBodyAsserter) assertContains(value interface{}, target string) bool {
-	return false // TODO: Implement
-}
-
-func (a *JSONBodyAsserter) assertNotContains(value interface{}, target string) bool {
-	return false // TODO: Implement
-}
-
-func (a *JSONBodyAsserter) assertIsNull(value interface{}) bool {
-	return value == nil
-}
-
-func (a *JSONBodyAsserter) assertIsNotNull(value interface{}) bool {
-	return value != nil
+		return ok
+	case nil:
+		return false
+	default:
+		return strings.Contains(JSONValueToString(v), target)
+	}
 }

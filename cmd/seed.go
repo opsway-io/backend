@@ -19,6 +19,10 @@ var seederCmd = &cobra.Command{
 		"team_opsway",
 		"teams_and_users",
 		"monitors",
+		"status_pages",
+		"maintenance",
+		"incidents",
+		"alerts",
 	},
 }
 
@@ -60,6 +64,14 @@ func getSeeders(args []string) []seeds.Seeder {
 			res = append(res, seeds.TeamsAndUsers)
 		case "monitors":
 			res = append(res, seeds.Monitors)
+		case "status_pages":
+			res = append(res, seeds.StatusPages)
+		case "maintenance":
+			res = append(res, seeds.Maintenance)
+		case "incidents":
+			res = append(res, seeds.Incidents)
+		case "alerts":
+			res = append(res, seeds.Alerts)
 		}
 	}
 

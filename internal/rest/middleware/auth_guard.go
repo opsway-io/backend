@@ -5,6 +5,7 @@ import (
 
 	"github.com/labstack/echo/v4"
 	"github.com/opsway-io/backend/internal/authentication"
+	"github.com/opsway-io/backend/internal/rest/helpers"
 	"github.com/sirupsen/logrus"
 )
 
@@ -15,22 +16,9 @@ func AuthGuardFactory(logger *logrus.Entry, jwtService authentication.Service) f
 	return func() func(next echo.HandlerFunc) echo.HandlerFunc {
 		return func(next echo.HandlerFunc) echo.HandlerFunc {
 			return func(c echo.Context) error {
-				header := c.Request().Header.Get("Authorization")
-				if header == "" {
-					l.Debug("missing authorization header")
-
-					return echo.ErrUnauthorized
-				}
-
-				typ, token, ok := strings.Cut(header, " ")
+				token, ok := getAccessToken(c)
 				if !ok {
-					l.Debug("invalid authorization token type")
-
-					return echo.ErrUnauthorized
-				}
-
-				if typ != "Bearer" {
-					l.Debug("authorization token not Bearer")
+					l.Debug("missing or invalid access token")
 
 					return echo.ErrUnauthorized
 				}
@@ -56,4 +44,24 @@ func AuthGuardFactory(logger *logrus.Entry, jwtService authentication.Service) f
 			}
 		}
 	}
+}
+
+// Reads the access token from the Authorization header, falling back to the access token cookie
+func getAccessToken(c echo.Context) (string, bool) {
+	header := c.Request().Header.Get("Authorization")
+	if header == "" {
+		cookie, err := c.Cookie(helpers.AccessTokenCookieName)
+		if err != nil || cookie.Value == "" {
+			return "", false
+		}
+
+		return cookie.Value, true
+	}
+
+	typ, token, ok := strings.Cut(header, " ")
+	if !ok || typ != "Bearer" {
+		return "", false
+	}
+
+	return token, true
 }

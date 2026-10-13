@@ -31,6 +31,7 @@ func Register(
 	}
 
 	TeamGuard := mw.TeamGuardFactory(logger, teamService)
+	AllowedRoles := mw.RoleGuardFactory(logger, teamService)
 
 	AuthHandler := handlers.AuthenticatedHandlerFactory(logger)
 
@@ -41,4 +42,6 @@ func Register(
 
 	reportsGroup.GET("", AuthHandler(h.GetReports))
 	reportsGroup.POST("", AuthHandler(h.CreateReport))
+	reportsGroup.GET("/:reportId", AuthHandler(h.GetReport))
+	reportsGroup.DELETE("/:reportId", AuthHandler(h.DeleteReport), AllowedRoles(mw.UserRoleOwner, mw.UserRoleAdmin))
 }

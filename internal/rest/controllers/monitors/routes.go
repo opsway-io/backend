@@ -35,6 +35,8 @@ func Register(
 
 	AuthHandler := handlers.AuthenticatedHandlerFactory(logger)
 
+	e.GET("/prober/locations", AuthHandler(h.GetProberLocations))
+
 	monitorsGroup := e.Group(
 		"/teams/:teamId/monitors",
 		TeamGuard(),
@@ -42,6 +44,9 @@ func Register(
 
 	monitorsGroup.GET("", AuthHandler(h.GetMonitors))
 	monitorsGroup.POST("", AuthHandler(h.PostMonitor), AllowedRoles(mw.UserRoleOwner, mw.UserRoleAdmin))
+
+	monitorsGroup.POST("/bulk", AuthHandler(h.PostMonitorsBulk), AllowedRoles(mw.UserRoleOwner, mw.UserRoleAdmin))
+	monitorsGroup.POST("/openapi/preview", AuthHandler(h.PostOpenAPIPreview), AllowedRoles(mw.UserRoleOwner, mw.UserRoleAdmin))
 
 	monitorsGroup.GET("/incidents", AuthHandler(h.GetMonitorIncidents))
 

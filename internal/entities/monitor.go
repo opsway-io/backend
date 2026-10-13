@@ -18,7 +18,11 @@ type Monitor struct {
 	State MonitorState `gorm:"not null;default:0"`
 	Name  string       `gorm:"index;not null"`
 
-	Settings   MonitorSettings    `gorm:"not null;constraint:OnDelete:CASCADE"`
+	Settings MonitorSettings `gorm:"not null;constraint:OnDelete:CASCADE"`
+	// Steps are executed in order (by Position) on every check.
+	Steps []MonitorStep `gorm:"constraint:OnDelete:CASCADE"`
+	// Assertions holds every assertion of the monitor (across all steps).
+	// Each assertion references its step through StepID.
 	Assertions []MonitorAssertion `gorm:"constraint:OnDelete:CASCADE"`
 	Incidents  []Incident         `gorm:"constraint:OnDelete:CASCADE"`
 
@@ -75,7 +79,25 @@ type MonitorSettings struct {
 	Body    MonitorSettingsBody     `gorm:"embedded;embeddedPrefix:body_"`
 	TLS     MonitorSettingsTLS      `gorm:"embedded;embeddedPrefix:tls_"`
 
+	Auth      MonitorSettingsAuth `gorm:"embedded;embeddedPrefix:auth_"`
+	Locations []string            `gorm:"serializer:json"`
+
 	UpdatedAt time.Time `gorm:"index"`
+}
+
+const (
+	MonitorAuthMethodNone                    = "NONE"
+	MonitorAuthMethodBasic                   = "BASIC"
+	MonitorAuthMethodOAuth2ClientCredentials = "OAUTH2_CLIENT_CREDENTIALS"
+)
+
+type MonitorSettingsAuth struct {
+	Method       string `gorm:"not null;default:'NONE'"`
+	TokenURL     string
+	ClientID     string
+	ClientSecret string
+	Username     string
+	Password     string
 }
 
 type MonitorSettingsHeader struct {
@@ -128,9 +150,42 @@ func (ms *MonitorSettings) SetFrequencySeconds(seconds uint64) {
 	ms.Frequency = time.Duration(seconds) * time.Second
 }
 
-type MonitorAssertion struct {
+// MonitorStep is a single HTTP request of a (multi-step) monitor.
+type MonitorStep struct {
 	ID        uint
 	MonitorID uint `gorm:"index;not null"`
+	Position  int  `gorm:"not null;default:0"`
+
+	Name      string                  `gorm:"not null;default:''"`
+	Method    string                  `gorm:"not null"`
+	URL       string                  `gorm:"not null"`
+	Headers   []MonitorSettingsHeader `gorm:"serializer:json"`
+	Body      MonitorSettingsBody     `gorm:"embedded;embeddedPrefix:body_"`
+	Variables []MonitorStepVariable   `gorm:"serializer:json"`
+
+	Assertions []MonitorAssertion `gorm:"foreignKey:StepID;constraint:OnDelete:CASCADE"`
+
+	CreatedAt time.Time
+	UpdatedAt time.Time `gorm:"index"`
+}
+
+func (MonitorStep) TableName() string {
+	return "monitor_steps"
+}
+
+// MonitorStepVariable extracts a value from a step's response, which later
+// steps can reference as {{Name}}.
+type MonitorStepVariable struct {
+	Name     string
+	Source   string
+	Property string
+}
+
+type MonitorAssertion struct {
+	ID        uint
+	MonitorID uint  `gorm:"index;not null"`
+	StepID    *uint `gorm:"index"`
+	Position  int   `gorm:"not null;default:0"`
 
 	Source   string `gorm:"not null"`
 	Property string

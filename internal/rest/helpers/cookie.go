@@ -18,6 +18,7 @@ type CookieService interface {
 	SetRefreshToken(c echo.Context, value string) error
 	GetAccessToken(c echo.Context) (*http.Cookie, error)
 	GetRefreshToken(c echo.Context) (*http.Cookie, error)
+	ClearTokens(c echo.Context)
 }
 
 type CookieServiceImpl struct {
@@ -66,4 +67,19 @@ func (s *CookieServiceImpl) GetAccessToken(c echo.Context) (*http.Cookie, error)
 
 func (s *CookieServiceImpl) GetRefreshToken(c echo.Context) (*http.Cookie, error) {
 	return c.Cookie(RefreshTokenCookieName)
+}
+
+func (s *CookieServiceImpl) ClearTokens(c echo.Context) {
+	for _, name := range []string{AccessTokenCookieName, RefreshTokenCookieName} {
+		cookie := new(http.Cookie)
+		cookie.Name = name
+		cookie.Value = ""
+		cookie.MaxAge = -1
+		cookie.Domain = s.authConfig.CookieDomain
+		cookie.Path = "/"
+		cookie.SameSite = http.SameSiteLaxMode
+		cookie.Secure = s.authConfig.CookieSecure
+
+		c.SetCookie(cookie)
+	}
 }

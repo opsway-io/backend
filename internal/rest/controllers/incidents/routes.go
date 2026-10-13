@@ -2,7 +2,7 @@ package incidents
 
 import (
 	"github.com/labstack/echo/v4"
-	"github.com/opsway-io/backend/internal/authentication"
+	"github.com/opsway-io/backend/internal/alerting"
 	"github.com/opsway-io/backend/internal/incident"
 	"github.com/opsway-io/backend/internal/rest/handlers"
 	mw "github.com/opsway-io/backend/internal/rest/middleware"
@@ -11,9 +11,9 @@ import (
 )
 
 type Handlers struct {
-	AuthenticationService authentication.Service
-	TeamService           team.Service
-	IncidentService       incident.Service
+	TeamService     team.Service
+	IncidentService incident.Service
+	AlertingService alerting.Service
 }
 
 func Register(
@@ -21,22 +21,31 @@ func Register(
 	logger *logrus.Entry,
 	teamService team.Service,
 	incidentService incident.Service,
+	alertingService alerting.Service,
 ) {
 	h := &Handlers{
+		TeamService:     teamService,
 		IncidentService: incidentService,
+		AlertingService: alertingService,
 	}
 
 	TeamGuard := mw.TeamGuardFactory(logger, teamService)
+	AllowedRoles := mw.RoleGuardFactory(logger, teamService)
 
 	AuthHandler := handlers.AuthenticatedHandlerFactory(logger)
 
-	monitorsGroup := e.Group(
+	incidentsGroup := e.Group(
 		"/teams/:teamId/incidents",
 		TeamGuard(),
 	)
 
-	monitorsGroup.GET("", AuthHandler(h.GetIncidents))
-	monitorsGroup.GET("/overview", AuthHandler(h.GetIncidents))
-	monitorsGroup.GET("/monitor/:monitorId", AuthHandler(h.GetMonitorIncidents))
-	monitorsGroup.PATCH("/:incidentId/resolved", AuthHandler(h.PatchSolveMonitorIncident))
+	incidentsGroup.GET("", AuthHandler(h.GetIncidents))
+	incidentsGroup.GET("/overview", AuthHandler(h.GetIncidents))
+	incidentsGroup.GET("/monitor/:monitorId", AuthHandler(h.GetMonitorIncidents))
+	incidentsGroup.GET("/:incidentId", AuthHandler(h.GetIncident))
+	incidentsGroup.GET("/:incidentId/alerts", AuthHandler(h.GetIncidentAlerts))
+	incidentsGroup.GET("/:incidentId/occurrences", AuthHandler(h.GetIncidentOccurrences))
+	incidentsGroup.PATCH("/:incidentId/resolved", AuthHandler(h.PatchSolveMonitorIncident))
+	incidentsGroup.PATCH("/:incidentId/acknowledge", AuthHandler(h.PatchAcknowledgeIncident))
+	incidentsGroup.PATCH("/:incidentId/visibility", AuthHandler(h.PatchIncidentVisibility), AllowedRoles(mw.UserRoleOwner, mw.UserRoleAdmin))
 }

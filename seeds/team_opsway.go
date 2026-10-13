@@ -3,6 +3,7 @@ package seeds
 import (
 	"github.com/opsway-io/backend/internal/entities"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 	"k8s.io/utils/pointer"
 )
 
@@ -11,28 +12,33 @@ func TeamOpsway(db *gorm.DB) {
 	t := entities.Team{
 		Name: "opsway",
 	}
-	db.FirstOrCreate(&t)
+	if err := db.Where(entities.Team{Name: t.Name}).FirstOrCreate(&t).Error; err != nil {
+		panic(err)
+	}
 
 	// Users
 	user := entities.User{
 		Email:       "admin@opsway.io",
 		Name:        "Douglas Adams",
-		DisplayName: pointer.StringPtr("Ford Prefect"),
-		Teams: []entities.Team{
-			t,
-		},
+		DisplayName: pointer.String("Ford Prefect"),
 	}
 
 	user.SetPassword("pass")
 
-	result := db.Create(&user)
-	if result.Error != nil {
-		panic(result.Error)
+	if err := db.Where(entities.User{Email: user.Email}).FirstOrCreate(&user).Error; err != nil {
+		panic(err)
 	}
 
-	db.Create(&entities.TeamUser{
+	// Membership, upserted so re-running the seed fixes the role
+	err := db.Clauses(clause.OnConflict{
+		Columns:   []clause.Column{{Name: "user_id"}, {Name: "team_id"}},
+		DoUpdates: clause.AssignmentColumns([]string{"role", "updated_at"}),
+	}).Create(&entities.TeamUser{
 		UserID: user.ID,
 		TeamID: t.ID,
 		Role:   entities.TeamRoleAdmin,
-	})
+	}).Error
+	if err != nil {
+		panic(err)
+	}
 }

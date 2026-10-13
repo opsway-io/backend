@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"strings"
 	"time"
 
 	"github.com/golang-jwt/jwt"
@@ -54,6 +55,10 @@ type Service interface {
 	InviteByEmail(ctx context.Context, teamID uint, role entities.TeamRole, email string) error
 	GenerateInviteLink(ctx context.Context, teamID uint, role entities.TeamRole, email string) (string, error)
 	AcceptInviteByToken(ctx context.Context, token string, user *entities.User) error
+	GetInvites(ctx context.Context, teamID uint) (*[]entities.TeamInvite, error)
+	DeleteInvite(ctx context.Context, teamID uint, email string) error
+
+	UpdateSettings(ctx context.Context, team *entities.Team) error
 }
 
 type ServiceImpl struct {
@@ -188,8 +193,17 @@ func (s *ServiceImpl) InviteByEmail(ctx context.Context, teamID uint, role entit
 		return errors.Wrap(err, "failed to get team")
 	}
 
+	// Store the pending invite, so it can be listed and revoked
+	if err := s.repository.UpsertInvite(ctx, &entities.TeamInvite{
+		TeamID: teamID,
+		Email:  strings.ToLower(email),
+		Role:   role,
+	}); err != nil {
+		return errors.Wrap(err, "failed to store invite")
+	}
+
 	// Generate invite link
-	link, err := s.GenerateInviteLink(ctx, teamID, role, email)
+	link, err := s.GenerateInviteLink(ctx, teamID, role, strings.ToLower(email))
 	if err != nil {
 		return errors.Wrap(err, "failed to generate invite link")
 	}
@@ -272,6 +286,15 @@ func (s *ServiceImpl) AcceptInviteByToken(ctx context.Context, tokenString strin
 
 	teamID := uint(teamIDFloat64)
 
+	// The invite must still be pending (it may have been revoked)
+	if _, err := s.repository.GetInvite(ctx, teamID, user.Email); err != nil {
+		if errors.Is(err, ErrInviteNotFound) {
+			return ErrInvalidInvitationToken
+		}
+
+		return errors.Wrap(err, "failed to get invite")
+	}
+
 	// Add user to team
 	if err := s.repository.AddUser(
 		ctx,
@@ -282,7 +305,23 @@ func (s *ServiceImpl) AcceptInviteByToken(ctx context.Context, tokenString strin
 		return errors.Wrap(err, "failed to add user to team")
 	}
 
+	if err := s.repository.DeleteInvite(ctx, teamID, user.Email); err != nil && !errors.Is(err, ErrInviteNotFound) {
+		return errors.Wrap(err, "failed to delete accepted invite")
+	}
+
 	return nil
+}
+
+func (s *ServiceImpl) GetInvites(ctx context.Context, teamID uint) (*[]entities.TeamInvite, error) {
+	return s.repository.GetInvites(ctx, teamID)
+}
+
+func (s *ServiceImpl) DeleteInvite(ctx context.Context, teamID uint, email string) error {
+	return s.repository.DeleteInvite(ctx, teamID, email)
+}
+
+func (s *ServiceImpl) UpdateSettings(ctx context.Context, team *entities.Team) error {
+	return s.repository.UpdateSettings(ctx, team)
 }
 
 func (s *ServiceImpl) getAvatarKey(teamID uint) string {

@@ -41,7 +41,7 @@ require (
 	golang.org/x/crypto v0.23.0
 	gorm.io/datatypes v1.2.6
 	gorm.io/driver/clickhouse v0.5.0
-	gorm.io/driver/postgres v1.5.0
+	gorm.io/driver/postgres v1.5.11
 	gorm.io/gorm v1.30.0
 	k8s.io/utils v0.0.0-20221128185143-99ec85e7a448
 )

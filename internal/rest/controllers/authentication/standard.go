@@ -72,6 +72,9 @@ func (h *Handlers) PostLogin(c hs.BaseContext) error {
 		return echo.ErrInternalServerError
 	}
 
+	h.CookieService.SetAccessToken(c, accessToken)
+	h.CookieService.SetRefreshToken(c, refreshToken)
+
 	c.Log.Info("user authenticated")
 
 	return c.JSON(http.StatusOK, newPostLoginResponse(

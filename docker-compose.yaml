@@ -14,10 +14,14 @@ services:
     ports:
       - 8001:8001
     depends_on:
-      - postgres
-      - redis
-      - ch_server
-      - storage
+      postgres:
+        condition: service_started
+      redis:
+        condition: service_started
+      ch_server:
+        condition: service_healthy
+      storage:
+        condition: service_started
   prober:
     image: acim/go-reflex
     restart: unless-stopped
@@ -27,8 +31,10 @@ services:
     volumes:
       - .:/app
     depends_on:
-      - redis
-      - ch_server
+      redis:
+        condition: service_started
+      ch_server:
+        condition: service_healthy
 
   # Dependencies
   postgres:

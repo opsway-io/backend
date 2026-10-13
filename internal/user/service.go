@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/gofrs/uuid"
@@ -36,6 +37,24 @@ type Service interface {
 	ChangePasswordWithOldPassword(ctx context.Context, userID uint, oldPassword string, newPassword string) error
 	ChangePasswordWithResetToken(ctx context.Context, userID uint, token string, newPassword string) (err error)
 	RequestPasswordReset(ctx context.Context, userId uint) error
+	// RequestPasswordResetByEmail sends a reset link if a user with the email exists. Unknown emails return ErrNotFound.
+	RequestPasswordResetByEmail(ctx context.Context, email string) error
+	// ResetPasswordWithToken sets a new password for the user that owns the reset token.
+	ResetPasswordWithToken(ctx context.Context, token string, newPassword string) error
+}
+
+// DefaultApplicationURL is used in emailed links when no application URL is configured.
+const DefaultApplicationURL = "https://my.opsway.io"
+
+type Option func(*ServiceImpl)
+
+// WithApplicationURL sets the dashboard base URL used in emailed links.
+func WithApplicationURL(url string) Option {
+	return func(s *ServiceImpl) {
+		if url != "" {
+			s.applicationURL = strings.TrimRight(url, "/")
+		}
+	}
 }
 
 type ServiceImpl struct {
@@ -44,16 +63,25 @@ type ServiceImpl struct {
 	cache      Cache
 	email      email.Sender
 	event      event.Service
+
+	applicationURL string
 }
 
-func NewService(repository Repository, cache Cache, storage storage.Service, email email.Sender, event event.Service) Service {
-	return &ServiceImpl{
-		repository: repository,
-		cache:      cache,
-		storage:    storage,
-		email:      email,
-		event:      event,
+func NewService(repository Repository, cache Cache, storage storage.Service, email email.Sender, event event.Service, opts ...Option) Service {
+	s := &ServiceImpl{
+		repository:     repository,
+		cache:          cache,
+		storage:        storage,
+		email:          email,
+		event:          event,
+		applicationURL: DefaultApplicationURL,
 	}
+
+	for _, opt := range opts {
+		opt(s)
+	}
+
+	return s
 }
 
 func (s *ServiceImpl) GetUserByID(ctx context.Context, id uint) (*entities.User, error) {
@@ -224,8 +252,8 @@ func (s *ServiceImpl) RequestPasswordReset(ctx context.Context, userId uint) err
 		&templates.PasswordResetTemplate{
 			Name: user.Name,
 			PasswordResetLink: fmt.Sprintf(
-				"%s/reset-password?token=%s",
-				"https://my.opsway.io", // TODO: move to config
+				"%s/login/reset-password?token=%s",
+				s.applicationURL,
 				token.String(),
 			),
 		},
@@ -239,8 +267,8 @@ func (s *ServiceImpl) RequestPasswordReset(ctx context.Context, userId uint) err
 func (s *ServiceImpl) ChangePasswordWithResetToken(ctx context.Context, userID uint, token string, newPassword string) error {
 	tokenUserID, err := s.cache.VerifyAndDeletePasswordResetToken(ctx, token)
 	if err != nil {
-		if errors.Is(err, ErrNotFound) {
-			return err
+		if errors.Is(err, ErrNoSuchPasswordResetToken) {
+			return ErrNotFound
 		}
 
 		return errors.Wrap(err, "failed to get user ID by token")
@@ -258,6 +286,41 @@ func (s *ServiceImpl) ChangePasswordWithResetToken(ctx context.Context, userID u
 		}
 
 		return errors.Wrap(err, "failed to get user")
+	}
+
+	if err := user.SetPassword(newPassword); err != nil {
+		return errors.Wrap(err, "failed to set new password")
+	}
+
+	if err := s.repository.Update(ctx, user); err != nil {
+		return errors.Wrap(err, "failed to update user")
+	}
+
+	return nil
+}
+
+func (s *ServiceImpl) RequestPasswordResetByEmail(ctx context.Context, email string) error {
+	user, err := s.repository.GetUserAndTeamsByEmailAddress(ctx, strings.ToLower(email))
+	if err != nil {
+		return err
+	}
+
+	return s.RequestPasswordReset(ctx, user.ID)
+}
+
+func (s *ServiceImpl) ResetPasswordWithToken(ctx context.Context, token string, newPassword string) error {
+	userID, err := s.cache.VerifyAndDeletePasswordResetToken(ctx, token)
+	if err != nil {
+		if errors.Is(err, ErrNoSuchPasswordResetToken) {
+			return ErrNotFound
+		}
+
+		return errors.Wrap(err, "failed to verify reset token")
+	}
+
+	user, err := s.repository.GetUserByID(ctx, userID)
+	if err != nil {
+		return err
 	}
 
 	if err := user.SetPassword(newPassword); err != nil {

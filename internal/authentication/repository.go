@@ -35,10 +35,18 @@ func NewRepository(redis *redis.Client) Repository {
 }
 
 func (r *RepositoryImpl) UseRefreshToken(ctx context.Context, token string) (ok bool, err error) {
-	notSeenBefore, err := r.redis.Do(ctx, "BF.ADD", "refresh_tokens", token).Bool()
+	res, err := r.redis.Do(ctx, "BF.ADD", "refresh_tokens", token).Result()
 	if err != nil {
 		return false, errors.Wrap(err, "failed to check refresh token")
 	}
 
-	return notSeenBefore, nil
+	// RESP3 replies with a boolean, RESP2 with an integer
+	switch notSeenBefore := res.(type) {
+	case bool:
+		return notSeenBefore, nil
+	case int64:
+		return notSeenBefore == 1, nil
+	default:
+		return false, errors.Errorf("unexpected BF.ADD reply type %T", res)
+	}
 }

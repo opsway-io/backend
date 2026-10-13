@@ -74,8 +74,8 @@ func (s *ServiceImpl) CreateCheckoutSession(team *entities.Team, priceLookupKey 
 	}
 
 	params := &stripe.CheckoutSessionParams{
-		SuccessURL:        stripe.String(s.Config.Domain + "/team/subscription"),
-		CancelURL:         stripe.String(s.Config.Domain + "/team/subscription"),
+		SuccessURL:        stripe.String(s.Config.Domain + "/settings/billing"),
+		CancelURL:         stripe.String(s.Config.Domain + "/settings/billing"),
 		Mode:              stripe.String(string(stripe.CheckoutSessionModeSubscription)),
 		ClientReferenceID: stripe.String(strconv.FormatUint(uint64(team.ID), 10)),
 
