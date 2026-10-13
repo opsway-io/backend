@@ -674,9 +674,16 @@ func handleTask(ctx context.Context, logger *logrus.Logger, httpProber http.Serv
 		}
 
 		// 2. Untrusted Certificate Authority or Hostname Mismatch
-		if !res.TLS.Certificate.TrustedCA || !res.TLS.Certificate.HostValid {
+		verifyHostname := true
+		if m.Settings.TLS.VerifyHostname != nil {
+			verifyHostname = *m.Settings.TLS.VerifyHostname
+		}
+
+		isMismatch := verifyHostname && !res.TLS.Certificate.HostValid
+		isUntrustedCA := !res.TLS.Certificate.TrustedCA
+
+		if isMismatch || isUntrustedCA {
 			title := "SSL/TLS Certificate Chain Invalid"
-			isMismatch := !res.TLS.Certificate.HostValid
 			if isMismatch {
 				title = "SSL/TLS Hostname Mismatch"
 			}
@@ -721,9 +728,19 @@ func handleTask(ctx context.Context, logger *logrus.Logger, httpProber http.Serv
 		}
 
 		// 3. Expiry and Near-Expiry
+		checkExpiration := true
+		if m.Settings.TLS.CheckExpiration != nil {
+			checkExpiration = *m.Settings.TLS.CheckExpiration
+		}
+		thresholdDays := 30
+		if m.Settings.TLS.ExpirationThresholdDays != nil && *m.Settings.TLS.ExpirationThresholdDays > 0 {
+			thresholdDays = int(*m.Settings.TLS.ExpirationThresholdDays)
+		}
+		thresholdDuration := time.Duration(thresholdDays) * 24 * time.Hour
+
 		expiry := res.TLS.Certificate.NotAfter
 		timeRemaining := time.Until(expiry)
-		if timeRemaining <= 0 {
+		if checkExpiration && timeRemaining <= 0 {
 			hasOpenExpiredIncident := false
 			if openIncidents != nil {
 				for _, inc := range *openIncidents {
@@ -744,7 +761,7 @@ func handleTask(ctx context.Context, logger *logrus.Logger, httpProber http.Serv
 				}
 				_ = i.Create(ctx, &[]entities.Incident{expInc})
 			}
-		} else if timeRemaining < 30*24*time.Hour {
+		} else if checkExpiration && timeRemaining < thresholdDuration {
 			hasOpenSSLIncident := false
 			if openIncidents != nil {
 				for _, inc := range *openIncidents {

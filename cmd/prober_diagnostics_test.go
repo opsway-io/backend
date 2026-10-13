@@ -248,3 +248,60 @@ func TestFormatTLSDescriptions(t *testing.T) {
 	assert.Contains(t, descExp, `WARNING: SSL/TLS certificate for "app.example.com" will expire in 7 days`)
 	assert.Contains(t, descExp, "Trigger certificate renewal via automated ACME client")
 }
+
+func TestFormatCertChainInvalidDescription(t *testing.T) {
+	// 1. Hostname mismatch with SANs and redirect chain
+	resMismatch := &http.Result{
+		TLS: &http.TLS{
+			Version: "TLS 1.3",
+			Cipher:  "TLS_AES_128_GCM_SHA256",
+			Certificate: http.Certificate{
+				Subject:       http.CertificateSubject{CommonName: "wrong.example.com"},
+				Issuer:        http.CertificateIssuer{Organization: "Let's Encrypt"},
+				NotBefore:     time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC),
+				NotAfter:      time.Date(2026, 4, 1, 0, 0, 0, 0, time.UTC),
+				HostValid:     false,
+				TrustedCA:     true,
+				DNSNames:      []string{"wrong.example.com", "other.example.com"},
+				TargetHost:    "api.example.com",
+				RedirectChain: []string{"https://example.com", "https://api.example.com"},
+			},
+		},
+	}
+
+	descMismatch := formatCertChainInvalidDescription(resMismatch, true, "https://example.com")
+	assert.Contains(t, descMismatch, "SSL/TLS Certificate Hostname Mismatch: Monitored hostname does not match certificate subject or SANs.")
+	assert.Contains(t, descMismatch, "• Target Endpoint:     https://example.com")
+	assert.Contains(t, descMismatch, "• Evaluated Hostname:  api.example.com")
+	assert.Contains(t, descMismatch, "• Common Name (CN):    wrong.example.com")
+	assert.Contains(t, descMismatch, "• Subject Alt Names:   wrong.example.com, other.example.com")
+	assert.Contains(t, descMismatch, "• Redirect Chain:      https://example.com -> https://api.example.com")
+	assert.Contains(t, descMismatch, "=== Root-Cause Diagnosis ===")
+	assert.Contains(t, descMismatch, "Hostname verification failed for 'api.example.com'")
+	assert.Contains(t, descMismatch, "=== Recommended Troubleshooting ===")
+
+	// 2. Untrusted CA Chain
+	resUntrusted := &http.Result{
+		TLS: &http.TLS{
+			Version: "TLS 1.3",
+			Certificate: http.Certificate{
+				Subject:    http.CertificateSubject{CommonName: "internal.corp"},
+				Issuer:     http.CertificateIssuer{Organization: "Untrusted Self-Signed CA"},
+				NotBefore:  time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC),
+				NotAfter:   time.Date(2027, 1, 1, 0, 0, 0, 0, time.UTC),
+				HostValid:  true,
+				TrustedCA:  false,
+				DNSNames:   []string{"internal.corp"},
+				TargetHost: "internal.corp",
+			},
+		},
+	}
+
+	descUntrusted := formatCertChainInvalidDescription(resUntrusted, false, "https://internal.corp")
+	assert.Contains(t, descUntrusted, "SSL/TLS Certificate Chain Invalid: Certificate was not issued by a trusted Certificate Authority")
+	assert.Contains(t, descUntrusted, "• Target Endpoint:     https://internal.corp")
+	assert.Contains(t, descUntrusted, "• Evaluated Hostname:  internal.corp")
+	assert.Contains(t, descUntrusted, "• Subject Alt Names:   internal.corp")
+	assert.Contains(t, descUntrusted, "Certificate trust chain verification failed")
+}
+

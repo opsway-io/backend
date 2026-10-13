@@ -62,6 +62,7 @@ func (s *ServiceImpl) Probe(ctx context.Context, method, url string, headers map
 	req = req.WithContext(httpStatCtx)
 
 	type tlsHop struct {
+		rawURL   string
 		hostname string
 		tlsState *tls.ConnectionState
 	}
@@ -75,6 +76,7 @@ func (s *ServiceImpl) Probe(ctx context.Context, method, url string, headers map
 		if req.Response != nil && req.Response.TLS != nil && len(req.Response.TLS.PeerCertificates) > 0 {
 			prevReq := via[len(via)-1]
 			tlsHops = append(tlsHops, tlsHop{
+				rawURL:   prevReq.URL.String(),
 				hostname: prevReq.URL.Hostname(),
 				tlsState: req.Response.TLS,
 			})
@@ -123,11 +125,14 @@ func (s *ServiceImpl) Probe(ctx context.Context, method, url string, headers map
 	// Add TLS information if available
 	if resp.TLS != nil && len(resp.TLS.PeerCertificates) > 0 {
 		finalReq := resp.Request
+		finalURL := url
 		finalHostname := req.URL.Hostname()
 		if finalReq != nil && finalReq.URL != nil {
+			finalURL = finalReq.URL.String()
 			finalHostname = finalReq.URL.Hostname()
 		}
 		tlsHops = append(tlsHops, tlsHop{
+			rawURL:   finalURL,
 			hostname: finalHostname,
 			tlsState: resp.TLS,
 		})
@@ -177,6 +182,11 @@ func (s *ServiceImpl) Probe(ctx context.Context, method, url string, headers map
 			}
 		}
 
+		redirectChain := make([]string, len(tlsHops))
+		for i, h := range tlsHops {
+			redirectChain[i] = h.rawURL
+		}
+
 		meta.TLS = &TLS{
 			Version: TLSVersionName(chosen.hop.tlsState.Version),
 			Cipher:  tls.CipherSuiteName(chosen.hop.tlsState.CipherSuite),
@@ -187,11 +197,14 @@ func (s *ServiceImpl) Probe(ctx context.Context, method, url string, headers map
 				Subject: CertificateSubject{
 					CommonName: chosen.cert.Subject.CommonName,
 				},
-				NotBefore:  chosen.cert.NotBefore,
-				NotAfter:   chosen.cert.NotAfter,
-				NotExpired: chosen.notExpired,
-				HostValid:  chosen.hostValid,
-				TrustedCA:  chosen.trustedCA,
+				NotBefore:     chosen.cert.NotBefore,
+				NotAfter:      chosen.cert.NotAfter,
+				NotExpired:    chosen.notExpired,
+				HostValid:     chosen.hostValid,
+				TrustedCA:     chosen.trustedCA,
+				DNSNames:      chosen.cert.DNSNames,
+				TargetHost:    chosen.hop.hostname,
+				RedirectChain: redirectChain,
 			},
 		}
 	} else if resp.TLS != nil {

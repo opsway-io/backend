@@ -382,16 +382,44 @@ func formatCertChainInvalidDescription(res *http.Result, isHostnameMismatch bool
 
 	sb.WriteString("=== Certificate Details ===\n")
 	sb.WriteString(fmt.Sprintf("• Target Endpoint:     %s\n", targetURL))
+	if res.TLS.Certificate.TargetHost != "" {
+		sb.WriteString(fmt.Sprintf("• Evaluated Hostname:  %s\n", res.TLS.Certificate.TargetHost))
+	}
 	sb.WriteString(fmt.Sprintf("• Common Name (CN):    %s\n", res.TLS.Certificate.Subject.CommonName))
+	if len(res.TLS.Certificate.DNSNames) > 0 {
+		sb.WriteString(fmt.Sprintf("• Subject Alt Names:   %s\n", strings.Join(res.TLS.Certificate.DNSNames, ", ")))
+	} else {
+		sb.WriteString("• Subject Alt Names:   <none>\n")
+	}
 	sb.WriteString(fmt.Sprintf("• Issuer Organization: %s\n", res.TLS.Certificate.Issuer.Organization))
 	sb.WriteString(fmt.Sprintf("• Valid Period:        %s to %s\n", res.TLS.Certificate.NotBefore.Format("2006-01-02"), res.TLS.Certificate.NotAfter.Format("2006-01-02")))
 	sb.WriteString(fmt.Sprintf("• Host Valid Match:    %v\n", res.TLS.Certificate.HostValid))
 	sb.WriteString(fmt.Sprintf("• Trusted CA Chain:    %v\n", res.TLS.Certificate.TrustedCA))
+	if len(res.TLS.Certificate.RedirectChain) > 1 {
+		sb.WriteString(fmt.Sprintf("• Redirect Chain:      %s\n", strings.Join(res.TLS.Certificate.RedirectChain, " -> ")))
+	}
+
+	sb.WriteString("\n=== Root-Cause Diagnosis ===\n")
+	if isHostnameMismatch {
+		evalHost := res.TLS.Certificate.TargetHost
+		if evalHost == "" {
+			evalHost = targetURL
+		}
+		sansStr := "<none>"
+		if len(res.TLS.Certificate.DNSNames) > 0 {
+			sansStr = strings.Join(res.TLS.Certificate.DNSNames, ", ")
+		}
+		sb.WriteString(fmt.Sprintf("Hostname verification failed for '%s'. The certificate presented is for CN '%s' with SANs [%s], which does not cover '%s'.\n",
+			evalHost, res.TLS.Certificate.Subject.CommonName, sansStr, evalHost))
+	} else {
+		sb.WriteString("Certificate trust chain verification failed. The certificate was not issued by a trusted Certificate Authority in the system trust store, or intermediate CA certificates are missing.\n")
+	}
 
 	sb.WriteString("\n=== Recommended Troubleshooting ===\n")
 	if isHostnameMismatch {
 		sb.WriteString("1. Verify the SSL certificate's Subject Alternative Names (SANs) include the target domain.\n")
 		sb.WriteString("2. Check for SNI (Server Name Indication) routing misconfiguration on reverse proxy or CDN.\n")
+		sb.WriteString("3. If this host is accessed by IP or internal alias, configure 'Host verification' in Monitor TLS Settings.\n")
 	} else {
 		sb.WriteString("1. Verify that intermediate CA certificates are bundled in the web server's fullchain.pem.\n")
 		sb.WriteString("2. If using a self-signed or private CA certificate, ensure it is installed in system trust store.\n")
