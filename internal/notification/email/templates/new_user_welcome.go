@@ -15,7 +15,7 @@ type NewUserWelcomeTemplate struct {
 }
 
 func (t *NewUserWelcomeTemplate) Subject() string {
-	return fmt.Sprintf("Welcome to opsway!")
+	return "Welcome to opsway!"
 }
 
 func (t *NewUserWelcomeTemplate) HTML() string {

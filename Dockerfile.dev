@@ -1,0 +1,2 @@
+FROM acim/go-reflex
+RUN apt-get update && apt-get install -y chromium

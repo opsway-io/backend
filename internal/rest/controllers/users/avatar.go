@@ -35,7 +35,7 @@ func (h *Handlers) PutUserAvatar(c hs.AuthenticatedContext) error {
 
 		return echo.ErrBadRequest
 	}
-	defer src.Close()
+	defer func() { _ = src.Close() }()
 
 	if err := h.UserService.UploadAvatar(
 		c.Request().Context(),

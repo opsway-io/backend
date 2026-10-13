@@ -2,96 +2,68 @@ package apikey
 
 import (
 	"context"
-	"errors"
-	"time"
+	"crypto/rand"
+	"crypto/sha256"
+	"encoding/hex"
 
 	"github.com/opsway-io/backend/internal/entities"
-	"gorm.io/gorm"
 )
 
-var ErrNotFound = errors.New("api key not found")
-
 type Service interface {
-	GetByTeamID(ctx context.Context, teamID uint) (*[]entities.ApiKey, error)
-	// Create generates a new key. The plaintext key is returned once and never stored.
-	Create(ctx context.Context, teamID, userID uint, name string) (key *entities.ApiKey, plaintext string, err error)
-	Delete(ctx context.Context, teamID, id uint) error
-	// Verify looks up the key matching a plaintext key and records its usage.
-	Verify(ctx context.Context, plaintext string) (*entities.ApiKey, error)
+	Create(ctx context.Context, teamID uint, name string) (plaintextKey string, err error)
+	GetByTeamID(ctx context.Context, teamID uint) (*[]entities.APIKey, error)
+	GetByPlaintext(ctx context.Context, plaintextKey string) (*entities.APIKey, error)
+	Delete(ctx context.Context, teamID, keyID uint) error
 }
 
 type ServiceImpl struct {
-	db *gorm.DB
+	repository Repository
 }
 
-func NewService(db *gorm.DB) Service {
-	return &ServiceImpl{db: db}
+func NewService(repository Repository) Service {
+	return &ServiceImpl{
+		repository: repository,
+	}
 }
 
-func (s *ServiceImpl) GetByTeamID(ctx context.Context, teamID uint) (*[]entities.ApiKey, error) {
-	var keys []entities.ApiKey
-	err := s.db.WithContext(ctx).
-		Where(entities.ApiKey{TeamID: teamID}).
-		Order("created_at desc").
-		Find(&keys).Error
-
-	return &keys, err
-}
-
-func (s *ServiceImpl) Create(ctx context.Context, teamID, userID uint, name string) (*entities.ApiKey, string, error) {
-	plaintext, err := GenerateKey()
+func (s *ServiceImpl) Create(ctx context.Context, teamID uint, name string) (string, error) {
+	// Generate random 32 byte key
+	b := make([]byte, 32)
+	_, err := rand.Read(b)
 	if err != nil {
-		return nil, "", err
+		return "", err
+	}
+	plaintextKey := hex.EncodeToString(b)
+
+	// Hash the key for storage
+	hash := sha256.Sum256([]byte(plaintextKey))
+	keyHash := hex.EncodeToString(hash[:])
+
+	apiKey := &entities.APIKey{
+		TeamID:  teamID,
+		Name:    name,
+		KeyHash: keyHash,
 	}
 
-	key := &entities.ApiKey{
-		TeamID:          teamID,
-		CreatedByUserID: userID,
-		Name:            name,
-		Prefix:          DisplayPrefix(plaintext),
-		Hash:            HashKey(plaintext),
+	err = s.repository.Create(ctx, apiKey)
+	if err != nil {
+		return "", err
 	}
 
-	if err := s.db.WithContext(ctx).Create(key).Error; err != nil {
-		return nil, "", err
-	}
-
-	return key, plaintext, nil
+	return plaintextKey, nil
 }
 
-func (s *ServiceImpl) Delete(ctx context.Context, teamID, id uint) error {
-	res := s.db.WithContext(ctx).
-		Where("id = ? AND team_id = ?", id, teamID).
-		Delete(&entities.ApiKey{})
-	if res.Error != nil {
-		return res.Error
-	}
-	if res.RowsAffected == 0 {
-		return ErrNotFound
-	}
-
-	return nil
+func (s *ServiceImpl) GetByTeamID(ctx context.Context, teamID uint) (*[]entities.APIKey, error) {
+	return s.repository.GetByTeamID(ctx, teamID)
 }
 
-func (s *ServiceImpl) Verify(ctx context.Context, plaintext string) (*entities.ApiKey, error) {
-	if !LooksLikeKey(plaintext) {
-		return nil, ErrNotFound
-	}
+func (s *ServiceImpl) GetByPlaintext(ctx context.Context, plaintextKey string) (*entities.APIKey, error) {
+	hash := sha256.Sum256([]byte(plaintextKey))
+	keyHash := hex.EncodeToString(hash[:])
 
-	var key entities.ApiKey
-	if err := s.db.WithContext(ctx).
-		Where(entities.ApiKey{Hash: HashKey(plaintext)}).
-		First(&key).Error; err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, ErrNotFound
-		}
+	return s.repository.GetByHash(ctx, keyHash)
+}
 
-		return nil, err
-	}
-
-	now := time.Now()
-	_ = s.db.WithContext(ctx).Model(&key).UpdateColumn("last_used_at", now).Error
-	key.LastUsedAt = &now
-
-	return &key, nil
+func (s *ServiceImpl) Delete(ctx context.Context, teamID, keyID uint) error {
+	return s.repository.Delete(ctx, teamID, keyID)
 }

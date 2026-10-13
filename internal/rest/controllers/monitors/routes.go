@@ -4,6 +4,7 @@ import (
 	"github.com/labstack/echo/v4"
 	"github.com/opsway-io/backend/internal/authentication"
 	"github.com/opsway-io/backend/internal/check"
+	"github.com/opsway-io/backend/internal/maintenance"
 	"github.com/opsway-io/backend/internal/monitor"
 	"github.com/opsway-io/backend/internal/rest/handlers"
 	mw "github.com/opsway-io/backend/internal/rest/middleware"
@@ -16,6 +17,7 @@ type Handlers struct {
 	TeamService           team.Service
 	CheckService          check.Service
 	MonitorService        monitor.Service
+	MaintenanceService    maintenance.Service
 }
 
 func Register(
@@ -24,18 +26,19 @@ func Register(
 	teamService team.Service,
 	monitorService monitor.Service,
 	checkService check.Service,
+	maintenanceService maintenance.Service,
 ) {
 	h := &Handlers{
-		MonitorService: monitorService,
-		CheckService:   checkService,
+		MonitorService:     monitorService,
+		CheckService:       checkService,
+		TeamService:        teamService,
+		MaintenanceService: maintenanceService,
 	}
 
 	TeamGuard := mw.TeamGuardFactory(logger, teamService)
 	AllowedRoles := mw.RoleGuardFactory(logger, teamService)
 
 	AuthHandler := handlers.AuthenticatedHandlerFactory(logger)
-
-	e.GET("/prober/locations", AuthHandler(h.GetProberLocations))
 
 	monitorsGroup := e.Group(
 		"/teams/:teamId/monitors",
@@ -44,9 +47,8 @@ func Register(
 
 	monitorsGroup.GET("", AuthHandler(h.GetMonitors))
 	monitorsGroup.POST("", AuthHandler(h.PostMonitor), AllowedRoles(mw.UserRoleOwner, mw.UserRoleAdmin))
-
 	monitorsGroup.POST("/bulk", AuthHandler(h.PostMonitorsBulk), AllowedRoles(mw.UserRoleOwner, mw.UserRoleAdmin))
-	monitorsGroup.POST("/openapi/preview", AuthHandler(h.PostOpenAPIPreview), AllowedRoles(mw.UserRoleOwner, mw.UserRoleAdmin))
+	monitorsGroup.POST("/openapi/preview", AuthHandler(h.PreviewOpenAPI), AllowedRoles(mw.UserRoleOwner, mw.UserRoleAdmin))
 
 	monitorsGroup.GET("/incidents", AuthHandler(h.GetMonitorIncidents))
 

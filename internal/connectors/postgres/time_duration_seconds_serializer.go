@@ -22,7 +22,7 @@ func (TimeDurationSecondsSerializer) Scan(ctx context.Context, field *schema.Fie
 	dbValueIsNil := dbValue == nil
 
 	structFieldType := field.StructField.Type
-	structFieldIsPointer := structFieldType.Kind() == reflect.Ptr
+	structFieldIsPointer := structFieldType.Kind() == reflect.Pointer
 
 	if !structFieldIsPointer && dbValueIsNil {
 		return fmt.Errorf("can't scan nil value to non-pointer target %s", structFieldType)
@@ -53,7 +53,7 @@ func (TimeDurationSecondsSerializer) Scan(ctx context.Context, field *schema.Fie
 }
 
 func (TimeDurationSecondsSerializer) Value(ctx context.Context, field *schema.Field, dst reflect.Value, fieldValue interface{}) (interface{}, error) {
-	if reflect.TypeOf(fieldValue).Kind() == reflect.Ptr {
+	if reflect.TypeOf(fieldValue).Kind() == reflect.Pointer {
 		if reflect.ValueOf(fieldValue).IsNil() {
 			return nil, nil
 		}

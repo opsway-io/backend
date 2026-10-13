@@ -1,9 +1,9 @@
 package seeds
 
 import (
+	"strings"
 	"time"
 
-	"github.com/opsway-io/backend/internal/alerting"
 	"github.com/opsway-io/backend/internal/entities"
 	"github.com/sirupsen/logrus"
 	"gorm.io/gorm"
@@ -11,7 +11,7 @@ import (
 
 //nolint:gochecknoglobals
 var seedAlertRules = []entities.AlertRule{
-	{Name: "Page on-call for any incident", Condition: alerting.ConditionAny, Channels: `["email","slack"]`, Enabled: true},
+	{Name: "Page on-call for any incident", Condition: "*", Channels: `["email","slack"]`, Enabled: true},
 	{Name: "Status code failures", Condition: "STATUS_CODE", Channels: `["email","webhook"]`, Enabled: true},
 	{Name: "Slow responses", Condition: "RESPONSE_TIME", Channels: `["slack","microsoft_teams"]`, Enabled: true},
 	{Name: "Expiring certificates", Condition: "TLS", Channels: `["email","discord"]`, Enabled: true},
@@ -66,7 +66,7 @@ func Alerts(db *gorm.DB) {
 
 		for i := range incidents {
 			in := incidents[i]
-			if !alerting.Matches(rule.Condition, &in) {
+			if !seedAlertRuleMatches(rule.Condition, &in) {
 				continue
 			}
 
@@ -107,12 +107,14 @@ func seedEscalationAndNotificationRules(db *gorm.DB, l *logrus.Entry, teamID uin
 			Name:                     "Primary on-call",
 			EscalationTimeoutMinutes: 15,
 		}
-		for i, id := range userIDs {
-			policy.Rotations = append(policy.Rotations, entities.EscalationRotation{UserID: id, Tier: uint(i + 1)})
-		}
-
 		if err := db.Create(&policy).Error; err != nil {
 			l.WithError(err).Error("failed to seed escalation policy")
+		} else {
+			for i, id := range userIDs {
+				if err := db.Create(&entities.OnCallRotation{EscalationPolicyID: policy.ID, UserID: id, Tier: i + 1}).Error; err != nil {
+					l.WithError(err).Error("failed to seed on-call rotation")
+				}
+			}
 		}
 	}
 
@@ -127,4 +129,9 @@ func seedEscalationAndNotificationRules(db *gorm.DB, l *logrus.Entry, teamID uin
 			l.WithError(err).Error("failed to seed notification rules")
 		}
 	}
+}
+
+// seedAlertRuleMatches mirrors the alerting worker's rule matching on incident titles.
+func seedAlertRuleMatches(condition string, in *entities.Incident) bool {
+	return condition == "*" || strings.Contains(strings.ToLower(in.Title), strings.ToLower(condition))
 }

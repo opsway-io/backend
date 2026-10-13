@@ -1,86 +1,68 @@
 package maintenance
 
 import (
-	"errors"
+	"fmt"
 	"net/http"
-	"strings"
 	"time"
 
 	"github.com/labstack/echo/v4"
 	"github.com/opsway-io/backend/internal/entities"
 	"github.com/opsway-io/backend/internal/maintenance"
-	hs "github.com/opsway-io/backend/internal/rest/handlers"
+	"github.com/opsway-io/backend/internal/monitor"
+	"github.com/opsway-io/backend/internal/rest/handlers"
 	"github.com/opsway-io/backend/internal/rest/helpers"
+	"github.com/opsway-io/backend/internal/team"
+	"github.com/sirupsen/logrus"
 )
 
-type MaintenanceWindowResponse struct {
-	ID          uint                               `json:"id"`
-	Title       string                             `json:"title"`
-	Description *string                            `json:"description"`
-	Status      entities.MaintenanceStatus         `json:"status"`
-	Settings    MaintenanceWindowResponseSettings  `json:"settings"`
-	Monitors    []MaintenanceWindowResponseMonitor `json:"monitors"`
-	CreatedAt   time.Time                          `json:"createdAt"`
-	UpdatedAt   time.Time                          `json:"updatedAt"`
+type Handlers struct {
+	TeamService        team.Service
+	MaintenanceService maintenance.Service
+	MonitorService     monitor.Service
 }
 
-type MaintenanceWindowResponseSettings struct {
-	StartAt time.Time `json:"startAt"`
-	EndAt   time.Time `json:"endAt"`
-}
-
-type MaintenanceWindowResponseMonitor struct {
-	ID   uint   `json:"id"`
-	Name string `json:"name"`
-}
-
-func newMaintenanceWindowResponse(m *entities.Maintenance, now time.Time) MaintenanceWindowResponse {
-	monitors := make([]MaintenanceWindowResponseMonitor, len(m.Monitors))
-	for i, mon := range m.Monitors {
-		monitors[i] = MaintenanceWindowResponseMonitor{ID: mon.ID, Name: mon.Name}
+func Register(
+	e *echo.Group,
+	logger *logrus.Entry,
+	teamService team.Service,
+	maintenanceService maintenance.Service,
+	monitorService monitor.Service,
+) {
+	h := &Handlers{
+		TeamService:        teamService,
+		MaintenanceService: maintenanceService,
+		MonitorService:     monitorService,
 	}
 
-	return MaintenanceWindowResponse{
-		ID:          m.ID,
-		Title:       m.Title,
-		Description: m.Description,
-		Status:      m.StatusAt(now),
-		Settings: MaintenanceWindowResponseSettings{
-			StartAt: m.Settings.StartAt,
-			EndAt:   m.Settings.EndAt,
-		},
-		Monitors:  monitors,
-		CreatedAt: m.CreatedAt,
-		UpdatedAt: m.UpdatedAt,
-	}
+	AuthHandler := handlers.AuthenticatedHandlerFactory(logger)
+
+	cg := e.Group("/teams/:teamId/maintenance")
+
+	cg.GET("", AuthHandler(h.GetMaintenanceWindows))
+	cg.POST("", AuthHandler(h.PostMaintenanceWindow))
+	cg.GET("/:maintenanceId", AuthHandler(h.GetMaintenanceWindow))
+	cg.PUT("/:maintenanceId", AuthHandler(h.PutMaintenanceWindow))
+	cg.DELETE("/:maintenanceId", AuthHandler(h.DeleteMaintenanceWindow))
 }
 
 type GetMaintenanceWindowsRequest struct {
 	TeamID uint `param:"teamId" validate:"required,numeric,gte=0"`
 }
 
-func (h *Handlers) GetMaintenanceWindows(c hs.AuthenticatedContext) error {
+func (h *Handlers) GetMaintenanceWindows(c handlers.AuthenticatedContext) error {
 	req, err := helpers.Bind[GetMaintenanceWindowsRequest](c)
 	if err != nil {
 		c.Log.WithError(err).Debug("failed to bind GetMaintenanceWindowsRequest")
-
 		return echo.ErrBadRequest
 	}
 
-	windows, err := h.MaintenanceService.GetByTeamID(c.Request().Context(), req.TeamID)
+	maintenances, err := h.MaintenanceService.GetByTeamID(c.Request().Context(), req.TeamID)
 	if err != nil {
 		c.Log.WithError(err).Error("failed to get maintenance windows")
-
 		return echo.ErrInternalServerError
 	}
 
-	now := time.Now()
-	resp := make([]MaintenanceWindowResponse, len(*windows))
-	for i := range *windows {
-		resp[i] = newMaintenanceWindowResponse(&(*windows)[i], now)
-	}
-
-	return c.JSON(http.StatusOK, resp)
+	return c.JSON(http.StatusOK, maintenances)
 }
 
 type GetMaintenanceWindowRequest struct {
@@ -88,107 +70,121 @@ type GetMaintenanceWindowRequest struct {
 	MaintenanceID uint `param:"maintenanceId" validate:"required,numeric,gte=0"`
 }
 
-func (h *Handlers) GetMaintenanceWindow(c hs.AuthenticatedContext) error {
+func (h *Handlers) GetMaintenanceWindow(c handlers.AuthenticatedContext) error {
 	req, err := helpers.Bind[GetMaintenanceWindowRequest](c)
 	if err != nil {
 		c.Log.WithError(err).Debug("failed to bind GetMaintenanceWindowRequest")
-
 		return echo.ErrBadRequest
 	}
 
-	window, err := h.MaintenanceService.GetByTeamIDAndID(c.Request().Context(), req.TeamID, req.MaintenanceID)
+	m, err := h.MaintenanceService.GetByID(c.Request().Context(), req.MaintenanceID)
 	if err != nil {
-		if errors.Is(err, maintenance.ErrNotFound) {
-			return echo.ErrNotFound
-		}
-
 		c.Log.WithError(err).Error("failed to get maintenance window")
-
-		return echo.ErrInternalServerError
+		return echo.ErrNotFound
 	}
 
-	return c.JSON(http.StatusOK, newMaintenanceWindowResponse(window, time.Now()))
+	return c.JSON(http.StatusOK, m)
 }
 
 type PostMaintenanceWindowRequest struct {
 	TeamID      uint      `param:"teamId" validate:"required,numeric,gte=0"`
-	Title       string    `json:"title" validate:"required,min=1,max=255"`
-	Description *string   `json:"description" validate:"omitempty,max=10000"`
+	Title       string    `json:"title" validate:"required"`
+	Description *string   `json:"description"`
 	StartAt     time.Time `json:"startAt" validate:"required"`
 	EndAt       time.Time `json:"endAt" validate:"required,gtfield=StartAt"`
-	MonitorIDs  []uint    `json:"monitorIds" validate:"omitempty,max=1000,dive,gt=0"`
+	MonitorIDs  []uint    `json:"monitorIds"`
 }
 
-func (h *Handlers) PostMaintenanceWindow(c hs.AuthenticatedContext) error {
+func (h *Handlers) PostMaintenanceWindow(c handlers.AuthenticatedContext) error {
 	req, err := helpers.Bind[PostMaintenanceWindowRequest](c)
 	if err != nil {
 		c.Log.WithError(err).Debug("failed to bind PostMaintenanceWindowRequest")
-
+		fmt.Println("BIND ERROR POST MAINTENANCE:", err)
 		return echo.ErrBadRequest
 	}
 
-	window := &entities.Maintenance{
+	var monitors []entities.Monitor
+	if req.MonitorIDs != nil {
+		monitors = make([]entities.Monitor, 0, len(req.MonitorIDs))
+		for _, id := range req.MonitorIDs {
+			m, err := h.MonitorService.GetMonitorAndSettingsByTeamIDAndID(c.Request().Context(), req.TeamID, id)
+			if err != nil {
+				c.Log.WithError(err).Debug("failed to get monitor")
+				return echo.ErrBadRequest
+			}
+			monitors = append(monitors, *m)
+		}
+	}
+
+	m := &entities.Maintenance{
 		TeamID:      req.TeamID,
-		Title:       strings.TrimSpace(req.Title),
-		Description: normalizeDescription(req.Description),
+		Title:       req.Title,
+		Description: req.Description,
 		Settings: entities.MaintenanceSettings{
-			StartAt: req.StartAt.UTC(),
-			EndAt:   req.EndAt.UTC(),
+			StartAt: req.StartAt,
+			EndAt:   req.EndAt,
 		},
+		Monitors: monitors,
 	}
 
-	if err := h.MaintenanceService.Create(c.Request().Context(), window, req.MonitorIDs); err != nil {
-		return h.mutationError(c, err)
+	err = h.MaintenanceService.Create(c.Request().Context(), m)
+	if err != nil {
+		c.Log.WithError(err).Error("failed to create maintenance window")
+		return echo.ErrInternalServerError
 	}
 
-	return c.JSON(http.StatusCreated, newMaintenanceWindowResponse(window, time.Now()))
+	return c.JSON(http.StatusCreated, m)
 }
 
 type PutMaintenanceWindowRequest struct {
 	TeamID        uint      `param:"teamId" validate:"required,numeric,gte=0"`
 	MaintenanceID uint      `param:"maintenanceId" validate:"required,numeric,gte=0"`
-	Title         string    `json:"title" validate:"required,min=1,max=255"`
-	Description   *string   `json:"description" validate:"omitempty,max=10000"`
+	Title         string    `json:"title" validate:"required"`
+	Description   *string   `json:"description"`
 	StartAt       time.Time `json:"startAt" validate:"required"`
 	EndAt         time.Time `json:"endAt" validate:"required,gtfield=StartAt"`
-	MonitorIDs    []uint    `json:"monitorIds" validate:"omitempty,max=1000,dive,gt=0"`
+	MonitorIDs    []uint    `json:"monitorIds"`
 }
 
-// PutMaintenanceWindow replaces the window. Completing a window early is done by
-// setting endAt to the current time.
-func (h *Handlers) PutMaintenanceWindow(c hs.AuthenticatedContext) error {
+func (h *Handlers) PutMaintenanceWindow(c handlers.AuthenticatedContext) error {
 	req, err := helpers.Bind[PutMaintenanceWindowRequest](c)
 	if err != nil {
 		c.Log.WithError(err).Debug("failed to bind PutMaintenanceWindowRequest")
-
 		return echo.ErrBadRequest
 	}
 
-	ctx := c.Request().Context()
-
-	window := &entities.Maintenance{
-		ID:          req.MaintenanceID,
-		TeamID:      req.TeamID,
-		Title:       strings.TrimSpace(req.Title),
-		Description: normalizeDescription(req.Description),
-		Settings: entities.MaintenanceSettings{
-			StartAt: req.StartAt.UTC(),
-			EndAt:   req.EndAt.UTC(),
-		},
-	}
-
-	if err := h.MaintenanceService.Update(ctx, window, req.MonitorIDs); err != nil {
-		return h.mutationError(c, err)
-	}
-
-	updated, err := h.MaintenanceService.GetByTeamIDAndID(ctx, req.TeamID, req.MaintenanceID)
+	m, err := h.MaintenanceService.GetByID(c.Request().Context(), req.MaintenanceID)
 	if err != nil {
-		c.Log.WithError(err).Error("failed to get maintenance window")
+		c.Log.WithError(err).Error("failed to get maintenance window for update")
+		return echo.ErrNotFound
+	}
 
+	var monitors []entities.Monitor
+	if req.MonitorIDs != nil {
+		monitors = make([]entities.Monitor, 0, len(req.MonitorIDs))
+		for _, id := range req.MonitorIDs {
+			monitorEntity, err := h.MonitorService.GetMonitorAndSettingsByTeamIDAndID(c.Request().Context(), req.TeamID, id)
+			if err != nil {
+				c.Log.WithError(err).Debug("failed to get monitor")
+				return echo.ErrBadRequest
+			}
+			monitors = append(monitors, *monitorEntity)
+		}
+	}
+
+	m.Title = req.Title
+	m.Description = req.Description
+	m.Settings.StartAt = req.StartAt
+	m.Settings.EndAt = req.EndAt
+	m.Monitors = monitors
+
+	err = h.MaintenanceService.Update(c.Request().Context(), m)
+	if err != nil {
+		c.Log.WithError(err).Error("failed to update maintenance window")
 		return echo.ErrInternalServerError
 	}
 
-	return c.JSON(http.StatusOK, newMaintenanceWindowResponse(updated, time.Now()))
+	return c.JSON(http.StatusOK, m)
 }
 
 type DeleteMaintenanceWindowRequest struct {
@@ -196,43 +192,24 @@ type DeleteMaintenanceWindowRequest struct {
 	MaintenanceID uint `param:"maintenanceId" validate:"required,numeric,gte=0"`
 }
 
-func (h *Handlers) DeleteMaintenanceWindow(c hs.AuthenticatedContext) error {
+func (h *Handlers) DeleteMaintenanceWindow(c handlers.AuthenticatedContext) error {
 	req, err := helpers.Bind[DeleteMaintenanceWindowRequest](c)
 	if err != nil {
 		c.Log.WithError(err).Debug("failed to bind DeleteMaintenanceWindowRequest")
-
 		return echo.ErrBadRequest
 	}
 
-	if err := h.MaintenanceService.Delete(c.Request().Context(), req.TeamID, req.MaintenanceID); err != nil {
-		return h.mutationError(c, err)
+	m, err := h.MaintenanceService.GetByID(c.Request().Context(), req.MaintenanceID)
+	if err != nil {
+		c.Log.WithError(err).Error("failed to get maintenance window for deletion")
+		return echo.ErrNotFound
+	}
+
+	err = h.MaintenanceService.Delete(c.Request().Context(), m)
+	if err != nil {
+		c.Log.WithError(err).Error("failed to delete maintenance window")
+		return echo.ErrInternalServerError
 	}
 
 	return c.NoContent(http.StatusNoContent)
-}
-
-func (h *Handlers) mutationError(c hs.AuthenticatedContext, err error) error {
-	switch {
-	case errors.Is(err, maintenance.ErrNotFound):
-		return echo.ErrNotFound
-	case errors.Is(err, maintenance.ErrInvalidMonitor):
-		return echo.NewHTTPError(http.StatusBadRequest, "one or more monitors do not exist")
-	default:
-		c.Log.WithError(err).Error("failed to mutate maintenance window")
-
-		return echo.ErrInternalServerError
-	}
-}
-
-func normalizeDescription(d *string) *string {
-	if d == nil {
-		return nil
-	}
-
-	trimmed := strings.TrimSpace(*d)
-	if trimmed == "" {
-		return nil
-	}
-
-	return &trimmed
 }

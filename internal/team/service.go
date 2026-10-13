@@ -4,10 +4,9 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"strings"
 	"time"
 
-	"github.com/golang-jwt/jwt"
+	"github.com/golang-jwt/jwt/v5"
 	"github.com/opsway-io/backend/internal/entities"
 	"github.com/opsway-io/backend/internal/notification/email"
 	"github.com/opsway-io/backend/internal/notification/email/templates"
@@ -35,7 +34,8 @@ type Service interface {
 	GetByStripeID(ctx context.Context, stripeID string) (*entities.Team, error)
 
 	GetTeamsAndRoleByUserID(ctx context.Context, userID uint) (*[]TeamAndRole, error)
-	GetUsersByID(ctx context.Context, teamId uint, offset *int, limit *int, query *string) (*[]TeamUser, error)
+	GetUsersByID(ctx context.Context, teamId uint, offset *int, limit *int, query *string, role *entities.TeamRole) (*[]TeamUser, error)
+	GetTeamUserCount(ctx context.Context, teamId uint) (int64, error)
 	GetUserRole(ctx context.Context, teamID, userID uint) (*entities.TeamRole, error)
 	UpdateUserRole(ctx context.Context, teamID, userID uint, role entities.TeamRole) error
 
@@ -52,13 +52,11 @@ type Service interface {
 
 	IsNameAvailable(ctx context.Context, name string) (bool, error)
 
+	GetTeamInvitations(ctx context.Context, teamID uint) (*[]entities.TeamInvitation, error)
+	DeleteTeamInvitation(ctx context.Context, teamID uint, email string) error
 	InviteByEmail(ctx context.Context, teamID uint, role entities.TeamRole, email string) error
 	GenerateInviteLink(ctx context.Context, teamID uint, role entities.TeamRole, email string) (string, error)
 	AcceptInviteByToken(ctx context.Context, token string, user *entities.User) error
-	GetInvites(ctx context.Context, teamID uint) (*[]entities.TeamInvite, error)
-	DeleteInvite(ctx context.Context, teamID uint, email string) error
-
-	UpdateSettings(ctx context.Context, team *entities.Team) error
 }
 
 type ServiceImpl struct {
@@ -66,19 +64,28 @@ type ServiceImpl struct {
 	repository Repository
 	storage    storage.Service
 	email      email.Sender
+	cache      Cache
 }
 
-func NewService(cfg Config, repository Repository, storage storage.Service, email email.Sender) Service {
+func NewService(cfg Config, repository Repository, storage storage.Service, email email.Sender, cache Cache) Service {
 	return &ServiceImpl{
 		config:     cfg,
 		repository: repository,
 		storage:    storage,
 		email:      email,
+		cache:      cache,
 	}
 }
 
 func (s *ServiceImpl) GetByID(ctx context.Context, id uint) (*entities.Team, error) {
-	return s.repository.GetByID(ctx, id)
+	if cachedTeam, err := s.cache.GetTeam(ctx, id); err == nil && cachedTeam != nil {
+		return cachedTeam, nil
+	}
+	team, err := s.repository.GetByID(ctx, id)
+	if err == nil {
+		_ = s.cache.SetTeam(ctx, team, 5*time.Minute)
+	}
+	return team, err
 }
 
 func (s *ServiceImpl) GetByStripeID(ctx context.Context, stripeID string) (*entities.Team, error) {
@@ -90,7 +97,11 @@ func (s *ServiceImpl) CreateWithOwnerUserID(ctx context.Context, team *entities.
 }
 
 func (s *ServiceImpl) UpdateDisplayName(ctx context.Context, teamID uint, displayName string) error {
-	return s.repository.UpdateDisplayName(ctx, teamID, displayName)
+	err := s.repository.UpdateDisplayName(ctx, teamID, displayName)
+	if err == nil {
+		_ = s.cache.DeleteTeam(ctx, teamID)
+	}
+	return err
 }
 
 func (s *ServiceImpl) Delete(ctx context.Context, id uint) error {
@@ -100,11 +111,27 @@ func (s *ServiceImpl) Delete(ctx context.Context, id uint) error {
 		}
 	}
 
-	return s.repository.Delete(ctx, id)
+	err := s.repository.Delete(ctx, id)
+	if err == nil {
+		_ = s.cache.DeleteTeam(ctx, id)
+		_ = s.cache.DeleteTeamUserCount(ctx, id)
+	}
+	return err
 }
 
-func (s *ServiceImpl) GetUsersByID(ctx context.Context, id uint, offset *int, limit *int, query *string) (*[]TeamUser, error) {
-	return s.repository.GetUsersByID(ctx, id, offset, limit, query)
+func (s *ServiceImpl) GetTeamUserCount(ctx context.Context, teamId uint) (int64, error) {
+	if cachedCount, err := s.cache.GetTeamUserCount(ctx, teamId); err == nil {
+		return cachedCount, nil
+	}
+	count, err := s.repository.GetTeamUserCount(ctx, teamId)
+	if err == nil {
+		_ = s.cache.SetTeamUserCount(ctx, teamId, count, 5*time.Minute)
+	}
+	return count, err
+}
+
+func (s *ServiceImpl) GetUsersByID(ctx context.Context, teamId uint, offset *int, limit *int, query *string, role *entities.TeamRole) (*[]TeamUser, error) {
+	return s.repository.GetUsersByID(ctx, teamId, offset, limit, query, role)
 }
 
 func (s *ServiceImpl) GetUserRole(ctx context.Context, teamID, userID uint) (*entities.TeamRole, error) {
@@ -112,7 +139,11 @@ func (s *ServiceImpl) GetUserRole(ctx context.Context, teamID, userID uint) (*en
 }
 
 func (s *ServiceImpl) RemoveUser(ctx context.Context, teamID, userID uint) error {
-	return s.repository.RemoveUser(ctx, teamID, userID)
+	err := s.repository.RemoveUser(ctx, teamID, userID)
+	if err == nil {
+		_ = s.cache.DeleteTeamUserCount(ctx, teamID)
+	}
+	return err
 }
 
 func (s *ServiceImpl) UploadAvatar(ctx context.Context, teamID uint, file io.Reader) error {
@@ -129,6 +160,8 @@ func (s *ServiceImpl) UploadAvatar(ctx context.Context, teamID uint, file io.Rea
 	}); err != nil {
 		return errors.Wrap(err, "failed to update team")
 	}
+
+	_ = s.cache.DeleteTeam(ctx, teamID)
 
 	return nil
 }
@@ -148,6 +181,8 @@ func (s *ServiceImpl) DeleteAvatar(ctx context.Context, teamID uint) error {
 		return errors.Wrap(err, "failed to delete avatar from storage")
 	}
 
+	_ = s.cache.DeleteTeam(ctx, teamID)
+
 	return nil
 }
 
@@ -158,15 +193,59 @@ func (s *ServiceImpl) GetAvatarURLByID(teamID uint) string {
 }
 
 func (s *ServiceImpl) UpdateUserRole(ctx context.Context, teamID, userID uint, role entities.TeamRole) error {
-	return s.repository.UpdateUserRole(ctx, teamID, userID, role)
+	err := s.repository.UpdateUserRole(ctx, teamID, userID, role)
+	if err != nil {
+		return err
+	}
+
+	if role == entities.TeamRoleAdmin || role == entities.TeamRoleOwner {
+		team, err := s.GetByID(ctx, teamID)
+		if err == nil {
+			offset, limit := 0, 100
+			users, err := s.GetUsersByID(ctx, teamID, &offset, &limit, nil, nil)
+			if err == nil && users != nil {
+				for _, u := range *users {
+					if u.ID == userID {
+						userName := u.Name
+						if u.DisplayName != nil {
+							userName = *u.DisplayName
+						}
+
+						_ = s.email.Send(
+							ctx,
+							"",
+							u.Email,
+							&templates.RoleChangedTemplate{
+								UserName:     userName,
+								NewRole:      string(role),
+								TeamName:     team.Name,
+								DashboardURL: fmt.Sprintf("%s/dashboard", s.config.ApplicationURL),
+							},
+						)
+						break
+					}
+				}
+			}
+		}
+	}
+
+	return nil
 }
 
 func (s *ServiceImpl) UpdateBilling(ctx context.Context, teamID uint, customerID string, plan string) error {
-	return s.repository.UpdateBilling(ctx, teamID, customerID, plan)
+	err := s.repository.UpdateBilling(ctx, teamID, customerID, plan)
+	if err == nil {
+		_ = s.cache.DeleteTeam(ctx, teamID)
+	}
+	return err
 }
 
 func (s *ServiceImpl) UpdateTeam(ctx context.Context, team *entities.Team) error {
-	return s.repository.UpdateTeam(ctx, team)
+	err := s.repository.UpdateTeam(ctx, team)
+	if err == nil {
+		_ = s.cache.DeleteTeam(ctx, team.ID)
+	}
+	return err
 }
 
 func (s *ServiceImpl) GetTeamsAndRoleByUserID(ctx context.Context, userID uint) (*[]TeamAndRole, error) {
@@ -193,19 +272,25 @@ func (s *ServiceImpl) InviteByEmail(ctx context.Context, teamID uint, role entit
 		return errors.Wrap(err, "failed to get team")
 	}
 
-	// Store the pending invite, so it can be listed and revoked
-	if err := s.repository.UpsertInvite(ctx, &entities.TeamInvite{
-		TeamID: teamID,
-		Email:  strings.ToLower(email),
-		Role:   role,
-	}); err != nil {
-		return errors.Wrap(err, "failed to store invite")
-	}
-
 	// Generate invite link
-	link, err := s.GenerateInviteLink(ctx, teamID, role, strings.ToLower(email))
+	link, err := s.GenerateInviteLink(ctx, teamID, role, email)
 	if err != nil {
 		return errors.Wrap(err, "failed to generate invite link")
+	}
+
+	// Extract the token part from the link to store in DB
+	// The link looks like: URL/login/team/invite?token=TOKEN
+	token := link[len(fmt.Sprintf("%s/login/team/invite?token=", s.config.ApplicationURL)):]
+
+	invitation := &entities.TeamInvitation{
+		TeamID: teamID,
+		Email:  email,
+		Role:   role,
+		Token:  token,
+	}
+
+	if err := s.repository.CreateTeamInvitation(ctx, invitation); err != nil {
+		return errors.Wrap(err, "failed to create team invitation")
 	}
 
 	// Send email
@@ -262,6 +347,12 @@ func (s *ServiceImpl) AcceptInviteByToken(ctx context.Context, tokenString strin
 		return errors.New("invalid token")
 	}
 
+	// Verify the token exists in the database
+	invitation, err := s.repository.GetTeamInvitationByToken(ctx, tokenString)
+	if err != nil {
+		return errors.Wrap(err, "invitation not found or expired")
+	}
+
 	// Check token type
 	if claims["type"] != "team-invite" {
 		return errors.New("invalid token type")
@@ -286,15 +377,6 @@ func (s *ServiceImpl) AcceptInviteByToken(ctx context.Context, tokenString strin
 
 	teamID := uint(teamIDFloat64)
 
-	// The invite must still be pending (it may have been revoked)
-	if _, err := s.repository.GetInvite(ctx, teamID, user.Email); err != nil {
-		if errors.Is(err, ErrInviteNotFound) {
-			return ErrInvalidInvitationToken
-		}
-
-		return errors.Wrap(err, "failed to get invite")
-	}
-
 	// Add user to team
 	if err := s.repository.AddUser(
 		ctx,
@@ -305,23 +387,20 @@ func (s *ServiceImpl) AcceptInviteByToken(ctx context.Context, tokenString strin
 		return errors.Wrap(err, "failed to add user to team")
 	}
 
-	if err := s.repository.DeleteInvite(ctx, teamID, user.Email); err != nil && !errors.Is(err, ErrInviteNotFound) {
-		return errors.Wrap(err, "failed to delete accepted invite")
-	}
+	_ = s.cache.DeleteTeamUserCount(ctx, teamID)
+
+	// Delete the invitation since it has been accepted
+	_ = s.repository.DeleteTeamInvitation(ctx, invitation.TeamID, invitation.Email)
 
 	return nil
 }
 
-func (s *ServiceImpl) GetInvites(ctx context.Context, teamID uint) (*[]entities.TeamInvite, error) {
-	return s.repository.GetInvites(ctx, teamID)
+func (s *ServiceImpl) GetTeamInvitations(ctx context.Context, teamID uint) (*[]entities.TeamInvitation, error) {
+	return s.repository.GetTeamInvitations(ctx, teamID)
 }
 
-func (s *ServiceImpl) DeleteInvite(ctx context.Context, teamID uint, email string) error {
-	return s.repository.DeleteInvite(ctx, teamID, email)
-}
-
-func (s *ServiceImpl) UpdateSettings(ctx context.Context, team *entities.Team) error {
-	return s.repository.UpdateSettings(ctx, team)
+func (s *ServiceImpl) DeleteTeamInvitation(ctx context.Context, teamID uint, email string) error {
+	return s.repository.DeleteTeamInvitation(ctx, teamID, email)
 }
 
 func (s *ServiceImpl) getAvatarKey(teamID uint) string {

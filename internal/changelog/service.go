@@ -15,10 +15,10 @@ type Service interface {
 	Update(ctx context.Context, teamID, changelogID uint, name string) (changelog entities.Changelog, err error)
 
 	GetEntriesWithAuthors(ctx context.Context, teamID, changelogID uint, offset *int, limit *int, query *string) (entries []entities.ChangelogEntry, total_count int, err error)
-	// GetEntryWithAuthors(ctx context.Context, teamID, changelogID, entryID uint) (entries entities.ChangelogEntry, err error)
-	// DeleteEntry(ctx context.Context, teamID, changelogID, entryID uint) (err error)
-	// CreateEntry(ctx context.Context, teamID, changelogID uint, title, content string, authorIDs []uint) (entry entities.ChangelogEntry, err error)
-	// UpdateEntry(ctx context.Context, teamID, changelogID, entryID uint, title, content string, authorIDs []uint) (entry entities.ChangelogEntry, err error)
+	GetEntryWithAuthors(ctx context.Context, teamID, changelogID, entryID uint) (entries entities.ChangelogEntry, err error)
+	DeleteEntry(ctx context.Context, teamID, changelogID, entryID uint) (err error)
+	CreateEntry(ctx context.Context, teamID, changelogID uint, title, content string, authorIDs []uint) (entry entities.ChangelogEntry, err error)
+	UpdateEntry(ctx context.Context, teamID, changelogID, entryID uint, title, content string, authorIDs []uint) (entry entities.ChangelogEntry, err error)
 }
 
 type ServiceImpl struct {
@@ -53,4 +53,20 @@ func (s *ServiceImpl) Update(ctx context.Context, teamID, changelogID uint, name
 
 func (s *ServiceImpl) GetEntriesWithAuthors(ctx context.Context, teamID, changelogID uint, offset *int, limit *int, query *string) ([]entities.ChangelogEntry, int, error) {
 	return s.repo.GetEntriesWithAuthors(ctx, teamID, changelogID, offset, limit, query)
+}
+
+func (s *ServiceImpl) GetEntryWithAuthors(ctx context.Context, teamID, changelogID, entryID uint) (entities.ChangelogEntry, error) {
+	return s.repo.GetEntryWithAuthors(ctx, teamID, changelogID, entryID)
+}
+
+func (s *ServiceImpl) DeleteEntry(ctx context.Context, teamID, changelogID, entryID uint) error {
+	return s.repo.DeleteEntry(ctx, teamID, changelogID, entryID)
+}
+
+func (s *ServiceImpl) CreateEntry(ctx context.Context, teamID, changelogID uint, title, content string, authorIDs []uint) (entities.ChangelogEntry, error) {
+	return s.repo.CreateEntry(ctx, teamID, changelogID, title, content, authorIDs)
+}
+
+func (s *ServiceImpl) UpdateEntry(ctx context.Context, teamID, changelogID, entryID uint, title, content string, authorIDs []uint) (entities.ChangelogEntry, error) {
+	return s.repo.UpdateEntry(ctx, teamID, changelogID, entryID, title, content, authorIDs)
 }

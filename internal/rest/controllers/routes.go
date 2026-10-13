@@ -8,20 +8,26 @@ import (
 	"github.com/opsway-io/backend/internal/billing"
 	"github.com/opsway-io/backend/internal/changelog"
 	"github.com/opsway-io/backend/internal/check"
-	"github.com/opsway-io/backend/internal/heartbeat"
+	"github.com/opsway-io/backend/internal/escalation"
+	"github.com/opsway-io/backend/internal/event"
+	"github.com/opsway-io/backend/internal/heartbeats"
 	"github.com/opsway-io/backend/internal/incident"
 	"github.com/opsway-io/backend/internal/maintenance"
 	"github.com/opsway-io/backend/internal/monitor"
+	"github.com/opsway-io/backend/internal/notification/email"
 	"github.com/opsway-io/backend/internal/report"
-	alertingcontroller "github.com/opsway-io/backend/internal/rest/controllers/alerting"
+	alertingController "github.com/opsway-io/backend/internal/rest/controllers/alerting"
 	"github.com/opsway-io/backend/internal/rest/controllers/apikeys"
 	"github.com/opsway-io/backend/internal/rest/controllers/authentication"
 	"github.com/opsway-io/backend/internal/rest/controllers/changelogs"
 	"github.com/opsway-io/backend/internal/rest/controllers/healthz"
-	"github.com/opsway-io/backend/internal/rest/controllers/heartbeats"
+	heartbeatsController "github.com/opsway-io/backend/internal/rest/controllers/heartbeats"
 	"github.com/opsway-io/backend/internal/rest/controllers/incidents"
-	maintenancecontroller "github.com/opsway-io/backend/internal/rest/controllers/maintenance"
+	maintenanceController "github.com/opsway-io/backend/internal/rest/controllers/maintenance"
+	"github.com/opsway-io/backend/internal/rest/controllers/metrics"
 	"github.com/opsway-io/backend/internal/rest/controllers/monitors"
+	"github.com/opsway-io/backend/internal/rest/controllers/prober"
+	"github.com/opsway-io/backend/internal/rest/controllers/prometheus"
 	"github.com/opsway-io/backend/internal/rest/controllers/reports"
 	"github.com/opsway-io/backend/internal/rest/controllers/statuspages"
 	"github.com/opsway-io/backend/internal/rest/controllers/teams"
@@ -33,6 +39,7 @@ import (
 	"github.com/opsway-io/backend/internal/team"
 	"github.com/opsway-io/backend/internal/user"
 	"github.com/sirupsen/logrus"
+	"gorm.io/gorm"
 )
 
 func Register(
@@ -44,18 +51,24 @@ func Register(
 	authenticationService auth.Service,
 	userService user.Service,
 	teamService team.Service,
+	alertingService alerting.Service,
 	monitorService monitor.Service,
 	checkService check.Service,
 	billingService billing.Service,
 	changelogService changelog.Service,
+	heartbeatService heartbeats.Service,
 	incidentService incident.Service,
-	reportsService report.Service,
 	maintenanceService maintenance.Service,
-	heartbeatService heartbeat.Service,
+	reportsService report.Service,
 	statusPageService statuspage.Service,
-	alertingService alerting.Service,
-	alertingPolicyService alerting.PolicyService,
+	escalationService escalation.Service,
+	eventService event.Service,
 	apiKeyService apikey.Service,
+	emailSender email.Sender,
+	availableLocations []string,
+	db *gorm.DB,
+	ch *gorm.DB,
+	statusPageBaseURL string,
 ) {
 	AuthGuard := middleware.AuthGuardFactory(logger, authenticationService)
 
@@ -70,7 +83,14 @@ func Register(
 
 	// Webhooks
 
-	webhooks.Register(root, logger, billingService, teamService)
+	webhooks.Register(
+		root,
+		logger.WithField("module", "webhooks"),
+		billingService,
+		teamService,
+		incidentService,
+		emailSender,
+	)
 
 	// Healthz
 
@@ -86,36 +106,44 @@ func Register(
 
 	// Teams
 
-	teams.Register(authRoot, logger, teamService, userService, billingService)
+	teams.Register(authRoot, logger, teamService, userService, billingService, escalationService)
+
+	// API Keys
+
+	apikeys.Register(authRoot, logger, teamService, apiKeyService)
 
 	// Monitors
 
-	monitors.Register(authRoot, logger, teamService, monitorService, checkService)
+	monitors.Register(authRoot, logger, teamService, monitorService, checkService, maintenanceService)
 
 	// Changelogs
 
 	changelogs.Register(authRoot, logger, teamService, changelogService)
 
-	// Incidents
-	incidents.Register(authRoot, logger, teamService, incidentService, alertingService)
+	// Alerting
+	alertingController.Register(authRoot, logger, teamService, alertingService, eventService)
 
-	// Reports
-	reports.Register(authRoot, logger, teamService, reportsService, checkService)
+	// Incidents
+	incidents.Register(authRoot, logger, teamService, incidentService, eventService, alertingService, userService)
+
+	// Heartbeats
+	heartbeatsController.Register(authRoot, logger, teamService, heartbeatService)
 
 	// Maintenance
-	maintenancecontroller.Register(authRoot, logger, teamService, maintenanceService)
+	maintenanceController.Register(authRoot, logger, teamService, maintenanceService, monitorService)
 
-	// Heartbeats (ping endpoint is public)
-	heartbeats.Register(authRoot, logger, teamService, heartbeatService)
-	heartbeats.RegisterPublic(root, logger, heartbeatService)
+	// Reports
+	reports.Register(authRoot, logger, teamService, reportsService, checkService, eventService)
 
-	// Status pages (public page, badge, widget and subscriptions are unauthenticated)
 	statuspages.Register(authRoot, logger, teamService, statusPageService)
-	statuspages.RegisterPublic(root, logger, statusPageService)
+	statuspages.RegisterPublic(root, logger, statusPageBaseURL, statusPageService, incidentService, maintenanceService, checkService, emailSender)
 
-	// Alerting, escalation & notification rules
-	alertingcontroller.Register(authRoot, logger, teamService, alertingService, alertingPolicyService)
+	// Prober
+	prober.Register(root, logger, availableLocations)
 
-	// API keys
-	apikeys.Register(authRoot, logger, teamService, apiKeyService)
+	// Prometheus Metrics
+	prometheus.Register(e, logger, db, ch)
+
+	// API Key Metrics
+	metrics.Register(root, logger, checkService, apiKeyService, db)
 }

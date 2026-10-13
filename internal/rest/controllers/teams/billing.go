@@ -16,8 +16,8 @@ func (h *Handlers) PostConfig(c hs.AuthenticatedContext) error {
 }
 
 type PostCreateCheckoutSession struct {
-	TeamID         uint   `param:"teamId" validate:"required,numeric,gt=0"`
-	PriceLookupKey string `json:"priceLookupKey" validate:"required,max=255"`
+	TeamID uint   `param:"teamId" validate:"required,numeric,gt=0"`
+	Plan   string `json:"plan" validate:"required,max=255"`
 }
 
 func (h *Handlers) PostCreateCheckoutSession(c hs.AuthenticatedContext) error {
@@ -35,15 +35,22 @@ func (h *Handlers) PostCreateCheckoutSession(c hs.AuthenticatedContext) error {
 		return echo.ErrInternalServerError
 	}
 
-	if team.PaymentPlan == entities.PaymentPlan(req.PriceLookupKey) {
+	if team.PaymentPlan == entities.PaymentPlan(req.Plan) {
 		return c.JSON(http.StatusOK, "")
 	}
 
+	priceID := ""
+	if req.Plan == "TEAM" {
+		priceID = h.BillingService.PostConfig().TeamPrice
+	} else if req.Plan == "ENTERPRISE" {
+		priceID = h.BillingService.PostConfig().EnterprisePrice
+	}
+
 	if team.StripeCustomerID == nil {
-		if req.PriceLookupKey == "FREE" {
+		if req.Plan == "FREE" {
 			return c.JSON(http.StatusOK, "")
 		}
-		s, err := h.BillingService.CreateCheckoutSession(team, req.PriceLookupKey)
+		s, err := h.BillingService.CreateCheckoutSession(team, priceID)
 		if err != nil {
 			c.Log.WithError(err).Debug("create stripe checkout session")
 
@@ -52,8 +59,8 @@ func (h *Handlers) PostCreateCheckoutSession(c hs.AuthenticatedContext) error {
 		return c.JSON(http.StatusOK, s.URL)
 	}
 
-	if req.PriceLookupKey == "FREE" {
-		_, err := h.BillingService.CancelSubscribtion(team)
+	if req.Plan == "FREE" {
+		_, err := h.BillingService.CancelSubscription(team)
 		if err != nil {
 			c.Log.WithError(err).Debug("cancel subscription")
 
@@ -63,7 +70,7 @@ func (h *Handlers) PostCreateCheckoutSession(c hs.AuthenticatedContext) error {
 	}
 
 	if team.PaymentPlan == "FREE" {
-		s, err := h.BillingService.CreateCheckoutSession(team, req.PriceLookupKey)
+		s, err := h.BillingService.CreateCheckoutSession(team, priceID)
 		if err != nil {
 			c.Log.WithError(err).Debug("create stripe checkout session")
 
@@ -72,7 +79,7 @@ func (h *Handlers) PostCreateCheckoutSession(c hs.AuthenticatedContext) error {
 		return c.JSON(http.StatusOK, s.URL)
 	}
 
-	_, err = h.BillingService.UpdateSubscribtion(team, req.PriceLookupKey)
+	_, err = h.BillingService.UpdateSubscription(team, priceID)
 	if err != nil {
 		c.Log.WithError(err).Debug("update subscription")
 
@@ -126,6 +133,10 @@ func (h *Handlers) PostCustomerPortal(c hs.AuthenticatedContext) error {
 		return echo.ErrInternalServerError
 	}
 
+	if team.StripeCustomerID == nil || *team.StripeCustomerID == "" {
+		return c.JSON(http.StatusOK, GetCustomerPortalResponse{URL: ""})
+	}
+
 	ps, err := h.BillingService.CreateCustomerPortal(team)
 	if err != nil {
 		c.Log.WithError(err).Debug("failed to create customer portal")
@@ -159,6 +170,10 @@ func (h *Handlers) GetCustomerSession(c hs.AuthenticatedContext) error {
 		return echo.ErrInternalServerError
 	}
 
+	if team.StripeCustomerID == nil || *team.StripeCustomerID == "" {
+		return c.JSON(http.StatusOK, GetCustomerSessionResponse{SessionID: ""})
+	}
+
 	s, err := h.BillingService.GetCustomerSession(team)
 	if err != nil {
 		c.Log.WithError(err).Debug("failed to get session")
@@ -174,11 +189,12 @@ type GetProductsResponse struct {
 }
 
 type Product struct {
-	ID       string   `json:"id"`
-	Name     string   `json:"name"`
-	Price    int64    `json:"price"`
-	Currency string   `json:"currency"`
-	Features []string `json:"marketing_features"`
+	ID        string   `json:"id"`
+	Name      string   `json:"name"`
+	Price     int64    `json:"price"`
+	Currency  string   `json:"currency"`
+	LookupKey string   `json:"lookupKey"`
+	Features  []string `json:"marketing_features"`
 }
 
 func (h *Handlers) GetProducts(c hs.AuthenticatedContext) error {
@@ -207,11 +223,12 @@ func (h *Handlers) GetProducts(c hs.AuthenticatedContext) error {
 		}
 
 		product := Product{
-			ID:       stripeProduct.ID,
-			Name:     stripeProduct.Name,
-			Price:    price.UnitAmount / 100,
-			Currency: string(price.Currency),
-			Features: make([]string, 0, len(stripeProduct.MarketingFeatures)),
+			ID:        stripeProduct.ID,
+			Name:      stripeProduct.Name,
+			Price:     price.UnitAmount / 100,
+			Currency:  string(price.Currency),
+			LookupKey: string(price.LookupKey),
+			Features:  make([]string, 0, len(stripeProduct.MarketingFeatures)),
 		}
 		for _, feature := range stripeProduct.MarketingFeatures {
 			product.Features = append(product.Features, feature.Name)

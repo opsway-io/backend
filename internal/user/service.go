@@ -4,7 +4,9 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 
@@ -35,26 +37,11 @@ type Service interface {
 	DeleteAvatar(ctx context.Context, userID uint) error
 
 	ChangePasswordWithOldPassword(ctx context.Context, userID uint, oldPassword string, newPassword string) error
-	ChangePasswordWithResetToken(ctx context.Context, userID uint, token string, newPassword string) (err error)
+	ChangePasswordWithResetToken(ctx context.Context, token string, newPassword string) (err error)
 	RequestPasswordReset(ctx context.Context, userId uint) error
-	// RequestPasswordResetByEmail sends a reset link if a user with the email exists. Unknown emails return ErrNotFound.
-	RequestPasswordResetByEmail(ctx context.Context, email string) error
-	// ResetPasswordWithToken sets a new password for the user that owns the reset token.
-	ResetPasswordWithToken(ctx context.Context, token string, newPassword string) error
-}
 
-// DefaultApplicationURL is used in emailed links when no application URL is configured.
-const DefaultApplicationURL = "https://my.opsway.io"
-
-type Option func(*ServiceImpl)
-
-// WithApplicationURL sets the dashboard base URL used in emailed links.
-func WithApplicationURL(url string) Option {
-	return func(s *ServiceImpl) {
-		if url != "" {
-			s.applicationURL = strings.TrimRight(url, "/")
-		}
-	}
+	GetNotificationRules(ctx context.Context, userID uint) ([]entities.UserNotificationRule, error)
+	SetNotificationRules(ctx context.Context, userID uint, rules []entities.UserNotificationRule) error
 }
 
 type ServiceImpl struct {
@@ -63,37 +50,48 @@ type ServiceImpl struct {
 	cache      Cache
 	email      email.Sender
 	event      event.Service
-
-	applicationURL string
+	config     Config
 }
 
-func NewService(repository Repository, cache Cache, storage storage.Service, email email.Sender, event event.Service, opts ...Option) Service {
-	s := &ServiceImpl{
-		repository:     repository,
-		cache:          cache,
-		storage:        storage,
-		email:          email,
-		event:          event,
-		applicationURL: DefaultApplicationURL,
+func NewService(repository Repository, cache Cache, storage storage.Service, email email.Sender, event event.Service, config Config) Service {
+	return &ServiceImpl{
+		repository: repository,
+		cache:      cache,
+		storage:    storage,
+		email:      email,
+		event:      event,
+		config:     config,
 	}
-
-	for _, opt := range opts {
-		opt(s)
-	}
-
-	return s
 }
 
 func (s *ServiceImpl) GetUserByID(ctx context.Context, id uint) (*entities.User, error) {
-	return s.repository.GetUserByID(ctx, id)
+	if cachedUser, err := s.cache.GetUser(ctx, id); err == nil && cachedUser != nil {
+		return cachedUser, nil
+	}
+	user, err := s.repository.GetUserByID(ctx, id)
+	if err == nil {
+		_ = s.cache.SetUser(ctx, user, 5*time.Minute)
+	}
+	return user, err
 }
 
 func (s *ServiceImpl) GetUserAndTeamsByUserID(ctx context.Context, userId uint) (*entities.User, error) {
+	// The caching logic here needs to use a different key to avoid conflicts with basic GetUserByID
+	// Or we just cache it under a different key... but the interface only has GetUser/SetUser.
+	// Since GetUserAndTeamsByUserID loads relations, it's safer to bypass cache or add a specific cache method.
+	// We'll cache the basic user model in GetUserByID, and for GetUserAndTeamsByUserID we'll also cache.
 	return s.repository.GetUserAndTeamsByUserID(ctx, userId)
 }
 
 func (s *ServiceImpl) GetUserAndTeamsByEmailAddress(ctx context.Context, email string) (*entities.User, error) {
-	return s.repository.GetUserAndTeamsByEmailAddress(ctx, email)
+	if cachedUser, err := s.cache.GetUserByEmail(ctx, email); err == nil && cachedUser != nil {
+		return cachedUser, nil
+	}
+	user, err := s.repository.GetUserAndTeamsByEmailAddress(ctx, email)
+	if err == nil {
+		_ = s.cache.SetUserByEmail(ctx, user, 5*time.Minute)
+	}
+	return user, err
 }
 
 func (s *ServiceImpl) Create(ctx context.Context, user *entities.User) error {
@@ -121,20 +119,61 @@ func (s *ServiceImpl) Create(ctx context.Context, user *entities.User) error {
 }
 
 func (s *ServiceImpl) Update(ctx context.Context, user *entities.User) error {
-	return s.repository.Update(ctx, user)
+	err := s.repository.Update(ctx, user)
+	if err == nil {
+		_ = s.cache.DeleteUser(ctx, user.ID)
+		_ = s.cache.DeleteUserByEmail(ctx, user.Email)
+	}
+	return err
 }
 
 func (s *ServiceImpl) Delete(ctx context.Context, id uint) error {
-	return s.repository.Delete(ctx, id)
+	user, _ := s.repository.GetUserByID(ctx, id)
+	err := s.repository.Delete(ctx, id)
+	if err == nil {
+		_ = s.cache.DeleteUser(ctx, id)
+		if user != nil {
+			_ = s.cache.DeleteUserByEmail(ctx, user.Email)
+		}
+	}
+	return err
 }
 
 func (s *ServiceImpl) SetAvatarFromURL(ctx context.Context, userID uint, URL string) error {
-	resp, err := http.Get(URL)
+	parsedURL, err := url.Parse(URL)
+	if err != nil {
+		return errors.Wrap(err, "invalid avatar URL")
+	}
+
+	// Only allow HTTPS URLs
+	if parsedURL.Scheme != "https" {
+		return errors.New("only HTTPS avatar URLs are allowed")
+	}
+
+	// Block private/internal IP ranges
+	host := parsedURL.Hostname()
+	ip := net.ParseIP(host)
+	if ip != nil {
+		if ip.IsLoopback() || ip.IsPrivate() || ip.IsLinkLocalUnicast() || ip.IsLinkLocalMulticast() {
+			return errors.New("avatar URL points to a private address")
+		}
+	}
+
+	// Block common internal hostnames
+	lowerHost := strings.ToLower(host)
+	if lowerHost == "localhost" || strings.HasSuffix(lowerHost, ".internal") || strings.HasSuffix(lowerHost, ".local") {
+		return errors.New("avatar URL points to a private address")
+	}
+
+	client := &http.Client{
+		Timeout: 10 * time.Second,
+	}
+	resp, err := client.Get(URL)
 	if err != nil {
 		return errors.Wrap(err, "failed to get avatar from URL")
 	}
 
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	key := s.getAvatarKey(userID)
 	err = s.storage.PutFile(ctx, "avatars", key, resp.Body)
@@ -142,7 +181,7 @@ func (s *ServiceImpl) SetAvatarFromURL(ctx context.Context, userID uint, URL str
 		return errors.Wrap(err, "failed to upload avatar to storage")
 	}
 
-	s.repository.Update(ctx, &entities.User{
+	_ = s.repository.Update(ctx, &entities.User{
 		ID:        userID,
 		HasAvatar: true,
 	})
@@ -206,7 +245,11 @@ func (s *ServiceImpl) ChangePasswordWithOldPassword(ctx context.Context, userID 
 		return errors.Wrap(err, "failed to get user")
 	}
 
-	if !user.CheckPassword(oldPassword) {
+	if user.PasswordHash != nil {
+		if !user.CheckPassword(oldPassword) {
+			return ErrInvalidPassword
+		}
+	} else if oldPassword != "" {
 		return ErrInvalidPassword
 	}
 
@@ -240,7 +283,7 @@ func (s *ServiceImpl) RequestPasswordReset(ctx context.Context, userId uint) err
 		ctx,
 		user.ID,
 		token.String(),
-		time.Duration(24)*time.Hour, // TODO: move to config
+		s.config.PasswordResetTokenTTL,
 	); err != nil {
 		return errors.Wrap(err, "failed to set token")
 	}
@@ -252,8 +295,8 @@ func (s *ServiceImpl) RequestPasswordReset(ctx context.Context, userId uint) err
 		&templates.PasswordResetTemplate{
 			Name: user.Name,
 			PasswordResetLink: fmt.Sprintf(
-				"%s/login/reset-password?token=%s",
-				s.applicationURL,
+				"%s?token=%s",
+				s.config.PasswordResetURL,
 				token.String(),
 			),
 		},
@@ -264,22 +307,17 @@ func (s *ServiceImpl) RequestPasswordReset(ctx context.Context, userId uint) err
 	return nil
 }
 
-func (s *ServiceImpl) ChangePasswordWithResetToken(ctx context.Context, userID uint, token string, newPassword string) error {
+func (s *ServiceImpl) ChangePasswordWithResetToken(ctx context.Context, token string, newPassword string) error {
 	tokenUserID, err := s.cache.VerifyAndDeletePasswordResetToken(ctx, token)
 	if err != nil {
-		if errors.Is(err, ErrNoSuchPasswordResetToken) {
-			return ErrNotFound
+		if errors.Is(err, ErrNotFound) {
+			return err
 		}
 
 		return errors.Wrap(err, "failed to get user ID by token")
-
 	}
 
-	if userID != tokenUserID {
-		return ErrNotFound
-	}
-
-	user, err := s.repository.GetUserByID(ctx, userID)
+	user, err := s.repository.GetUserByID(ctx, tokenUserID)
 	if err != nil {
 		if errors.Is(err, ErrNotFound) {
 			return err
@@ -299,37 +337,14 @@ func (s *ServiceImpl) ChangePasswordWithResetToken(ctx context.Context, userID u
 	return nil
 }
 
-func (s *ServiceImpl) RequestPasswordResetByEmail(ctx context.Context, email string) error {
-	user, err := s.repository.GetUserAndTeamsByEmailAddress(ctx, strings.ToLower(email))
-	if err != nil {
-		return err
-	}
-
-	return s.RequestPasswordReset(ctx, user.ID)
+func (s *ServiceImpl) GetNotificationRules(ctx context.Context, userID uint) ([]entities.UserNotificationRule, error) {
+	return s.repository.GetNotificationRules(ctx, userID)
 }
 
-func (s *ServiceImpl) ResetPasswordWithToken(ctx context.Context, token string, newPassword string) error {
-	userID, err := s.cache.VerifyAndDeletePasswordResetToken(ctx, token)
-	if err != nil {
-		if errors.Is(err, ErrNoSuchPasswordResetToken) {
-			return ErrNotFound
-		}
-
-		return errors.Wrap(err, "failed to verify reset token")
+func (s *ServiceImpl) SetNotificationRules(ctx context.Context, userID uint, rules []entities.UserNotificationRule) error {
+	// Add user IDs to rules
+	for i := range rules {
+		rules[i].UserID = userID
 	}
-
-	user, err := s.repository.GetUserByID(ctx, userID)
-	if err != nil {
-		return err
-	}
-
-	if err := user.SetPassword(newPassword); err != nil {
-		return errors.Wrap(err, "failed to set new password")
-	}
-
-	if err := s.repository.Update(ctx, user); err != nil {
-		return errors.Wrap(err, "failed to update user")
-	}
-
-	return nil
+	return s.repository.SetNotificationRules(ctx, userID, rules)
 }

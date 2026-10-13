@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/opsway-io/backend/internal/entities"
-	"github.com/opsway-io/backend/internal/incident"
 	"github.com/sirupsen/logrus"
 	"gorm.io/gorm"
 	"k8s.io/utils/pointer"
@@ -121,13 +120,11 @@ func Incidents(db *gorm.DB) {
 				}
 			}
 
-			title, _ := incident.DescribeAssertion(*assertion)
-
 			in := entities.Incident{
 				TeamID:              t.ID,
-				MonitorID:           m.ID,
-				MonitorAssertionID:  assertion.ID,
-				Title:               title,
+				MonitorID:           pointer.Uint(m.ID),
+				MonitorAssertionID:  pointer.Uint(assertion.ID),
+				Title:               assertion.Source,
 				Description:         pointer.String(scenario.description),
 				IsStatusPageVisible: mi%2 == 0,
 				CreatedAt:           createdAt,
@@ -141,7 +138,7 @@ func Incidents(db *gorm.DB) {
 				ackAt := createdAt.Add(time.Duration(2+rnd.Intn(20)) * time.Minute)
 				in.Acknowledged = true
 				in.AcknowledgedAt = &ackAt
-				in.AcknowledgedByUserID = &ackUser
+				in.AcknowledgedBy = &ackUser
 				in.UpdatedAt = ackAt
 			}
 
@@ -149,7 +146,7 @@ func Incidents(db *gorm.DB) {
 				resolvedAt := createdAt.Add(time.Duration(15+rnd.Intn(240)) * time.Minute)
 				in.Resolved = true
 				in.ResolvedAt = &resolvedAt
-				in.ResolvedByUserID = &ackUser
+				in.ResolvedBy = &ackUser
 				in.RootCauseAnalysis = pointer.String(scenario.rca)
 				in.UpdatedAt = resolvedAt
 				endAt = resolvedAt
@@ -221,12 +218,8 @@ func seedEnsureAssertion(db *gorm.DB, monitorID uint, s seedIncidentScenario) (*
 	}
 
 	var step entities.MonitorStep
-	if err := db.Where(entities.MonitorStep{MonitorID: monitorID}).Order("position asc, id asc").First(&step).Error; err == nil {
-		a.StepID = &step.ID
-
-		var maxPos int
-		db.Model(&entities.MonitorAssertion{}).Where("step_id = ?", step.ID).Select("COALESCE(MAX(position), -1)").Scan(&maxPos)
-		a.Position = maxPos + 1
+	if err := db.Where(entities.MonitorStep{MonitorID: monitorID}).Order("order_index asc, id asc").First(&step).Error; err == nil {
+		a.MonitorStepID = step.ID
 	}
 
 	if err := db.Create(&a).Error; err != nil {

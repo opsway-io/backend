@@ -1,7 +1,6 @@
 package seeds
 
 import (
-	"github.com/lib/pq"
 	"github.com/opsway-io/backend/internal/entities"
 	"gorm.io/gorm"
 )
@@ -14,7 +13,7 @@ func StatusPages(db *gorm.DB) {
 		panic(err)
 	}
 
-	var monitorIDs []int64
+	var monitorIDs []uint
 	if err := db.Model(&entities.Monitor{}).
 		Where("team_id = ?", t.ID).
 		Order("id ASC").
@@ -23,10 +22,10 @@ func StatusPages(db *gorm.DB) {
 		panic(err)
 	}
 
-	take := func(from, to int) pq.Int64Array {
-		res := pq.Int64Array{}
+	take := func(from, to int) []entities.Monitor {
+		res := []entities.Monitor{}
 		for i := from; i < to && i < len(monitorIDs); i++ {
-			res = append(res, monitorIDs[i])
+			res = append(res, entities.Monitor{ID: monitorIDs[i]})
 		}
 
 		return res
@@ -37,22 +36,22 @@ func StatusPages(db *gorm.DB) {
 			TeamID:       t.ID,
 			Name:         "Opsway public status",
 			Domain:       "status.opsway.eu",
-			Layout:       string(entities.StatusPageLayoutStats),
+			Layout:       "STATS",
 			ShowBranding: true,
 			SupportURL:   "mailto:support@opsway.io",
-			MonitorIDs:   take(0, 2),
+			Monitors:     take(0, 2),
 			Groups: []entities.StatusPageGroup{
-				{Name: "API", Order: 0, MonitorIDs: take(2, 5)},
-				{Name: "Website", Order: 1, MonitorIDs: take(5, 8)},
+				{Name: "API", Order: 0, Monitors: take(2, 5)},
+				{Name: "Website", Order: 1, Monitors: take(5, 8)},
 			},
 		},
 		{
 			TeamID:       t.ID,
 			Name:         "Internal services",
 			Domain:       "internal-status.opsway.eu",
-			Layout:       string(entities.StatusPageLayoutCompact),
+			Layout:       "COMPACT",
 			ShowBranding: false,
-			MonitorIDs:   take(0, 4),
+			Monitors:     take(0, 4),
 			Groups:       []entities.StatusPageGroup{},
 		},
 	}

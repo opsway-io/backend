@@ -2,6 +2,7 @@ package clickhouse
 
 import (
 	"context"
+	"strings"
 	"time"
 
 	"github.com/pkg/errors"
@@ -15,6 +16,17 @@ type Config struct {
 	Debug bool `default:"false"`
 }
 
+func ensureAsyncInsertDSN(dsn string) string {
+	if strings.Contains(dsn, "async_insert=") {
+		return dsn
+	}
+	separator := "?"
+	if strings.Contains(dsn, "?") {
+		separator = "&"
+	}
+	return dsn + separator + "async_insert=1&wait_for_async_insert=0"
+}
+
 func NewClient(ctx context.Context, conf Config) (*gorm.DB, error) {
 	gormConfig := &gorm.Config{}
 	if conf.Debug {
@@ -23,8 +35,10 @@ func NewClient(ctx context.Context, conf Config) (*gorm.DB, error) {
 		gormConfig.Logger = logger.Default.LogMode(logger.Silent)
 	}
 
+	dsn := ensureAsyncInsertDSN(conf.DSN)
+
 	db, err := gorm.Open(clickhouse.New(clickhouse.Config{
-		DSN: conf.DSN,
+		DSN: dsn,
 	}), gormConfig)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to connect to database")

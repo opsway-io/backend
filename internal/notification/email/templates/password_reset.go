@@ -16,7 +16,7 @@ type PasswordResetTemplate struct {
 }
 
 func (t *PasswordResetTemplate) Subject() string {
-	return fmt.Sprintf("Password reset")
+	return "Password reset"
 }
 
 func (t *PasswordResetTemplate) HTML() string {

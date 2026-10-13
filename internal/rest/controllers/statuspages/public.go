@@ -4,172 +4,447 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
-	"net/mail"
-	"net/url"
 	"strings"
+	"time"
 
+	"github.com/google/uuid"
 	"github.com/labstack/echo/v4"
+	"github.com/opsway-io/backend/internal/check"
 	"github.com/opsway-io/backend/internal/entities"
+	"github.com/opsway-io/backend/internal/incident"
+	"github.com/opsway-io/backend/internal/maintenance"
+	"github.com/opsway-io/backend/internal/notification/email"
+	"github.com/opsway-io/backend/internal/notification/email/templates"
+	"github.com/opsway-io/backend/internal/rest/helpers"
 	"github.com/opsway-io/backend/internal/statuspage"
+	"github.com/sirupsen/logrus"
+	"golang.org/x/crypto/bcrypt"
 )
 
-const passwordHeader = "X-Status-Page-Password"
+type PublicHandlers struct {
+	StatusPageBaseURL  string
+	StatusPageService  statuspage.Service
+	IncidentService    incident.Service
+	MaintenanceService maintenance.Service
+	CheckService       check.Service
+	EmailSender        email.Sender
+}
+
+func RegisterPublic(
+	e *echo.Group,
+	logger *logrus.Entry,
+	statusPageBaseURL string,
+	statusPageService statuspage.Service,
+	incidentService incident.Service,
+	maintenanceService maintenance.Service,
+	checkService check.Service,
+	emailSender email.Sender,
+) {
+	h := &PublicHandlers{
+		StatusPageBaseURL:  statusPageBaseURL,
+		StatusPageService:  statusPageService,
+		IncidentService:    incidentService,
+		MaintenanceService: maintenanceService,
+		CheckService:       checkService,
+		EmailSender:        emailSender,
+	}
+
+	publicGroup := e.Group("/public/status-pages")
+	publicGroup.GET("/:domain", h.GetPublicStatusPage)
+	publicGroup.GET("/:domain/badge.svg", h.GetBadgeSVG)
+	publicGroup.GET("/:domain/widget.json", h.GetWidgetSummary)
+	publicGroup.GET("/:domain/widget.js", h.GetWidgetScript)
+	publicGroup.GET("/:domain/calendar.ics", h.GetMaintenanceCalendar)
+	publicGroup.GET("/:domain/metrics", h.GetPublicMetrics)
+	publicGroup.POST("/:domain/subscribe", h.Subscribe)
+	publicGroup.GET("/:domain/subscribe/verify/:token", h.VerifySubscriber)
+	publicGroup.DELETE("/:domain/subscribe/:token", h.Unsubscribe)
+}
+
+type GetPublicStatusPageRequest struct {
+	Domain string `param:"domain" validate:"required"`
+}
+
+type PublicMonitor struct {
+	ID               uint      `json:"id"`
+	Name             string    `json:"name"`
+	Status           string    `json:"status"` // "OPERATIONAL" or "OUTAGE"
+	CreatedAt        time.Time `json:"createdAt"`
+	UptimePercentage *float32  `json:"uptimePercentage"`
+	DailyUptimes     []float32 `json:"dailyUptimes"`
+}
+
+type PublicIncident struct {
+	ID          uint   `json:"id"`
+	Title       string `json:"title"`
+	Description string `json:"description"`
+	MonitorID   *uint  `json:"monitorId"`
+}
+
+type PublicMaintenance struct {
+	ID          uint      `json:"id"`
+	Title       string    `json:"title"`
+	Description string    `json:"description"`
+	StartAt     time.Time `json:"startAt"`
+	EndAt       time.Time `json:"endAt"`
+}
+
+type PublicGroup struct {
+	ID         uint   `json:"id"`
+	Name       string `json:"name"`
+	Container  string `json:"container"`
+	Order      int    `json:"order"`
+	Status     string `json:"status"` // "OPERATIONAL", "DEGRADED", "OUTAGE"
+	MonitorIDs []uint `json:"monitorIds"`
+}
 
 type GetPublicStatusPageResponse struct {
-	Name                 string `json:"name"`
-	LogoURL              string `json:"logoUrl"`
-	LogoLink             string `json:"logoLink"`
-	FaviconURL           string `json:"faviconUrl"`
-	Layout               string `json:"layout"`
-	CustomCSS            string `json:"customCss"`
-	HeaderHTML           string `json:"headerHtml"`
-	FooterHTML           string `json:"footerHtml"`
-	CustomComponentsHTML string `json:"customComponentsHtml"`
-	ShowBranding         bool   `json:"showBranding"`
-	IsPrivate            bool   `json:"isPrivate"`
-	SupportURL           string `json:"supportUrl,omitempty"`
-	*statuspage.PublicView
+	Name                 string              `json:"name"`
+	LogoURL              string              `json:"logoUrl"`
+	LogoLink             string              `json:"logoLink"`
+	FaviconURL           string              `json:"faviconUrl"`
+	Layout               string              `json:"layout"`
+	CustomCSS            string              `json:"customCss"`
+	HeaderHTML           string              `json:"headerHtml"`
+	FooterHTML           string              `json:"footerHtml"`
+	CustomComponentsHTML string              `json:"customComponentsHtml"`
+	ShowBranding         bool                `json:"showBranding"`
+	IsPrivate            bool                `json:"isPrivate"`
+	SupportURL           string              `json:"supportUrl"`
+	Monitors             []PublicMonitor     `json:"monitors"`
+	Groups               []PublicGroup       `json:"groups"`
+	ActiveIncidents      []PublicIncident    `json:"activeIncidents"`
+	ActiveMaintenance    []PublicMaintenance `json:"activeMaintenance"`
+	MaintenanceEvents    []PublicMaintenance `json:"maintenanceEvents"`
 }
 
-// loadPage resolves the status page from the :domain param and enforces the password of private pages.
-func (h *Handlers) loadPage(c echo.Context, requirePassword bool) (*entities.StatusPage, error) {
-	domain := c.Param("domain")
-	if domain == "" || len(domain) > 253 {
-		return nil, echo.ErrNotFound
-	}
-
-	page, err := h.StatusPageService.GetByDomain(c.Request().Context(), domain)
+func (h *PublicHandlers) GetPublicStatusPage(c echo.Context) error {
+	req, err := helpers.Bind[GetPublicStatusPageRequest](c)
 	if err != nil {
-		if errors.Is(err, statuspage.ErrNotFound) {
-			return nil, echo.ErrNotFound
-		}
-
-		h.Logger.WithError(err).Error("failed to get status page by domain")
-
-		return nil, echo.ErrInternalServerError
-	}
-
-	if requirePassword && page.IsPrivate && !page.CheckPassword(c.Request().Header.Get(passwordHeader)) {
-		return nil, echo.ErrUnauthorized
-	}
-
-	return page, nil
-}
-
-func (h *Handlers) GetPublicStatusPage(c echo.Context) error {
-	page, err := h.loadPage(c, true)
-	if err != nil {
-		return err
-	}
-
-	view, err := h.StatusPageService.GetPublicView(c.Request().Context(), page)
-	if err != nil {
-		h.Logger.WithError(err).Error("failed to build public status page")
-
-		return echo.ErrInternalServerError
-	}
-
-	c.Response().Header().Set("Cache-Control", "no-store")
-
-	return c.JSON(http.StatusOK, GetPublicStatusPageResponse{
-		Name:                 page.Name,
-		LogoURL:              page.LogoURL,
-		LogoLink:             page.LogoLink,
-		FaviconURL:           page.FaviconURL,
-		Layout:               page.Layout,
-		CustomCSS:            page.CustomCSS,
-		HeaderHTML:           page.HeaderHTML,
-		FooterHTML:           page.FooterHTML,
-		CustomComponentsHTML: page.CustomComponentsHTML,
-		ShowBranding:         page.ShowBranding,
-		IsPrivate:            page.IsPrivate,
-		SupportURL:           page.SupportURL,
-		PublicView:           view,
-	})
-}
-
-type PostSubscribeRequest struct {
-	Email       string `json:"email"`
-	Channel     string `json:"channel"`
-	Destination string `json:"destination"`
-}
-
-func (h *Handlers) PostSubscribe(c echo.Context) error {
-	page, err := h.loadPage(c, false)
-	if err != nil {
-		return err
-	}
-
-	var req PostSubscribeRequest
-	if err := c.Bind(&req); err != nil {
+		logrus.WithError(err).Debug("failed to bind GetPublicStatusPageRequest")
 		return echo.ErrBadRequest
 	}
 
-	channel := entities.StatusPageSubscriberChannel(strings.ToUpper(strings.TrimSpace(req.Channel)))
-	if channel == "" {
-		channel = entities.StatusPageSubscriberChannelEmail
-	}
-
-	if err := validateSubscription(channel, req.Email, req.Destination); err != nil {
-		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
-	}
-
-	if err := h.StatusPageService.Subscribe(c.Request().Context(), page, channel, req.Email, req.Destination); err != nil {
-		h.Logger.WithError(err).Error("failed to subscribe to status page")
-
-		return echo.ErrInternalServerError
-	}
-
-	return c.NoContent(http.StatusAccepted)
-}
-
-func validateSubscription(channel entities.StatusPageSubscriberChannel, email, destination string) error {
-	email = strings.TrimSpace(email)
-	if email == "" || len(email) > 254 {
-		return errors.New("a valid email is required")
-	}
-	if addr, err := mail.ParseAddress(email); err != nil || addr.Address != email {
-		return errors.New("a valid email is required")
-	}
-
-	switch channel {
-	case entities.StatusPageSubscriberChannelEmail:
-		return nil
-	case entities.StatusPageSubscriberChannelWebhook, entities.StatusPageSubscriberChannelSlack:
-		u, err := url.Parse(strings.TrimSpace(destination))
-		if err != nil || u.Scheme != "https" || u.Host == "" || len(destination) > 2048 {
-			return errors.New("destination must be a valid https URL")
-		}
-		if channel == entities.StatusPageSubscriberChannelSlack && u.Hostname() != "hooks.slack.com" {
-			return errors.New("destination must be a Slack incoming webhook URL (https://hooks.slack.com/...)")
-		}
-
-		return nil
-	default:
-		return fmt.Errorf("unsupported channel %q", channel)
-	}
-}
-
-func (h *Handlers) GetVerifySubscriber(c echo.Context) error {
-	page, err := h.loadPage(c, false)
+	sp, err := h.StatusPageService.GetByDomain(c.Request().Context(), req.Domain)
 	if err != nil {
-		return err
-	}
-
-	token := c.Param("token")
-	if token == "" || len(token) > 128 {
-		return echo.ErrNotFound
-	}
-
-	if err := h.StatusPageService.VerifySubscriber(c.Request().Context(), page, token); err != nil {
-		if errors.Is(err, statuspage.ErrInvalidToken) {
+		if errors.Is(err, statuspage.ErrNotFound) {
 			return echo.ErrNotFound
 		}
-
-		h.Logger.WithError(err).Error("failed to verify subscriber")
-
+		logrus.WithError(err).Error("failed to get public status page")
 		return echo.ErrInternalServerError
 	}
 
-	return c.NoContent(http.StatusNoContent)
+	// Password validation if status page is private
+	if sp.IsPrivate {
+		passwordHeader := c.Request().Header.Get("X-Status-Page-Password")
+		if passwordHeader == "" {
+			return c.JSON(http.StatusUnauthorized, map[string]interface{}{
+				"message":   "Password required",
+				"isPrivate": true,
+			})
+		}
+		err := bcrypt.CompareHashAndPassword([]byte(sp.PasswordHash), []byte(passwordHeader))
+		if err != nil {
+			return c.JSON(http.StatusUnauthorized, map[string]interface{}{
+				"message":   "Invalid password",
+				"isPrivate": true,
+			})
+		}
+	}
+
+	uniqueMonitors := make(map[uint]bool)
+	var orderedMonitors []entities.Monitor
+
+	for _, m := range sp.Monitors {
+		if !uniqueMonitors[m.ID] {
+			uniqueMonitors[m.ID] = true
+			orderedMonitors = append(orderedMonitors, m)
+		}
+	}
+	for _, g := range sp.Groups {
+		for _, m := range g.Monitors {
+			if !uniqueMonitors[m.ID] {
+				uniqueMonitors[m.ID] = true
+				orderedMonitors = append(orderedMonitors, m)
+			}
+		}
+	}
+
+	var monitorIDs []uint
+	for _, m := range orderedMonitors {
+		monitorIDs = append(monitorIDs, m.ID)
+	}
+
+	var uptimes map[uint]check.MonitorUptimeResult
+	if h.CheckService != nil {
+		var err error
+		uptimes, err = h.CheckService.GetMonitorUptimesByMonitorIDs(c.Request().Context(), monitorIDs)
+		if err != nil {
+			logrus.WithError(err).Error("failed to get monitor uptimes")
+		}
+	}
+
+	monitors := make([]PublicMonitor, len(orderedMonitors))
+	for i, m := range orderedMonitors {
+		status := "OPERATIONAL"
+		if m.State == 0 { // Inactive
+			status = "OUTAGE"
+		}
+
+		var uptimePtr *float32
+		var dailyUptimes []float32
+		if res, ok := uptimes[m.ID]; ok {
+			uptimePtr = &res.UptimePercentage
+			dailyUptimes = res.DailyUptimes
+		}
+
+		monitors[i] = PublicMonitor{
+			ID:               m.ID,
+			Name:             m.Name,
+			Status:           status,
+			CreatedAt:        m.CreatedAt,
+			UptimePercentage: uptimePtr,
+			DailyUptimes:     dailyUptimes,
+		}
+	}
+
+	activeIncidents := []PublicIncident{}
+	if h.IncidentService != nil {
+		incidents, err := h.IncidentService.GetActiveByMonitorIDs(c.Request().Context(), monitorIDs)
+		if err == nil {
+			for _, inc := range incidents {
+				desc := ""
+				if inc.Description != nil {
+					desc = *inc.Description
+				}
+				activeIncidents = append(activeIncidents, PublicIncident{
+					ID:          inc.ID,
+					Title:       inc.Title,
+					Description: desc,
+					MonitorID:   inc.MonitorID,
+				})
+			}
+		}
+	}
+
+	activeMaintenance := []PublicMaintenance{}
+	if h.MaintenanceService != nil {
+		maintenances, err := h.MaintenanceService.GetActiveByMonitorIDs(c.Request().Context(), time.Now(), monitorIDs)
+		if err == nil {
+			for _, mnt := range maintenances {
+				desc := ""
+				if mnt.Description != nil {
+					desc = *mnt.Description
+				}
+				activeMaintenance = append(activeMaintenance, PublicMaintenance{
+					ID:          mnt.ID,
+					Title:       mnt.Title,
+					Description: desc,
+					StartAt:     mnt.Settings.StartAt,
+					EndAt:       mnt.Settings.EndAt,
+				})
+			}
+		}
+	}
+
+	maintenanceEvents := []PublicMaintenance{}
+	if h.MaintenanceService != nil {
+		allMaintenances, err := h.MaintenanceService.GetAllByMonitorIDs(c.Request().Context(), monitorIDs)
+		if err == nil {
+			for _, mnt := range allMaintenances {
+				desc := ""
+				if mnt.Description != nil {
+					desc = *mnt.Description
+				}
+				maintenanceEvents = append(maintenanceEvents, PublicMaintenance{
+					ID:          mnt.ID,
+					Title:       mnt.Title,
+					Description: desc,
+					StartAt:     mnt.Settings.StartAt,
+					EndAt:       mnt.Settings.EndAt,
+				})
+			}
+		}
+	}
+
+	return c.JSON(http.StatusOK, GetPublicStatusPageResponse{
+		Name:                 sp.Name,
+		LogoURL:              sp.LogoURL,
+		LogoLink:             sp.LogoLink,
+		FaviconURL:           sp.FaviconURL,
+		Layout:               sp.Layout,
+		CustomCSS:            sp.CustomCSS,
+		HeaderHTML:           sp.HeaderHTML,
+		FooterHTML:           sp.FooterHTML,
+		CustomComponentsHTML: sp.CustomComponentsHTML,
+		ShowBranding:         sp.ShowBranding,
+		IsPrivate:            sp.IsPrivate,
+		SupportURL:           sp.SupportURL,
+		Monitors:             monitors,
+		Groups: func() []PublicGroup {
+			var groups []PublicGroup
+			for _, g := range sp.Groups {
+				var gm []uint
+				for _, m := range g.Monitors {
+					gm = append(gm, m.ID)
+				}
+
+				groupStatus := "OPERATIONAL"
+				outageCount := 0
+				totalCount := len(gm)
+				for _, mID := range gm {
+					for _, pm := range monitors {
+						if pm.ID == mID && pm.Status != "OPERATIONAL" {
+							outageCount++
+							break
+						}
+					}
+				}
+				if totalCount > 0 {
+					if outageCount == totalCount {
+						groupStatus = "OUTAGE"
+					} else if outageCount > 0 {
+						groupStatus = "DEGRADED"
+					}
+				}
+
+				groups = append(groups, PublicGroup{
+					ID:         g.ID,
+					Name:       g.Name,
+					Container:  g.Container,
+					Order:      g.Order,
+					Status:     groupStatus,
+					MonitorIDs: gm,
+				})
+			}
+			if groups == nil {
+				groups = []PublicGroup{}
+			}
+			return groups
+		}(),
+		ActiveIncidents:   activeIncidents,
+		ActiveMaintenance: activeMaintenance,
+		MaintenanceEvents: maintenanceEvents,
+	})
+}
+
+type SubscribeRequest struct {
+	Domain      string `param:"domain" validate:"required"`
+	Email       string `json:"email" validate:"required"`
+	Channel     string `json:"channel"`     // EMAIL (default), WEBHOOK, SMS, SLACK
+	Destination string `json:"destination"` // target URL or phone number
+}
+
+func (h *PublicHandlers) Subscribe(c echo.Context) error {
+	req, err := helpers.Bind[SubscribeRequest](c)
+	if err != nil {
+		logrus.WithError(err).Debug("failed to bind SubscribeRequest")
+		return echo.ErrBadRequest
+	}
+
+	sp, err := h.StatusPageService.GetByDomain(c.Request().Context(), req.Domain)
+	if err != nil {
+		if errors.Is(err, statuspage.ErrNotFound) {
+			return echo.ErrNotFound
+		}
+		return echo.ErrInternalServerError
+	}
+
+	channel := strings.ToUpper(req.Channel)
+	if channel == "" {
+		channel = "EMAIL"
+	}
+
+	token := uuid.New().String()
+	err = h.StatusPageService.SubscribeChannel(c.Request().Context(), sp.ID, req.Email, channel, req.Destination, token)
+	if err != nil {
+		logrus.WithError(err).Error("failed to create subscriber")
+		return echo.ErrInternalServerError
+	}
+
+	// Dispatch verification email only for EMAIL channel if email sender configured
+	if channel == "EMAIL" && h.EmailSender != nil {
+		verificationURL := fmt.Sprintf("%s/%s/subscribe/verify/%s", h.StatusPageBaseURL, req.Domain, token)
+		err = h.EmailSender.Send(c.Request().Context(), "", req.Email, &templates.StatuspageVerifyTemplate{
+			StatusPageName:  sp.Name,
+			VerificationURL: verificationURL,
+		})
+		if err != nil {
+			logrus.WithError(err).Error("failed to dispatch verification email")
+		}
+
+		logrus.WithFields(logrus.Fields{
+			"email": req.Email,
+			"token": token,
+		}).Info("Dispatched verification email")
+	}
+
+	return c.JSON(http.StatusOK, map[string]interface{}{
+		"success":  true,
+		"channel":  channel,
+		"verified": channel != "EMAIL",
+	})
+}
+
+type VerifySubscriberRequest struct {
+	Domain string `param:"domain" validate:"required"`
+	Token  string `param:"token" validate:"required"`
+}
+
+func (h *PublicHandlers) VerifySubscriber(c echo.Context) error {
+	req, err := helpers.Bind[VerifySubscriberRequest](c)
+	if err != nil {
+		logrus.WithError(err).Debug("failed to bind VerifySubscriberRequest")
+		return echo.ErrBadRequest
+	}
+
+	sp, err := h.StatusPageService.GetByDomain(c.Request().Context(), req.Domain)
+	if err != nil {
+		if errors.Is(err, statuspage.ErrNotFound) {
+			return echo.ErrNotFound
+		}
+		return echo.ErrInternalServerError
+	}
+
+	sub, err := h.StatusPageService.GetSubscriberByToken(c.Request().Context(), req.Token)
+	if err != nil {
+		logrus.WithError(err).Error("failed to get subscriber")
+		return echo.ErrInternalServerError
+	}
+
+	err = h.StatusPageService.VerifySubscriber(c.Request().Context(), req.Token)
+	if err != nil {
+		logrus.WithError(err).Error("failed to verify subscriber")
+		return echo.ErrInternalServerError
+	}
+
+	// Dispatch subscription confirmed email
+	statusPageURL := fmt.Sprintf("%s/%s", h.StatusPageBaseURL, sp.Domain)
+	unsubscribeURL := fmt.Sprintf("%s/%s/subscribe/%s", h.StatusPageBaseURL, sp.Domain, sub.Token)
+	err = h.EmailSender.Send(c.Request().Context(), "", sub.Email, &templates.SubscriptionConfirmedTemplate{
+		StatusPageName: sp.Name,
+		StatusPageURL:  statusPageURL,
+		UnsubscribeURL: unsubscribeURL,
+	})
+	if err != nil {
+		logrus.WithError(err).Error("failed to dispatch subscription confirmed email")
+	}
+
+	return c.JSON(http.StatusOK, map[string]bool{"verified": true})
+}
+
+func (h *PublicHandlers) Unsubscribe(c echo.Context) error {
+	req, err := helpers.Bind[VerifySubscriberRequest](c) // reusing VerifySubscriberRequest struct since it has Domain and Token
+	if err != nil {
+		logrus.WithError(err).Debug("failed to bind unsubscribe request")
+		return echo.ErrBadRequest
+	}
+
+	err = h.StatusPageService.Unsubscribe(c.Request().Context(), req.Token)
+	if err != nil {
+		logrus.WithError(err).Error("failed to unsubscribe")
+		return echo.ErrInternalServerError
+	}
+
+	return c.JSON(http.StatusOK, map[string]bool{"unsubscribed": true})
 }

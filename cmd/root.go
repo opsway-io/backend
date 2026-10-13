@@ -1,6 +1,8 @@
 package cmd
 
 import (
+	"strings"
+
 	"github.com/go-playground/validator/v10"
 	"github.com/mcuadros/go-defaults"
 	auth "github.com/opsway-io/backend/internal/authentication"
@@ -8,12 +10,14 @@ import (
 	"github.com/opsway-io/backend/internal/connectors/clickhouse"
 	"github.com/opsway-io/backend/internal/connectors/postgres"
 	"github.com/opsway-io/backend/internal/connectors/redis"
+	logger_pkg "github.com/opsway-io/backend/internal/logger"
 	"github.com/opsway-io/backend/internal/notification/email"
 	"github.com/opsway-io/backend/internal/probes/http"
 	"github.com/opsway-io/backend/internal/rest"
 	"github.com/opsway-io/backend/internal/rest/controllers/authentication"
 	"github.com/opsway-io/backend/internal/storage"
 	"github.com/opsway-io/backend/internal/team"
+	"github.com/opsway-io/backend/internal/user"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -23,6 +27,10 @@ import (
 )
 
 var cfgFile string
+
+type ReportConfig struct {
+	Concurrency int `mapstructure:"concurrency" default:"5"`
+}
 
 type Config struct {
 	Log            LogConfig                             `mapstructure:"log"`
@@ -37,7 +45,20 @@ type Config struct {
 	HTTPProbe      http.Config                           `mapstructure:"http_probe"`
 	Email          email.Config                          `mapstructure:"email"`
 	Team           team.Config                           `mapstructure:"team"`
+	User           user.Config                           `mapstructure:"user"`
 	Stripe         billing.Config                        `mapstructure:"stripe"`
+	Report         ReportConfig                          `mapstructure:"report"`
+	StatusPage     StatusPageConfig                      `mapstructure:"status_page"`
+	Forecaster     ForecasterConfig                      `mapstructure:"forecaster"`
+}
+
+type ForecasterConfig struct {
+	Enabled bool   `mapstructure:"enabled" default:"false"`
+	URL     string `mapstructure:"url" default:"http://forecaster-api:8000/predict"`
+}
+
+type StatusPageConfig struct {
+	BaseURL string `mapstructure:"base_url" default:"https://status.opsway.eu"`
 }
 
 var validate = validator.New()
@@ -79,6 +100,7 @@ func initConfig() {
 		logrus.Info("Using secret file: ", viper.ConfigFileUsed())
 	}
 
+	viper.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
 	viper.AutomaticEnv()
 }
 
@@ -114,6 +136,10 @@ func getLogger(config LogConfig) *logrus.Logger {
 		logger.Warn("Unknown log format, setting log format to text")
 		logger.SetFormatter(&logrus.TextFormatter{})
 	}
+
+	// Hook into log-search
+	hook := logger_pkg.NewLogSearchHook("http://log-search.default.svc.cluster.local:3000/v1/logs", "valid_token_billing")
+	logger.AddHook(hook)
 
 	return logger
 }

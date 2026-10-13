@@ -2,7 +2,7 @@ package cmd
 
 import (
 	"context"
-	"time"
+	"strings"
 
 	"github.com/opsway-io/backend/internal/alerting"
 	"github.com/opsway-io/backend/internal/apikey"
@@ -14,9 +14,11 @@ import (
 	"github.com/opsway-io/backend/internal/connectors/postgres"
 	"github.com/opsway-io/backend/internal/connectors/redis"
 	"github.com/opsway-io/backend/internal/entities"
+	"github.com/opsway-io/backend/internal/escalation"
 	"github.com/opsway-io/backend/internal/event"
-	"github.com/opsway-io/backend/internal/heartbeat"
+	"github.com/opsway-io/backend/internal/heartbeats"
 	"github.com/opsway-io/backend/internal/incident"
+	"github.com/opsway-io/backend/internal/k8s"
 	"github.com/opsway-io/backend/internal/maintenance"
 	"github.com/opsway-io/backend/internal/monitor"
 	"github.com/opsway-io/backend/internal/notification/email"
@@ -68,36 +70,82 @@ func runAPI(cmd *cobra.Command, args []string) {
 	db.SetupJoinTable(&entities.Team{}, "Users", &entities.TeamUser{})
 	db.SetupJoinTable(&entities.ChangelogEntry{}, "Authors", &entities.ChangelogEntryAuthor{})
 
-	if err := db.AutoMigrate(
+	db.AutoMigrate(
 		entities.User{},
 		entities.Team{},
 		entities.Monitor{},
 		entities.MonitorSettings{},
 		entities.MonitorStep{},
 		entities.MonitorAssertion{},
+		entities.MonitorVariable{},
+		entities.AlertRule{},
+		entities.AlertTrigger{},
 		entities.Maintenance{},
 		entities.MaintenanceSettings{},
 		entities.MaintenanceComment{},
 		entities.Incident{},
 		entities.IncidentComment{},
+		entities.IncidentOccurrence{},
 		entities.Changelog{},
 		entities.ChangelogEntry{},
 		entities.Report{},
-		entities.IncidentOccurrence{},
-		entities.AlertRule{},
-		entities.AlertTrigger{},
-		entities.EscalationPolicy{},
-		entities.EscalationRotation{},
-		entities.UserNotificationRule{},
-		entities.ApiKey{},
-		entities.TeamInvite{},
-		entities.Heartbeat{},
 		entities.StatusPage{},
 		entities.StatusPageGroup{},
 		entities.StatusPageSubscriber{},
-	); err != nil {
-		l.WithError(err).Error("Failed to auto migrate database")
+		entities.APIKey{},
+		entities.EscalationPolicy{},
+		entities.OnCallRotation{},
+		entities.TeamInvitation{},
+		entities.UserNotificationRule{},
+		entities.EscalationJob{},
+		entities.NotificationJob{},
+	)
+
+	// --- DATA MIGRATION ---
+	// Migrate existing single-step config into monitor_steps
+	err = db.Exec(`
+		INSERT INTO monitor_steps (monitor_id, order_index, name, method, url, headers, body_type, body_content, updated_at)
+		SELECT 
+			monitor_id, 0, 'Step 1', method, url, headers, body_type, body_content, updated_at
+		FROM monitor_settings
+		WHERE method IS NOT NULL AND NOT EXISTS (SELECT 1 FROM monitor_steps WHERE monitor_steps.monitor_id = monitor_settings.monitor_id AND order_index = 0)
+	`).Error
+	if err != nil && !strings.Contains(err.Error(), "does not exist") {
+		l.WithError(err).Fatal("Failed to migrate monitor settings to monitor steps")
 	}
+
+	err = db.Exec(`
+		INSERT INTO monitor_steps (monitor_id, order_index, name, method, url, headers, body_type, body_content, updated_at)
+		SELECT 
+			monitor_id, 1, 'Teardown', teardown_method, teardown_url, '[]', teardown_body_type, teardown_body_content, updated_at
+		FROM monitor_settings
+		WHERE teardown_enabled = true AND NOT EXISTS (SELECT 1 FROM monitor_steps WHERE monitor_steps.monitor_id = monitor_settings.monitor_id AND order_index = 1)
+	`).Error
+	if err != nil && !strings.Contains(err.Error(), "does not exist") {
+		l.WithError(err).Fatal("Failed to migrate teardown settings to monitor steps")
+	}
+
+	err = db.Exec(`
+		UPDATE monitor_assertions SET monitor_step_id = (
+			SELECT id FROM monitor_steps WHERE monitor_steps.monitor_id = monitor_assertions.monitor_id AND order_index = 0 LIMIT 1
+		) WHERE (monitor_step_id IS NULL OR monitor_step_id = 0) AND monitor_id IS NOT NULL
+	`).Error
+	if err != nil {
+		l.WithError(err).Fatal("Failed to migrate monitor assertions")
+	}
+
+	err = db.Exec(`
+		UPDATE monitor_variables SET monitor_step_id = (
+			SELECT id FROM monitor_steps WHERE monitor_steps.monitor_id = monitor_variables.monitor_id AND order_index = 0 LIMIT 1
+		) WHERE (monitor_step_id IS NULL OR monitor_step_id = 0) AND monitor_id IS NOT NULL
+	`).Error
+	if err != nil {
+		l.WithError(err).Fatal("Failed to migrate monitor variables")
+	}
+
+	db.Exec(`ALTER TABLE monitor_assertions ALTER COLUMN monitor_step_id SET NOT NULL`)
+	db.Exec(`ALTER TABLE monitor_variables ALTER COLUMN monitor_step_id SET NOT NULL`)
+	// ----------------------
 
 	ch_db, err := clickhouse.NewClient(ctx, conf.Clickhouse)
 	if err != nil {
@@ -110,16 +158,16 @@ func runAPI(cmd *cobra.Command, args []string) {
 
 	var emailSender email.Sender
 	if conf.Email.Debug {
-		l.Info("Using console email sender")
+		l.Info("Using SMTP email sender")
 
-		emailSender = email.NewConsoleSender()
+		emailSender = email.NewSMTPSender(conf.Email)
 	} else {
 		l.Info("Using Sendgrid email sender")
 
 		emailSender = email.NewSendgridSender(conf.Email)
 	}
 
-	eventService, err := event.NewService(redisClient)
+	eventService, err := event.NewService(redisClient, "")
 	if err != nil {
 		l.WithError(err).Fatal("Failed to create event service")
 	}
@@ -131,52 +179,50 @@ func runAPI(cmd *cobra.Command, args []string) {
 
 	userRepository := user.NewRepository(db)
 	userCache := user.NewCache(redisClient)
-	userService := user.NewService(userRepository, userCache, storageService, emailSender, eventService, user.WithApplicationURL(conf.Team.ApplicationURL))
+	userService := user.NewService(userRepository, userCache, storageService, emailSender, eventService, conf.User)
 
 	teamRepository := team.NewRepository(db)
-	teamService := team.NewService(conf.Team, teamRepository, storageService, emailSender)
+	teamCache := team.NewCache(redisClient)
+	teamService := team.NewService(conf.Team, teamRepository, storageService, emailSender, teamCache)
 
-	monitorService := monitor.NewService(db, redisClient, monitor.WithLocations(conf.Prober.Locations))
-
-	// Convert legacy single-request monitors into 1-step monitors (idempotent)
-	if migrated, err := monitor.MigrateToSteps(ctx, db); err != nil {
-		l.WithError(err).Error("Failed to migrate monitors to steps")
-	} else if migrated > 0 {
-		l.WithField("count", migrated).Info("Migrated legacy monitors to steps")
-
-		if n, err := monitorService.RescheduleActive(ctx); err != nil {
-			l.WithError(err).Error("Failed to reschedule monitors")
-		} else {
-			l.WithField("count", n).Info("Rescheduled active monitors")
-		}
-	}
+	monitorService := monitor.NewService(db, redisClient)
 
 	httpResultService := check.NewService(ch_db)
+
+	alertingRepository := alerting.NewRepository(db)
+	alertingService := alerting.NewService(alertingRepository)
+
+	heartbeatsRepository := heartbeats.NewRepository(db)
+	heartbeatsService := heartbeats.NewService(heartbeatsRepository)
+
+	maintenanceRepository := maintenance.NewRepository(db)
+	maintenanceService := maintenance.NewService(maintenanceRepository, eventService)
+
+	k8sService := k8s.NewService(l)
+
+	statuspageRepository := statuspage.NewRepository(db)
+	statuspageService := statuspage.NewService(statuspageRepository, k8sService)
 
 	billingService := billing.NewService(conf.Stripe)
 
 	changelogService := changelog.NewService(db)
 
-	if err := incident.Migrate(db); err != nil {
-		l.WithError(err).Error("Failed to migrate incident indexes")
-	}
-
 	incidentRepository := incident.NewRepository(db)
-	incidentService := incident.NewService(incidentRepository, newIncidentSubscriberHooks(conf, l, db)...)
+	incidentService := incident.NewService(incidentRepository, eventService)
 
-	reportRepository := report.NewRepository(db, ch_db)
+	reportRepository := report.NewRepository(db)
 	reportsService := report.NewService(reportRepository)
 
-	maintenanceService := maintenance.NewService(maintenance.NewRepository(db))
+	apiKeyRepository := apikey.NewRepository(db)
+	apiKeyService := apikey.NewService(apiKeyRepository)
 
-	heartbeatService := heartbeat.NewService(db)
-	go heartbeat.RunChecker(ctx, heartbeatService, 30*time.Second, l.WithField("module", "heartbeat_checker"))
+	escalationRepo := escalation.NewRepository(db)
+	escalationService := escalation.NewService(escalationRepo)
 
-	statusPageService := statuspage.NewService(db, ch_db, emailSender)
-
-	alertingService := alerting.NewService(l.WithField("module", "alerting"), alerting.NewRepository(db), nil)
-	alertingPolicyService := alerting.NewPolicyService(alerting.NewPolicyRepository(db))
-	apiKeyService := apikey.NewService(db)
+	availableLocations := conf.Prober.AvailableLocations
+	if len(availableLocations) == 0 {
+		availableLocations = []string{"global"}
+	}
 
 	srv, err := rest.NewServer(
 		conf.REST,
@@ -186,18 +232,24 @@ func runAPI(cmd *cobra.Command, args []string) {
 		authenticationService,
 		userService,
 		teamService,
+		alertingService,
 		monitorService,
 		httpResultService,
 		billingService,
 		changelogService,
+		heartbeatsService,
 		incidentService,
-		reportsService,
 		maintenanceService,
-		heartbeatService,
-		statusPageService,
-		alertingService,
-		alertingPolicyService,
+		reportsService,
+		statuspageService,
+		escalationService,
+		eventService,
 		apiKeyService,
+		emailSender,
+		availableLocations,
+		db,
+		ch_db,
+		conf.StatusPage.BaseURL,
 	)
 	if err != nil {
 		l.WithError(err).Fatal("Failed to create REST server")

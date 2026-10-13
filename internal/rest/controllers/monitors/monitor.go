@@ -2,9 +2,8 @@ package monitors
 
 import (
 	"errors"
-	"math"
+	"fmt"
 	"net/http"
-	"strconv"
 	"time"
 
 	"github.com/labstack/echo/v4"
@@ -14,6 +13,83 @@ import (
 	hs "github.com/opsway-io/backend/internal/rest/handlers"
 	"github.com/opsway-io/backend/internal/rest/helpers"
 )
+
+/*
+	Shared structs
+*/
+
+type Monitor struct {
+	ID        uint            `json:"id"`
+	State     string          `json:"state" validate:"required,monitorState"`
+	Name      string          `json:"name" validate:"required,max=255"`
+	Settings  MonitorSettings `json:"settings" validate:"required,dive"`
+	Steps     []MonitorStep   `json:"steps" validate:"required,dive"`
+	CreatedAt time.Time       `json:"createdAt"`
+	UpdatedAt time.Time       `json:"updatedAt"`
+}
+
+type MonitorStep struct {
+	Name       string                  `json:"name" validate:"required,max=255"`
+	Method     string                  `json:"method" validate:"required,monitorMethod"`
+	URL        string                  `json:"url" validate:"required,url"`
+	Headers    []MonitorSettingsHeader `json:"headers" validate:"dive"`
+	Body       MonitorSettingsBody     `json:"body" validate:"dive"`
+	Assertions []MonitorAssertion      `json:"assertions" validate:"dive,monitorAssertions"`
+	Variables  []MonitorVariable       `json:"variables" validate:"dive"`
+}
+
+type MonitorSettings struct {
+	FrequencySeconds uint64              `json:"frequencySeconds" validate:"required,numeric,gte=10"`
+	Auth             MonitorSettingsAuth `json:"auth" validate:"required"`
+	TLS              MonitorSettingsTLS  `json:"tls" validate:"required"`
+	Locations        []string            `json:"locations" validate:"required,dive,location"`
+}
+
+type MonitorSettingsTeardown struct {
+	Enabled bool                `json:"enabled"`
+	Method  string              `json:"method"`
+	URL     string              `json:"url"`
+	Body    MonitorSettingsBody `json:"body"`
+}
+
+type MonitorVariable struct {
+	Name     string `json:"name" validate:"required"`
+	Source   string `json:"source" validate:"required"`
+	Property string `json:"property" validate:"required"`
+}
+
+type MonitorAssertion struct {
+	Source   string `json:"source"`
+	Property string `json:"property"`
+	Operator string `json:"operator"`
+	Target   string `json:"target"`
+}
+
+type MonitorSettingsHeader struct {
+	Key   string `json:"key" validate:"required,max=255"`
+	Value string `json:"value" validate:"max=255"`
+}
+
+type MonitorSettingsBody struct {
+	Type    string  `json:"type" validate:"required,monitorBodyType"`
+	Content *string `json:"content" validate:"omitempty,max=1048576"` // Max 1 MB
+}
+
+type MonitorSettingsTLS struct {
+	Enabled                 bool  `json:"enabled"`
+	VerifyHostname          *bool `json:"verifyHostname"`
+	CheckExpiration         *bool `json:"checkExpiration"`
+	ExpirationThresholdDays *uint `json:"expirationThresholdDays"`
+}
+
+type MonitorSettingsAuth struct {
+	Method       string `json:"method" validate:"required"`
+	TokenURL     string `json:"tokenUrl" validate:"omitempty,url"`
+	ClientID     string `json:"clientId"`
+	ClientSecret string `json:"clientSecret"`
+	Username     string `json:"username"`
+	Password     string `json:"password"`
+}
 
 /*
 	Handlers
@@ -38,6 +114,7 @@ type GetMonitorsResponseMonitor struct {
 
 type GetMonitorsResponseMonitorStats struct {
 	UptimePercentage     float64   `json:"uptimePercentage"`
+	AverageResponseTime  float64   `json:"averageResponseTime"`
 	AverageResponseTimes []float64 `json:"averageResponseTimes"`
 	P99                  uint      `json:"p99"`
 	P95                  uint      `json:"p95"`
@@ -65,36 +142,106 @@ func (h *Handlers) GetMonitors(c hs.AuthenticatedContext) error {
 		return echo.ErrInternalServerError
 	}
 
-	return c.JSON(http.StatusOK, newGetMonitorsResponse(monitors, monitorStats))
+	resp, err := newGetMonitorsResponse(monitors, monitorStats)
+	if err != nil {
+		c.Log.WithError(err).Error("failed to create GetMonitorsResponse")
+
+		return echo.ErrInternalServerError
+	}
+
+	return c.JSON(http.StatusOK, resp)
 }
 
-func newGetMonitorsResponse(monitors *[]monitor.MonitorWithTotalCount, stats *[]check.MonitorOverviews) *GetMonitorsResponse {
-	if monitors == nil {
-		monitors = &[]monitor.MonitorWithTotalCount{}
-	}
-
+func newGetMonitorsResponse(monitors *[]monitor.MonitorWithTotalCount, stats *[]check.MonitorOverviews) (*GetMonitorsResponse, error) {
 	res := make([]GetMonitorsResponseMonitor, len(*monitors))
 
-	monitorStatsMap := map[uint]check.MonitorOverviews{}
-	if stats != nil {
-		for _, m := range *stats {
-			monitorStatsMap[m.MonitorID] = m
-		}
+	monitorStatsMap := make(map[uint]check.MonitorOverviews, len(*stats))
+	for _, m := range *stats {
+		monitorStatsMap[m.MonitorID] = m
 	}
 
-	for i := range *monitors {
-		m := &(*monitors)[i]
+	for i, m := range *monitors {
+		locations := m.Settings.Locations
+		if locations == nil {
+			locations = []string{}
+		}
+
+		steps := make([]MonitorStep, len(m.Steps))
+		for j, s := range m.Steps {
+			headers := make([]MonitorSettingsHeader, len(s.Headers))
+			for k, h := range s.Headers {
+				headers[k] = MonitorSettingsHeader{
+					Key:   h.Key,
+					Value: h.Value,
+				}
+			}
+
+			assertions := make([]MonitorAssertion, len(s.Assertions))
+			for k, a := range s.Assertions {
+				assertions[k] = MonitorAssertion{
+					Source:   a.Source,
+					Operator: a.Operator,
+					Target:   a.Target,
+					Property: a.Property,
+				}
+			}
+
+			variables := make([]MonitorVariable, len(s.Variables))
+			for k, v := range s.Variables {
+				variables[k] = MonitorVariable{
+					Name:     v.Name,
+					Source:   v.Source,
+					Property: v.Property,
+				}
+			}
+			steps[j] = MonitorStep{
+				Name:    s.Name,
+				Method:  s.Method,
+				URL:     s.URL,
+				Headers: headers,
+				Body: MonitorSettingsBody{
+					Type:    s.Body.Type,
+					Content: s.Body.GetContentString(),
+				},
+				Assertions: assertions,
+				Variables:  variables,
+			}
+		}
 
 		res[i] = GetMonitorsResponseMonitor{
-			Monitor: newMonitorResponse(&m.Monitor),
-			Stats: GetMonitorsResponseMonitorStats{
-				AverageResponseTimes: []float64{},
+			Monitor: Monitor{
+				ID:        m.ID,
+				State:     m.GetStateString(),
+				Name:      m.Name,
+				CreatedAt: m.CreatedAt,
+				UpdatedAt: m.UpdatedAt,
+				Settings: MonitorSettings{
+					FrequencySeconds: m.Settings.GetFrequencySeconds(),
+					TLS: MonitorSettingsTLS{
+						Enabled:                 m.Settings.TLS.Enabled,
+						VerifyHostname:          m.Settings.TLS.VerifyHostname,
+						CheckExpiration:         m.Settings.TLS.CheckExpiration,
+						ExpirationThresholdDays: m.Settings.TLS.ExpirationThresholdDays,
+					},
+					Auth: MonitorSettingsAuth{
+						Method:       m.Settings.Auth.Method,
+						TokenURL:     m.Settings.Auth.TokenURL,
+						ClientID:     m.Settings.Auth.ClientID,
+						ClientSecret: m.Settings.Auth.ClientSecret,
+						Username:     m.Settings.Auth.Username,
+						Password:     m.Settings.Auth.Password,
+					},
+					Locations: locations,
+				},
+				Steps: steps,
 			},
 		}
 
-		if stat, ok := monitorStatsMap[m.ID]; ok {
+		stat, ok := monitorStatsMap[m.ID]
+		if ok {
 			res[i].Stats = GetMonitorsResponseMonitorStats{
-				UptimePercentage:     0, // TODO: Implement
+				UptimePercentage:     float64(stat.UptimePercentage),
+				AverageResponseTime:  float64(stat.AverageResponseTime),
 				AverageResponseTimes: stat.Stats,
 				P99:                  uint(stat.P99),
 				P95:                  uint(stat.P95),
@@ -110,7 +257,7 @@ func newGetMonitorsResponse(monitors *[]monitor.MonitorWithTotalCount, stats *[]
 	return &GetMonitorsResponse{
 		Monitors:   res,
 		TotalCount: totalCount,
-	}
+	}, nil
 }
 
 type GetMonitorRequest struct {
@@ -153,33 +300,98 @@ func (h *Handlers) GetMonitor(c hs.AuthenticatedContext) error {
 		return echo.ErrInternalServerError
 	}
 
-	return c.JSON(http.StatusOK, newGetMonitorResponse(m, stats))
-}
+	resp, err := newGetMonitorResponse(m, stats)
+	if err != nil {
+		c.Log.WithError(err).Error("failed to create GetMonitorResponse")
 
-func newGetMonitorResponse(m *entities.Monitor, stats *check.MonitorStats) *GetMonitorResponse {
-	resp := GetMonitorResponse{
-		Monitor: newMonitorResponse(m),
+		return echo.ErrInternalServerError
 	}
 
-	if stats != nil {
-		resp.Stats = GetMonitorResponseStats{
-			UptimePercentage:    finiteOrZero(stats.UptimePercentage),    // TODO: Implement
-			AverageResponseTime: finiteOrZero(stats.AverageResponseTime), // TODO: Implement
+	return c.JSON(http.StatusOK, resp)
+}
+
+func newGetMonitorResponse(m *entities.Monitor, stats *check.MonitorStats) (*GetMonitorResponse, error) {
+	locations := m.Settings.Locations
+	if locations == nil {
+		locations = []string{}
+	}
+
+	steps := make([]MonitorStep, len(m.Steps))
+	for j, s := range m.Steps {
+		headers := make([]MonitorSettingsHeader, len(s.Headers))
+		for k, h := range s.Headers {
+			headers[k] = MonitorSettingsHeader{
+				Key:   h.Key,
+				Value: h.Value,
+			}
+		}
+
+		assertions := make([]MonitorAssertion, len(s.Assertions))
+		for k, a := range s.Assertions {
+			assertions[k] = MonitorAssertion{
+				Source:   a.Source,
+				Operator: a.Operator,
+				Target:   a.Target,
+				Property: a.Property,
+			}
+		}
+
+		variables := make([]MonitorVariable, len(s.Variables))
+		for k, v := range s.Variables {
+			variables[k] = MonitorVariable{
+				Name:     v.Name,
+				Source:   v.Source,
+				Property: v.Property,
+			}
+		}
+		steps[j] = MonitorStep{
+			Name:    s.Name,
+			Method:  s.Method,
+			URL:     s.URL,
+			Headers: headers,
+			Body: MonitorSettingsBody{
+				Type:    s.Body.Type,
+				Content: s.Body.GetContentString(),
+			},
+			Assertions: assertions,
+			Variables:  variables,
 		}
 	}
 
-	return &resp
-}
-
-// finiteOrZero guards against NaN/Inf from aggregates over zero checks, which
-// encoding/json cannot serialize.
-func finiteOrZero(v float32) float64 {
-	f := float64(v)
-	if math.IsNaN(f) || math.IsInf(f, 0) {
-		return 0
+	resp := GetMonitorResponse{
+		Monitor: Monitor{
+			ID:        m.ID,
+			State:     m.GetStateString(),
+			Name:      m.Name,
+			CreatedAt: m.CreatedAt,
+			UpdatedAt: m.UpdatedAt,
+			Settings: MonitorSettings{
+				FrequencySeconds: m.Settings.GetFrequencySeconds(),
+				TLS: MonitorSettingsTLS{
+					Enabled:                 m.Settings.TLS.Enabled,
+					VerifyHostname:          m.Settings.TLS.VerifyHostname,
+					CheckExpiration:         m.Settings.TLS.CheckExpiration,
+					ExpirationThresholdDays: m.Settings.TLS.ExpirationThresholdDays,
+				},
+				Auth: MonitorSettingsAuth{
+					Method:       m.Settings.Auth.Method,
+					TokenURL:     m.Settings.Auth.TokenURL,
+					ClientID:     m.Settings.Auth.ClientID,
+					ClientSecret: m.Settings.Auth.ClientSecret,
+					Username:     m.Settings.Auth.Username,
+					Password:     m.Settings.Auth.Password,
+				},
+				Locations: locations,
+			},
+			Steps: steps,
+		},
+		Stats: GetMonitorResponseStats{
+			UptimePercentage:    float64(stats.UptimePercentage),
+			AverageResponseTime: float64(stats.AverageResponseTime),
+		},
 	}
 
-	return f
+	return &resp, nil
 }
 
 type DeleteMonitorRequest struct {
@@ -217,72 +429,110 @@ func (h *Handlers) DeleteMonitor(c hs.AuthenticatedContext) error {
 type PostMonitorRequest struct {
 	TeamID   uint            `param:"teamId" validate:"required,numeric,gte=0"`
 	Name     string          `json:"name" validate:"required,max=255"`
-	Settings MonitorSettings `json:"settings"`
-	Steps    []MonitorStep   `json:"steps" validate:"required,min=1,dive"`
+	Settings MonitorSettings `json:"settings" validate:"required,dive"`
+	Steps    []MonitorStep   `json:"steps" validate:"required,dive"`
 }
 
 func (h *Handlers) PostMonitor(c hs.AuthenticatedContext) error {
 	req, err := helpers.Bind[PostMonitorRequest](c)
 	if err != nil {
 		c.Log.WithError(err).Debug("failed to bind PostMonitorRequest")
-
-		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
+		fmt.Println("BIND ERROR POST MONITOR:", err)
+		return echo.ErrBadRequest
 	}
 
-	m, err := newMonitorEntity(req.TeamID, req.Name, req.Settings, req.Steps, h.MonitorService.Locations())
+	ctx := c.Request().Context()
+	teamEntity, err := h.TeamService.GetByID(ctx, req.TeamID)
 	if err != nil {
-		return badRequest(err)
-	}
-
-	if err := h.MonitorService.Create(c.Request().Context(), m); err != nil {
-		c.Log.WithError(err).Error("failed to create monitor")
-
+		c.Log.WithError(err).Debug("failed to get team")
 		return echo.ErrInternalServerError
 	}
 
-	return c.NoContent(http.StatusCreated)
-}
-
-type PostMonitorsBulkRequest struct {
-	TeamID   uint                      `param:"teamId" validate:"required,numeric,gte=0"`
-	Monitors []PostMonitorsBulkMonitor `json:"monitors" validate:"required,min=1,dive"`
-}
-
-type PostMonitorsBulkMonitor struct {
-	Name     string          `json:"name" validate:"required,max=255"`
-	Settings MonitorSettings `json:"settings"`
-	Steps    []MonitorStep   `json:"steps" validate:"required,min=1,dive"`
-}
-
-func (h *Handlers) PostMonitorsBulk(c hs.AuthenticatedContext) error {
-	req, err := helpers.Bind[PostMonitorsBulkRequest](c)
-	if err != nil {
-		c.Log.WithError(err).Debug("failed to bind PostMonitorsBulkRequest")
-
-		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
-	}
-
-	if len(req.Monitors) > maxMonitorsPerBulk {
-		return echo.NewHTTPError(http.StatusBadRequest, "too many monitors in one request")
-	}
-
-	monitors := make([]*entities.Monitor, len(req.Monitors))
-	for i, rm := range req.Monitors {
-		m, err := newMonitorEntity(req.TeamID, rm.Name, rm.Settings, rm.Steps, h.MonitorService.Locations())
+	limit := teamEntity.GetMonitorLimit()
+	if limit != -1 {
+		count, err := h.MonitorService.CountByTeamID(ctx, req.TeamID)
 		if err != nil {
-			var vErr *ValidationError
-			if errors.As(err, &vErr) {
-				return echo.NewHTTPError(http.StatusBadRequest, "monitors["+itoa(i)+"]: "+vErr.Error())
-			}
+			c.Log.WithError(err).Debug("failed to get monitor count")
+			return echo.ErrInternalServerError
+		}
+		if count >= int64(limit) {
+			return echo.NewHTTPError(http.StatusPaymentRequired, "Payment Required")
+		}
+	}
 
-			return badRequest(err)
+	steps := make([]entities.MonitorStep, len(req.Steps))
+	for i, s := range req.Steps {
+		headers := make([]entities.MonitorStepHeader, len(s.Headers))
+		for j, h := range s.Headers {
+			headers[j] = entities.MonitorStepHeader{
+				Key:   h.Key,
+				Value: h.Value,
+			}
 		}
 
-		monitors[i] = m
+		assertions := make([]entities.MonitorAssertion, len(s.Assertions))
+		for j, a := range s.Assertions {
+			assertions[j] = entities.MonitorAssertion{
+				Source:   a.Source,
+				Operator: a.Operator,
+				Target:   a.Target,
+				Property: a.Property,
+			}
+		}
+
+		variables := make([]entities.MonitorVariable, len(s.Variables))
+		for j, v := range s.Variables {
+			variables[j] = entities.MonitorVariable{
+				Name:     v.Name,
+				Source:   v.Source,
+				Property: v.Property,
+			}
+		}
+
+		body := entities.MonitorStepBody{
+			Type: s.Body.Type,
+		}
+		body.SetContentString(s.Body.Content)
+
+		steps[i] = entities.MonitorStep{
+			Name:       s.Name,
+			OrderIndex: i,
+			Method:     s.Method,
+			URL:        s.URL,
+			Headers:    headers,
+			Body:       body,
+			Assertions: assertions,
+			Variables:  variables,
+		}
 	}
 
-	if err := h.MonitorService.CreateMany(c.Request().Context(), monitors); err != nil {
-		c.Log.WithError(err).Error("failed to create monitors")
+	m := &entities.Monitor{
+		TeamID: req.TeamID,
+		Name:   req.Name,
+		Settings: entities.MonitorSettings{
+			TLS: entities.MonitorSettingsTLS{
+				Enabled:                 req.Settings.TLS.Enabled,
+				VerifyHostname:          req.Settings.TLS.VerifyHostname,
+				CheckExpiration:         req.Settings.TLS.CheckExpiration,
+				ExpirationThresholdDays: req.Settings.TLS.ExpirationThresholdDays,
+			},
+			Auth: entities.MonitorSettingsAuth{
+				Method:       req.Settings.Auth.Method,
+				TokenURL:     req.Settings.Auth.TokenURL,
+				ClientID:     req.Settings.Auth.ClientID,
+				ClientSecret: req.Settings.Auth.ClientSecret,
+				Username:     req.Settings.Auth.Username,
+				Password:     req.Settings.Auth.Password,
+			},
+			Locations: req.Settings.Locations,
+		},
+		Steps: steps,
+	}
+
+	m.Settings.SetFrequencySeconds(req.Settings.FrequencySeconds)
+
+	if err := h.MonitorService.Create(c.Request().Context(), m); err != nil {
+		c.Log.WithError(err).Error("failed to create monitor")
 
 		return echo.ErrInternalServerError
 	}
@@ -312,7 +562,9 @@ type Incident struct {
 	ID                 uint      `json:"id"`
 	CreatedAt          time.Time `json:"createdAt"`
 	UpdatedAt          time.Time `json:"updatedAt"`
-	MonitorAssertionID uint      `json:"monitorAssertionId"`
+	MonitorAssertionID *uint     `json:"monitorAssertionId"`
+	Resolved           bool      `json:"resolved"`
+	Acknowledged       bool      `json:"acknowledged"`
 }
 
 func (h *Handlers) GetMonitorIncidents(c hs.AuthenticatedContext) error {
@@ -366,6 +618,8 @@ func newGetMonitorWithIncidentsResponse(monitors *[]entities.Monitor) (*GetMonit
 				CreatedAt:          incident.CreatedAt,
 				UpdatedAt:          incident.UpdatedAt,
 				MonitorAssertionID: incident.MonitorAssertionID,
+				Resolved:           incident.Resolved,
+				Acknowledged:       incident.Acknowledged,
 			}
 		}
 		res[i] = monitorWithIncidents
@@ -381,8 +635,8 @@ type PutMonitorRequest struct {
 	MonitorID uint            `param:"monitorId" validate:"required,numeric,gte=0"`
 	Name      string          `json:"name" validate:"required,max=255"`
 	State     string          `json:"state" validate:"required,monitorState"`
-	Settings  MonitorSettings `json:"settings"`
-	Steps     []MonitorStep   `json:"steps" validate:"required,min=1,dive"`
+	Settings  MonitorSettings `json:"settings" validate:"required,dive"`
+	Steps     []MonitorStep   `json:"steps" validate:"required,dive"`
 }
 
 func (h *Handlers) PutMonitor(c hs.AuthenticatedContext) error {
@@ -392,16 +646,106 @@ func (h *Handlers) PutMonitor(c hs.AuthenticatedContext) error {
 	if err != nil {
 		c.Log.WithError(err).Debug("failed to bind PutMonitorRequest")
 
-		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
-	}
-
-	m, err := newMonitorEntity(req.TeamID, req.Name, req.Settings, req.Steps, h.MonitorService.Locations())
-	if err != nil {
-		return badRequest(err)
-	}
-
-	if err := m.SetStateString(req.State); err != nil {
 		return echo.ErrBadRequest
+	}
+
+	steps := make([]entities.MonitorStep, len(req.Steps))
+	for i, s := range req.Steps {
+		headers := make([]entities.MonitorStepHeader, len(s.Headers))
+		for j, h := range s.Headers {
+			headers[j] = entities.MonitorStepHeader{
+				Key:   h.Key,
+				Value: h.Value,
+			}
+		}
+
+		assertions := make([]entities.MonitorAssertion, len(s.Assertions))
+		for j, a := range s.Assertions {
+			assertions[j] = entities.MonitorAssertion{
+				Source:   a.Source,
+				Operator: a.Operator,
+				Target:   a.Target,
+				Property: a.Property,
+			}
+		}
+
+		variables := make([]entities.MonitorVariable, len(s.Variables))
+		for j, v := range s.Variables {
+			variables[j] = entities.MonitorVariable{
+				Name:     v.Name,
+				Source:   v.Source,
+				Property: v.Property,
+			}
+		}
+
+		body := entities.MonitorStepBody{
+			Type: s.Body.Type,
+		}
+		body.SetContentString(s.Body.Content)
+
+		steps[i] = entities.MonitorStep{
+			Name:       s.Name,
+			OrderIndex: i,
+			Method:     s.Method,
+			URL:        s.URL,
+			Headers:    headers,
+			Body:       body,
+			Assertions: assertions,
+			Variables:  variables,
+		}
+	}
+
+	m := &entities.Monitor{
+		TeamID: req.TeamID,
+		Name:   req.Name,
+		Settings: entities.MonitorSettings{
+			TLS: entities.MonitorSettingsTLS{
+				Enabled:                 req.Settings.TLS.Enabled,
+				VerifyHostname:          req.Settings.TLS.VerifyHostname,
+				CheckExpiration:         req.Settings.TLS.CheckExpiration,
+				ExpirationThresholdDays: req.Settings.TLS.ExpirationThresholdDays,
+			},
+			Auth: entities.MonitorSettingsAuth{
+				Method:       req.Settings.Auth.Method,
+				TokenURL:     req.Settings.Auth.TokenURL,
+				ClientID:     req.Settings.Auth.ClientID,
+				ClientSecret: req.Settings.Auth.ClientSecret,
+				Username:     req.Settings.Auth.Username,
+				Password:     req.Settings.Auth.Password,
+			},
+			Locations: req.Settings.Locations,
+		},
+		Steps: steps,
+	}
+
+	m.SetStateString(req.State)
+	m.Settings.SetFrequencySeconds(req.Settings.FrequencySeconds)
+
+	if req.State == "ACTIVE" {
+		activeMaintenances, err := h.MaintenanceService.GetActive(ctx, time.Now())
+		if err != nil {
+			c.Log.WithError(err).Error("failed to get active maintenances")
+			return echo.ErrInternalServerError
+		}
+
+		for _, maintenance := range *activeMaintenances {
+			if maintenance.TeamID == req.TeamID {
+				appliesToAll := len(maintenance.Monitors) == 0
+				appliesToThis := false
+				if !appliesToAll {
+					for _, m := range maintenance.Monitors {
+						if m.ID == req.MonitorID {
+							appliesToThis = true
+							break
+						}
+					}
+				}
+
+				if appliesToAll || appliesToThis {
+					return echo.NewHTTPError(http.StatusConflict, "Cannot resume monitor while an active maintenance window is ongoing for this monitor. Please complete or delete the maintenance first.")
+				}
+			}
+		}
 	}
 
 	if err := h.MonitorService.Update(
@@ -440,6 +784,33 @@ func (h *Handlers) PutMonitorState(c hs.AuthenticatedContext) error {
 
 	stateEnum := entities.GetMonitorStateEnumFromString(req.State)
 
+	if req.State == "ACTIVE" {
+		activeMaintenances, err := h.MaintenanceService.GetActive(ctx, time.Now())
+		if err != nil {
+			c.Log.WithError(err).Error("failed to get active maintenances")
+			return echo.ErrInternalServerError
+		}
+
+		for _, maintenance := range *activeMaintenances {
+			if maintenance.TeamID == req.TeamID {
+				appliesToAll := len(maintenance.Monitors) == 0
+				appliesToThis := false
+				if !appliesToAll {
+					for _, m := range maintenance.Monitors {
+						if m.ID == req.MonitorID {
+							appliesToThis = true
+							break
+						}
+					}
+				}
+
+				if appliesToAll || appliesToThis {
+					return echo.NewHTTPError(http.StatusConflict, "Cannot resume monitor while an active maintenance window is ongoing for this monitor. Please complete or delete the maintenance first.")
+				}
+			}
+		}
+	}
+
 	if err := h.MonitorService.SetState(
 		ctx,
 		req.TeamID,
@@ -456,17 +827,4 @@ func (h *Handlers) PutMonitorState(c hs.AuthenticatedContext) error {
 	}
 
 	return c.NoContent(http.StatusNoContent)
-}
-
-func badRequest(err error) error {
-	var vErr *ValidationError
-	if errors.As(err, &vErr) {
-		return echo.NewHTTPError(http.StatusBadRequest, vErr.Error())
-	}
-
-	return echo.ErrBadRequest
-}
-
-func itoa(i int) string {
-	return strconv.Itoa(i)
 }

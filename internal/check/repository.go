@@ -3,6 +3,7 @@ package check
 import (
 	"context"
 	"errors"
+	"time"
 
 	"github.com/gofrs/uuid"
 	"github.com/opsway-io/backend/internal/connectors/clickhouse"
@@ -14,13 +15,16 @@ var ErrNotFound = errors.New("probe result not found")
 type Repository interface {
 	Create(ctx context.Context, maintenance *Check) error
 	GetByTeamIDAndMonitorIDAndCheckID(ctx context.Context, teamID uint, monitorID uint, checkID uuid.UUID) (*Check, error)
+	GetLatestByMonitorID(ctx context.Context, monitorID uint) (*Check, error)
 	GetByTeamIDAndMonitorIDPaginated(ctx context.Context, teamID, monitorID uint, offset, limit *int) (*[]Check, error)
-	GetMonitorMetricsByMonitorID(ctx context.Context, monitorID uint) (*[]AggMetric, error)
+	GetMonitorMetricsByMonitorID(ctx context.Context, monitorID uint, start *string, end *string) (*[]AggMetric, error)
 	GetMonitorOverviewsByTeamID(ctx context.Context, teamID uint) (*[]MonitorOverviews, error)
-	GetMonitorStatsByMonitorID(ctx context.Context, monitorID uint) (*MonitorStats, error)
 	GetMonitorOverviewStatsByTeamID(ctx context.Context, teamID uint) (*[]MonitorOverviewStats, error)
+	GetMonitorUptimesByMonitorIDs(ctx context.Context, monitorIDs []uint) (map[uint]MonitorUptimeResult, error)
 	GetMonitorIDAndAssertions(ctx context.Context, monitorID uint, assertions []string) (*[]Check, error)
 	GetByTeamIDMonitorsUptime(ctx context.Context, teamID uint, start, end string) (*[]MonitorUptime, error)
+	GetByTeamIDMonitorsPerformance(ctx context.Context, teamID uint, start, end string) (*[]MonitorPerformance, error)
+	GetMonitorStatsByMonitorID(ctx context.Context, monitorID uint) (*MonitorStats, error)
 }
 
 type RepositoryImpl struct {
@@ -41,6 +45,30 @@ func (r *RepositoryImpl) GetByTeamIDAndMonitorIDAndCheckID(ctx context.Context, 
 			TeamID:    uint64(teamID),
 			MonitorID: uint64(monitorID),
 		},
+	).First(
+		&check,
+	).Error
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, ErrNotFound
+		}
+
+		return nil, err
+	}
+
+	return &check, nil
+}
+
+func (r *RepositoryImpl) GetLatestByMonitorID(ctx context.Context, monitorID uint) (*Check, error) {
+	var check Check
+	err := r.db.WithContext(
+		ctx,
+	).Where(
+		Check{
+			MonitorID: uint64(monitorID),
+		},
+	).Order(
+		"created_at desc",
 	).First(
 		&check,
 	).Error
@@ -89,11 +117,13 @@ type AggMetric struct {
 	TLS        float64
 	Processing float64
 	Transfer   float64
+	Total      float64
 }
 
-func (r *RepositoryImpl) GetMonitorMetricsByMonitorID(ctx context.Context, monitorID uint) (*[]AggMetric, error) {
+func (r *RepositoryImpl) GetMonitorMetricsByMonitorID(ctx context.Context, monitorID uint, start *string, end *string) (*[]AggMetric, error) {
 	var metrics []AggMetric
-	err := r.db.WithContext(
+
+	query := r.db.WithContext(
 		ctx,
 	).Table("checks").Select(`
 		tumbleStart(wndw) as start, 
@@ -101,11 +131,37 @@ func (r *RepositoryImpl) GetMonitorMetricsByMonitorID(ctx context.Context, monit
 		avg(timing_tcp_connection)/1000000 as tcp,
 		avg(timing_tls_handshake)/1000000 as tls,
 		avg(timing_server_processing)/1000000 as processing,
-		avg(timing_content_transfer)/1000000 as transfer`).
-		Where("monitor_id = ?", monitorID).
-		Group("tumble(toDateTime(created_at), INTERVAL 1 HOUR) as wndw").
-		Where("created_at BETWEEN DATE_SUB(NOW(), INTERVAL 1 MONTH) AND NOW()").
-		Order("start ASC").
+		avg(timing_content_transfer)/1000000 as transfer,
+		avg(timing_total)/1000000 as total`).
+		Where("monitor_id = ?", monitorID)
+
+	if start != nil && end != nil {
+		// Calculate the difference in hours
+		startTime, err1 := time.Parse(time.RFC3339, *start)
+		endTime, err2 := time.Parse(time.RFC3339, *end)
+		if err1 == nil && err2 == nil {
+			duration := endTime.Sub(startTime)
+			if duration.Hours() <= 24 {
+				// Less than a day, group by 5 minutes
+				query = query.Group("tumble(toDateTime(created_at), INTERVAL 5 MINUTE) as wndw")
+			} else if duration.Hours() <= 72 {
+				// Less than 3 days, group by 15 minutes
+				query = query.Group("tumble(toDateTime(created_at), INTERVAL 15 MINUTE) as wndw")
+			} else {
+				// Otherwise group by 1 hour
+				query = query.Group("tumble(toDateTime(created_at), INTERVAL 1 HOUR) as wndw")
+			}
+			query = query.Where("created_at BETWEEN ? AND ?", startTime, endTime)
+		} else {
+			query = query.Group("tumble(toDateTime(created_at), INTERVAL 1 HOUR) as wndw")
+			query = query.Where("created_at BETWEEN DATE_SUB(NOW(), INTERVAL 1 MONTH) AND NOW()")
+		}
+	} else {
+		query = query.Group("tumble(toDateTime(created_at), INTERVAL 1 HOUR) as wndw")
+		query = query.Where("created_at BETWEEN DATE_SUB(NOW(), INTERVAL 1 MONTH) AND NOW()")
+	}
+
+	err := query.Order("start ASC").
 		Find(&metrics).Error
 
 	return &metrics, err
@@ -125,21 +181,23 @@ func (r *RepositoryImpl) GetMonitorStatsByMonitorID(ctx context.Context, monitor
 	err := r.db.WithContext(
 		ctx,
 	).Table("checks").Select(`
-		(count(status_code <= 400) / count(status_code)) * 100 as uptime_percentage,
-		avg(timing_total/1000000) as average_response_time`).
+		if(count() = 0, 0, (countIf(status_code > 0 AND status_code < 400) / count()) * 100) as uptime_percentage,
+		if(count() = 0, 0, avg(timing_total/1000000)) as average_response_time`).
 		Where("monitor_id = ?", monitorID).
-		Where("created_at BETWEEN DATE_SUB(NOW(), INTERVAL 1 DAY) AND NOW()").
+		Where("created_at BETWEEN DATE_SUB(NOW(), INTERVAL 30 DAY) AND NOW()").
 		Scan(&stats).Error
 
 	return &stats, err
 }
 
 type MonitorOverviews struct {
-	MonitorID uint
-	Latest    string
-	P99       float32
-	P95       float32
-	Stats     []float64 `gorm:"type:float"`
+	MonitorID           uint
+	Latest              string
+	UptimePercentage    float32
+	AverageResponseTime float32
+	P99                 float32
+	P95                 float32
+	Stats               []float64 `gorm:"type:float"`
 }
 
 type MonitorOverviewStats struct {
@@ -154,11 +212,13 @@ func (r *RepositoryImpl) GetMonitorOverviewsByTeamID(ctx context.Context, teamID
 	).Table("checks").Select(`
 		monitor_id,
 		max(created_at) as latest, 
+		(countIf(status_code > 0 AND status_code < 400) / count()) * 100 as uptime_percentage,
+		avg(timing_total/1000000) as average_response_time,
 		quantile(0.99)(timing_total)/1000000 as p99, 
 		quantile(0.95)(timing_total)/1000000 as p95`).
 		Where("team_id = ?", teamID).
 		Group("monitor_id").
-		Where("created_at BETWEEN DATE_SUB(NOW(), INTERVAL 1 DAY) AND NOW()").
+		Where("created_at BETWEEN DATE_SUB(NOW(), INTERVAL 30 DAY) AND NOW()").
 		Order("latest ASC").
 		Find(&overviews).Error
 
@@ -179,16 +239,113 @@ func (r *RepositoryImpl) GetMonitorOverviewStatsByTeamID(ctx context.Context, te
 				avg(timing_total) / 1000000 AS timing,
 				tumbleStart(wndw) AS start
 			FROM checks
-			WHERE (team_id = 1) AND ((created_at >= (NOW() - toIntervalDay(1))) AND (created_at <= NOW()))
+			WHERE (team_id = ?) AND ((created_at >= (NOW() - toIntervalDay(1))) AND (created_at <= NOW()))
 			GROUP BY
 				monitor_id,
 				tumble(toDateTime(created_at), toIntervalHour('1')) AS wndw
 			ORDER BY start ASC
 		)
-		GROUP BY monitor_id`).
+		GROUP BY monitor_id`, teamID).
 		Find(&overviews).Error
 
 	return &overviews, err
+}
+
+type MonitorUptimeResult struct {
+	MonitorID        uint
+	UptimePercentage float32
+	DailyUptimes     []float32 `gorm:"type:float"`
+}
+
+func (r *RepositoryImpl) GetMonitorUptimesByMonitorIDs(ctx context.Context, monitorIDs []uint) (map[uint]MonitorUptimeResult, error) {
+	if len(monitorIDs) == 0 {
+		return make(map[uint]MonitorUptimeResult), nil
+	}
+
+	// 1. Get overall uptime percentage for each monitor
+	var overallResults []struct {
+		MonitorID        uint
+		UptimePercentage float32
+	}
+	err := r.db.WithContext(ctx).Raw(`
+		SELECT 
+			monitor_id,
+			if(count() = 0, 0, (countIf(status_code > 0 AND status_code < 400) / count()) * 100) as uptime_percentage
+		FROM checks
+		WHERE monitor_id IN ? AND created_at >= DATE_SUB(NOW(), INTERVAL 90 DAY)
+		GROUP BY monitor_id
+	`, monitorIDs).Scan(&overallResults).Error
+	if err != nil {
+		return nil, err
+	}
+
+	// 2. Get daily uptimes for each monitor
+	var dailyResults []struct {
+		MonitorID   uint
+		Day         time.Time
+		DailyUptime float32
+	}
+	err = r.db.WithContext(ctx).Raw(`
+		SELECT 
+			monitor_id,
+			toDate(created_at) as day,
+			if(count() = 0, 0, (countIf(status_code > 0 AND status_code < 400) / count()) * 100) as daily_uptime
+		FROM checks
+		WHERE monitor_id IN ? AND created_at >= DATE_SUB(NOW(), INTERVAL 90 DAY)
+		GROUP BY monitor_id, day
+		ORDER BY monitor_id, day ASC
+	`, monitorIDs).Scan(&dailyResults).Error
+	if err != nil {
+		return nil, err
+	}
+
+	// Group daily results by monitor ID
+	dailyByMonitor := make(map[uint][]struct {
+		Day         time.Time
+		DailyUptime float32
+	})
+	for _, dr := range dailyResults {
+		dailyByMonitor[dr.MonitorID] = append(dailyByMonitor[dr.MonitorID], struct {
+			Day         time.Time
+			DailyUptime float32
+		}{dr.Day, dr.DailyUptime})
+	}
+
+	now := time.Now().UTC()
+	// Truncate to day
+	today := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, time.UTC)
+
+	uptimes := make(map[uint]MonitorUptimeResult)
+
+	for _, overall := range overallResults {
+		// Initialize exactly 90 days with -1
+		paddedUptimes := make([]float32, 90)
+		for i := 0; i < 90; i++ {
+			paddedUptimes[i] = -1 // No data
+		}
+
+		// Map existing data to the correct index
+		if daily, ok := dailyByMonitor[overall.MonitorID]; ok {
+			for _, dr := range daily {
+				daysAgo := int(today.Sub(dr.Day.UTC()).Hours() / 24)
+				if daysAgo >= 0 && daysAgo < 90 {
+					idx := 89 - daysAgo
+					paddedUptimes[idx] = dr.DailyUptime
+				}
+			}
+		}
+
+		uptimes[overall.MonitorID] = MonitorUptimeResult{
+			MonitorID:        overall.MonitorID,
+			UptimePercentage: overall.UptimePercentage,
+			DailyUptimes:     paddedUptimes,
+		}
+	}
+
+	for _, r := range uptimes {
+		uptimes[r.MonitorID] = r
+	}
+	return uptimes, nil
 }
 
 func (r *RepositoryImpl) GetMonitorIDAndAssertions(ctx context.Context, monitorID uint, assertions []string) (*[]Check, error) {
@@ -199,7 +356,7 @@ func (r *RepositoryImpl) GetMonitorIDAndAssertions(ctx context.Context, monitorI
 		Check{
 			MonitorID: uint64(monitorID),
 		},
-	).Where(assertions[0]).Order(
+	).Where("assertion = ?", assertions[0]).Order(
 		"created_at desc",
 	).Find(
 		&checks,
@@ -231,9 +388,9 @@ func (r *RepositoryImpl) GetByTeamIDMonitorsUptime(ctx context.Context, teamID u
 		url,
 		count(status_code <= 400) / count(status_code) * 100 as uptime_percentage, 
 		avg(timing_total/1000000) as average_response_time, 
-		toMonth(created_at) as date`).
+		toString(toMonth(created_at)) as date`).
 		Where("team_id = ?", teamID).
-		// Where("created_at BETWEEN ? AND ?", start, end).
+		Where("created_at BETWEEN parseDateTimeBestEffort(?) AND parseDateTimeBestEffort(?)", start, end).
 		Group("monitor_id, url, date").
 		Order("date ASC").
 		Find(&uptime).Error
@@ -243,4 +400,32 @@ func (r *RepositoryImpl) GetByTeamIDMonitorsUptime(ctx context.Context, teamID u
 	}
 
 	return &uptime, nil
+}
+
+type MonitorPerformance struct {
+	MonitorID           uint
+	AverageResponseTime float32
+	P99                 float32
+	P95                 float32
+}
+
+func (r *RepositoryImpl) GetByTeamIDMonitorsPerformance(ctx context.Context, teamID uint, start, end string) (*[]MonitorPerformance, error) {
+	var performance []MonitorPerformance
+	err := r.db.WithContext(
+		ctx,
+	).Table("checks").Select(`
+		monitor_id, 
+		avg(timing_total/1000000) as average_response_time, 
+		quantile(0.99)(timing_total)/1000000 as p99, 
+		quantile(0.95)(timing_total)/1000000 as p95`).
+		Where("team_id = ?", teamID).
+		Where("created_at BETWEEN parseDateTimeBestEffort(?) AND parseDateTimeBestEffort(?)", start, end).
+		Group("monitor_id").
+		Find(&performance).Error
+
+	if err != nil {
+		return nil, err
+	}
+
+	return &performance, nil
 }

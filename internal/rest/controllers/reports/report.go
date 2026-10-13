@@ -3,10 +3,10 @@ package reports
 import (
 	"errors"
 	"net/http"
-	"time"
 
 	"github.com/labstack/echo/v4"
 	"github.com/opsway-io/backend/internal/entities"
+	"github.com/opsway-io/backend/internal/event/events"
 	"github.com/opsway-io/backend/internal/report"
 	hs "github.com/opsway-io/backend/internal/rest/handlers"
 	"github.com/opsway-io/backend/internal/rest/helpers"
@@ -21,13 +21,25 @@ type GetReportsResponse struct {
 }
 
 type GetReportsResponseReport struct {
-	ID        uint       `json:"id"`
-	TeamID    uint       `json:"teamId"`
-	Type      string     `json:"type"`
-	Status    string     `json:"status"`
-	Start     *time.Time `json:"start,omitempty"`
-	End       *time.Time `json:"end,omitempty"`
-	CreatedAt time.Time  `json:"createdAt"`
+	ID        uint   `json:"id"`
+	TeamID    uint   `json:"teamId"`
+	Type      string `json:"type"`
+	Status    string `json:"status"`
+	CreatedAt string `json:"createdAt"`
+}
+
+type GetReportRequest struct {
+	TeamID   uint `param:"teamId" validate:"required,numeric,gte=0"`
+	ReportID uint `param:"reportId" validate:"required,numeric,gte=0"`
+}
+
+type GetReportResponse struct {
+	ID        uint                `json:"id"`
+	TeamID    uint                `json:"teamId"`
+	Type      string              `json:"type"`
+	Status    string              `json:"status"`
+	CreatedAt string              `json:"createdAt"`
+	Data      entities.ReportData `json:"data"`
 }
 
 func (h *Handlers) GetReports(c hs.AuthenticatedContext) error {
@@ -38,75 +50,76 @@ func (h *Handlers) GetReports(c hs.AuthenticatedContext) error {
 		return echo.ErrBadRequest
 	}
 
-	reports, err := h.ReportService.GetResportsByTeam(c.Request().Context(), req.TeamID)
+	ctx := c.Request().Context()
+
+	reports, err := h.ReportService.GetResportsByTeam(
+		ctx,
+		req.TeamID)
 	if err != nil {
-		c.Log.WithError(err).Error("failed to get reports")
+		c.Log.WithError(err).Error("failed to get Reports")
 
 		return echo.ErrInternalServerError
 	}
 
-	resp := GetReportsResponse{
-		Reports: make([]GetReportsResponseReport, len(*reports)),
-	}
-	for i, r := range *reports {
-		resp.Reports[i] = newReportResponse(&r)
-	}
+	resp := h.newGetReportResponse(reports)
 
 	return c.JSON(http.StatusOK, resp)
-}
-
-func newReportResponse(r *entities.Report) GetReportsResponseReport {
-	return GetReportsResponseReport{
-		ID:        r.ID,
-		TeamID:    r.TeamID,
-		Type:      string(r.Type),
-		Status:    string(r.Status),
-		Start:     r.Start,
-		End:       r.End,
-		CreatedAt: r.CreatedAt,
-	}
-}
-
-type GetReportRequest struct {
-	TeamID   uint `param:"teamId" validate:"required,numeric,gte=0"`
-	ReportID uint `param:"reportId" validate:"required,numeric,gte=0"`
-}
-
-type GetReportResponse struct {
-	GetReportsResponseReport
-	Data entities.ReportData `json:"data"`
 }
 
 func (h *Handlers) GetReport(c hs.AuthenticatedContext) error {
 	req, err := helpers.Bind[GetReportRequest](c)
 	if err != nil {
 		c.Log.WithError(err).Debug("failed to bind GetReportRequest")
-
 		return echo.ErrBadRequest
 	}
 
-	r, err := h.ReportService.GetByTeamIDAndID(c.Request().Context(), req.TeamID, req.ReportID)
+	ctx := c.Request().Context()
+
+	report, err := h.ReportService.GetByID(ctx, req.ReportID)
 	if err != nil {
-		if errors.Is(err, report.ErrNotFound) {
-			return echo.ErrNotFound
-		}
-
-		c.Log.WithError(err).Error("failed to get report")
-
-		return echo.ErrInternalServerError
+		c.Log.WithError(err).Error("failed to get Report")
+		return echo.ErrNotFound
 	}
 
-	return c.JSON(http.StatusOK, GetReportResponse{
-		GetReportsResponseReport: newReportResponse(r),
-		Data:                     r.Report.Data(),
-	})
+	if report.TeamID != req.TeamID {
+		return echo.ErrForbidden
+	}
+
+	resp := GetReportResponse{
+		ID:        report.ID,
+		TeamID:    report.TeamID,
+		Type:      string(report.Type),
+		Status:    string(report.Status),
+		CreatedAt: report.CreatedAt.Format("2006-01-02T15:04:05Z07:00"),
+		Data:      report.Report.Data(),
+	}
+
+	return c.JSON(http.StatusOK, resp)
+}
+
+func (h *Handlers) newGetReportResponse(reports *[]entities.Report) *GetReportsResponse {
+	resp := &GetReportsResponse{
+		Reports: make([]GetReportsResponseReport, len(*reports)),
+	}
+
+	for i, in := range *reports {
+		resp.Reports[i] = GetReportsResponseReport{
+			ID:        in.ID,
+			TeamID:    in.TeamID,
+			Type:      string(in.Type),
+			Status:    string(in.Status),
+			CreatedAt: in.CreatedAt.Format("2006-01-02T15:04:05Z07:00"),
+		}
+	}
+
+	return resp
 }
 
 type PostReportsRequest struct {
-	TeamID     uint      `param:"teamId" validate:"required,numeric,gte=0"`
-	ReportType string    `json:"reportType" validate:"required,oneof=UPTIME PERFORMANCE INCIDENT ALL CUSTOM"`
-	Start      time.Time `json:"start" validate:"required"`
-	End        time.Time `json:"end" validate:"required"`
+	TeamID     uint   `param:"teamId" validate:"required,numeric,gte=0"`
+	ReportType string `json:"reportType" validate:"required,oneof=UPTIME PERFORMANCE INCIDENT ALL CUSTOM"`
+	Start      string `json:"start" validate:"required"`
+	End        string `json:"end" validate:"required"`
 }
 
 func (h *Handlers) CreateReport(c hs.AuthenticatedContext) error {
@@ -117,26 +130,38 @@ func (h *Handlers) CreateReport(c hs.AuthenticatedContext) error {
 		return echo.ErrBadRequest
 	}
 
-	if !req.End.After(req.Start) {
-		return echo.NewHTTPError(http.StatusBadRequest, "end must be after start")
-	}
+	ctx := c.Request().Context()
 
-	reportType, err := entities.ReportFrom(req.ReportType)
+	report, err := h.ReportService.CreateReport(
+		ctx,
+		req.TeamID,
+		req.ReportType,
+		entities.ReportData{},
+	)
 	if err != nil {
-		return echo.ErrBadRequest
+		c.Log.WithError(err).Error("failed to create report")
+
+		return echo.ErrInternalServerError
 	}
 
-	r, err := h.ReportService.Generate(c.Request().Context(), req.TeamID, reportType, req.Start, req.End)
+	err = h.EventService.Publish(events.ReportGenerateTask{
+		ReportID:   report.ID,
+		TeamID:     req.TeamID,
+		ReportType: req.ReportType,
+		Start:      req.Start,
+		End:        req.End,
+	})
 	if err != nil {
-		// The report is still stored (status FAILED) when only data collection failed
-		c.Log.WithError(err).Error("failed to generate report")
+		c.Log.WithError(err).Error("failed to publish report generation task")
 
-		if r == nil {
-			return echo.ErrInternalServerError
-		}
+		// Optional: mark report as failed since it couldn't be enqueued
+		report.Status = entities.ReportStatusFailed
+		_ = h.ReportService.Update(ctx, report)
+
+		return echo.ErrInternalServerError
 	}
 
-	return c.JSON(http.StatusCreated, newReportResponse(r))
+	return c.NoContent(http.StatusCreated)
 }
 
 type DeleteReportRequest struct {
@@ -147,6 +172,8 @@ type DeleteReportRequest struct {
 func (h *Handlers) DeleteReport(c hs.AuthenticatedContext) error {
 	req, err := helpers.Bind[DeleteReportRequest](c)
 	if err != nil {
+		c.Log.WithError(err).Debug("failed to bind DeleteReportRequest")
+
 		return echo.ErrBadRequest
 	}
 

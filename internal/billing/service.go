@@ -1,7 +1,6 @@
 package billing
 
 import (
-	"os"
 	"strconv"
 
 	"github.com/opsway-io/backend/internal/entities"
@@ -18,22 +17,24 @@ import (
 )
 
 type Config struct {
-	PublishableKey string `mapstructure:"publishable_key"`
-	SecretKey      string `mapstructure:"secret_key"`
-	WebhookSecret  string `mapstructure:"webhook_secret"`
-	Domain         string `mapstructure:"domain"`
+	PublishableKey    string `mapstructure:"publishable_key"`
+	SecretKey         string `mapstructure:"secret_key"`
+	WebhookSecret     string `mapstructure:"webhook_secret"`
+	Domain            string `mapstructure:"domain"`
+	TeamPriceID       string `mapstructure:"team_price_id"`
+	EnterprisePriceID string `mapstructure:"enterprise_price_id"`
 }
 
 type Service interface {
 	PostConfig() StripeConfig
-	CreateCheckoutSession(team *entities.Team, priceLookupKey string) (*stripe.CheckoutSession, error)
-	UpdateSubscribtion(team *entities.Team, priceLookupKey string) (*stripe.Subscription, error)
-	CancelSubscribtion(team *entities.Team) (*stripe.Subscription, error)
+	CreateCheckoutSession(team *entities.Team, priceID string) (*stripe.CheckoutSession, error)
+	UpdateSubscription(team *entities.Team, priceID string) (*stripe.Subscription, error)
+	CancelSubscription(team *entities.Team) (*stripe.Subscription, error)
 	GetCheckoutSession(sessionID string) (*stripe.CheckoutSession, error)
 	GetLineItems(sessionID string) *session.LineItemIter
 	GetPrices(priceLookupKeys []string) ([]*stripe.Price, error)
-	GetCustomerSubscribtion(customerID string) *subscription.Iter
-	GetSubscribtion(subID string) (*stripe.Subscription, error)
+	GetCustomerSubscription(customerID string) *subscription.Iter
+	GetSubscription(subID string) (*stripe.Subscription, error)
 	GetProduct(productID string) (*stripe.Product, error)
 	GetProducts() *product.Iter
 	CreateCustomerPortal(team *entities.Team) (*stripe.BillingPortalSession, error)
@@ -54,25 +55,20 @@ func NewService(conf Config) Service {
 }
 
 type StripeConfig struct {
-	PublishableKey string `json:"publishableKey"`
-	BasicPrice     string `json:"basicPrice"`
-	ProPrice       string `json:"proPrice"`
+	PublishableKey  string `json:"publishableKey"`
+	TeamPrice       string `json:"teamPrice"`
+	EnterprisePrice string `json:"enterprisePrice"`
 }
 
 func (s *ServiceImpl) PostConfig() StripeConfig {
 	return StripeConfig{
-		PublishableKey: os.Getenv("STRIPE_PUBLISHABLE_KEY"),
-		BasicPrice:     os.Getenv("BASIC_PRICE_ID"),
-		ProPrice:       os.Getenv("PRO_PRICE_ID"),
+		PublishableKey:  s.Config.PublishableKey,
+		TeamPrice:       s.Config.TeamPriceID,
+		EnterprisePrice: s.Config.EnterprisePriceID,
 	}
 }
 
-func (s *ServiceImpl) CreateCheckoutSession(team *entities.Team, priceLookupKey string) (*stripe.CheckoutSession, error) {
-	priceID, err := s.GetPrices([]string{priceLookupKey})
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to get price")
-	}
-
+func (s *ServiceImpl) CreateCheckoutSession(team *entities.Team, priceID string) (*stripe.CheckoutSession, error) {
 	params := &stripe.CheckoutSessionParams{
 		SuccessURL:        stripe.String(s.Config.Domain + "/settings/billing"),
 		CancelURL:         stripe.String(s.Config.Domain + "/settings/billing"),
@@ -81,8 +77,7 @@ func (s *ServiceImpl) CreateCheckoutSession(team *entities.Team, priceLookupKey 
 
 		LineItems: []*stripe.CheckoutSessionLineItemParams{
 			{
-
-				Price:    stripe.String(priceID[0].ID),
+				Price:    stripe.String(priceID),
 				Quantity: stripe.Int64(1),
 			},
 		},
@@ -95,22 +90,24 @@ func (s *ServiceImpl) CreateCheckoutSession(team *entities.Team, priceLookupKey 
 	return session.New(params)
 }
 
-func (s *ServiceImpl) UpdateSubscribtion(team *entities.Team, priceLookupKey string) (*stripe.Subscription, error) {
+func (s *ServiceImpl) UpdateSubscription(team *entities.Team, priceID string) (*stripe.Subscription, error) {
 	// Set Customer on session if already a customer
 
-	priceID, err := s.GetPrices([]string{priceLookupKey})
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to get price")
+	sub := s.GetCustomerSubscription(*team.StripeCustomerID)
+	if !sub.Next() {
+		return nil, errors.New("no active subscription found for customer")
 	}
-	sub := s.GetCustomerSubscribtion(*team.StripeCustomerID)
-	sub.Next()
 	teamSubscription := sub.Subscription()
+
+	if len(teamSubscription.Items.Data) == 0 {
+		return nil, errors.New("subscription has no items")
+	}
 
 	params := &stripe.SubscriptionParams{
 		Items: []*stripe.SubscriptionItemsParams{
 			{
 				ID:    stripe.String(teamSubscription.Items.Data[0].ID),
-				Price: stripe.String(priceID[0].ID),
+				Price: stripe.String(priceID),
 			},
 		},
 	}
@@ -122,11 +119,13 @@ func (s *ServiceImpl) UpdateSubscribtion(team *entities.Team, priceLookupKey str
 	return result, nil
 }
 
-func (s *ServiceImpl) CancelSubscribtion(team *entities.Team) (*stripe.Subscription, error) {
+func (s *ServiceImpl) CancelSubscription(team *entities.Team) (*stripe.Subscription, error) {
 	// Set Customer on session if already a customer
 
-	sub := s.GetCustomerSubscribtion(*team.StripeCustomerID)
-	sub.Next()
+	sub := s.GetCustomerSubscription(*team.StripeCustomerID)
+	if !sub.Next() {
+		return nil, errors.New("no active subscription found for customer")
+	}
 	teamSubscription := sub.Subscription()
 
 	params := &stripe.SubscriptionCancelParams{}
@@ -168,12 +167,12 @@ func (s *ServiceImpl) GetPrices(priceLookupKeys []string) ([]*stripe.Price, erro
 	return prices, nil
 }
 
-func (s *ServiceImpl) GetCustomerSubscribtion(customerID string) *subscription.Iter {
+func (s *ServiceImpl) GetCustomerSubscription(customerID string) *subscription.Iter {
 	params := &stripe.SubscriptionListParams{Customer: stripe.String(customerID)}
 	return subscription.List(params)
 }
 
-func (s *ServiceImpl) GetSubscribtion(subID string) (*stripe.Subscription, error) {
+func (s *ServiceImpl) GetSubscription(subID string) (*stripe.Subscription, error) {
 	params := &stripe.SubscriptionParams{}
 	return subscription.Get(subID, params)
 

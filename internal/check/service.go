@@ -12,13 +12,16 @@ type Service interface {
 
 	GetByTeamIDAndMonitorIDPaginated(ctx context.Context, teamID, monitorID uint, offset, limit *int) (*[]Check, error)
 	GetByTeamIDAndMonitorIDAndCheckID(ctx context.Context, teamID uint, monitorID uint, checkID uuid.UUID) (*Check, error)
+	GetLatestByMonitorID(ctx context.Context, monitorID uint) (*Check, error)
 
-	GetMonitorMetricsByMonitorID(ctx context.Context, monitorID uint) (*[]AggMetric, error)
+	GetMonitorMetricsByMonitorID(ctx context.Context, monitorID uint, start *string, end *string) (*[]AggMetric, error)
 	GetMonitorStatsByMonitorID(ctx context.Context, monitorID uint) (*MonitorStats, error)
 	GetMonitorOverviewsByTeamID(ctx context.Context, teamID uint) (*[]MonitorOverviews, error)
 
 	GetMonitorIDAndAssertions(ctx context.Context, monitorID uint, assertions []string) (*[]Check, error)
 	GetByTeamIDMonitorsUptime(ctx context.Context, teamID uint, start, end string) (*[]MonitorUptime, error)
+	GetByTeamIDMonitorsPerformance(ctx context.Context, teamID uint, start, end string) (*[]MonitorPerformance, error)
+	GetMonitorUptimesByMonitorIDs(ctx context.Context, monitorIDs []uint) (map[uint]MonitorUptimeResult, error)
 }
 
 type ServiceImpl struct {
@@ -43,12 +46,16 @@ func (s *ServiceImpl) GetByTeamIDAndMonitorIDAndCheckID(ctx context.Context, tea
 	return s.repository.GetByTeamIDAndMonitorIDAndCheckID(ctx, teamID, monitorID, checkID)
 }
 
+func (s *ServiceImpl) GetLatestByMonitorID(ctx context.Context, monitorID uint) (*Check, error) {
+	return s.repository.GetLatestByMonitorID(ctx, monitorID)
+}
+
 func (s *ServiceImpl) GetMonitorStatsByMonitorID(ctx context.Context, monitorID uint) (*MonitorStats, error) {
 	return s.repository.GetMonitorStatsByMonitorID(ctx, monitorID)
 }
 
-func (s *ServiceImpl) GetMonitorMetricsByMonitorID(ctx context.Context, monitorID uint) (*[]AggMetric, error) {
-	return s.repository.GetMonitorMetricsByMonitorID(ctx, monitorID)
+func (s *ServiceImpl) GetMonitorMetricsByMonitorID(ctx context.Context, monitorID uint, start *string, end *string) (*[]AggMetric, error) {
+	return s.repository.GetMonitorMetricsByMonitorID(ctx, monitorID, start, end)
 }
 
 func (s *ServiceImpl) GetMonitorOverviewsByTeamID(ctx context.Context, teamID uint) (*[]MonitorOverviews, error) {
@@ -72,9 +79,16 @@ func (s *ServiceImpl) GetMonitorOverviewsByTeamID(ctx context.Context, teamID ui
 	return overviews, err
 }
 
+func (s *ServiceImpl) GetMonitorUptimesByMonitorIDs(ctx context.Context, monitorIDs []uint) (map[uint]MonitorUptimeResult, error) {
+	return s.repository.GetMonitorUptimesByMonitorIDs(ctx, monitorIDs)
+}
+
 func (s *ServiceImpl) GetMonitorIDAndAssertions(ctx context.Context, monitorID uint, assertions []string) (*[]Check, error) {
 	return s.repository.GetMonitorIDAndAssertions(ctx, monitorID, assertions)
 }
 func (s *ServiceImpl) GetByTeamIDMonitorsUptime(ctx context.Context, teamID uint, start, end string) (*[]MonitorUptime, error) {
 	return s.repository.GetByTeamIDMonitorsUptime(ctx, teamID, start, end)
+}
+func (s *ServiceImpl) GetByTeamIDMonitorsPerformance(ctx context.Context, teamID uint, start, end string) (*[]MonitorPerformance, error) {
+	return s.repository.GetByTeamIDMonitorsPerformance(ctx, teamID, start, end)
 }

@@ -3,17 +3,23 @@ package incidents
 import (
 	"github.com/labstack/echo/v4"
 	"github.com/opsway-io/backend/internal/alerting"
+	"github.com/opsway-io/backend/internal/authentication"
+	"github.com/opsway-io/backend/internal/event"
 	"github.com/opsway-io/backend/internal/incident"
 	"github.com/opsway-io/backend/internal/rest/handlers"
 	mw "github.com/opsway-io/backend/internal/rest/middleware"
 	"github.com/opsway-io/backend/internal/team"
+	"github.com/opsway-io/backend/internal/user"
 	"github.com/sirupsen/logrus"
 )
 
 type Handlers struct {
-	TeamService     team.Service
-	IncidentService incident.Service
-	AlertingService alerting.Service
+	AuthenticationService authentication.Service
+	TeamService           team.Service
+	IncidentService       incident.Service
+	EventService          event.Service
+	AlertingService       alerting.Service
+	UserService           user.Service
 }
 
 func Register(
@@ -21,31 +27,34 @@ func Register(
 	logger *logrus.Entry,
 	teamService team.Service,
 	incidentService incident.Service,
+	eventService event.Service,
 	alertingService alerting.Service,
+	userService user.Service,
 ) {
 	h := &Handlers{
-		TeamService:     teamService,
 		IncidentService: incidentService,
+		EventService:    eventService,
 		AlertingService: alertingService,
+		UserService:     userService,
 	}
 
 	TeamGuard := mw.TeamGuardFactory(logger, teamService)
-	AllowedRoles := mw.RoleGuardFactory(logger, teamService)
 
 	AuthHandler := handlers.AuthenticatedHandlerFactory(logger)
 
-	incidentsGroup := e.Group(
+	monitorsGroup := e.Group(
 		"/teams/:teamId/incidents",
 		TeamGuard(),
 	)
 
-	incidentsGroup.GET("", AuthHandler(h.GetIncidents))
-	incidentsGroup.GET("/overview", AuthHandler(h.GetIncidents))
-	incidentsGroup.GET("/monitor/:monitorId", AuthHandler(h.GetMonitorIncidents))
-	incidentsGroup.GET("/:incidentId", AuthHandler(h.GetIncident))
-	incidentsGroup.GET("/:incidentId/alerts", AuthHandler(h.GetIncidentAlerts))
-	incidentsGroup.GET("/:incidentId/occurrences", AuthHandler(h.GetIncidentOccurrences))
-	incidentsGroup.PATCH("/:incidentId/resolved", AuthHandler(h.PatchSolveMonitorIncident))
-	incidentsGroup.PATCH("/:incidentId/acknowledge", AuthHandler(h.PatchAcknowledgeIncident))
-	incidentsGroup.PATCH("/:incidentId/visibility", AuthHandler(h.PatchIncidentVisibility), AllowedRoles(mw.UserRoleOwner, mw.UserRoleAdmin))
+	monitorsGroup.GET("", AuthHandler(h.GetIncidents))
+	monitorsGroup.GET("/overview", AuthHandler(h.GetIncidents))
+	monitorsGroup.GET("/monitor/:monitorId", AuthHandler(h.GetMonitorIncidents))
+	monitorsGroup.GET("/:incidentId", AuthHandler(h.GetIncident))
+	monitorsGroup.PATCH("/:incidentId/resolved", AuthHandler(h.PatchSolveIncident))
+	monitorsGroup.PATCH("/:incidentId/acknowledge", AuthHandler(h.PatchAcknowledgeIncident))
+	monitorsGroup.PATCH("/:incidentId/root_cause", AuthHandler(h.PatchRootCauseIncident))
+	monitorsGroup.PATCH("/:incidentId/visibility", AuthHandler(h.PatchVisibilityIncident))
+	monitorsGroup.GET("/:incidentId/alerts", AuthHandler(h.GetIncidentAlerts))
+	monitorsGroup.GET("/:incidentId/occurrences", AuthHandler(h.GetIncidentOccurrences))
 }

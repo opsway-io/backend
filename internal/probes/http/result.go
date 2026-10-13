@@ -36,13 +36,16 @@ type TLS struct {
 }
 
 type Certificate struct {
-	Issuer     CertificateIssuer
-	Subject    CertificateSubject
-	NotBefore  time.Time
-	NotAfter   time.Time
-	NotExpired bool
-	HostValid  bool
-	TrustedCA  bool
+	Issuer        CertificateIssuer
+	Subject       CertificateSubject
+	NotBefore     time.Time
+	NotAfter      time.Time
+	NotExpired    bool
+	HostValid     bool
+	TrustedCA     bool
+	DNSNames      []string
+	TargetHost    string
+	RedirectChain []string
 }
 
 type CertificateSubject struct {

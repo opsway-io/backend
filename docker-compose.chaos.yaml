@@ -1,0 +1,15 @@
+version: '3.1'
+
+services:
+  pumba:
+    image: ghcr.io/alexei-led/pumba:latest
+    # Actually wait, let's use:
+    # image: alexei-led/pumba
+    # Since pumba requires access to docker socket:
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    command: >
+      --interval 15s
+      kill
+      --signal SIGKILL
+      opsway-redis-1 opsway-postgres-1

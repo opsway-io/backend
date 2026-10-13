@@ -5,102 +5,102 @@ import (
 	"time"
 
 	"github.com/opsway-io/backend/internal/entities"
+	"github.com/opsway-io/backend/internal/event"
+	"github.com/opsway-io/backend/internal/event/events"
 )
 
 type Service interface {
-	GetByTeamIDAndID(ctx context.Context, teamID, id uint) (*entities.Maintenance, error)
+	GetByID(ctx context.Context, id uint) (*entities.Maintenance, error)
 	GetByTeamID(ctx context.Context, teamID uint) (*[]entities.Maintenance, error)
-	GetActiveByTeamID(ctx context.Context, teamID uint) (*[]entities.Maintenance, error)
-	Create(ctx context.Context, maintenance *entities.Maintenance, monitorIDs []uint) error
-	Update(ctx context.Context, maintenance *entities.Maintenance, monitorIDs []uint) error
-	Delete(ctx context.Context, teamID, id uint) error
-
-	// IsMonitorUnderMaintenance reports whether an active maintenance window
-	// currently covers the monitor. Intended for monitor GET responses and alert suppression.
-	IsMonitorUnderMaintenance(ctx context.Context, teamID, monitorID uint) (bool, error)
-	// MonitorsUnderMaintenance returns a predicate telling whether a monitor of
-	// the team is covered by an active maintenance window (one query for many monitors).
-	MonitorsUnderMaintenance(ctx context.Context, teamID uint) (func(monitorID uint) bool, error)
+	GetActive(ctx context.Context, now time.Time) (*[]entities.Maintenance, error)
+	GetActiveByMonitorIDs(ctx context.Context, now time.Time, monitorIDs []uint) ([]entities.Maintenance, error)
+	GetUpcomingByMonitorIDs(ctx context.Context, now time.Time, monitorIDs []uint) ([]entities.Maintenance, error)
+	GetAllByMonitorIDs(ctx context.Context, monitorIDs []uint) ([]entities.Maintenance, error)
+	GetUnnotified(ctx context.Context, now time.Time) (*[]entities.Maintenance, error)
+	GetUnreminded(ctx context.Context, now time.Time, reminderWindow time.Duration) (*[]entities.Maintenance, error)
+	GetUnconcluded(ctx context.Context, now time.Time) (*[]entities.Maintenance, error)
+	Create(ctx context.Context, maintenance *entities.Maintenance) error
+	Update(ctx context.Context, maintenance *entities.Maintenance) error
+	Delete(ctx context.Context, maintenance *entities.Maintenance) error
 }
 
 type ServiceImpl struct {
-	repository Repository
-	now        func() time.Time
+	repository   Repository
+	eventService event.Service
 }
 
-func NewService(repository Repository) Service {
+func NewService(repository Repository, eventService event.Service) Service {
 	return &ServiceImpl{
-		repository: repository,
-		now:        time.Now,
+		repository:   repository,
+		eventService: eventService,
 	}
 }
 
-func (s *ServiceImpl) GetByTeamIDAndID(ctx context.Context, teamID, id uint) (*entities.Maintenance, error) {
-	return s.repository.GetByTeamIDAndID(ctx, teamID, id)
+func (s *ServiceImpl) GetByID(ctx context.Context, id uint) (*entities.Maintenance, error) {
+	return s.repository.GetByID(ctx, id)
 }
 
 func (s *ServiceImpl) GetByTeamID(ctx context.Context, teamID uint) (*[]entities.Maintenance, error) {
 	return s.repository.GetByTeamID(ctx, teamID)
 }
 
-func (s *ServiceImpl) GetActiveByTeamID(ctx context.Context, teamID uint) (*[]entities.Maintenance, error) {
-	return s.repository.GetActiveByTeamID(ctx, teamID, s.now())
+func (s *ServiceImpl) GetActive(ctx context.Context, now time.Time) (*[]entities.Maintenance, error) {
+	return s.repository.GetActive(ctx, now)
 }
 
-func (s *ServiceImpl) Create(ctx context.Context, maintenance *entities.Maintenance, monitorIDs []uint) error {
-	return s.repository.Create(ctx, maintenance, monitorIDs)
+func (s *ServiceImpl) GetActiveByMonitorIDs(ctx context.Context, now time.Time, monitorIDs []uint) ([]entities.Maintenance, error) {
+	return s.repository.GetActiveByMonitorIDs(ctx, now, monitorIDs)
 }
 
-func (s *ServiceImpl) Update(ctx context.Context, maintenance *entities.Maintenance, monitorIDs []uint) error {
-	return s.repository.Update(ctx, maintenance, monitorIDs)
+func (s *ServiceImpl) GetUpcomingByMonitorIDs(ctx context.Context, now time.Time, monitorIDs []uint) ([]entities.Maintenance, error) {
+	return s.repository.GetUpcomingByMonitorIDs(ctx, now, monitorIDs)
 }
 
-func (s *ServiceImpl) Delete(ctx context.Context, teamID, id uint) error {
-	return s.repository.Delete(ctx, teamID, id)
+func (s *ServiceImpl) GetAllByMonitorIDs(ctx context.Context, monitorIDs []uint) ([]entities.Maintenance, error) {
+	return s.repository.GetAllByMonitorIDs(ctx, monitorIDs)
 }
 
-func (s *ServiceImpl) IsMonitorUnderMaintenance(ctx context.Context, teamID, monitorID uint) (bool, error) {
-	covered, err := s.MonitorsUnderMaintenance(ctx, teamID)
-	if err != nil {
-		return false, err
+func (s *ServiceImpl) GetUnnotified(ctx context.Context, now time.Time) (*[]entities.Maintenance, error) {
+	return s.repository.GetUnnotified(ctx, now)
+}
+
+func (s *ServiceImpl) GetUnreminded(ctx context.Context, now time.Time, reminderWindow time.Duration) (*[]entities.Maintenance, error) {
+	return s.repository.GetUnreminded(ctx, now, reminderWindow)
+}
+
+func (s *ServiceImpl) GetUnconcluded(ctx context.Context, now time.Time) (*[]entities.Maintenance, error) {
+	return s.repository.GetUnconcluded(ctx, now)
+}
+
+func (s *ServiceImpl) Create(ctx context.Context, maintenance *entities.Maintenance) error {
+	err := s.repository.Create(ctx, maintenance)
+	if err == nil {
+		_ = s.eventService.Publish(events.MaintenanceEvent{
+			Maintenance: maintenance,
+			Action:      "created",
+		})
 	}
-
-	return covered(monitorID), nil
+	return err
 }
 
-func (s *ServiceImpl) MonitorsUnderMaintenance(ctx context.Context, teamID uint) (func(monitorID uint) bool, error) {
-	active, err := s.repository.GetActiveByTeamID(ctx, teamID, s.now())
-	if err != nil {
-		return nil, err
+func (s *ServiceImpl) Update(ctx context.Context, maintenance *entities.Maintenance) error {
+	err := s.repository.Update(ctx, maintenance)
+	if err == nil {
+		_ = s.eventService.Publish(events.MaintenanceEvent{
+			Maintenance: maintenance,
+			Action:      "updated",
+		})
 	}
-
-	return CoversMonitor(*active), nil
+	return err
 }
 
-// CoversMonitor builds a predicate from a set of (active) maintenance windows.
-func CoversMonitor(windows []entities.Maintenance) func(monitorID uint) bool {
-	all := false
-	ids := map[uint]struct{}{}
-
-	for _, w := range windows {
-		if len(w.Monitors) == 0 {
-			all = true
-
-			break
-		}
-
-		for _, m := range w.Monitors {
-			ids[m.ID] = struct{}{}
-		}
+func (s *ServiceImpl) Delete(ctx context.Context, maintenance *entities.Maintenance) error {
+	err := s.repository.Delete(ctx, maintenance)
+	if err == nil {
+		_ = s.eventService.Publish(events.MaintenanceEvent{
+			Maintenance: maintenance,
+			Action:      "completed",
+		})
 	}
-
-	return func(monitorID uint) bool {
-		if all {
-			return true
-		}
-
-		_, ok := ids[monitorID]
-
-		return ok
-	}
+	return err
 }

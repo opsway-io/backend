@@ -1,201 +1,196 @@
 package heartbeats
 
 import (
-	"errors"
 	"net/http"
-	"strings"
 	"time"
 
 	"github.com/labstack/echo/v4"
 	"github.com/opsway-io/backend/internal/entities"
-	"github.com/opsway-io/backend/internal/heartbeat"
-	hs "github.com/opsway-io/backend/internal/rest/handlers"
+	"github.com/opsway-io/backend/internal/heartbeats"
+	"github.com/opsway-io/backend/internal/rest/handlers"
 	"github.com/opsway-io/backend/internal/rest/helpers"
+	"github.com/opsway-io/backend/internal/team"
+	"github.com/sirupsen/logrus"
 )
 
-type HeartbeatResponse struct {
-	ID        uint                     `json:"id"`
-	Name      string                   `json:"name"`
-	Status    entities.HeartbeatStatus `json:"status"`
-	Interval  uint                     `json:"interval"`
-	Grace     uint                     `json:"grace"`
-	LastPing  *time.Time               `json:"lastPing"`
-	CreatedAt time.Time                `json:"createdAt"`
-	UpdatedAt time.Time                `json:"updatedAt"`
+type Handlers struct {
+	TeamService      team.Service
+	HeartbeatService heartbeats.Service
 }
 
-func newHeartbeatResponse(h *entities.Heartbeat, now time.Time) HeartbeatResponse {
-	return HeartbeatResponse{
-		ID:        h.ID,
-		Name:      h.Name,
-		Status:    h.StatusAt(now),
-		Interval:  h.Interval,
-		Grace:     h.Grace,
-		LastPing:  h.LastPingAt,
-		CreatedAt: h.CreatedAt,
-		UpdatedAt: h.UpdatedAt,
+func Register(
+	e *echo.Group,
+	logger *logrus.Entry,
+	teamService team.Service,
+	heartbeatService heartbeats.Service,
+) {
+	h := &Handlers{
+		TeamService:      teamService,
+		HeartbeatService: heartbeatService,
 	}
+
+	AuthHandler := handlers.AuthenticatedHandlerFactory(logger)
+
+	cg := e.Group("/teams/:teamId/heartbeats")
+
+	cg.GET("", AuthHandler(h.GetHeartbeats))
+	cg.POST("", AuthHandler(h.PostHeartbeat))
+	cg.GET("/:heartbeatId", AuthHandler(h.GetHeartbeat))
+	cg.PUT("/:heartbeatId", AuthHandler(h.PutHeartbeat))
+	cg.DELETE("/:heartbeatId", AuthHandler(h.DeleteHeartbeat))
+	cg.POST("/:heartbeatId/ping", AuthHandler(h.PingHeartbeat))
 }
 
 type GetHeartbeatsRequest struct {
 	TeamID uint `param:"teamId" validate:"required,numeric,gte=0"`
 }
 
-func (h *Handlers) GetHeartbeats(c hs.AuthenticatedContext) error {
+func (h *Handlers) GetHeartbeats(c handlers.AuthenticatedContext) error {
 	req, err := helpers.Bind[GetHeartbeatsRequest](c)
 	if err != nil {
 		c.Log.WithError(err).Debug("failed to bind GetHeartbeatsRequest")
-
 		return echo.ErrBadRequest
 	}
 
-	heartbeats, err := h.HeartbeatService.GetByTeamID(c.Request().Context(), req.TeamID)
+	hbs, err := h.HeartbeatService.GetAllByTeamID(c.Request().Context(), req.TeamID)
 	if err != nil {
 		c.Log.WithError(err).Error("failed to get heartbeats")
-
 		return echo.ErrInternalServerError
 	}
 
-	now := time.Now()
-	resp := make([]HeartbeatResponse, len(*heartbeats))
-	for i := range *heartbeats {
-		resp[i] = newHeartbeatResponse(&(*heartbeats)[i], now)
-	}
-
-	return c.JSON(http.StatusOK, resp)
+	return c.JSON(http.StatusOK, hbs)
 }
 
-type HeartbeatIDRequest struct {
+type GetHeartbeatRequest struct {
 	TeamID      uint `param:"teamId" validate:"required,numeric,gte=0"`
 	HeartbeatID uint `param:"heartbeatId" validate:"required,numeric,gte=0"`
 }
 
-func (h *Handlers) GetHeartbeat(c hs.AuthenticatedContext) error {
-	req, err := helpers.Bind[HeartbeatIDRequest](c)
+func (h *Handlers) GetHeartbeat(c handlers.AuthenticatedContext) error {
+	req, err := helpers.Bind[GetHeartbeatRequest](c)
 	if err != nil {
-		c.Log.WithError(err).Debug("failed to bind HeartbeatIDRequest")
-
+		c.Log.WithError(err).Debug("failed to bind GetHeartbeatRequest")
 		return echo.ErrBadRequest
 	}
 
-	hb, err := h.HeartbeatService.GetByTeamIDAndID(c.Request().Context(), req.TeamID, req.HeartbeatID)
+	hb, err := h.HeartbeatService.GetByIDAndTeamID(c.Request().Context(), req.TeamID, req.HeartbeatID)
 	if err != nil {
-		return h.serviceError(c, err)
+		c.Log.WithError(err).Error("failed to get heartbeat")
+		return echo.ErrNotFound
 	}
 
-	return c.JSON(http.StatusOK, newHeartbeatResponse(hb, time.Now()))
+	return c.JSON(http.StatusOK, hb)
 }
 
-// Interval and grace are in minutes. Interval max is 31 days, grace max 1 day.
 type PostHeartbeatRequest struct {
 	TeamID   uint   `param:"teamId" validate:"required,numeric,gte=0"`
-	Name     string `json:"name" validate:"required,min=1,max=255"`
-	Interval uint   `json:"interval" validate:"required,gte=1,lte=44640"`
-	Grace    uint   `json:"grace" validate:"gte=0,lte=1440"`
+	Name     string `json:"name" validate:"required"`
+	Interval int64  `json:"interval" validate:"required,numeric,gte=1"`
+	Grace    int64  `json:"grace" validate:"required,numeric,gte=0"`
 }
 
-func (h *Handlers) PostHeartbeat(c hs.AuthenticatedContext) error {
+func (h *Handlers) PostHeartbeat(c handlers.AuthenticatedContext) error {
 	req, err := helpers.Bind[PostHeartbeatRequest](c)
 	if err != nil {
 		c.Log.WithError(err).Debug("failed to bind PostHeartbeatRequest")
-
 		return echo.ErrBadRequest
 	}
 
 	hb := &entities.Heartbeat{
 		TeamID:   req.TeamID,
-		Name:     strings.TrimSpace(req.Name),
-		Interval: req.Interval,
-		Grace:    req.Grace,
+		Name:     req.Name,
+		Status:   entities.HeartbeatStatusPaused,
+		Interval: time.Duration(req.Interval) * time.Minute,
+		Grace:    time.Duration(req.Grace) * time.Minute,
 	}
 
-	if err := h.HeartbeatService.Create(c.Request().Context(), hb); err != nil {
+	err = h.HeartbeatService.Create(c.Request().Context(), hb)
+	if err != nil {
 		c.Log.WithError(err).Error("failed to create heartbeat")
-
 		return echo.ErrInternalServerError
 	}
 
-	return c.JSON(http.StatusCreated, newHeartbeatResponse(hb, time.Now()))
+	return c.JSON(http.StatusCreated, hb)
 }
 
 type PutHeartbeatRequest struct {
 	TeamID      uint   `param:"teamId" validate:"required,numeric,gte=0"`
 	HeartbeatID uint   `param:"heartbeatId" validate:"required,numeric,gte=0"`
-	Name        string `json:"name" validate:"required,min=1,max=255"`
-	Interval    uint   `json:"interval" validate:"required,gte=1,lte=44640"`
-	Grace       uint   `json:"grace" validate:"gte=0,lte=1440"`
+	Name        string `json:"name" validate:"required"`
+	Interval    int64  `json:"interval" validate:"required,numeric,gte=1"`
+	Grace       int64  `json:"grace" validate:"required,numeric,gte=0"`
 }
 
-func (h *Handlers) PutHeartbeat(c hs.AuthenticatedContext) error {
+func (h *Handlers) PutHeartbeat(c handlers.AuthenticatedContext) error {
 	req, err := helpers.Bind[PutHeartbeatRequest](c)
 	if err != nil {
 		c.Log.WithError(err).Debug("failed to bind PutHeartbeatRequest")
-
 		return echo.ErrBadRequest
 	}
 
-	ctx := c.Request().Context()
-
-	if err := h.HeartbeatService.Update(ctx, &entities.Heartbeat{
-		ID:       req.HeartbeatID,
-		TeamID:   req.TeamID,
-		Name:     strings.TrimSpace(req.Name),
-		Interval: req.Interval,
-		Grace:    req.Grace,
-	}); err != nil {
-		return h.serviceError(c, err)
-	}
-
-	hb, err := h.HeartbeatService.GetByTeamIDAndID(ctx, req.TeamID, req.HeartbeatID)
+	hb, err := h.HeartbeatService.GetByIDAndTeamID(c.Request().Context(), req.TeamID, req.HeartbeatID)
 	if err != nil {
-		return h.serviceError(c, err)
+		c.Log.WithError(err).Error("failed to get heartbeat for update")
+		return echo.ErrNotFound
 	}
 
-	return c.JSON(http.StatusOK, newHeartbeatResponse(hb, time.Now()))
+	hb.Name = req.Name
+	hb.Interval = time.Duration(req.Interval) * time.Minute
+	hb.Grace = time.Duration(req.Grace) * time.Minute
+
+	err = h.HeartbeatService.Update(c.Request().Context(), hb)
+	if err != nil {
+		c.Log.WithError(err).Error("failed to update heartbeat")
+		return echo.ErrInternalServerError
+	}
+
+	return c.JSON(http.StatusOK, hb)
 }
 
-func (h *Handlers) DeleteHeartbeat(c hs.AuthenticatedContext) error {
-	req, err := helpers.Bind[HeartbeatIDRequest](c)
-	if err != nil {
-		c.Log.WithError(err).Debug("failed to bind HeartbeatIDRequest")
+type DeleteHeartbeatRequest struct {
+	TeamID      uint `param:"teamId" validate:"required,numeric,gte=0"`
+	HeartbeatID uint `param:"heartbeatId" validate:"required,numeric,gte=0"`
+}
 
+func (h *Handlers) DeleteHeartbeat(c handlers.AuthenticatedContext) error {
+	req, err := helpers.Bind[DeleteHeartbeatRequest](c)
+	if err != nil {
+		c.Log.WithError(err).Debug("failed to bind DeleteHeartbeatRequest")
 		return echo.ErrBadRequest
 	}
 
-	if err := h.HeartbeatService.Delete(c.Request().Context(), req.TeamID, req.HeartbeatID); err != nil {
-		return h.serviceError(c, err)
+	hb, err := h.HeartbeatService.GetByIDAndTeamID(c.Request().Context(), req.TeamID, req.HeartbeatID)
+	if err != nil {
+		c.Log.WithError(err).Error("failed to get heartbeat for deletion")
+		return echo.ErrNotFound
+	}
+
+	err = h.HeartbeatService.Delete(c.Request().Context(), hb)
+	if err != nil {
+		c.Log.WithError(err).Error("failed to delete heartbeat")
+		return echo.ErrInternalServerError
 	}
 
 	return c.NoContent(http.StatusNoContent)
 }
 
-// PingHeartbeat is called (unauthenticated) by cron jobs / background tasks.
-func (h *Handlers) PingHeartbeat(c echo.Context) error {
-	req, err := helpers.Bind[HeartbeatIDRequest](c)
+type PingHeartbeatRequest struct {
+	TeamID      uint `param:"teamId" validate:"required,numeric,gte=0"`
+	HeartbeatID uint `param:"heartbeatId" validate:"required,numeric,gte=0"`
+}
+
+func (h *Handlers) PingHeartbeat(c handlers.AuthenticatedContext) error {
+	req, err := helpers.Bind[PingHeartbeatRequest](c)
 	if err != nil {
+		c.Log.WithError(err).Debug("failed to bind PingHeartbeatRequest")
 		return echo.ErrBadRequest
 	}
 
-	// The endpoint is unauthenticated, so don't echo heartbeat details back.
-	if _, err := h.HeartbeatService.Ping(c.Request().Context(), req.TeamID, req.HeartbeatID); err != nil {
-		if errors.Is(err, heartbeat.ErrNotFound) {
-			return echo.ErrNotFound
-		}
-
-		h.Logger.WithError(err).Error("failed to ping heartbeat")
-
+	err = h.HeartbeatService.Ping(c.Request().Context(), req.HeartbeatID)
+	if err != nil {
+		c.Log.WithError(err).Error("failed to ping heartbeat")
 		return echo.ErrInternalServerError
 	}
 
-	return c.JSON(http.StatusOK, map[string]bool{"ok": true})
-}
-
-func (h *Handlers) serviceError(c hs.AuthenticatedContext, err error) error {
-	if errors.Is(err, heartbeat.ErrNotFound) {
-		return echo.ErrNotFound
-	}
-
-	c.Log.WithError(err).Error("heartbeat operation failed")
-
-	return echo.ErrInternalServerError
+	return c.NoContent(http.StatusOK)
 }

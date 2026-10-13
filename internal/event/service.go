@@ -1,6 +1,8 @@
 package event
 
 import (
+	"context"
+
 	"github.com/ThreeDotsLabs/watermill"
 	"github.com/ThreeDotsLabs/watermill-redisstream/pkg/redisstream"
 	"github.com/ThreeDotsLabs/watermill/message"
@@ -11,7 +13,7 @@ import (
 
 type Service interface {
 	Publish(event events.Event) error
-	// Subscribe(ctx context.Context, eventName string) (<-chan Event, error)
+	Subscribe(ctx context.Context, eventName string) (<-chan *message.Message, error)
 }
 
 type service struct {
@@ -19,7 +21,7 @@ type service struct {
 	subscriber *redisstream.Subscriber
 }
 
-func NewService(redisClient *redis.Client) (Service, error) {
+func NewService(redisClient *redis.Client, consumerGroup string) (Service, error) {
 	publisher, err := redisstream.NewPublisher(
 		redisstream.PublisherConfig{
 			Client:     redisClient,
@@ -31,10 +33,16 @@ func NewService(redisClient *redis.Client) (Service, error) {
 		return nil, err
 	}
 
+	subscriberConfig := redisstream.SubscriberConfig{
+		Client: redisClient,
+	}
+	if consumerGroup != "" {
+		subscriberConfig.ConsumerGroup = consumerGroup
+		subscriberConfig.Consumer = watermill.NewShortUUID()
+	}
+
 	subscriber, err := redisstream.NewSubscriber(
-		redisstream.SubscriberConfig{
-			Client: redisClient,
-		},
+		subscriberConfig,
 		watermill.NewStdLogger(false, false),
 	)
 	if err != nil {
@@ -45,6 +53,10 @@ func NewService(redisClient *redis.Client) (Service, error) {
 		publisher:  publisher,
 		subscriber: subscriber,
 	}, nil
+}
+
+func (s *service) Subscribe(ctx context.Context, topic string) (<-chan *message.Message, error) {
+	return s.subscriber.Subscribe(ctx, topic)
 }
 
 func (s *service) Publish(event events.Event) error {
@@ -65,15 +77,4 @@ func (s *service) marshal(e events.Event) ([]byte, error) {
 	}
 
 	return b, nil
-}
-
-func (s *service) unmarshalEvent(data []byte) (events.Event, error) {
-	var e events.Event
-
-	err := json.Unmarshal(data, e)
-	if err != nil {
-		return nil, err
-	}
-
-	return e, nil
 }

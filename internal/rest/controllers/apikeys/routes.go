@@ -19,15 +19,20 @@ func Register(
 	teamService team.Service,
 	apiKeyService apikey.Service,
 ) {
-	h := &Handlers{ApiKeyService: apiKeyService}
+	h := &Handlers{
+		ApiKeyService: apiKeyService,
+	}
 
 	TeamGuard := mw.TeamGuardFactory(logger, teamService)
 	AllowedRoles := mw.RoleGuardFactory(logger, teamService)
 	AuthHandler := handlers.AuthenticatedHandlerFactory(logger)
 
-	g := e.Group("/teams/:teamId/apikeys", TeamGuard(), AllowedRoles(mw.UserRoleOwner, mw.UserRoleAdmin))
+	apikeysGroup := e.Group(
+		"/teams/:teamId/apikeys",
+		TeamGuard(),
+	)
 
-	g.GET("", AuthHandler(h.GetApiKeys))
-	g.POST("", AuthHandler(h.PostApiKey))
-	g.DELETE("/:keyId", AuthHandler(h.DeleteApiKey))
+	apikeysGroup.GET("", AuthHandler(h.GetApiKeys))
+	apikeysGroup.POST("", AuthHandler(h.PostApiKey), AllowedRoles(mw.UserRoleOwner, mw.UserRoleAdmin))
+	apikeysGroup.DELETE("/:keyId", AuthHandler(h.DeleteApiKey), AllowedRoles(mw.UserRoleOwner, mw.UserRoleAdmin))
 }
