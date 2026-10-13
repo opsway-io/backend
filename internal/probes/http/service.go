@@ -61,7 +61,26 @@ func (s *ServiceImpl) Probe(ctx context.Context, method, url string, headers map
 	httpStatCtx := httpstat.WithHTTPStat(ctx, &result)
 	req = req.WithContext(httpStatCtx)
 
+	type tlsHop struct {
+		hostname string
+		tlsState *tls.ConnectionState
+	}
+	var tlsHops []tlsHop
+
 	client := s.newHttpClient(timeout)
+	client.CheckRedirect = func(req *xhttp.Request, via []*xhttp.Request) error {
+		if len(via) >= 10 {
+			return errors.New("stopped after 10 redirects")
+		}
+		if req.Response != nil && req.Response.TLS != nil && len(req.Response.TLS.PeerCertificates) > 0 {
+			prevReq := via[len(via)-1]
+			tlsHops = append(tlsHops, tlsHop{
+				hostname: prevReq.URL.Hostname(),
+				tlsState: req.Response.TLS,
+			})
+		}
+		return nil
+	}
 
 	// Send the request
 	resp, err := client.Do(req)
@@ -102,34 +121,83 @@ func (s *ServiceImpl) Probe(ctx context.Context, method, url string, headers map
 	}
 
 	// Add TLS information if available
-	if resp.TLS != nil {
+	if resp.TLS != nil && len(resp.TLS.PeerCertificates) > 0 {
+		finalReq := resp.Request
+		finalHostname := req.URL.Hostname()
+		if finalReq != nil && finalReq.URL != nil {
+			finalHostname = finalReq.URL.Hostname()
+		}
+		tlsHops = append(tlsHops, tlsHop{
+			hostname: finalHostname,
+			tlsState: resp.TLS,
+		})
+	}
+
+	if len(tlsHops) > 0 {
+		type evaluatedHop struct {
+			hop        tlsHop
+			cert       *x509.Certificate
+			notExpired bool
+			hostValid  bool
+			trustedCA  bool
+		}
+
+		evaluated := make([]evaluatedHop, len(tlsHops))
+		var firstFailing *evaluatedHop
+
+		for i, h := range tlsHops {
+			cert := h.tlsState.PeerCertificates[0]
+			ne := s.certificateNotExpired(cert)
+			hv := s.certificateHostValid(cert, h.hostname)
+			tca := s.certificateTrusted(h.tlsState, h.hostname)
+
+			eh := evaluatedHop{
+				hop:        h,
+				cert:       cert,
+				notExpired: ne,
+				hostValid:  hv,
+				trustedCA:  tca,
+			}
+			evaluated[i] = eh
+
+			if firstFailing == nil && (!hv || !tca || !ne) {
+				firstFailing = &evaluated[i]
+			}
+		}
+
+		chosen := evaluated[0]
+		if firstFailing != nil {
+			chosen = *firstFailing
+		} else {
+			// If all hops are valid, prefer the hop with the earliest expiring certificate
+			for _, eh := range evaluated[1:] {
+				if eh.cert.NotAfter.Before(chosen.cert.NotAfter) {
+					chosen = eh
+				}
+			}
+		}
+
+		meta.TLS = &TLS{
+			Version: TLSVersionName(chosen.hop.tlsState.Version),
+			Cipher:  tls.CipherSuiteName(chosen.hop.tlsState.CipherSuite),
+			Certificate: Certificate{
+				Issuer: CertificateIssuer{
+					Organization: strings.Join(chosen.cert.Issuer.Organization, ""),
+				},
+				Subject: CertificateSubject{
+					CommonName: chosen.cert.Subject.CommonName,
+				},
+				NotBefore:  chosen.cert.NotBefore,
+				NotAfter:   chosen.cert.NotAfter,
+				NotExpired: chosen.notExpired,
+				HostValid:  chosen.hostValid,
+				TrustedCA:  chosen.trustedCA,
+			},
+		}
+	} else if resp.TLS != nil {
 		meta.TLS = &TLS{
 			Version: TLSVersionName(resp.TLS.Version),
 			Cipher:  tls.CipherSuiteName(resp.TLS.CipherSuite),
-		}
-
-		if len(resp.TLS.PeerCertificates) > 0 {
-			cert := resp.TLS.PeerCertificates[0]
-			hostname := req.URL.Hostname()
-
-			trustedCA := s.certificateTrusted(resp.TLS, hostname)
-
-			notExpired := s.certificateNotExpired(cert)
-			hostValid := s.certificateHostValid(cert, hostname)
-
-			meta.TLS.Certificate = Certificate{
-				Issuer: CertificateIssuer{
-					Organization: strings.Join(cert.Issuer.Organization, ""),
-				},
-				Subject: CertificateSubject{
-					CommonName: cert.Subject.CommonName,
-				},
-				NotBefore:  cert.NotBefore,
-				NotAfter:   cert.NotAfter,
-				NotExpired: notExpired,
-				HostValid:  hostValid,
-				TrustedCA:  trustedCA,
-			}
 		}
 	}
 

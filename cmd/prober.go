@@ -147,10 +147,6 @@ func runProber(cmd *cobra.Command, args []string) {
 			})
 		}
 	}
-
-	wp.StopWait()
-
-	l.Info("Goodbye!")
 }
 
 func handleTask(ctx context.Context, logger *logrus.Logger, httpProber http.Service, tcpProber tcp.Service, icmpProber icmp.Service, dnsProber dns.Service, postgresProber probePostgres.Service, mysqlProber probeMysql.Service, redisProber probeRedis.Service, browserProber browser.Service, websocketProber websocket.Service, udpProber udp.Service, m *entities.Monitor, c check.Service, i incident.Service, location string, availableLocations []string, rc *redis.Client) {
@@ -707,6 +703,20 @@ func handleTask(ctx context.Context, logger *logrus.Logger, httpProber http.Serv
 					Description: &desc,
 				}
 				_ = i.Create(ctx, &[]entities.Incident{chainInc})
+			}
+		} else {
+			if openIncidents != nil {
+				for _, inc := range *openIncidents {
+					if (inc.Title == "SSL/TLS Certificate Chain Invalid" || inc.Title == "SSL/TLS Hostname Mismatch") && !inc.Resolved {
+						l.Info("SSL/TLS certificate chain and hostname are now valid, resolving open incident")
+						inc.Incident.Resolved = true
+						now := time.Now()
+						inc.Incident.ResolvedAt = &now
+						if err := i.Update(ctx, &inc.Incident); err != nil {
+							l.WithError(err).Error("failed to resolve SSL/TLS incident")
+						}
+					}
+				}
 			}
 		}
 
