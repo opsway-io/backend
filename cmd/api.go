@@ -145,6 +145,15 @@ func runAPI(cmd *cobra.Command, args []string) {
 
 	db.Exec(`ALTER TABLE monitor_assertions ALTER COLUMN monitor_step_id SET NOT NULL`)
 	db.Exec(`ALTER TABLE monitor_variables ALTER COLUMN monitor_step_id SET NOT NULL`)
+
+	err = db.Exec(`
+		UPDATE monitor_settings
+		SET frequency = frequency / 1000000000
+		WHERE frequency >= 1000000000
+	`).Error
+	if err != nil && !strings.Contains(err.Error(), "does not exist") {
+		l.WithError(err).Warn("Failed to migrate legacy monitor frequencies")
+	}
 	// ----------------------
 
 	ch_db, err := clickhouse.NewClient(ctx, conf.Clickhouse)

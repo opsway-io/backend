@@ -21,6 +21,7 @@ func NewValidator() *Validator {
 	_ = v.RegisterValidation("monitorBodyType", BodyTypeValidator)
 	_ = v.RegisterValidation("monitorState", MonitorStateValidator)
 	_ = v.RegisterValidation("monitorAssertions", MonitorAssertionsValidator)
+	_ = v.RegisterValidation("location", LocationValidator)
 
 	return &Validator{
 		validator: v,
@@ -122,4 +123,8 @@ func MonitorAssertionsValidator(fl validator.FieldLevel) bool {
 		return true
 	}
 	return false
+}
+
+func LocationValidator(fl validator.FieldLevel) bool {
+	return len(fl.Field().String()) > 0
 }

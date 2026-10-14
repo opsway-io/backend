@@ -38,6 +38,9 @@ func (TimeDurationSecondsSerializer) Scan(ctx context.Context, field *schema.Fie
 	if !ok {
 		return errors.Errorf("expected int64, got %T", dbValue)
 	}
+	if seconds >= 1000000000 {
+		seconds = seconds / 1000000000
+	}
 	dur := time.Duration(seconds) * time.Second
 
 	var v reflect.Value
