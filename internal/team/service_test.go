@@ -3,7 +3,9 @@ package team_test
 import (
 	"context"
 	"testing"
+	"time"
 
+	"github.com/golang-jwt/jwt/v5"
 	"github.com/opsway-io/backend/internal/entities"
 	emailMocks "github.com/opsway-io/backend/internal/notification/email/mocks"
 	storageMocks "github.com/opsway-io/backend/internal/storage/mocks"
@@ -88,3 +90,207 @@ func TestService_UpdateDisplayName(t *testing.T) {
 		cache.AssertExpectations(t)
 	})
 }
+
+func TestService_AcceptInviteByToken(t *testing.T) {
+	ctx := context.Background()
+	secret := "test-secret"
+	cfg := team.Config{
+		InvitationSecret: secret,
+		InvitationExpiry: time.Hour,
+	}
+
+	createToken := func(claims jwt.MapClaims) string {
+		tok := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+		str, err := tok.SignedString([]byte(secret))
+		if err != nil {
+			t.Fatalf("failed to sign token: %v", err)
+		}
+		return str
+	}
+
+	t.Run("successfully accepts invite with exact matching email", func(t *testing.T) {
+		repo := new(teamMocks.Repository)
+		cache := new(teamMocks.Cache)
+		svc := team.NewService(cfg, repo, nil, nil, cache)
+
+		tokenStr := createToken(jwt.MapClaims{
+			"exp":     time.Now().Add(time.Hour).Unix(),
+			"type":    "team-invite",
+			"sub":     "user@example.com",
+			"team_id": float64(1),
+			"role":    string(entities.TeamRoleAdmin),
+		})
+
+		user := &entities.User{
+			ID:    42,
+			Email: "user@example.com",
+		}
+
+		invitation := &entities.TeamInvitation{
+			TeamID: 1,
+			Email:  "user@example.com",
+			Token:  tokenStr,
+		}
+
+		repo.On("GetTeamInvitationByToken", ctx, tokenStr).Return(invitation, nil)
+		repo.On("AddUser", ctx, uint(1), uint(42), entities.TeamRoleAdmin).Return(nil)
+		cache.On("DeleteTeamUserCount", ctx, uint(1)).Return(nil)
+		repo.On("DeleteTeamInvitation", ctx, uint(1), "user@example.com").Return(nil)
+
+		err := svc.AcceptInviteByToken(ctx, tokenStr, user)
+		assert.NoError(t, err)
+
+		repo.AssertExpectations(t)
+		cache.AssertExpectations(t)
+	})
+
+	t.Run("successfully accepts invite with case-insensitive email match", func(t *testing.T) {
+		repo := new(teamMocks.Repository)
+		cache := new(teamMocks.Cache)
+		svc := team.NewService(cfg, repo, nil, nil, cache)
+
+		tokenStr := createToken(jwt.MapClaims{
+			"exp":     time.Now().Add(time.Hour).Unix(),
+			"type":    "team-invite",
+			"sub":     "User@Example.COM ",
+			"team_id": float64(1),
+			"role":    string(entities.TeamRoleMember),
+		})
+
+		user := &entities.User{
+			ID:    42,
+			Email: "user@example.com",
+		}
+
+		invitation := &entities.TeamInvitation{
+			TeamID: 1,
+			Email:  "User@Example.COM ",
+			Token:  tokenStr,
+		}
+
+		repo.On("GetTeamInvitationByToken", ctx, tokenStr).Return(invitation, nil)
+		repo.On("AddUser", ctx, uint(1), uint(42), entities.TeamRoleMember).Return(nil)
+		cache.On("DeleteTeamUserCount", ctx, uint(1)).Return(nil)
+		repo.On("DeleteTeamInvitation", ctx, uint(1), "User@Example.COM ").Return(nil)
+
+		err := svc.AcceptInviteByToken(ctx, tokenStr, user)
+		assert.NoError(t, err)
+
+		repo.AssertExpectations(t)
+		cache.AssertExpectations(t)
+	})
+
+	t.Run("returns ErrEmailMismatch when signed-in user email differs from invite email", func(t *testing.T) {
+		repo := new(teamMocks.Repository)
+		cache := new(teamMocks.Cache)
+		svc := team.NewService(cfg, repo, nil, nil, cache)
+
+		tokenStr := createToken(jwt.MapClaims{
+			"exp":     time.Now().Add(time.Hour).Unix(),
+			"type":    "team-invite",
+			"sub":     "other@example.com",
+			"team_id": float64(1),
+			"role":    string(entities.TeamRoleMember),
+		})
+
+		user := &entities.User{
+			ID:    42,
+			Email: "user@example.com",
+		}
+
+		invitation := &entities.TeamInvitation{
+			TeamID: 1,
+			Email:  "other@example.com",
+			Token:  tokenStr,
+		}
+
+		repo.On("GetTeamInvitationByToken", ctx, tokenStr).Return(invitation, nil)
+
+		err := svc.AcceptInviteByToken(ctx, tokenStr, user)
+		assert.ErrorIs(t, err, team.ErrEmailMismatch)
+
+		repo.AssertExpectations(t)
+	})
+
+	t.Run("returns ErrInvitationNotFound when token not in DB", func(t *testing.T) {
+		repo := new(teamMocks.Repository)
+		cache := new(teamMocks.Cache)
+		svc := team.NewService(cfg, repo, nil, nil, cache)
+
+		tokenStr := createToken(jwt.MapClaims{
+			"exp":     time.Now().Add(time.Hour).Unix(),
+			"type":    "team-invite",
+			"sub":     "user@example.com",
+			"team_id": float64(1),
+			"role":    string(entities.TeamRoleMember),
+		})
+
+		user := &entities.User{
+			ID:    42,
+			Email: "user@example.com",
+		}
+
+		repo.On("GetTeamInvitationByToken", ctx, tokenStr).Return(nil, assert.AnError)
+
+		err := svc.AcceptInviteByToken(ctx, tokenStr, user)
+		assert.ErrorIs(t, err, team.ErrInvitationNotFound)
+
+		repo.AssertExpectations(t)
+	})
+
+	t.Run("returns ErrInvalidInvitationToken when signature is invalid", func(t *testing.T) {
+		repo := new(teamMocks.Repository)
+		cache := new(teamMocks.Cache)
+		svc := team.NewService(cfg, repo, nil, nil, cache)
+
+		wrongKeyToken := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
+			"exp":     time.Now().Add(time.Hour).Unix(),
+			"type":    "team-invite",
+			"sub":     "user@example.com",
+			"team_id": float64(1),
+			"role":    string(entities.TeamRoleMember),
+		})
+		tokenStr, _ := wrongKeyToken.SignedString([]byte("wrong-secret"))
+
+		user := &entities.User{
+			ID:    42,
+			Email: "user@example.com",
+		}
+
+		err := svc.AcceptInviteByToken(ctx, tokenStr, user)
+		assert.ErrorIs(t, err, team.ErrInvalidInvitationToken)
+	})
+
+	t.Run("returns ErrInvalidInvitationToken when token type is not team-invite", func(t *testing.T) {
+		repo := new(teamMocks.Repository)
+		cache := new(teamMocks.Cache)
+		svc := team.NewService(cfg, repo, nil, nil, cache)
+
+		tokenStr := createToken(jwt.MapClaims{
+			"exp":     time.Now().Add(time.Hour).Unix(),
+			"type":    "wrong-type",
+			"sub":     "user@example.com",
+			"team_id": float64(1),
+			"role":    string(entities.TeamRoleMember),
+		})
+
+		user := &entities.User{
+			ID:    42,
+			Email: "user@example.com",
+		}
+
+		invitation := &entities.TeamInvitation{
+			TeamID: 1,
+			Email:  "user@example.com",
+			Token:  tokenStr,
+		}
+
+		repo.On("GetTeamInvitationByToken", ctx, tokenStr).Return(invitation, nil)
+
+		err := svc.AcceptInviteByToken(ctx, tokenStr, user)
+		assert.ErrorIs(t, err, team.ErrInvalidInvitationToken)
+
+		repo.AssertExpectations(t)
+	})
+}
+

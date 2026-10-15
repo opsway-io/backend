@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"strings"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
@@ -17,6 +18,10 @@ import (
 var (
 	ErrAlreadyOnTeam          = errors.New("user is already on team")
 	ErrInvalidInvitationToken = errors.New("invalid invitation token")
+	ErrInvitationNotFound     = errors.New("invitation not found or expired")
+	ErrEmailMismatch          = errors.New("token email does not match user email")
+	ErrInvalidRole            = errors.New("invalid role")
+	ErrInvalidTeamID          = errors.New("invalid team ID")
 )
 
 type Config struct {
@@ -336,43 +341,41 @@ func (s *ServiceImpl) AcceptInviteByToken(ctx context.Context, tokenString strin
 		return []byte(s.config.InvitationSecret), nil
 	})
 	if err != nil {
-		return errors.Wrap(err, "failed to parse token")
+		return errors.Wrap(ErrInvalidInvitationToken, err.Error())
 	}
 
 	claims, ok := token.Claims.(jwt.MapClaims)
-	if !ok {
-		return errors.New("failed to parse token claims")
-	}
-	if !token.Valid {
-		return errors.New("invalid token")
+	if !ok || !token.Valid {
+		return ErrInvalidInvitationToken
 	}
 
 	// Verify the token exists in the database
 	invitation, err := s.repository.GetTeamInvitationByToken(ctx, tokenString)
 	if err != nil {
-		return errors.Wrap(err, "invitation not found or expired")
+		return ErrInvitationNotFound
 	}
 
 	// Check token type
 	if claims["type"] != "team-invite" {
-		return errors.New("invalid token type")
+		return ErrInvalidInvitationToken
 	}
 
-	// Check user email matches token email
-	if claims["sub"] != user.Email {
-		return errors.New("token email does not match user email")
+	// Check user email matches token email (case-insensitive)
+	sub, ok := claims["sub"].(string)
+	if !ok || !strings.EqualFold(strings.TrimSpace(sub), strings.TrimSpace(user.Email)) {
+		return ErrEmailMismatch
 	}
 
 	// Get role
 	role, err := entities.TeamRoleFrom(claims["role"])
 	if err != nil {
-		return errors.Wrap(err, "failed to get role")
+		return errors.Wrap(ErrInvalidRole, err.Error())
 	}
 
 	// Get team ID
 	teamIDFloat64, ok := claims["team_id"].(float64)
 	if !ok {
-		return errors.New("failed to parse team ID")
+		return ErrInvalidTeamID
 	}
 
 	teamID := uint(teamIDFloat64)

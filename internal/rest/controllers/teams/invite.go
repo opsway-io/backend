@@ -88,6 +88,16 @@ func (h *Handlers) PostTeamInvitesAccept(c hs.AuthenticatedContext) error {
 		req.Token,
 		user,
 	); err != nil {
+		if errors.Is(err, team.ErrInvalidInvitationToken) || errors.Is(err, team.ErrInvalidRole) || errors.Is(err, team.ErrInvalidTeamID) {
+			return echo.NewHTTPError(http.StatusBadRequest, err.Error())
+		}
+		if errors.Is(err, team.ErrInvitationNotFound) {
+			return echo.NewHTTPError(http.StatusNotFound, "invitation not found or expired")
+		}
+		if errors.Is(err, team.ErrEmailMismatch) {
+			return echo.NewHTTPError(http.StatusForbidden, "this invitation was sent to a different email address")
+		}
+
 		c.Log.WithError(err).Error("failed to accept invites")
 
 		return echo.ErrInternalServerError
