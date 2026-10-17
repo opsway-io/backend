@@ -32,6 +32,7 @@ import (
 	probePostgres "github.com/opsway-io/backend/internal/probes/postgres"
 	probeRedis "github.com/opsway-io/backend/internal/probes/redis"
 	"github.com/opsway-io/backend/internal/probes/tcp"
+	proberPkg "github.com/opsway-io/backend/internal/prober"
 	"github.com/opsway-io/backend/internal/probes/udp"
 	"github.com/opsway-io/backend/internal/probes/websocket"
 	"github.com/redis/go-redis/v9"
@@ -44,7 +45,9 @@ import (
 
 type ProberConfig struct {
 	Concurrency        int      `mapstructure:"concurrency" default:"25"`
-	Location           string   `mapstructure:"location" default:"global"`
+	Location           string   `mapstructure:"location" default:"opsway-dk"`
+	Name               string   `mapstructure:"name" default:"Denmark (opsway-dk)"`
+	CountryCode        string   `mapstructure:"country_code" default:"dk"`
 	AvailableLocations []string `mapstructure:"available_locations"`
 }
 
@@ -114,6 +117,47 @@ func runProber(cmd *cobra.Command, args []string) {
 	browserProber := browser.NewService()
 	websocketProber := websocket.NewService()
 	udpProber := udp.NewService()
+
+	proberService := proberPkg.NewService(redisClient, nil)
+	locInfo := proberPkg.LocationInfo{
+		ID:          conf.Prober.Location,
+		Name:        conf.Prober.Name,
+		CountryCode: conf.Prober.CountryCode,
+		Status:      "online",
+	}
+	if locInfo.Name == "" {
+		locInfo.Name = locInfo.ID
+	}
+	if locInfo.CountryCode == "" {
+		locInfo.CountryCode = proberPkg.ExtractCountryCode(locInfo.ID)
+	}
+
+	if err := proberService.RegisterHeartbeat(ctx, locInfo); err != nil {
+		l.WithError(err).Warn("Failed to register initial prober heartbeat")
+	} else {
+		l.WithFields(logrus.Fields{
+			"location": locInfo.ID,
+			"name":     locInfo.Name,
+		}).Info("Registered prober location heartbeat")
+	}
+
+	go func() {
+		ticker := time.NewTicker(15 * time.Second)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ctx.Done():
+				shutdownCtx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+				_ = proberService.Unregister(shutdownCtx, locInfo.ID)
+				cancel()
+				return
+			case <-ticker.C:
+				if err := proberService.RegisterHeartbeat(ctx, locInfo); err != nil {
+					l.WithError(err).Warn("Failed to send prober heartbeat")
+				}
+			}
+		}
+	}()
 
 	l.Info("Waiting for tasks...")
 

@@ -22,6 +22,7 @@ import (
 	"github.com/opsway-io/backend/internal/maintenance"
 	"github.com/opsway-io/backend/internal/monitor"
 	"github.com/opsway-io/backend/internal/notification/email"
+	proberPkg "github.com/opsway-io/backend/internal/prober"
 	"github.com/opsway-io/backend/internal/report"
 	"github.com/opsway-io/backend/internal/rest"
 	"github.com/opsway-io/backend/internal/statuspage"
@@ -228,10 +229,37 @@ func runAPI(cmd *cobra.Command, args []string) {
 	escalationRepo := escalation.NewRepository(db)
 	escalationService := escalation.NewService(escalationRepo)
 
-	availableLocations := conf.Prober.AvailableLocations
-	if len(availableLocations) == 0 {
-		availableLocations = []string{"global"}
+	fallbackLocations := []proberPkg.LocationInfo{}
+	if len(conf.Prober.AvailableLocations) > 0 {
+		for _, loc := range conf.Prober.AvailableLocations {
+			fallbackLocations = append(fallbackLocations, proberPkg.LocationInfo{
+				ID:          loc,
+				Name:        loc,
+				CountryCode: proberPkg.ExtractCountryCode(loc),
+				Status:      "online",
+			})
+		}
+	} else if conf.Prober.Location != "" {
+		fallbackLocations = []proberPkg.LocationInfo{
+			{
+				ID:          conf.Prober.Location,
+				Name:        conf.Prober.Name,
+				CountryCode: conf.Prober.CountryCode,
+				Status:      "online",
+			},
+		}
+	} else {
+		fallbackLocations = []proberPkg.LocationInfo{
+			{
+				ID:          "opsway-dk",
+				Name:        "Denmark (opsway-dk)",
+				CountryCode: "dk",
+				Status:      "online",
+			},
+		}
 	}
+
+	proberService := proberPkg.NewService(redisClient, fallbackLocations)
 
 	srv, err := rest.NewServer(
 		conf.REST,
@@ -255,7 +283,7 @@ func runAPI(cmd *cobra.Command, args []string) {
 		eventService,
 		apiKeyService,
 		emailSender,
-		availableLocations,
+		proberService,
 		db,
 		ch_db,
 		conf.StatusPage.BaseURL,

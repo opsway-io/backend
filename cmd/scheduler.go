@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"context"
+	"sync"
 	"time"
 
 	connectorPostgres "github.com/opsway-io/backend/internal/connectors/postgres"
@@ -10,6 +11,7 @@ import (
 	"github.com/opsway-io/backend/internal/event"
 	"github.com/opsway-io/backend/internal/event/events"
 	"github.com/opsway-io/backend/internal/monitor"
+	proberPkg "github.com/opsway-io/backend/internal/prober"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 )
@@ -106,15 +108,21 @@ func runScheduler(cmd *cobra.Command, args []string) {
 		}
 	}()
 
-	locations := conf.Prober.AvailableLocations
-	if len(locations) == 0 {
-		locations = []string{"global", "eu-central-1", "us-east-1"} // Fallback
-	}
+	proberService := proberPkg.NewService(redisClient, nil)
 
-	l.Info("Starting scheduler for locations: ", locations)
+	runningLocations := make(map[string]bool)
+	var mu sync.Mutex
 
-	for _, location := range locations {
-		loc := location // capture loop variable
+	startLocationWorker := func(loc string) {
+		mu.Lock()
+		if runningLocations[loc] {
+			mu.Unlock()
+			return
+		}
+		runningLocations[loc] = true
+		mu.Unlock()
+
+		l.Infof("Starting scheduler worker for location: %s", loc)
 		go func(loc string) {
 			for {
 				if err := ctx.Err(); err != nil {
@@ -142,6 +150,37 @@ func runScheduler(cmd *cobra.Command, args []string) {
 			}
 		}(loc)
 	}
+
+	// Initial locations from config or fallbacks
+	initialLocations := []string{"opsway-dk", "global"}
+	if conf.Prober.Location != "" {
+		initialLocations = append(initialLocations, conf.Prober.Location)
+	}
+	initialLocations = append(initialLocations, conf.Prober.AvailableLocations...)
+
+	for _, loc := range initialLocations {
+		startLocationWorker(loc)
+	}
+
+	// Periodically discover active probers and start workers dynamically
+	go func() {
+		ticker := time.NewTicker(30 * time.Second)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-ticker.C:
+				activeLocs, err := proberService.GetActiveLocations(ctx)
+				if err != nil {
+					continue
+				}
+				for _, loc := range activeLocs {
+					startLocationWorker(loc.ID)
+				}
+			}
+		}
+	}()
 
 	l.Info("Scheduler running. Waiting for tasks...")
 	<-ctx.Done()

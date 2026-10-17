@@ -45,11 +45,12 @@ object_storage:
 
 prober:
   concurrency: 1
-  location: "global"
+  location: "opsway-dk"
+  name: "Denmark (opsway-dk)"
+  country_code: "dk"
   available_locations:
+    - "opsway-dk"
     - "global"
-    - "eu-central-1"
-    - "us-east-1"
 
 team:
   invitation_secret: supersecret

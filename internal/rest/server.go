@@ -19,6 +19,7 @@ import (
 	"github.com/opsway-io/backend/internal/maintenance"
 	"github.com/opsway-io/backend/internal/monitor"
 	"github.com/opsway-io/backend/internal/notification/email"
+	proberService "github.com/opsway-io/backend/internal/prober"
 	"github.com/opsway-io/backend/internal/report"
 	"github.com/opsway-io/backend/internal/rest/controllers"
 	"github.com/opsway-io/backend/internal/rest/controllers/authentication"
@@ -63,7 +64,7 @@ func NewServer(
 	eventService event.Service,
 	apiKeyService apikey.Service,
 	emailSender email.Sender,
-	availableLocations []string,
+	proberService proberService.Service,
 	db *gorm.DB,
 	ch *gorm.DB,
 	statusPageBaseURL string,
@@ -120,7 +121,7 @@ func NewServer(
 		eventService,
 		apiKeyService,
 		emailSender,
-		availableLocations,
+		proberService,
 		db,
 		ch,
 		statusPageBaseURL,

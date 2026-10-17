@@ -15,6 +15,7 @@ import (
 	"github.com/opsway-io/backend/internal/maintenance"
 	"github.com/opsway-io/backend/internal/monitor"
 	"github.com/opsway-io/backend/internal/notification/email"
+	proberService "github.com/opsway-io/backend/internal/prober"
 	"github.com/opsway-io/backend/internal/report"
 	alertingController "github.com/opsway-io/backend/internal/rest/controllers/alerting"
 	"github.com/opsway-io/backend/internal/rest/controllers/apikeys"
@@ -65,7 +66,7 @@ func Register(
 	eventService event.Service,
 	apiKeyService apikey.Service,
 	emailSender email.Sender,
-	availableLocations []string,
+	proberService proberService.Service,
 	db *gorm.DB,
 	ch *gorm.DB,
 	statusPageBaseURL string,
@@ -139,7 +140,7 @@ func Register(
 	statuspages.RegisterPublic(root, logger, statusPageBaseURL, statusPageService, incidentService, maintenanceService, checkService, emailSender)
 
 	// Prober
-	prober.Register(root, logger, availableLocations)
+	prober.Register(root, logger, proberService)
 
 	// Prometheus Metrics
 	prometheus.Register(e, logger, db, ch)
