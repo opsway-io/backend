@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"encoding/json"
+	"time"
 
 	"github.com/gammazero/workerpool"
 	"github.com/opsway-io/backend/internal/check"
@@ -78,93 +79,112 @@ func runReport(cmd *cobra.Command, args []string) {
 
 	l.WithField("concurrency", conf.Report.Concurrency).Info("Report generator started")
 
-	messages, err := eventService.Subscribe(ctx, "ReportGenerateTask")
-	if err != nil {
-		l.WithError(err).Fatal("Failed to subscribe to report_tasks")
-	}
+	for {
+		if ctx.Err() != nil {
+			break
+		}
 
-	for msg := range messages {
-		msg := msg
-
-		wp.Submit(func() {
-			var task events.ReportGenerateTask
-			if err := json.Unmarshal(msg.Payload, &task); err != nil {
-				l.WithError(err).Error("failed to unmarshal ReportGenerateTask")
-				msg.Ack()
-				return
+		messages, err := eventService.Subscribe(ctx, "ReportGenerateTask")
+		if err != nil {
+			l.WithError(err).Error("Failed to subscribe to report_tasks, retrying in 2 seconds...")
+			select {
+			case <-ctx.Done():
+				break
+			case <-time.After(2 * time.Second):
+				continue
 			}
+		}
 
-			l.WithField("task", task).Info("Processing report task")
+		for msg := range messages {
+			msg := msg
 
-			rep, err := reportService.GetByID(ctx, task.ReportID)
-			if err != nil {
-				l.WithError(err).Error("failed to fetch report by ID")
-				msg.Ack()
-				return
-			}
-
-			// Do not process already completed/failed tasks (idempotency)
-			if rep.Status != entities.ReportStatusPending {
-				msg.Ack()
-				return
-			}
-
-			var reportData entities.ReportData
-
-			// Logic to generate the report data
-			switch task.ReportType {
-			case "UPTIME", "ALL":
-				uptimeReport, err := httpResultService.GetByTeamIDMonitorsUptime(ctx, task.TeamID, task.Start, task.End)
-				if err != nil {
-					l.WithError(err).Error("failed to get uptime report")
-					rep.Status = entities.ReportStatusFailed
-					_ = reportService.Update(ctx, rep)
-					msg.Ack() // We ack so it doesn't get retried infinitely if it's a persistent error
-					return
-				}
-				reportData.Uptime = uptimeReport
-				if task.ReportType != "ALL" {
-					break
-				}
-				fallthrough
-			case "PERFORMANCE":
-				performanceReport, err := httpResultService.GetByTeamIDMonitorsPerformance(ctx, task.TeamID, task.Start, task.End)
-				if err != nil {
-					l.WithError(err).Error("failed to get performance report")
-					rep.Status = entities.ReportStatusFailed
-					_ = reportService.Update(ctx, rep)
+			wp.Submit(func() {
+				var task events.ReportGenerateTask
+				if err := json.Unmarshal(msg.Payload, &task); err != nil {
+					l.WithError(err).Error("failed to unmarshal ReportGenerateTask")
 					msg.Ack()
 					return
 				}
-				reportData.Performance = performanceReport
-				if task.ReportType != "ALL" {
-					break
-				}
-				fallthrough
-			case "INCIDENT":
-				incidentReport, err := incidentService.GetByTeamIDMonitorsIncidentStats(ctx, task.TeamID, task.Start, task.End)
+
+				l.WithField("task", task).Info("Processing report task")
+
+				rep, err := reportService.GetByID(ctx, task.ReportID)
 				if err != nil {
-					l.WithError(err).Error("failed to get incident report")
-					rep.Status = entities.ReportStatusFailed
-					_ = reportService.Update(ctx, rep)
+					l.WithError(err).Error("failed to fetch report by ID")
 					msg.Ack()
 					return
 				}
-				reportData.Incident = incidentReport
-			}
 
-			rep.Report = datatypes.NewJSONType(reportData)
-			rep.Status = entities.ReportStatusCompleted
+				// Do not process already completed/failed tasks (idempotency)
+				if rep.Status != entities.ReportStatusPending {
+					msg.Ack()
+					return
+				}
 
-			if err := reportService.Update(ctx, rep); err != nil {
-				l.WithError(err).Error("failed to update report status")
+				var reportData entities.ReportData
+
+				// Logic to generate the report data
+				switch task.ReportType {
+				case "UPTIME", "ALL":
+					uptimeReport, err := httpResultService.GetByTeamIDMonitorsUptime(ctx, task.TeamID, task.Start, task.End)
+					if err != nil {
+						l.WithError(err).Error("failed to get uptime report")
+						rep.Status = entities.ReportStatusFailed
+						_ = reportService.Update(ctx, rep)
+						msg.Ack() // We ack so it doesn't get retried infinitely if it's a persistent error
+						return
+					}
+					reportData.Uptime = uptimeReport
+					if task.ReportType != "ALL" {
+						break
+					}
+					fallthrough
+				case "PERFORMANCE":
+					performanceReport, err := httpResultService.GetByTeamIDMonitorsPerformance(ctx, task.TeamID, task.Start, task.End)
+					if err != nil {
+						l.WithError(err).Error("failed to get performance report")
+						rep.Status = entities.ReportStatusFailed
+						_ = reportService.Update(ctx, rep)
+						msg.Ack()
+						return
+					}
+					reportData.Performance = performanceReport
+					if task.ReportType != "ALL" {
+						break
+					}
+					fallthrough
+				case "INCIDENT":
+					incidentReport, err := incidentService.GetByTeamIDMonitorsIncidentStats(ctx, task.TeamID, task.Start, task.End)
+					if err != nil {
+						l.WithError(err).Error("failed to get incident report")
+						rep.Status = entities.ReportStatusFailed
+						_ = reportService.Update(ctx, rep)
+						msg.Ack()
+						return
+					}
+					reportData.Incident = incidentReport
+				}
+
+				rep.Report = datatypes.NewJSONType(reportData)
+				rep.Status = entities.ReportStatusCompleted
+
+				if err := reportService.Update(ctx, rep); err != nil {
+					l.WithError(err).Error("failed to update report status")
+					msg.Ack()
+					return
+				}
+
+				l.WithField("report_id", task.ReportID).Info("Successfully generated report")
 				msg.Ack()
-				return
-			}
+			})
+		}
 
-			l.WithField("report_id", task.ReportID).Info("Successfully generated report")
-			msg.Ack()
-		})
+		l.Warn("report generator subscriber channel closed, re-subscribing in 2 seconds...")
+		select {
+		case <-ctx.Done():
+			break
+		case <-time.After(2 * time.Second):
+		}
 	}
 
 	l.Info("Shutting down report generator...")

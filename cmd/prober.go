@@ -117,34 +117,66 @@ func runProber(cmd *cobra.Command, args []string) {
 
 	l.Info("Waiting for tasks...")
 
-	subscriber, err := eventService.Subscribe(ctx, fmt.Sprintf("prober.tasks.%s", conf.Prober.Location))
-	if err != nil {
-		l.WithError(err).Fatal("failed to subscribe to prober tasks")
-	}
-
 	for {
-		select {
-		case <-ctx.Done():
+		if ctx.Err() != nil {
 			l.Info("Shutting down...")
 			wp.StopWait()
 			l.Info("Goodbye!")
 			return
-		case msg := <-subscriber:
-			if msg == nil {
+		}
+
+		subscriber, err := eventService.Subscribe(ctx, fmt.Sprintf("prober.tasks.%s", conf.Prober.Location))
+		if err != nil {
+			l.WithError(err).Error("failed to subscribe to prober tasks, retrying in 2 seconds...")
+			select {
+			case <-ctx.Done():
+				l.Info("Shutting down...")
+				wp.StopWait()
+				l.Info("Goodbye!")
+				return
+			case <-time.After(2 * time.Second):
 				continue
 			}
+		}
 
-			wp.Submit(func() {
-				var task events.ProberTask
-				if err := json.Unmarshal(msg.Payload, &task); err != nil {
-					l.WithError(err).Error("failed to unmarshal prober task")
-					msg.Nack()
-					return
+		channelClosed := false
+		for !channelClosed {
+			select {
+			case <-ctx.Done():
+				l.Info("Shutting down...")
+				wp.StopWait()
+				l.Info("Goodbye!")
+				return
+			case msg, ok := <-subscriber:
+				if !ok {
+					l.Warn("prober subscriber channel closed, re-subscribing in 2 seconds...")
+					channelClosed = true
+					select {
+					case <-ctx.Done():
+						l.Info("Shutting down...")
+						wp.StopWait()
+						l.Info("Goodbye!")
+						return
+					case <-time.After(2 * time.Second):
+					}
+					break
+				}
+				if msg == nil {
+					continue
 				}
 
-				handleTask(ctx, l, httpProber, tcpProber, icmpProber, dnsProber, postgresProber, mysqlProber, redisProber, browserProber, websocketProber, udpProber, task.Monitor, httpResultService, incidentService, conf.Prober.Location, conf.Prober.AvailableLocations, redisClient, conf.Forecaster)
-				msg.Ack()
-			})
+				wp.Submit(func() {
+					var task events.ProberTask
+					if err := json.Unmarshal(msg.Payload, &task); err != nil {
+						l.WithError(err).Error("failed to unmarshal prober task")
+						msg.Nack()
+						return
+					}
+
+					handleTask(ctx, l, httpProber, tcpProber, icmpProber, dnsProber, postgresProber, mysqlProber, redisProber, browserProber, websocketProber, udpProber, task.Monitor, httpResultService, incidentService, conf.Prober.Location, conf.Prober.AvailableLocations, redisClient, conf.Forecaster)
+					msg.Ack()
+				})
+			}
 		}
 	}
 }

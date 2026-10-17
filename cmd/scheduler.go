@@ -116,18 +116,29 @@ func runScheduler(cmd *cobra.Command, args []string) {
 	for _, location := range locations {
 		loc := location // capture loop variable
 		go func(loc string) {
-			if err := schedule.On(ctx, loc, func(ctx context.Context, m *entities.Monitor) {
-				l.WithFields(logrus.Fields{
-					"monitor_id": m.ID,
-					"location":   loc,
-				}).Debug("Scheduling probe")
+			for {
+				if err := ctx.Err(); err != nil {
+					return
+				}
 
-				eventService.Publish(events.ProberTask{
-					Monitor:  m,
-					Location: loc,
-				})
-			}); err != nil {
-				l.WithError(err).Errorf("failed to start schedule for location %s", loc)
+				if err := schedule.On(ctx, loc, func(ctx context.Context, m *entities.Monitor) {
+					l.WithFields(logrus.Fields{
+						"monitor_id": m.ID,
+						"location":   loc,
+					}).Debug("Scheduling probe")
+
+					eventService.Publish(events.ProberTask{
+						Monitor:  m,
+						Location: loc,
+					})
+				}); err != nil {
+					l.WithError(err).Errorf("schedule for location %s exited with error, retrying in 2 seconds...", loc)
+					select {
+					case <-ctx.Done():
+						return
+					case <-time.After(2 * time.Second):
+					}
+				}
 			}
 		}(loc)
 	}
