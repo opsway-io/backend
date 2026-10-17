@@ -92,10 +92,8 @@ func (a *JSONBodyAsserter) IsRuleValid(rule Rule) error {
 	// The target must be set for the following operators:
 	// - CONTAINS
 	// - NOT_CONTAINS
-	// - HAS_KEY
-	// - NOT_HAS_KEY
-	// Not for EQUAL, NOT_EQUAL, HAS_VALUE, NOT_HAS_VALUE because the target can be empty
-	if ok := rule.Operator == "CONTAINS" || rule.Operator == "NOT_CONTAINS" || rule.Operator == "HAS_KEY" || rule.Operator == "NOT_HAS_KEY"; ok {
+	// Not for EQUAL, NOT_EQUAL, HAS_VALUE, NOT_HAS_VALUE, HAS_KEY, NOT_HAS_KEY because the target can be empty
+	if ok := rule.Operator == "CONTAINS" || rule.Operator == "NOT_CONTAINS"; ok {
 		if ok := rule.Target != ""; !ok {
 			return fmt.Errorf("target must be set for operator: %s", rule.Operator)
 		}
@@ -153,7 +151,7 @@ func (a *JSONBodyAsserter) assert(result *http.Result, rule Rule) bool {
 
 	value, err := jsonpath.Read(unmarshalData, NormalizeJSONPath(rule.Property))
 	if err != nil {
-		return false
+		return rule.Operator == "NOT_HAS_KEY"
 	}
 
 	switch rule.Operator {

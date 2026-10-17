@@ -43,6 +43,16 @@ func TestJSONBodyAsserter_IsRuleValid(t *testing.T) {
 			args:    args{rule: Rule{Source: "JSON_BODY", Property: "$.name", Operator: "EMPTY", Target: "test"}},
 			wantErr: true,
 		},
+		{
+			name:    "Valid rule HAS_KEY with empty target",
+			args:    args{rule: Rule{Source: "JSON_BODY", Property: "$.name", Operator: "HAS_KEY", Target: ""}},
+			wantErr: false,
+		},
+		{
+			name:    "Valid rule NOT_HAS_KEY with empty target",
+			args:    args{rule: Rule{Source: "JSON_BODY", Property: "$.name", Operator: "NOT_HAS_KEY", Target: ""}},
+			wantErr: false,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -105,6 +115,58 @@ func TestJSONBodyAsserter_assert(t *testing.T) {
 				rules:  []Rule{{Source: "JSON_BODY", Property: "name", Operator: "EQUAL", Target: "test"}},
 			},
 			wantOk:  []bool{true},
+			wantErr: false,
+		},
+		{
+			name: "Valid json path HAS_KEY with empty target",
+			args: args{
+				result: &http.Result{Response: http.Response{Body: []byte(`{"name": "test", "nested": {"id": 123}}`)}},
+				rules: []Rule{
+					{Source: "JSON_BODY", Property: "$.name", Operator: "HAS_KEY", Target: ""},
+					{Source: "JSON_BODY", Property: "$.nested.id", Operator: "HAS_KEY", Target: ""},
+					{Source: "JSON_BODY", Property: "$.missing", Operator: "HAS_KEY", Target: ""},
+				},
+			},
+			wantOk:  []bool{true, true, false},
+			wantErr: false,
+		},
+		{
+			name: "Valid json path NOT_HAS_KEY with empty target",
+			args: args{
+				result: &http.Result{Response: http.Response{Body: []byte(`{"name": "test"}`)}},
+				rules: []Rule{
+					{Source: "JSON_BODY", Property: "$.missing", Operator: "NOT_HAS_KEY", Target: ""},
+					{Source: "JSON_BODY", Property: "$.name", Operator: "NOT_HAS_KEY", Target: ""},
+				},
+			},
+			wantOk:  []bool{true, false},
+			wantErr: false,
+		},
+		{
+			name: "Valid json path array indexing",
+			args: args{
+				result: &http.Result{Response: http.Response{Body: []byte(`[{"name": "test", "id": 1}]`)}},
+				rules: []Rule{
+					{Source: "JSON_BODY", Property: "$", Operator: "NOT_NULL", Target: ""},
+					{Source: "JSON_BODY", Property: "$[0].name", Operator: "HAS_KEY", Target: ""},
+					{Source: "JSON_BODY", Property: "$[0].id", Operator: "NOT_NULL", Target: ""},
+					{Source: "JSON_BODY", Property: "$[0].missing", Operator: "HAS_KEY", Target: ""},
+				},
+			},
+			wantOk:  []bool{true, true, true, false},
+			wantErr: false,
+		},
+		{
+			name: "Valid json path nested array indexing",
+			args: args{
+				result: &http.Result{Response: http.Response{Body: []byte(`{"items": [{"title": "hello"}]}`)}},
+				rules: []Rule{
+					{Source: "JSON_BODY", Property: "$.items", Operator: "NOT_NULL", Target: ""},
+					{Source: "JSON_BODY", Property: "$.items[0].title", Operator: "HAS_KEY", Target: ""},
+					{Source: "JSON_BODY", Property: "$.items[0].missing", Operator: "HAS_KEY", Target: ""},
+				},
+			},
+			wantOk:  []bool{true, true, false},
 			wantErr: false,
 		},
 	}

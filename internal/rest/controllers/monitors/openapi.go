@@ -1,9 +1,12 @@
 package monitors
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/url"
+	"sort"
+	"strings"
 
 	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/labstack/echo/v4"
@@ -85,71 +88,114 @@ func (h *Handlers) PreviewOpenAPI(c hs.AuthenticatedContext) error {
 	}
 
 	endpoints := make([]PreviewOpenAPIEndpoint, 0)
-	for path, pathItem := range doc.Paths.Map() {
-		for method, operation := range pathItem.Operations() {
-			endpoint := PreviewOpenAPIEndpoint{
-				Method:  method,
-				Path:    path,
-				Summary: operation.Summary,
+	if doc.Paths != nil {
+		paths := make([]string, 0, len(doc.Paths.Map()))
+		for p := range doc.Paths.Map() {
+			paths = append(paths, p)
+		}
+		sort.Strings(paths)
+
+		for _, path := range paths {
+			pathItem := doc.Paths.Find(path)
+			if pathItem == nil {
+				continue
 			}
 
-			// Find expected status code (first 2xx or just 200)
-			statusCode := "200"
-			for code := range operation.Responses.Map() {
-				if len(code) > 0 && code[0] == '2' {
-					statusCode = code
-					break
+			operations := pathItem.Operations()
+			methods := make([]string, 0, len(operations))
+			for m := range operations {
+				methods = append(methods, m)
+			}
+			sort.Strings(methods)
+
+			for _, method := range methods {
+				operation := operations[method]
+				if operation == nil {
+					continue
 				}
-			}
-			endpoint.StatusCode = statusCode
 
-			// Get example request body if available
-			if operation.RequestBody != nil && operation.RequestBody.Value != nil {
-				content := operation.RequestBody.Value.Content
-				if jsonContent, ok := content["application/json"]; ok {
-					if jsonContent.Example != nil {
-						endpoint.RequestBody = fmt.Sprintf("%v", jsonContent.Example)
+				endpoint := PreviewOpenAPIEndpoint{
+					Method:  method,
+					Path:    path,
+					Summary: operation.Summary,
+				}
+
+				// Find expected status code (prefer 200, then lowest 2xx, fallback 200)
+				statusCode := "200"
+				if operation.Responses != nil {
+					var codes2xx []string
+					for code := range operation.Responses.Map() {
+						if len(code) == 3 && code[0] == '2' {
+							codes2xx = append(codes2xx, code)
+						}
+					}
+					sort.Strings(codes2xx)
+					if len(codes2xx) > 0 {
+						has200 := false
+						for _, c := range codes2xx {
+							if c == "200" {
+								has200 = true
+								break
+							}
+						}
+						if has200 {
+							statusCode = "200"
+						} else {
+							statusCode = codes2xx[0]
+						}
 					}
 				}
-			}
+				endpoint.StatusCode = statusCode
 
-			assertions := []PreviewOpenAPIAssertion{}
-			assertions = append(assertions, PreviewOpenAPIAssertion{
-				Source:   "STATUS_CODE",
-				Operator: "EQUAL",
-				Target:   statusCode,
-			})
-
-			responseRef := operation.Responses.Map()[statusCode]
-			if responseRef != nil && responseRef.Value != nil {
-				if content, ok := responseRef.Value.Content["application/json"]; ok {
-					if content.Schema != nil && content.Schema.Value != nil {
-						schema := content.Schema.Value
-						if schema.Properties != nil {
-							for propName, propRef := range schema.Properties {
-								assertions = append(assertions, PreviewOpenAPIAssertion{
-									Source:   "JSON_BODY",
-									Property: "$." + propName,
-									Operator: "HAS_KEY",
-								})
-
-								if propRef.Value != nil && propRef.Value.Properties != nil {
-									for subPropName := range propRef.Value.Properties {
-										assertions = append(assertions, PreviewOpenAPIAssertion{
-											Source:   "JSON_BODY",
-											Property: "$." + propName + "." + subPropName,
-											Operator: "HAS_KEY",
-										})
-									}
-								}
+				// Get example request body if available
+				if operation.RequestBody != nil && operation.RequestBody.Value != nil {
+					content := operation.RequestBody.Value.Content
+					if jsonContent, ok := content["application/json"]; ok {
+						if jsonContent.Example != nil {
+							if str, ok := jsonContent.Example.(string); ok {
+								endpoint.RequestBody = str
+							} else if b, err := json.Marshal(jsonContent.Example); err == nil {
+								endpoint.RequestBody = string(b)
+							} else {
+								endpoint.RequestBody = fmt.Sprintf("%v", jsonContent.Example)
 							}
 						}
 					}
 				}
-			}
 
-			endpoint.Assertions = assertions
-			endpoints = append(endpoints, endpoint)
+				assertions := []PreviewOpenAPIAssertion{
+					{
+						Source:   "STATUS_CODE",
+						Operator: "EQUAL",
+						Target:   statusCode,
+					},
+				}
+
+				if operation.Responses != nil {
+					responseRef := operation.Responses.Map()[statusCode]
+					if responseRef != nil && responseRef.Value != nil {
+						var responseSchema *openapi3.Schema
+						if content, ok := responseRef.Value.Content["application/json"]; ok && content.Schema != nil && content.Schema.Value != nil {
+							responseSchema = content.Schema.Value
+						} else {
+							for mediaType, mediaTypeObj := range responseRef.Value.Content {
+								if isJSONMediaType(mediaType) && mediaTypeObj.Schema != nil && mediaTypeObj.Schema.Value != nil {
+									responseSchema = mediaTypeObj.Schema.Value
+									break
+								}
+							}
+						}
+
+						if responseSchema != nil {
+							schemaAssertions := extractSchemaAssertions(responseSchema, "$", 0, 8, make(map[*openapi3.Schema]bool))
+							assertions = append(assertions, deduplicateAssertions(schemaAssertions)...)
+						}
+					}
+				}
+
+				endpoint.Assertions = assertions
+				endpoints = append(endpoints, endpoint)
+			}
 		}
 	}
 
@@ -157,6 +203,118 @@ func (h *Handlers) PreviewOpenAPI(c hs.AuthenticatedContext) error {
 		Endpoints: endpoints,
 		Auth:      auth,
 	})
+}
+
+func isJSONMediaType(mt string) bool {
+	mt = strings.ToLower(strings.TrimSpace(mt))
+	return strings.Contains(mt, "application/json") || strings.HasSuffix(mt, "+json")
+}
+
+func extractSchemaAssertions(
+	schema *openapi3.Schema,
+	prefix string,
+	depth int,
+	maxDepth int,
+	activeStack map[*openapi3.Schema]bool,
+) []PreviewOpenAPIAssertion {
+	if schema == nil || depth > maxDepth || activeStack[schema] {
+		return nil
+	}
+
+	activeStack[schema] = true
+	defer func() {
+		delete(activeStack, schema)
+	}()
+
+	var assertions []PreviewOpenAPIAssertion
+
+	// Handle allOf composition
+	for _, subRef := range schema.AllOf {
+		if subRef != nil && subRef.Value != nil {
+			assertions = append(assertions, extractSchemaAssertions(subRef.Value, prefix, depth, maxDepth, activeStack)...)
+		}
+	}
+
+	// Handle oneOf / anyOf if no explicit properties
+	if schema.Properties == nil && len(schema.AllOf) == 0 {
+		if len(schema.OneOf) > 0 && schema.OneOf[0] != nil && schema.OneOf[0].Value != nil {
+			assertions = append(assertions, extractSchemaAssertions(schema.OneOf[0].Value, prefix, depth, maxDepth, activeStack)...)
+		} else if len(schema.AnyOf) > 0 && schema.AnyOf[0] != nil && schema.AnyOf[0].Value != nil {
+			assertions = append(assertions, extractSchemaAssertions(schema.AnyOf[0].Value, prefix, depth, maxDepth, activeStack)...)
+		}
+	}
+
+	// Handle array types
+	isArray := (schema.Type != nil && schema.Type.Permits("array")) || schema.Items != nil
+	if isArray {
+		if prefix == "$" {
+			assertions = append(assertions, PreviewOpenAPIAssertion{
+				Source:   "JSON_BODY",
+				Property: "$",
+				Operator: "NOT_NULL",
+			})
+			if schema.Items != nil && schema.Items.Value != nil {
+				assertions = append(assertions, extractSchemaAssertions(schema.Items.Value, "$[0]", depth+1, maxDepth, activeStack)...)
+			}
+		} else if schema.Items != nil && schema.Items.Value != nil {
+			assertions = append(assertions, extractSchemaAssertions(schema.Items.Value, prefix+"[0]", depth+1, maxDepth, activeStack)...)
+		}
+	}
+
+	// Handle object properties
+	if schema.Properties != nil {
+		requiredMap := make(map[string]bool, len(schema.Required))
+		for _, req := range schema.Required {
+			requiredMap[req] = true
+		}
+
+		propNames := make([]string, 0, len(schema.Properties))
+		for propName := range schema.Properties {
+			propNames = append(propNames, propName)
+		}
+		sort.Strings(propNames)
+
+		for _, propName := range propNames {
+			propRef := schema.Properties[propName]
+			var propPath string
+			if prefix == "$" {
+				propPath = "$." + propName
+			} else {
+				propPath = prefix + "." + propName
+			}
+
+			operator := "HAS_KEY"
+			if requiredMap[propName] && (propRef.Value == nil || !propRef.Value.PermitsNull()) {
+				operator = "NOT_NULL"
+			}
+
+			assertions = append(assertions, PreviewOpenAPIAssertion{
+				Source:   "JSON_BODY",
+				Property: propPath,
+				Operator: operator,
+			})
+
+			if propRef.Value != nil {
+				subAssertions := extractSchemaAssertions(propRef.Value, propPath, depth+1, maxDepth, activeStack)
+				assertions = append(assertions, subAssertions...)
+			}
+		}
+	}
+
+	return deduplicateAssertions(assertions)
+}
+
+func deduplicateAssertions(assertions []PreviewOpenAPIAssertion) []PreviewOpenAPIAssertion {
+	seen := make(map[string]bool, len(assertions))
+	result := make([]PreviewOpenAPIAssertion, 0, len(assertions))
+	for _, a := range assertions {
+		key := a.Source + "|" + a.Property + "|" + a.Operator + "|" + a.Target
+		if !seen[key] {
+			seen[key] = true
+			result = append(result, a)
+		}
+	}
+	return result
 }
 
 type PostMonitorsBulkMonitorRequest struct {
