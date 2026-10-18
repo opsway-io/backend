@@ -84,6 +84,12 @@ func runScheduler(cmd *cobra.Command, args []string) {
 				continue
 			}
 			mCopy := m
+			if len(mCopy.Settings.Locations) == 0 {
+				mCopy.Settings.Locations = []string{monitor.DefaultLocation}
+				if mCopy.Settings.ID != 0 {
+					_ = db.WithContext(ctx).Model(&mCopy.Settings).Update("locations", mCopy.Settings.Locations).Error
+				}
+			}
 			_ = schedule.Remove(ctx, &mCopy)
 			if err := schedule.Add(ctx, &mCopy); err != nil {
 				l.WithError(err).Errorf("failed to add monitor %d to schedule", m.ID)
@@ -130,14 +136,16 @@ func runScheduler(cmd *cobra.Command, args []string) {
 				}
 
 				if err := schedule.On(ctx, loc, func(ctx context.Context, m *entities.Monitor) {
+					targetLoc := resolveTargetLocation(ctx, proberService, loc, conf.Prober.Location)
+
 					l.WithFields(logrus.Fields{
 						"monitor_id": m.ID,
-						"location":   loc,
+						"location":   targetLoc,
 					}).Debug("Scheduling probe")
 
 					eventService.Publish(events.ProberTask{
 						Monitor:  m,
-						Location: loc,
+						Location: targetLoc,
 					})
 				}); err != nil {
 					l.WithError(err).Errorf("schedule for location %s exited with error, retrying in 2 seconds...", loc)
@@ -152,7 +160,7 @@ func runScheduler(cmd *cobra.Command, args []string) {
 	}
 
 	// Initial locations from config or fallbacks
-	initialLocations := []string{"opsway-dk", "global"}
+	initialLocations := []string{monitor.DefaultLocation, monitor.LegacyLocation}
 	if conf.Prober.Location != "" {
 		initialLocations = append(initialLocations, conf.Prober.Location)
 	}
@@ -186,3 +194,28 @@ func runScheduler(cmd *cobra.Command, args []string) {
 	<-ctx.Done()
 	l.Info("Shutting down scheduler...")
 }
+
+func resolveTargetLocation(ctx context.Context, proberService proberPkg.Service, loc string, configuredLoc string) string {
+	if proberService != nil {
+		if activeLocs, err := proberService.GetActiveLocations(ctx); err == nil && len(activeLocs) > 0 {
+			for _, active := range activeLocs {
+				if active.ID == loc {
+					return loc
+				}
+			}
+			if loc == monitor.LegacyLocation || loc == monitor.DefaultLocation {
+				return activeLocs[0].ID
+			}
+		}
+	}
+
+	if loc == monitor.LegacyLocation {
+		if configuredLoc != "" && configuredLoc != monitor.LegacyLocation {
+			return configuredLoc
+		}
+		return monitor.DefaultLocation
+	}
+
+	return loc
+}
+

@@ -22,6 +22,7 @@ func Monitors(db *gorm.DB) {
 			TeamID: t.ID,
 			Settings: entities.MonitorSettings{
 				Frequency: time.Minute * 1,
+				Locations: []string{"opsway-dk"},
 			},
 			Steps: []entities.MonitorStep{
 				{

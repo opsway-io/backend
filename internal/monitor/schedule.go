@@ -11,7 +11,11 @@ import (
 	"github.com/vmihailenco/msgpack"
 )
 
-const taskKind = "http-probe"
+const (
+	taskKind        = "http-probe"
+	DefaultLocation = "opsway-dk"
+	LegacyLocation  = "global"
+)
 
 type Schedule interface {
 	Add(ctx context.Context, monitor *entities.Monitor) error
@@ -37,7 +41,7 @@ func (s *ScheduleImpl) Add(ctx context.Context, monitor *entities.Monitor) error
 
 	locations := monitor.Settings.Locations
 	if len(locations) == 0 {
-		locations = []string{"global"}
+		locations = []string{DefaultLocation}
 	}
 
 	for _, loc := range locations {
@@ -51,9 +55,19 @@ func (s *ScheduleImpl) Add(ctx context.Context, monitor *entities.Monitor) error
 }
 
 func (s *ScheduleImpl) Remove(ctx context.Context, monitor *entities.Monitor) error {
-	locations := monitor.Settings.Locations
-	if len(locations) == 0 {
-		locations = []string{"global"}
+	seen := make(map[string]bool)
+	var locations []string
+	for _, loc := range monitor.Settings.Locations {
+		if !seen[loc] {
+			seen[loc] = true
+			locations = append(locations, loc)
+		}
+	}
+	for _, fallback := range []string{DefaultLocation, LegacyLocation} {
+		if !seen[fallback] {
+			seen[fallback] = true
+			locations = append(locations, fallback)
+		}
 	}
 
 	for _, loc := range locations {
