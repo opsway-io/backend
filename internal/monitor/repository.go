@@ -212,6 +212,12 @@ func (r *RepositoryImpl) Update(ctx context.Context, teamID, monitorID uint, m *
 		for i := range m.Steps {
 			m.Steps[i].MonitorID = monitorID
 			m.Steps[i].OrderIndex = i
+			for j := range m.Steps[i].Assertions {
+				m.Steps[i].Assertions[j].MonitorID = monitorID
+			}
+			for j := range m.Steps[i].Variables {
+				m.Steps[i].Variables[j].MonitorID = monitorID
+			}
 		}
 		if err := tx.Create(&m.Steps).Error; err != nil {
 			tx.Rollback()

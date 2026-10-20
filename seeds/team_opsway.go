@@ -179,4 +179,18 @@ func TeamOpsway(db *gorm.DB) {
 	if err := db.Model(&sp).Association("Monitors").Replace(seededMonitors); err != nil {
 		panic(err)
 	}
+
+	// Ensure default AlertRule exists for Team Opsway
+	var ruleCount int64
+	db.Model(&entities.AlertRule{}).Where("team_id = ?", t.ID).Count(&ruleCount)
+	if ruleCount == 0 {
+		defaultRule := entities.AlertRule{
+			TeamID:    t.ID,
+			Name:      "All Incidents",
+			Condition: "*",
+			Channels:  `["email"]`,
+			Enabled:   true,
+		}
+		_ = db.Create(&defaultRule).Error
+	}
 }

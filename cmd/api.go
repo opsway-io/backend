@@ -79,6 +79,7 @@ func runAPI(cmd *cobra.Command, args []string) {
 		entities.MonitorStep{},
 		entities.MonitorAssertion{},
 		entities.MonitorVariable{},
+		entities.Heartbeat{},
 		entities.AlertRule{},
 		entities.AlertTrigger{},
 		entities.Maintenance{},
@@ -146,6 +147,17 @@ func runAPI(cmd *cobra.Command, args []string) {
 
 	db.Exec(`ALTER TABLE monitor_assertions ALTER COLUMN monitor_step_id SET NOT NULL`)
 	db.Exec(`ALTER TABLE monitor_variables ALTER COLUMN monitor_step_id SET NOT NULL`)
+
+	db.Exec(`
+		UPDATE monitor_assertions SET monitor_id = (
+			SELECT monitor_id FROM monitor_steps WHERE monitor_steps.id = monitor_assertions.monitor_step_id LIMIT 1
+		) WHERE (monitor_id IS NULL OR monitor_id = 0) AND monitor_step_id IS NOT NULL AND monitor_step_id != 0
+	`)
+	db.Exec(`
+		UPDATE monitor_variables SET monitor_id = (
+			SELECT monitor_id FROM monitor_steps WHERE monitor_steps.id = monitor_variables.monitor_step_id LIMIT 1
+		) WHERE (monitor_id IS NULL OR monitor_id = 0) AND monitor_step_id IS NOT NULL AND monitor_step_id != 0
+	`)
 
 	err = db.Exec(`
 		UPDATE monitor_settings

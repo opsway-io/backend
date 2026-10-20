@@ -2,6 +2,8 @@ package entities
 
 import (
 	"time"
+
+	"gorm.io/gorm"
 )
 
 type MonitorState int
@@ -105,6 +107,20 @@ type MonitorStep struct {
 
 func (MonitorStep) TableName() string {
 	return "monitor_steps"
+}
+
+func (ms *MonitorStep) BeforeSave(tx *gorm.DB) error {
+	for i := range ms.Assertions {
+		if ms.MonitorID != 0 {
+			ms.Assertions[i].MonitorID = ms.MonitorID
+		}
+	}
+	for i := range ms.Variables {
+		if ms.MonitorID != 0 {
+			ms.Variables[i].MonitorID = ms.MonitorID
+		}
+	}
+	return nil
 }
 
 type MonitorStepHeader struct {

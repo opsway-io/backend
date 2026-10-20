@@ -8,8 +8,11 @@ import (
 	"testing"
 	"time"
 
+	"github.com/opsway-io/backend/internal/entities"
+	incidentMocks "github.com/opsway-io/backend/internal/incident/mocks"
 	"github.com/opsway-io/backend/internal/probes/http"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 )
 
 func TestBuildDiagnosticSnapshot(t *testing.T) {
@@ -133,4 +136,37 @@ func TestCheckAnomaly_Timeout(t *testing.T) {
 	assert.Error(t, err)
 	assert.Nil(t, resp)
 	assert.Less(t, elapsed, 1300*time.Millisecond)
+}
+
+func TestTriggerIncident_UsesMonitorIDWhenAssertionMonitorIDIsZero(t *testing.T) {
+	mockIncidentSvc := incidentMocks.NewService(t)
+	m := &entities.Monitor{
+		ID:     42,
+		TeamID: 7,
+		Name:   "API Monitor",
+	}
+	res := &http.Result{
+		Response: http.Response{StatusCode: 500},
+	}
+	failed := []entities.MonitorAssertion{
+		{
+			ID:        101,
+			MonitorID: 0, // Unpopulated on multi-step assertion
+			Source:    "STATUS_CODE",
+			Operator:  "EQUAL",
+			Target:    "200",
+		},
+	}
+
+	mockIncidentSvc.On("Upsert", mock.Anything, mock.MatchedBy(func(incidents *[]entities.Incident) bool {
+		if incidents == nil || len(*incidents) != 1 {
+			return false
+		}
+		inc := (*incidents)[0]
+		return inc.MonitorID != nil && *inc.MonitorID == 42 && inc.TeamID == 7 && inc.MonitorAssertionID != nil && *inc.MonitorAssertionID == 101
+	})).Return(nil)
+	mockIncidentSvc.On("CreateOccurrence", mock.Anything, mock.Anything).Return(nil)
+
+	err := triggerIncident(context.Background(), m, res, &failed, mockIncidentSvc)
+	assert.NoError(t, err)
 }

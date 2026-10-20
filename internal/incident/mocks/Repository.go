@@ -238,6 +238,34 @@ func (_m *Repository) GetActiveByMonitorIDs(ctx context.Context, monitorIDs []ui
 	return r0, r1
 }
 
+// GetByTeamIDAndStatusPaginated provides a mock function with given fields: ctx, teamID, resolved, offset, limit
+func (_m *Repository) GetByTeamIDAndStatusPaginated(ctx context.Context, teamID uint, resolved *bool, offset *int, limit *int) (*[]entities.Incident, error) {
+	ret := _m.Called(ctx, teamID, resolved, offset, limit)
+
+	var r0 *[]entities.Incident
+	if ret.Get(0) != nil {
+		r0 = ret.Get(0).(*[]entities.Incident)
+	}
+	return r0, ret.Error(1)
+}
+
+// CreateOccurrence provides a mock function with given fields: ctx, occurrence
+func (_m *Repository) CreateOccurrence(ctx context.Context, occurrence *entities.IncidentOccurrence) error {
+	ret := _m.Called(ctx, occurrence)
+	return ret.Error(0)
+}
+
+// GetOccurrencesPaginated provides a mock function with given fields: ctx, incidentID, offset, limit
+func (_m *Repository) GetOccurrencesPaginated(ctx context.Context, incidentID uint, offset *int, limit *int) (int, *[]entities.IncidentOccurrence, error) {
+	ret := _m.Called(ctx, incidentID, offset, limit)
+
+	var r1 *[]entities.IncidentOccurrence
+	if ret.Get(1) != nil {
+		r1 = ret.Get(1).(*[]entities.IncidentOccurrence)
+	}
+	return ret.Int(0), r1, ret.Error(2)
+}
+
 // NewRepository creates a new instance of Repository. It also registers a testing interface on the mock and a cleanup function to assert the mocks expectations.
 // The first argument is typically a *testing.T value.
 func NewRepository(t interface {

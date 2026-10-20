@@ -208,6 +208,45 @@ func (_m *Service) Upsert(ctx context.Context, incidents *[]entities.Incident) e
 	return r0
 }
 
+// GetByTeamIDAndStatusPaginated provides a mock function with given fields: ctx, teamID, resolved, offset, limit
+func (_m *Service) GetByTeamIDAndStatusPaginated(ctx context.Context, teamID uint, resolved *bool, offset *int, limit *int) (*[]entities.Incident, error) {
+	ret := _m.Called(ctx, teamID, resolved, offset, limit)
+
+	var r0 *[]entities.Incident
+	if ret.Get(0) != nil {
+		r0 = ret.Get(0).(*[]entities.Incident)
+	}
+	return r0, ret.Error(1)
+}
+
+// GetActiveByMonitorIDs provides a mock function with given fields: ctx, monitorIDs
+func (_m *Service) GetActiveByMonitorIDs(ctx context.Context, monitorIDs []uint) ([]entities.Incident, error) {
+	ret := _m.Called(ctx, monitorIDs)
+
+	var r0 []entities.Incident
+	if ret.Get(0) != nil {
+		r0 = ret.Get(0).([]entities.Incident)
+	}
+	return r0, ret.Error(1)
+}
+
+// CreateOccurrence provides a mock function with given fields: ctx, occurrence
+func (_m *Service) CreateOccurrence(ctx context.Context, occurrence *entities.IncidentOccurrence) error {
+	ret := _m.Called(ctx, occurrence)
+	return ret.Error(0)
+}
+
+// GetOccurrencesPaginated provides a mock function with given fields: ctx, incidentID, offset, limit
+func (_m *Service) GetOccurrencesPaginated(ctx context.Context, incidentID uint, offset *int, limit *int) (int, *[]entities.IncidentOccurrence, error) {
+	ret := _m.Called(ctx, incidentID, offset, limit)
+
+	var r1 *[]entities.IncidentOccurrence
+	if ret.Get(1) != nil {
+		r1 = ret.Get(1).(*[]entities.IncidentOccurrence)
+	}
+	return ret.Int(0), r1, ret.Error(2)
+}
+
 // NewService creates a new instance of Service. It also registers a testing interface on the mock and a cleanup function to assert the mocks expectations.
 // The first argument is typically a *testing.T value.
 func NewService(t interface {

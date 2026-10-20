@@ -78,4 +78,16 @@ func TeamsAndUsers(db *gorm.DB) {
 			Role:   entities.TeamRoleMember,
 		})
 	}
+
+	var ruleCount int64
+	db.Model(&entities.AlertRule{}).Where("team_id = ?", t.ID).Count(&ruleCount)
+	if ruleCount == 0 {
+		_ = db.Create(&entities.AlertRule{
+			TeamID:    t.ID,
+			Name:      "All Incidents",
+			Condition: "*",
+			Channels:  `["email"]`,
+			Enabled:   true,
+		}).Error
+	}
 }
