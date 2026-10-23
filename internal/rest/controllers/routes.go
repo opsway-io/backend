@@ -12,7 +12,10 @@ import (
 	"github.com/opsway-io/backend/internal/event"
 	"github.com/opsway-io/backend/internal/heartbeats"
 	"github.com/opsway-io/backend/internal/incident"
+	"github.com/opsway-io/backend/internal/investigation"
+	"github.com/opsway-io/backend/internal/llm"
 	"github.com/opsway-io/backend/internal/maintenance"
+	"github.com/opsway-io/backend/internal/mcp"
 	"github.com/opsway-io/backend/internal/monitor"
 	"github.com/opsway-io/backend/internal/notification/email"
 	proberService "github.com/opsway-io/backend/internal/prober"
@@ -31,6 +34,7 @@ import (
 	"github.com/opsway-io/backend/internal/rest/controllers/prometheus"
 	"github.com/opsway-io/backend/internal/rest/controllers/reports"
 	"github.com/opsway-io/backend/internal/rest/controllers/statuspages"
+	"github.com/opsway-io/backend/internal/rest/controllers/suite"
 	"github.com/opsway-io/backend/internal/rest/controllers/teams"
 	"github.com/opsway-io/backend/internal/rest/controllers/users"
 	"github.com/opsway-io/backend/internal/rest/controllers/webhooks"
@@ -147,4 +151,39 @@ func Register(
 
 	// API Key Metrics
 	metrics.Register(root, logger, checkService, apiKeyService, db)
+
+	// Opsway Umbrella Suite, Unified MCP Gateway & Agent Investigation Engine
+	mcpGateway := mcp.NewGateway(
+		mcp.GatewayConfig{
+			LogSearchURL:       "http://log-search.log-search.svc.cluster.local:8080",
+			LogSearchPublicURL: "https://logs.opsway.eu",
+			LogSearchAgentKey:  "valid_agent_key",
+			PantomathURL:       "http://pantomath.pantomath.svc.cluster.local:8000",
+			PantomathEnabled:   true,
+		},
+		db,
+		monitorService,
+		checkService,
+		incidentService,
+		logger,
+	)
+	llmClient := llm.NewClient("", "", "")
+	investigationService := investigation.NewService(
+		db,
+		mcpGateway,
+		incidentService,
+		monitorService,
+		llmClient,
+		"https://logs.opsway.eu",
+		logger,
+	)
+	suite.Register(
+		root,
+		authRoot,
+		logger.WithField("module", "suite"),
+		teamService,
+		investigationService,
+		mcpGateway,
+		apiKeyService,
+	)
 }

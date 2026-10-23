@@ -879,6 +879,16 @@ func (w *worker) sendSlackAlert(ctx context.Context, incident *entities.Incident
 					{
 						"type": "button",
 						"text": map[string]interface{}{
+							"type":  "plain_text",
+							"text":  "🔍 Investigate with AI",
+							"emoji": true,
+						},
+						"value":     fmt.Sprintf("investigate_%d", incident.ID),
+						"action_id": "investigate_incident",
+					},
+					{
+						"type": "button",
+						"text": map[string]interface{}{
 							"type": "plain_text",
 							"text": "Resolve",
 						},

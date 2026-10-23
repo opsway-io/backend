@@ -39,10 +39,13 @@ type MonitorStep struct {
 }
 
 type MonitorSettings struct {
-	FrequencySeconds uint64              `json:"frequencySeconds" validate:"required,numeric,gte=10"`
-	Auth             MonitorSettingsAuth `json:"auth" validate:"required"`
-	TLS              MonitorSettingsTLS  `json:"tls" validate:"required"`
-	Locations        []string            `json:"locations" validate:"required,dive,location"`
+	FrequencySeconds     uint64              `json:"frequencySeconds" validate:"required,numeric,gte=10"`
+	Auth                 MonitorSettingsAuth `json:"auth" validate:"required"`
+	TLS                  MonitorSettingsTLS  `json:"tls" validate:"required"`
+	Locations            []string            `json:"locations" validate:"required,dive,location"`
+	LogSearchServices    []string            `json:"logSearchServices,omitempty"`
+	LogSearchQueryFilter *string             `json:"logSearchQueryFilter,omitempty"`
+	InvestigationPolicy  string              `json:"investigationPolicy,omitempty"`
 }
 
 type MonitorSettingsTeardown struct {
@@ -231,7 +234,10 @@ func newGetMonitorsResponse(monitors *[]monitor.MonitorWithTotalCount, stats *[]
 						Username:     m.Settings.Auth.Username,
 						Password:     m.Settings.Auth.Password,
 					},
-					Locations: locations,
+					Locations:            locations,
+					LogSearchServices:    m.Settings.LogSearchServices,
+					LogSearchQueryFilter: m.Settings.LogSearchQueryFilter,
+					InvestigationPolicy:  m.Settings.InvestigationPolicy,
 				},
 				Steps: steps,
 			},
@@ -381,7 +387,10 @@ func newGetMonitorResponse(m *entities.Monitor, stats *check.MonitorStats) (*Get
 					Username:     m.Settings.Auth.Username,
 					Password:     m.Settings.Auth.Password,
 				},
-				Locations: locations,
+				Locations:            locations,
+				LogSearchServices:    m.Settings.LogSearchServices,
+				LogSearchQueryFilter: m.Settings.LogSearchQueryFilter,
+				InvestigationPolicy:  m.Settings.InvestigationPolicy,
 			},
 			Steps: steps,
 		},
@@ -524,7 +533,10 @@ func (h *Handlers) PostMonitor(c hs.AuthenticatedContext) error {
 				Username:     req.Settings.Auth.Username,
 				Password:     req.Settings.Auth.Password,
 			},
-			Locations: req.Settings.Locations,
+			Locations:            req.Settings.Locations,
+			LogSearchServices:    req.Settings.LogSearchServices,
+			LogSearchQueryFilter: req.Settings.LogSearchQueryFilter,
+			InvestigationPolicy:  req.Settings.InvestigationPolicy,
 		},
 		Steps: steps,
 	}
@@ -713,7 +725,10 @@ func (h *Handlers) PutMonitor(c hs.AuthenticatedContext) error {
 				Username:     req.Settings.Auth.Username,
 				Password:     req.Settings.Auth.Password,
 			},
-			Locations: req.Settings.Locations,
+			Locations:            req.Settings.Locations,
+			LogSearchServices:    req.Settings.LogSearchServices,
+			LogSearchQueryFilter: req.Settings.LogSearchQueryFilter,
+			InvestigationPolicy:  req.Settings.InvestigationPolicy,
 		},
 		Steps: steps,
 	}

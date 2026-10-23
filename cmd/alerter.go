@@ -1,6 +1,8 @@
 package cmd
 
 import (
+	"context"
+
 	"github.com/opsway-io/backend/internal/alerting"
 	"github.com/opsway-io/backend/internal/check"
 	"github.com/opsway-io/backend/internal/connectors/clickhouse"
@@ -10,7 +12,9 @@ import (
 	"github.com/opsway-io/backend/internal/event"
 	"github.com/opsway-io/backend/internal/heartbeats"
 	"github.com/opsway-io/backend/internal/incident"
+	"github.com/opsway-io/backend/internal/investigation"
 	"github.com/opsway-io/backend/internal/llm"
+	"github.com/opsway-io/backend/internal/mcp"
 	"github.com/opsway-io/backend/internal/monitor"
 	"github.com/opsway-io/backend/internal/notification/email"
 	"github.com/opsway-io/backend/internal/statuspage"
@@ -131,7 +135,31 @@ func runAlerter(cmd *cobra.Command, args []string) {
 		l.WithField("module", "alerter"),
 	)
 
-	llmClient := llm.NewClient("", "", "") // Use defaults for MVP
+	llmClient := llm.NewClient(conf.Agent.LLMBaseURL, conf.Agent.LLMAPIKey, conf.Agent.LLMModel)
+	mcpGateway := mcp.NewGateway(
+		mcp.GatewayConfig{
+			LogSearchURL:       conf.LogSearch.URL,
+			LogSearchPublicURL: conf.LogSearch.PublicURL,
+			LogSearchAgentKey:  conf.LogSearch.AgentAPIKey,
+			PantomathURL:       conf.Pantomath.URL,
+			PantomathEnabled:   conf.Pantomath.Enabled,
+		},
+		db,
+		monitorService,
+		checkService,
+		incidentSvc,
+		l.WithField("module", "mcp_gateway"),
+	)
+	investigationSvc := investigation.NewService(
+		db,
+		mcpGateway,
+		incidentSvc,
+		monitorService,
+		llmClient,
+		conf.LogSearch.PublicURL,
+		l.WithField("module", "investigation"),
+	)
+
 	rcaWorker := incident.NewRCAWorker(
 		eventServiceRCA,
 		incidentSvc,
@@ -140,6 +168,14 @@ func runAlerter(cmd *cobra.Command, args []string) {
 		heartbeatsService.GetByIDAndTeamID,
 		llmClient,
 		l.WithField("module", "rca_worker"),
+		func(ctx context.Context, teamID uint, incidentID uint) error {
+			_, err := investigationSvc.TriggerInvestigation(ctx, investigation.TriggerRequest{
+				TeamID:        teamID,
+				IncidentID:    incidentID,
+				TriggerSource: "AUTOMATIC",
+			})
+			return err
+		},
 	)
 
 	go func() {

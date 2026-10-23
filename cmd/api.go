@@ -101,6 +101,12 @@ func runAPI(cmd *cobra.Command, args []string) {
 		entities.UserNotificationRule{},
 		entities.EscalationJob{},
 		entities.NotificationJob{},
+		entities.TeamEntitlement{},
+		entities.ServiceCatalogItem{},
+		entities.AgentConfig{},
+		entities.IncidentInvestigation{},
+		entities.InvestigationStep{},
+		entities.RemediationAction{},
 	)
 
 	// --- DATA MIGRATION ---

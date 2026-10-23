@@ -81,6 +81,10 @@ type MonitorSettings struct {
 	Frequency time.Duration       `gorm:"not null;serializer:timeDurationSeconds"`
 	Locations []string            `gorm:"serializer:json"`
 
+	LogSearchServices    []string `gorm:"serializer:json" json:"logSearchServices"`
+	LogSearchQueryFilter *string  `json:"logSearchQueryFilter,omitempty"`
+	InvestigationPolicy  string   `gorm:"not null;default:'AUTO'" json:"investigationPolicy"`
+
 	SslExpiryNotifiedAt    *time.Time `gorm:"index"`
 	DomainExpiryNotifiedAt *time.Time `gorm:"index"`
 

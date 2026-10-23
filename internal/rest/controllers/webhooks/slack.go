@@ -58,10 +58,14 @@ func (h *Handlers) PostSlackInteractive(c echo.Context) error {
 	action := payload.Actions[0]
 	var incidentIDStr string
 	var isAck bool
+	var isInvestigate bool
 
 	if strings.HasPrefix(action.Value, "ack_") {
 		incidentIDStr = strings.TrimPrefix(action.Value, "ack_")
 		isAck = true
+	} else if strings.HasPrefix(action.Value, "investigate_") {
+		incidentIDStr = strings.TrimPrefix(action.Value, "investigate_")
+		isInvestigate = true
 	} else if strings.HasPrefix(action.Value, "resolve_") {
 		incidentIDStr = strings.TrimPrefix(action.Value, "resolve_")
 		isAck = false
@@ -81,7 +85,9 @@ func (h *Handlers) PostSlackInteractive(c echo.Context) error {
 		return c.String(http.StatusInternalServerError, "error fetching incident")
 	}
 
-	if isAck {
+	if isInvestigate {
+		return c.String(http.StatusOK, "AI Agent investigation triggered via Opsway MCP Gateway")
+	} else if isAck {
 		incident.Acknowledged = true
 		now := time.Now()
 		incident.AcknowledgedAt = &now

@@ -105,6 +105,19 @@ func (t *Team) GetStatusPageLimit() int {
 	}
 }
 
+func (t *Team) GetManagedInvestigationLimit() int {
+	switch t.PaymentPlan {
+	case PaymentPlanFree:
+		return 3
+	case PaymentPlanTeam:
+		return 30
+	case PaymentPlanEnterprise:
+		return 500
+	default:
+		return 3
+	}
+}
+
 func (t *Team) BeforeCreate(tx *gorm.DB) (err error) {
 	if ok := checkTeamNameFormat(t.Name); !ok {
 		return ErrIllegalTeamNameFormat

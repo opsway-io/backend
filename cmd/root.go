@@ -50,6 +50,26 @@ type Config struct {
 	Report         ReportConfig                          `mapstructure:"report"`
 	StatusPage     StatusPageConfig                      `mapstructure:"status_page"`
 	Forecaster     ForecasterConfig                      `mapstructure:"forecaster"`
+	LogSearch      LogSearchConfig                       `mapstructure:"log_search"`
+	Pantomath      PantomathConfig                       `mapstructure:"pantomath"`
+	Agent          AgentRunnerConfig                     `mapstructure:"agent"`
+}
+
+type LogSearchConfig struct {
+	URL         string `mapstructure:"url" default:"http://log-search.log-search.svc.cluster.local:8080"`
+	PublicURL   string `mapstructure:"public_url" default:"https://logs.opsway.eu"`
+	AgentAPIKey string `mapstructure:"agent_api_key" default:"valid_agent_key"`
+}
+
+type PantomathConfig struct {
+	Enabled bool   `mapstructure:"enabled" default:"true"`
+	URL     string `mapstructure:"url" default:"http://pantomath.pantomath.svc.cluster.local:8000"`
+}
+
+type AgentRunnerConfig struct {
+	LLMBaseURL string `mapstructure:"llm_base_url" default:"http://localhost:11434/v1"`
+	LLMAPIKey  string `mapstructure:"llm_api_key" default:""`
+	LLMModel   string `mapstructure:"llm_model" default:"llama3"`
 }
 
 type ForecasterConfig struct {

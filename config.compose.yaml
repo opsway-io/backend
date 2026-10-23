@@ -72,3 +72,17 @@ status_page:
 forecaster:
   enabled: true
   url: "http://forecaster-api:8000/predict"
+
+log_search:
+  url: "http://log-search:8080"
+  public_url: "https://logs.opsway.eu"
+  agent_api_key: "valid_agent_key"
+
+pantomath:
+  enabled: true
+  url: "http://pantomath:8000"
+
+agent:
+  llm_base_url: "http://localhost:11434/v1"
+  llm_api_key: ""
+  llm_model: "llama3"

@@ -90,4 +90,35 @@ func TeamsAndUsers(db *gorm.DB) {
 			Enabled:   true,
 		}).Error
 	}
+
+	// Default Umbrella Platform Entitlements for default team
+	for _, prod := range []entities.ProductSlug{
+		entities.ProductMonitoring,
+		entities.ProductLogSearch,
+		entities.ProductPantomath,
+		entities.ProductManagedAgent,
+	} {
+		var ent entities.TeamEntitlement
+		db.Where(entities.TeamEntitlement{TeamID: t.ID, Product: prod}).FirstOrCreate(&ent, entities.TeamEntitlement{
+			TeamID:       t.ID,
+			Product:      prod,
+			Tier:         entities.EntitlementTierFree,
+			Enabled:      true,
+			MonthlyQuota: entities.DefaultMonthlyQuota(prod, entities.EntitlementTierFree),
+		})
+	}
+
+	// Default Agent Config for default team
+	var agentCfg entities.AgentConfig
+	db.Where(entities.AgentConfig{TeamID: t.ID}).FirstOrCreate(&agentCfg, entities.AgentConfig{
+		TeamID:                 t.ID,
+		Enabled:                true,
+		ExecutionMode:          entities.AgentModeManaged,
+		AutoTriggerOnConsensus: true,
+		AutoTriggerOnAnomaly:   true,
+		AutoTriggerOnLogSpike:  true,
+		MinOccurrences:         1,
+		CooldownMinutes:        30,
+		RemediationLevel:       entities.RemediationApprovalRequired,
+	})
 }
