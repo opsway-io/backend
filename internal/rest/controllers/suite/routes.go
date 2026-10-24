@@ -6,8 +6,6 @@ import (
 	"github.com/opsway-io/backend/internal/investigation"
 	"github.com/opsway-io/backend/internal/mcp"
 	"github.com/opsway-io/backend/internal/rest/handlers"
-	mw "github.com/opsway-io/backend/internal/rest/middleware"
-	"github.com/opsway-io/backend/internal/team"
 	"github.com/sirupsen/logrus"
 )
 
@@ -20,9 +18,8 @@ type Handlers struct {
 
 func Register(
 	root *echo.Group,
-	authRoot *echo.Group,
+	teamGroup *echo.Group,
 	logger *logrus.Entry,
-	teamService team.Service,
 	investigationService investigation.Service,
 	mcpGateway mcp.Gateway,
 	apiKeyService apikey.Service,
@@ -34,7 +31,6 @@ func Register(
 		Logger:               logger,
 	}
 
-	TeamGuard := mw.TeamGuardFactory(logger, teamService)
 	AuthHandler := handlers.AuthenticatedHandlerFactory(logger)
 
 	// Unified MCP Gateway endpoint (supports API Key or Bearer Token)
@@ -43,12 +39,6 @@ func Register(
 
 	// BYOA External Agent Callback (authenticated via investigation UUID & team/incident)
 	root.POST("/teams/:teamId/incidents/:incidentId/investigations/:uuid/callback", h.PostByoaCallback)
-
-	// Authenticated Team Suite Routes
-	teamGroup := authRoot.Group(
-		"/teams/:teamId",
-		TeamGuard(),
-	)
 
 	// Modular Product Entitlements
 	teamGroup.GET("/entitlements", AuthHandler(h.GetEntitlements))

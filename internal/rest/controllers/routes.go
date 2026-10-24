@@ -111,7 +111,7 @@ func Register(
 
 	// Teams
 
-	teams.Register(authRoot, logger, teamService, userService, billingService, escalationService)
+	teamsGroup := teams.Register(authRoot, logger, teamService, userService, billingService, escalationService)
 
 	// API Keys
 
@@ -179,9 +179,8 @@ func Register(
 	)
 	suite.Register(
 		root,
-		authRoot,
+		teamsGroup,
 		logger.WithField("module", "suite"),
-		teamService,
 		investigationService,
 		mcpGateway,
 		apiKeyService,

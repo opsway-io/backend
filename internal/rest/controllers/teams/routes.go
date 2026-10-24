@@ -27,7 +27,7 @@ func Register(
 	userService user.Service,
 	billingService billing.Service,
 	escalationService escalation.Service,
-) {
+) *echo.Group {
 	h := &Handlers{
 		TeamService:       teamService,
 		UserService:       userService,
@@ -72,4 +72,6 @@ func Register(
 
 	teamsGroup.GET("/escalation", AuthHandler(h.GetEscalationPolicy), AllowedRoles(mw.UserRoleOwner, mw.UserRoleAdmin))
 	teamsGroup.PUT("/escalation", AuthHandler(h.PutEscalationPolicy), AllowedRoles(mw.UserRoleOwner, mw.UserRoleAdmin))
+
+	return teamsGroup
 }
