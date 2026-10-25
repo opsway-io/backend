@@ -274,7 +274,7 @@ func (g *gatewayImpl) ListTools(ctx context.Context, teamID uint) []Tool {
 
 func (g *gatewayImpl) CallTool(ctx context.Context, teamID uint, toolName string, args map[string]interface{}) (*ToolCallResult, error) {
 	switch toolName {
-	case "monitoring.get_incident_details":
+	case "monitoring.get_incident_details", "monitoring.get_incident":
 		incID := uint(getIntArg(args, "incident_id", 0))
 		inc, err := g.incidentSvc.GetByID(ctx, incID)
 		if err != nil || inc == nil || inc.TeamID != teamID {
@@ -289,7 +289,7 @@ func (g *gatewayImpl) CallTool(ctx context.Context, teamID uint, toolName string
 			"monitor":  mon,
 		}, false), nil
 
-	case "monitoring.get_monitor_check_timings":
+	case "monitoring.get_monitor_check_timings", "monitoring.get_probe_history":
 		monID := uint(getIntArg(args, "monitor_id", 0))
 		limit := getIntArg(args, "limit", 15)
 		offset := 0
@@ -354,6 +354,9 @@ func (g *gatewayImpl) CallTool(ctx context.Context, teamID uint, toolName string
 			"checked_at": time.Now().UTC().Format(time.RFC3339),
 			"message":    "Immediate multi-location verification probe completed: HTTP 200 OK (118ms).",
 		}, false), nil
+
+	case "logs.get_error_traces":
+		return g.callLogSearchMCP(ctx, teamID, "get_error_summary", args)
 
 	case "logs.get_error_summary",
 		"logs.semantic_search",

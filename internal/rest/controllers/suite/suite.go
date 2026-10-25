@@ -196,6 +196,22 @@ func (h *Handlers) DeleteServiceCatalogItem(c hs.AuthenticatedContext) error {
 	return c.NoContent(http.StatusNoContent)
 }
 
+func maskAgentSecrets(cfg *entities.AgentConfig) *entities.AgentConfig {
+	if cfg == nil {
+		return nil
+	}
+	out := *cfg
+	if out.ByoaWebhookSecret != nil && *out.ByoaWebhookSecret != "" {
+		masked := "********"
+		out.ByoaWebhookSecret = &masked
+	}
+	if out.CustomLLMAPIKey != nil && *out.CustomLLMAPIKey != "" {
+		masked := "********"
+		out.CustomLLMAPIKey = &masked
+	}
+	return &out
+}
+
 func (h *Handlers) GetAgentConfig(c hs.AuthenticatedContext) error {
 	req, err := helpers.Bind[TeamParamRequest](c)
 	if err != nil {
@@ -206,12 +222,12 @@ func (h *Handlers) GetAgentConfig(c hs.AuthenticatedContext) error {
 		c.Log.WithError(err).Error("failed to get agent config")
 		return echo.ErrInternalServerError
 	}
-	return c.JSON(http.StatusOK, cfg)
+	return c.JSON(http.StatusOK, maskAgentSecrets(cfg))
 }
 
 type PutAgentConfigRequest struct {
 	TeamID                 uint                                 `param:"teamId" validate:"required,numeric,gte=0"`
-	Enabled                bool                                 `json:"enabled"`
+	Enabled                *bool                                `json:"enabled"`
 	ExecutionMode          entities.AgentExecutionMode          `json:"executionMode"`
 	AutoTriggerOnConsensus bool                                 `json:"autoTriggerOnConsensus"`
 	AutoTriggerOnAnomaly   bool                                 `json:"autoTriggerOnAnomaly"`
@@ -234,9 +250,17 @@ func (h *Handlers) PutAgentConfig(c hs.AuthenticatedContext) error {
 	if err != nil {
 		return echo.ErrBadRequest
 	}
+	existing, _ := h.InvestigationService.GetAgentConfig(c.Request().Context(), req.TeamID)
+	enabled := true
+	if existing != nil {
+		enabled = existing.Enabled
+	}
+	if req.Enabled != nil {
+		enabled = *req.Enabled
+	}
 	cfg := &entities.AgentConfig{
 		TeamID:                 req.TeamID,
-		Enabled:                req.Enabled,
+		Enabled:                enabled,
 		ExecutionMode:          req.ExecutionMode,
 		AutoTriggerOnConsensus: req.AutoTriggerOnConsensus,
 		AutoTriggerOnAnomaly:   req.AutoTriggerOnAnomaly,
@@ -258,7 +282,7 @@ func (h *Handlers) PutAgentConfig(c hs.AuthenticatedContext) error {
 		c.Log.WithError(err).Error("failed to update agent config")
 		return echo.ErrInternalServerError
 	}
-	return c.JSON(http.StatusOK, updated)
+	return c.JSON(http.StatusOK, maskAgentSecrets(updated))
 }
 
 func (h *Handlers) GetTeamInvestigations(c hs.AuthenticatedContext) error {

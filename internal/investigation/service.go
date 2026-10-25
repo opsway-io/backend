@@ -262,11 +262,13 @@ func (s *serviceImpl) UpdateAgentConfig(ctx context.Context, teamID uint, incomi
 		cfg.RemediationLevel = incoming.RemediationLevel
 	}
 	cfg.ByoaWebhookURL = incoming.ByoaWebhookURL
-	cfg.ByoaWebhookSecret = incoming.ByoaWebhookSecret
+	if incoming.ByoaWebhookSecret != nil && *incoming.ByoaWebhookSecret != "" && *incoming.ByoaWebhookSecret != "********" {
+		cfg.ByoaWebhookSecret = incoming.ByoaWebhookSecret
+	}
 	cfg.CustomLLMProvider = incoming.CustomLLMProvider
 	cfg.CustomLLMBaseURL = incoming.CustomLLMBaseURL
 	cfg.CustomLLMModel = incoming.CustomLLMModel
-	if incoming.CustomLLMAPIKey != nil && *incoming.CustomLLMAPIKey != "" {
+	if incoming.CustomLLMAPIKey != nil && *incoming.CustomLLMAPIKey != "" && *incoming.CustomLLMAPIKey != "********" {
 		cfg.CustomLLMAPIKey = incoming.CustomLLMAPIKey
 	}
 	if incoming.ExternalMCPServers != nil {

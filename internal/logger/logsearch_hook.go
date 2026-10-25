@@ -60,7 +60,9 @@ func (hook *LogSearchHook) Fire(entry *logrus.Entry) error {
 
 	// Fire and forget (in a real system, you'd batch and retry)
 	go func() {
-		hook.HttpClient.Do(req)
+		if resp, err := hook.HttpClient.Do(req); err == nil && resp != nil {
+			_ = resp.Body.Close()
+		}
 	}()
 
 	return nil

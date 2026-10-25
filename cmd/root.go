@@ -158,7 +158,7 @@ func getLogger(config LogConfig) *logrus.Logger {
 	}
 
 	// Hook into log-search
-	hook := logger_pkg.NewLogSearchHook("http://log-search.default.svc.cluster.local:3000/v1/logs", "valid_token_billing")
+	hook := logger_pkg.NewLogSearchHook("http://log-search.log-search.svc.cluster.local:8080/v1/logs", "valid_token_billing")
 	logger.AddHook(hook)
 
 	return logger
