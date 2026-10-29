@@ -26,7 +26,7 @@ func (Check) TableName() string {
 
 // TableOptions sets table options for ClickHouse to optimize group by queries
 func (Check) TableOptions() string {
-	return "ENGINE=ReplicatedMergeTree() ORDER BY (team_id, monitor_id, created_at)"
+	return "ENGINE=ReplicatedMergeTree('/clickhouse/tables/{shard}/opsway/checks', '{replica}') ORDER BY (team_id, monitor_id, created_at)"
 }
 
 type Timing struct {

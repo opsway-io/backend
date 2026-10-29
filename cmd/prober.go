@@ -209,16 +209,20 @@ func runProber(cmd *cobra.Command, args []string) {
 					continue
 				}
 
-				wp.Submit(func() {
-					var task events.ProberTask
-					if err := json.Unmarshal(msg.Payload, &task); err != nil {
-						l.WithError(err).Error("failed to unmarshal prober task")
-						msg.Nack()
-						return
-					}
+				var task events.ProberTask
+				if err := json.Unmarshal(msg.Payload, &task); err != nil {
+					l.WithError(err).Error("failed to unmarshal prober task")
+					msg.Nack()
+					continue
+				}
 
+				// Acknowledge receipt before submitting to the workerpool so Watermill's
+				// single-channel stream subscriber can immediately deliver the next probe task
+				// and allow concurrent execution across workerpool workers.
+				msg.Ack()
+
+				wp.Submit(func() {
 					handleTask(ctx, l, httpProber, tcpProber, icmpProber, dnsProber, postgresProber, mysqlProber, redisProber, browserProber, websocketProber, udpProber, task.Monitor, httpResultService, incidentService, conf.Prober.Location, conf.Prober.AvailableLocations, redisClient, conf.Forecaster)
-					msg.Ack()
 				})
 			}
 		}
