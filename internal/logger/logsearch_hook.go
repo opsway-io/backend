@@ -3,7 +3,10 @@ package logger
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"net/http"
+	"os"
+	"strings"
 	"time"
 
 	"github.com/sirupsen/logrus"
@@ -11,7 +14,11 @@ import (
 
 // LogMessage matches the struct expected by log-search
 type LogMessage struct {
-	Message string `json:"message"`
+	Message     string                 `json:"message"`
+	Timestamp   string                 `json:"timestamp"`
+	Level       string                 `json:"level"`
+	ServiceName string                 `json:"service_name"`
+	Fields      map[string]interface{} `json:"fields,omitempty"`
 }
 
 // LogPayload is the array wrapper
@@ -20,28 +27,61 @@ type LogPayload struct {
 }
 
 type LogSearchHook struct {
-	Endpoint   string
-	Token      string
-	HttpClient *http.Client
+	Endpoint    string
+	Token       string
+	ServiceName string
+	HttpClient  *http.Client
+}
+
+func detectServiceName() string {
+	if len(os.Args) > 1 && !strings.HasPrefix(os.Args[1], "-") {
+		return os.Args[1]
+	}
+	if svc := os.Getenv("OPSWAY_SERVICE_NAME"); svc != "" {
+		return svc
+	}
+	return "backend"
 }
 
 func NewLogSearchHook(endpoint string, token string) *LogSearchHook {
 	return &LogSearchHook{
-		Endpoint:   endpoint,
-		Token:      token,
-		HttpClient: &http.Client{Timeout: 5 * time.Second},
+		Endpoint:    endpoint,
+		Token:       token,
+		ServiceName: detectServiceName(),
+		HttpClient:  &http.Client{Timeout: 5 * time.Second},
 	}
 }
 
 func (hook *LogSearchHook) Fire(entry *logrus.Entry) error {
-	msg, err := entry.String()
-	if err != nil {
-		msg = entry.Message
+	if entry.Level == logrus.DebugLevel && entry.Message == "healthz check" {
+		return nil
+	}
+
+	msg := entry.Message
+	fields := make(map[string]interface{}, len(entry.Data))
+	var kvParts []string
+	for k, v := range entry.Data {
+		fields[k] = fmt.Sprintf("%v", v)
+		kvParts = append(kvParts, fmt.Sprintf("%s=%v", k, v))
+	}
+	if len(kvParts) > 0 {
+		msg = fmt.Sprintf("%s (%s)", msg, strings.Join(kvParts, " "))
+	}
+
+	lvl := strings.ToUpper(entry.Level.String())
+	if lvl == "WARNING" {
+		lvl = "WARN"
 	}
 
 	payload := LogPayload{
 		Logs: []LogMessage{
-			{Message: msg},
+			{
+				Message:     msg,
+				Timestamp:   entry.Time.UTC().Format(time.RFC3339Nano),
+				Level:       lvl,
+				ServiceName: hook.ServiceName,
+				Fields:      fields,
+			},
 		},
 	}
 
