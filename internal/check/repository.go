@@ -15,16 +15,16 @@ var ErrNotFound = errors.New("probe result not found")
 type Repository interface {
 	Create(ctx context.Context, maintenance *Check) error
 	GetByTeamIDAndMonitorIDAndCheckID(ctx context.Context, teamID uint, monitorID uint, checkID uuid.UUID) (*Check, error)
-	GetLatestByMonitorID(ctx context.Context, monitorID uint) (*Check, error)
+	GetLatestByMonitorID(ctx context.Context, teamID uint, monitorID uint) (*Check, error)
 	GetByTeamIDAndMonitorIDPaginated(ctx context.Context, teamID, monitorID uint, offset, limit *int) (*[]Check, error)
-	GetMonitorMetricsByMonitorID(ctx context.Context, monitorID uint, start *string, end *string) (*[]AggMetric, error)
+	GetMonitorMetricsByMonitorID(ctx context.Context, teamID uint, monitorID uint, start *string, end *string) (*[]AggMetric, error)
 	GetMonitorOverviewsByTeamID(ctx context.Context, teamID uint) (*[]MonitorOverviews, error)
 	GetMonitorOverviewStatsByTeamID(ctx context.Context, teamID uint) (*[]MonitorOverviewStats, error)
-	GetMonitorUptimesByMonitorIDs(ctx context.Context, monitorIDs []uint) (map[uint]MonitorUptimeResult, error)
-	GetMonitorIDAndAssertions(ctx context.Context, monitorID uint, assertions []string) (*[]Check, error)
+	GetMonitorUptimesByMonitorIDs(ctx context.Context, teamID uint, monitorIDs []uint) (map[uint]MonitorUptimeResult, error)
+	GetMonitorIDAndAssertions(ctx context.Context, teamID uint, monitorID uint, assertions []string) (*[]Check, error)
 	GetByTeamIDMonitorsUptime(ctx context.Context, teamID uint, start, end string) (*[]MonitorUptime, error)
 	GetByTeamIDMonitorsPerformance(ctx context.Context, teamID uint, start, end string) (*[]MonitorPerformance, error)
-	GetMonitorStatsByMonitorID(ctx context.Context, monitorID uint) (*MonitorStats, error)
+	GetMonitorStatsByMonitorID(ctx context.Context, teamID uint, monitorID uint) (*MonitorStats, error)
 }
 
 type RepositoryImpl struct {
@@ -59,12 +59,13 @@ func (r *RepositoryImpl) GetByTeamIDAndMonitorIDAndCheckID(ctx context.Context, 
 	return &check, nil
 }
 
-func (r *RepositoryImpl) GetLatestByMonitorID(ctx context.Context, monitorID uint) (*Check, error) {
+func (r *RepositoryImpl) GetLatestByMonitorID(ctx context.Context, teamID uint, monitorID uint) (*Check, error) {
 	var check Check
 	err := r.db.WithContext(
 		ctx,
 	).Where(
 		Check{
+			TeamID:    uint64(teamID),
 			MonitorID: uint64(monitorID),
 		},
 	).Order(
@@ -120,7 +121,7 @@ type AggMetric struct {
 	Total      float64
 }
 
-func (r *RepositoryImpl) GetMonitorMetricsByMonitorID(ctx context.Context, monitorID uint, start *string, end *string) (*[]AggMetric, error) {
+func (r *RepositoryImpl) GetMonitorMetricsByMonitorID(ctx context.Context, teamID uint, monitorID uint, start *string, end *string) (*[]AggMetric, error) {
 	var metrics []AggMetric
 
 	query := r.db.WithContext(
@@ -133,7 +134,7 @@ func (r *RepositoryImpl) GetMonitorMetricsByMonitorID(ctx context.Context, monit
 		avg(timing_server_processing)/1000000 as processing,
 		avg(timing_content_transfer)/1000000 as transfer,
 		avg(timing_total)/1000000 as total`).
-		Where("monitor_id = ?", monitorID)
+		Where("team_id = ? AND monitor_id = ?", teamID, monitorID)
 
 	if start != nil && end != nil {
 		// Calculate the difference in hours
@@ -176,14 +177,14 @@ type MonitorStats struct {
 	AverageResponseTime float32
 }
 
-func (r *RepositoryImpl) GetMonitorStatsByMonitorID(ctx context.Context, monitorID uint) (*MonitorStats, error) {
+func (r *RepositoryImpl) GetMonitorStatsByMonitorID(ctx context.Context, teamID uint, monitorID uint) (*MonitorStats, error) {
 	var stats MonitorStats
 	err := r.db.WithContext(
 		ctx,
 	).Table("checks").Select(`
 		if(count() = 0, 0, (countIf(status_code > 0 AND status_code < 400) / count()) * 100) as uptime_percentage,
 		if(count() = 0, 0, avg(timing_total/1000000)) as average_response_time`).
-		Where("monitor_id = ?", monitorID).
+		Where("team_id = ? AND monitor_id = ?", teamID, monitorID).
 		Where("created_at BETWEEN DATE_SUB(NOW(), INTERVAL 30 DAY) AND NOW()").
 		Scan(&stats).Error
 
@@ -257,7 +258,7 @@ type MonitorUptimeResult struct {
 	DailyUptimes     []float32 `gorm:"type:float"`
 }
 
-func (r *RepositoryImpl) GetMonitorUptimesByMonitorIDs(ctx context.Context, monitorIDs []uint) (map[uint]MonitorUptimeResult, error) {
+func (r *RepositoryImpl) GetMonitorUptimesByMonitorIDs(ctx context.Context, teamID uint, monitorIDs []uint) (map[uint]MonitorUptimeResult, error) {
 	if len(monitorIDs) == 0 {
 		return make(map[uint]MonitorUptimeResult), nil
 	}
@@ -272,9 +273,9 @@ func (r *RepositoryImpl) GetMonitorUptimesByMonitorIDs(ctx context.Context, moni
 			monitor_id,
 			if(count() = 0, 0, (countIf(status_code > 0 AND status_code < 400) / count()) * 100) as uptime_percentage
 		FROM checks
-		WHERE monitor_id IN ? AND created_at >= DATE_SUB(NOW(), INTERVAL 90 DAY)
+		WHERE team_id = ? AND monitor_id IN ? AND created_at >= DATE_SUB(NOW(), INTERVAL 90 DAY)
 		GROUP BY monitor_id
-	`, monitorIDs).Scan(&overallResults).Error
+	`, teamID, monitorIDs).Scan(&overallResults).Error
 	if err != nil {
 		return nil, err
 	}
@@ -291,10 +292,10 @@ func (r *RepositoryImpl) GetMonitorUptimesByMonitorIDs(ctx context.Context, moni
 			toDate(created_at) as day,
 			if(count() = 0, 0, (countIf(status_code > 0 AND status_code < 400) / count()) * 100) as daily_uptime
 		FROM checks
-		WHERE monitor_id IN ? AND created_at >= DATE_SUB(NOW(), INTERVAL 90 DAY)
+		WHERE team_id = ? AND monitor_id IN ? AND created_at >= DATE_SUB(NOW(), INTERVAL 90 DAY)
 		GROUP BY monitor_id, day
 		ORDER BY monitor_id, day ASC
-	`, monitorIDs).Scan(&dailyResults).Error
+	`, teamID, monitorIDs).Scan(&dailyResults).Error
 	if err != nil {
 		return nil, err
 	}
@@ -348,12 +349,13 @@ func (r *RepositoryImpl) GetMonitorUptimesByMonitorIDs(ctx context.Context, moni
 	return uptimes, nil
 }
 
-func (r *RepositoryImpl) GetMonitorIDAndAssertions(ctx context.Context, monitorID uint, assertions []string) (*[]Check, error) {
+func (r *RepositoryImpl) GetMonitorIDAndAssertions(ctx context.Context, teamID uint, monitorID uint, assertions []string) (*[]Check, error) {
 	var checks []Check
 	err := r.db.WithContext(
 		ctx,
 	).Where(
 		Check{
+			TeamID:    uint64(teamID),
 			MonitorID: uint64(monitorID),
 		},
 	).Where("assertion = ?", assertions[0]).Order(

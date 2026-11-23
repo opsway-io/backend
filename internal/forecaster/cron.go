@@ -61,6 +61,7 @@ func (w *worker) triggerTraining(ctx context.Context) {
 
 	for _, m := range *monitors {
 		e := events.TrainForecasterEvent{
+			TeamID:    m.TeamID,
 			MonitorID: m.ID,
 		}
 		if err := w.eventService.Publish(e); err != nil {

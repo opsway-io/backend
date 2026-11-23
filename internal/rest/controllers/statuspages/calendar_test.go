@@ -79,19 +79,19 @@ func (m *mockCheckService) GetByTeamIDAndMonitorIDPaginated(ctx context.Context,
 func (m *mockCheckService) GetByTeamIDAndMonitorIDAndCheckID(ctx context.Context, teamID uint, monitorID uint, checkID uuid.UUID) (*check.Check, error) {
 	return nil, nil
 }
-func (m *mockCheckService) GetLatestByMonitorID(ctx context.Context, monitorID uint) (*check.Check, error) {
+func (m *mockCheckService) GetLatestByMonitorID(ctx context.Context, teamID uint, monitorID uint) (*check.Check, error) {
 	return nil, nil
 }
-func (m *mockCheckService) GetMonitorMetricsByMonitorID(ctx context.Context, monitorID uint, start *string, end *string) (*[]check.AggMetric, error) {
+func (m *mockCheckService) GetMonitorMetricsByMonitorID(ctx context.Context, teamID uint, monitorID uint, start *string, end *string) (*[]check.AggMetric, error) {
 	return nil, nil
 }
-func (m *mockCheckService) GetMonitorStatsByMonitorID(ctx context.Context, monitorID uint) (*check.MonitorStats, error) {
+func (m *mockCheckService) GetMonitorStatsByMonitorID(ctx context.Context, teamID uint, monitorID uint) (*check.MonitorStats, error) {
 	return nil, nil
 }
 func (m *mockCheckService) GetMonitorOverviewsByTeamID(ctx context.Context, teamID uint) (*[]check.MonitorOverviews, error) {
 	return nil, nil
 }
-func (m *mockCheckService) GetMonitorIDAndAssertions(ctx context.Context, monitorID uint, assertions []string) (*[]check.Check, error) {
+func (m *mockCheckService) GetMonitorIDAndAssertions(ctx context.Context, teamID uint, monitorID uint, assertions []string) (*[]check.Check, error) {
 	return nil, nil
 }
 func (m *mockCheckService) GetByTeamIDMonitorsUptime(ctx context.Context, teamID uint, start, end string) (*[]check.MonitorUptime, error) {
@@ -100,7 +100,7 @@ func (m *mockCheckService) GetByTeamIDMonitorsUptime(ctx context.Context, teamID
 func (m *mockCheckService) GetByTeamIDMonitorsPerformance(ctx context.Context, teamID uint, start, end string) (*[]check.MonitorPerformance, error) {
 	return nil, nil
 }
-func (m *mockCheckService) GetMonitorUptimesByMonitorIDs(ctx context.Context, monitorIDs []uint) (map[uint]check.MonitorUptimeResult, error) {
+func (m *mockCheckService) GetMonitorUptimesByMonitorIDs(ctx context.Context, teamID uint, monitorIDs []uint) (map[uint]check.MonitorUptimeResult, error) {
 	return map[uint]check.MonitorUptimeResult{
 		10: {
 			UptimePercentage: 99.95,

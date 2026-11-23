@@ -420,8 +420,7 @@ func (g *gatewayImpl) callLogSearchMCP(ctx context.Context, teamID uint, upstrea
 				apiKey = "valid_agent_key"
 			}
 			req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", apiKey))
-			// Pass tenant header (using tenant_123 as fallback so existing cluster logs are visible)
-			req.Header.Set("X-Opsway-Tenant-ID", "tenant_123")
+			req.Header.Set("X-Opsway-Tenant-ID", fmt.Sprintf("team_%d", teamID))
 
 			resp, err := g.httpClient.Do(req)
 			if err == nil {
@@ -590,6 +589,8 @@ func (g *gatewayImpl) callPantomathMCP(ctx context.Context, teamID uint, toolNam
 		// Milvus collection names require underscores rather than hyphens.
 		forwardArgs["product"] = strings.ReplaceAll(strings.TrimSpace(prod), "-", "_")
 	}
+	tenantID := fmt.Sprintf("team_%d", teamID)
+	forwardArgs["tenant"] = tenantID
 
 	if g.cfg.PantomathURL != "" {
 		rpcReq := JSONRPCRequest{
@@ -607,6 +608,7 @@ func (g *gatewayImpl) callPantomathMCP(ctx context.Context, teamID uint, toolNam
 		if err == nil {
 			req.Header.Set("Content-Type", "application/json")
 			req.Header.Set("Accept", "application/json, text/event-stream")
+			req.Header.Set("X-Opsway-Tenant-ID", tenantID)
 
 			resp, err := g.httpClient.Do(req)
 			if err != nil {

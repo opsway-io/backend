@@ -128,7 +128,7 @@ func (h *PublicHandlers) GetPublicMetrics(c echo.Context) error {
 
 	var resMonitors []PublicMonitorMetrics
 	if h.CheckService != nil && len(monitorIDs) > 0 {
-		uptimes, _ := h.CheckService.GetMonitorUptimesByMonitorIDs(c.Request().Context(), monitorIDs)
+		uptimes, _ := h.CheckService.GetMonitorUptimesByMonitorIDs(c.Request().Context(), sp.TeamID, monitorIDs)
 		for _, id := range monitorIDs {
 			var uptimePct float32 = 100.0
 			var daily []float32

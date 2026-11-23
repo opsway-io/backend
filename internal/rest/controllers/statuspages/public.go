@@ -178,7 +178,7 @@ func (h *PublicHandlers) GetPublicStatusPage(c echo.Context) error {
 	var uptimes map[uint]check.MonitorUptimeResult
 	if h.CheckService != nil {
 		var err error
-		uptimes, err = h.CheckService.GetMonitorUptimesByMonitorIDs(c.Request().Context(), monitorIDs)
+		uptimes, err = h.CheckService.GetMonitorUptimesByMonitorIDs(c.Request().Context(), sp.TeamID, monitorIDs)
 		if err != nil {
 			logrus.WithError(err).Error("failed to get monitor uptimes")
 		}

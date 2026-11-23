@@ -3,6 +3,7 @@ package monitors
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"os"
@@ -10,11 +11,12 @@ import (
 
 	"github.com/labstack/echo/v4"
 	"github.com/opsway-io/backend/internal/check"
+	"github.com/opsway-io/backend/internal/monitor"
 	hs "github.com/opsway-io/backend/internal/rest/handlers"
 	"github.com/opsway-io/backend/internal/rest/helpers"
 )
 
-func getMetricsPredictions(monitorID uint, metrics *[]check.AggMetric) (*ForecasterPredictResponse, error) {
+func getMetricsPredictions(teamID uint, monitorID uint, metrics *[]check.AggMetric) (*ForecasterPredictResponse, error) {
 	if len(*metrics) == 0 {
 		return &ForecasterPredictResponse{}, nil
 	}
@@ -33,6 +35,7 @@ func getMetricsPredictions(monitorID uint, metrics *[]check.AggMetric) (*Forecas
 	}
 
 	reqBody, err := json.Marshal(ChecksPredictRequest{
+		TeamID:    int(teamID),
 		MonitorID: int(monitorID),
 		Timings:   timings,
 	})
@@ -70,6 +73,7 @@ func getMetricsPredictions(monitorID uint, metrics *[]check.AggMetric) (*Forecas
 }
 
 type ForecasterForecastRequest struct {
+	TeamID     int      `json:"team_id"`
 	MonitorID  int      `json:"monitor_id"`
 	Timestamps []string `json:"timestamps"`
 }
@@ -80,11 +84,12 @@ type ForecasterForecastResponse struct {
 	LowerBounds []float64 `json:"lower_bounds"`
 }
 
-func getMetricsForecast(monitorID uint, timestamps []string) (*ForecasterForecastResponse, error) {
+func getMetricsForecast(teamID uint, monitorID uint, timestamps []string) (*ForecasterForecastResponse, error) {
 	if len(timestamps) == 0 {
 		return &ForecasterForecastResponse{}, nil
 	}
 	reqBody, err := json.Marshal(ForecasterForecastRequest{
+		TeamID:     int(teamID),
 		MonitorID:  int(monitorID),
 		Timestamps: timestamps,
 	})
@@ -150,8 +155,17 @@ func (h *Handlers) GetMonitorMetrics(c hs.AuthenticatedContext) error {
 
 	ctx := c.Request().Context()
 
+	if _, err := h.MonitorService.GetMonitorAndSettingsByTeamIDAndID(ctx, req.TeamID, req.MonitorID); err != nil {
+		if errors.Is(err, monitor.ErrNotFound) {
+			return echo.ErrNotFound
+		}
+		c.Log.WithError(err).Error("failed to verify monitor ownership")
+		return echo.ErrInternalServerError
+	}
+
 	metrics, err := h.CheckService.GetMonitorMetricsByMonitorID(
 		ctx,
+		req.TeamID,
 		req.MonitorID,
 		req.Start,
 		req.End,
@@ -162,7 +176,7 @@ func (h *Handlers) GetMonitorMetrics(c hs.AuthenticatedContext) error {
 		return echo.ErrInternalServerError
 	}
 
-	predictions, predErr := getMetricsPredictions(req.MonitorID, metrics)
+	predictions, predErr := getMetricsPredictions(req.TeamID, req.MonitorID, metrics)
 	hasPredictions := predErr == nil && predictions != nil && len(predictions.Predictions) == len(*metrics)
 	if predErr != nil {
 		c.Log.WithError(predErr).Warn("failed to fetch predictions from forecaster")
@@ -176,7 +190,7 @@ func (h *Handlers) GetMonitorMetrics(c hs.AuthenticatedContext) error {
 		futureTimestamps = append(futureTimestamps, now.Add(time.Hour*time.Duration(i)).Format(time.RFC3339))
 	}
 
-	forecast, forecastErr := getMetricsForecast(req.MonitorID, futureTimestamps)
+	forecast, forecastErr := getMetricsForecast(req.TeamID, req.MonitorID, futureTimestamps)
 	hasForecast := forecastErr == nil && forecast != nil && len(forecast.Predictions) == len(futureTimestamps)
 	if forecastErr != nil {
 		c.Log.WithError(forecastErr).Warn("failed to fetch forecast from forecaster")

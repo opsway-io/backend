@@ -299,7 +299,7 @@ func (h *Handlers) GetMonitor(c hs.AuthenticatedContext) error {
 		return echo.ErrInternalServerError
 	}
 
-	stats, err := h.CheckService.GetMonitorStatsByMonitorID(c.Request().Context(), m.ID)
+	stats, err := h.CheckService.GetMonitorStatsByMonitorID(c.Request().Context(), m.TeamID, m.ID)
 	if err != nil {
 		c.Log.WithError(err).Error("failed to get monitor stats")
 

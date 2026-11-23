@@ -631,7 +631,7 @@ func handleTask(ctx context.Context, logger *logrus.Logger, httpProber http.Serv
 			}
 		}
 
-		anomalyResp, err := checkAnomaly(ctx, forecasterConfig, m.ID, res)
+		anomalyResp, err := checkAnomaly(ctx, forecasterConfig, m.TeamID, m.ID, res)
 		if err != nil {
 			l.WithError(err).Error("failed to check for anomaly")
 		} else if anomalyResp != nil && len(anomalyResp.Anomalies) > 0 && anomalyResp.Anomalies[0] {
@@ -924,12 +924,13 @@ type ForecasterPredictResponse struct {
 	LowerBounds []float64 `json:"lower_bounds"`
 }
 
-func checkAnomaly(ctx context.Context, cfg ForecasterConfig, monitorID uint, res *http.Result) (*ForecasterPredictResponse, error) {
+func checkAnomaly(ctx context.Context, cfg ForecasterConfig, teamID uint, monitorID uint, res *http.Result) (*ForecasterPredictResponse, error) {
 	if !cfg.Enabled || cfg.URL == "" {
 		return nil, nil
 	}
 
-	reqBody := fmt.Sprintf(`{"monitor_id": %d, "timings": [{"response_time": %f, "dns_lookup": %f, "tcp_connection": %f, "tls_handshake": %f, "server_processing": %f, "content_transfer": %f}]}`,
+	reqBody := fmt.Sprintf(`{"team_id": %d, "monitor_id": %d, "timings": [{"response_time": %f, "dns_lookup": %f, "tcp_connection": %f, "tls_handshake": %f, "server_processing": %f, "content_transfer": %f}]}`,
+		teamID,
 		monitorID,
 		float64(res.Timing.Phases.Total.Milliseconds()),
 		float64(res.Timing.Phases.DNSLookup.Milliseconds()),

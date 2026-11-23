@@ -99,7 +99,7 @@ func TestCheckAnomaly_Disabled(t *testing.T) {
 		URL:     "http://localhost:9999/predict",
 	}
 
-	resp, err := checkAnomaly(context.Background(), cfg, 1, res)
+	resp, err := checkAnomaly(context.Background(), cfg, 7, 1, res)
 	assert.NoError(t, err)
 	assert.Nil(t, resp)
 }
@@ -130,7 +130,7 @@ func TestCheckAnomaly_Timeout(t *testing.T) {
 	}
 
 	start := time.Now()
-	resp, err := checkAnomaly(context.Background(), cfg, 1, res)
+	resp, err := checkAnomaly(context.Background(), cfg, 7, 1, res)
 	elapsed := time.Since(start)
 
 	assert.Error(t, err)

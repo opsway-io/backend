@@ -53,7 +53,7 @@ func (h *Handlers) GetPrometheusMetrics(c hs.AuthenticatedContext) error {
 	sb.WriteString("# TYPE opsway_monitor_uptime_ratio gauge\n")
 
 	for _, m := range monitors {
-		stats, err := h.CheckService.GetMonitorStatsByMonitorID(ctx, m.ID)
+		stats, err := h.CheckService.GetMonitorStatsByMonitorID(ctx, req.TeamID, m.ID)
 		if err != nil {
 			continue
 		}

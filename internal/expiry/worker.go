@@ -87,7 +87,7 @@ func (w *worker) checkSSLExpiry(ctx context.Context, m *entities.Monitor) {
 		thresholdDays = *m.Settings.TLS.ExpirationThresholdDays
 	}
 
-	latestCheck, err := w.checkService.GetLatestByMonitorID(ctx, m.ID)
+	latestCheck, err := w.checkService.GetLatestByMonitorID(ctx, m.TeamID, m.ID)
 	if err != nil || latestCheck == nil || latestCheck.TLS == nil {
 		return
 	}

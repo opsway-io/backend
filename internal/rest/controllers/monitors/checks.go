@@ -12,6 +12,7 @@ import (
 	"github.com/gofrs/uuid"
 	"github.com/labstack/echo/v4"
 	"github.com/opsway-io/backend/internal/check"
+	"github.com/opsway-io/backend/internal/monitor"
 	hs "github.com/opsway-io/backend/internal/rest/handlers"
 	"github.com/opsway-io/backend/internal/rest/helpers"
 )
@@ -27,6 +28,7 @@ type ForecasterTimingMetric struct {
 }
 
 type ChecksPredictRequest struct {
+	TeamID    int                      `json:"team_id"`
 	MonitorID int                      `json:"monitor_id"`
 	Timings   []ForecasterTimingMetric `json:"timings"`
 }
@@ -38,7 +40,7 @@ type ForecasterPredictResponse struct {
 	LowerBounds []float64 `json:"lower_bounds"`
 }
 
-func getChecksAnomalies(monitorID uint, checks *[]check.Check) ([]bool, error) {
+func getChecksAnomalies(teamID uint, monitorID uint, checks *[]check.Check) ([]bool, error) {
 	if len(*checks) == 0 {
 		return nil, nil
 	}
@@ -57,6 +59,7 @@ func getChecksAnomalies(monitorID uint, checks *[]check.Check) ([]bool, error) {
 	}
 
 	reqBody, err := json.Marshal(ChecksPredictRequest{
+		TeamID:    int(teamID),
 		MonitorID: int(monitorID),
 		Timings:   timings,
 	})
@@ -157,7 +160,7 @@ func (h *Handlers) GetMonitorChecks(c hs.AuthenticatedContext) error {
 		return echo.ErrInternalServerError
 	}
 
-	anomalies, err := getChecksAnomalies(req.MonitorID, results)
+	anomalies, err := getChecksAnomalies(req.TeamID, req.MonitorID, results)
 	if err != nil {
 		c.Log.WithError(err).Warn("failed to fetch anomalies from forecaster")
 	}
@@ -257,7 +260,7 @@ func (h *Handlers) GetMonitorCheck(c hs.AuthenticatedContext) error {
 	}
 
 	singleCheckList := []check.Check{*result}
-	anomalies, err := getChecksAnomalies(req.MonitorID, &singleCheckList)
+	anomalies, err := getChecksAnomalies(req.TeamID, req.MonitorID, &singleCheckList)
 	isAnomaly := false
 	if err == nil && len(anomalies) > 0 {
 		isAnomaly = anomalies[0]
@@ -290,16 +293,28 @@ func (h *Handlers) GetFailedMonitorChecks(c hs.AuthenticatedContext) error {
 
 	ctx := c.Request().Context()
 
+	if _, err := h.MonitorService.GetMonitorAndSettingsByTeamIDAndID(ctx, req.TeamID, req.MonitorID); err != nil {
+		if errors.Is(err, monitor.ErrNotFound) {
+			return echo.ErrNotFound
+		}
+		c.Log.WithError(err).Error("failed to verify monitor ownership")
+		return echo.ErrInternalServerError
+	}
+
 	monitorAssertion, err := h.MonitorService.GetMonitorAssertionByID(ctx, req.MonitorAssertionID)
 	if err != nil {
 		c.Log.WithError(err).Error("failed to get monitorAssertion")
 		return echo.ErrInternalServerError
+	}
+	if monitorAssertion.MonitorID != req.MonitorID {
+		return echo.ErrNotFound
 	}
 
 	// map monitorassertion to filter
 
 	result, err := h.CheckService.GetMonitorIDAndAssertions(
 		ctx,
+		req.TeamID,
 		monitorAssertion.MonitorID,
 		[]string{"status_code == 200"},
 	)
