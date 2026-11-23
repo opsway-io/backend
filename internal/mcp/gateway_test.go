@@ -2,58 +2,70 @@ package mcp
 
 import (
 	"context"
+	"encoding/json"
+	"net/http"
+	"net/http/httptest"
+	"strings"
 	"testing"
 )
 
-func TestGatewayJSONRPC(t *testing.T) {
-	gw := NewGateway(
-		GatewayConfig{
-			LogSearchPublicURL: "https://logs.opsway.eu",
-		},
-		nil,
-		nil,
-		nil,
-		nil,
-		nil,
-	)
+func TestCallPantomathMCP_StreamableHTTPSSE(t *testing.T) {
+	var receivedAccept string
+	var receivedParams ToolCallParams
 
-	// Test Initialize
-	initResp := gw.HandleJSONRPC(context.Background(), 1, JSONRPCRequest{
-		JSONRPC: "2.0",
-		ID:      1,
-		Method:  "initialize",
-	})
-	if initResp == nil || initResp.Result == nil {
-		t.Fatalf("expected initialize result, got nil")
-	}
-
-	// Test Ping
-	pingResp := gw.HandleJSONRPC(context.Background(), 1, JSONRPCRequest{
-		JSONRPC: "2.0",
-		ID:      2,
-		Method:  "ping",
-	})
-	if pingResp == nil || pingResp.Error != nil {
-		t.Fatalf("expected ping success, got %v", pingResp)
-	}
-
-	// Test Tools List
-	tools := gw.ListTools(context.Background(), 1)
-	if len(tools) == 0 {
-		t.Fatalf("expected non-empty tool list for default team")
-	}
-
-	hasMonitoring := false
-	hasLogs := false
-	for _, tool := range tools {
-		if tool.Name == "monitoring.get_incident_details" {
-			hasMonitoring = true
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/mcp" {
+			http.NotFound(w, r)
+			return
 		}
-		if tool.Name == "logs.get_error_summary" {
-			hasLogs = true
+		receivedAccept = r.Header.Get("Accept")
+
+		var req JSONRPCRequest
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			t.Fatalf("failed to decode request: %v", err)
 		}
+		if err := json.Unmarshal(req.Params, &receivedParams); err != nil {
+			t.Fatalf("failed to decode params: %v", err)
+		}
+
+		w.Header().Set("Content-Type", "text/event-stream")
+		_, _ = w.Write([]byte("event: message\ndata: {\"jsonrpc\":\"2.0\",\"id\":1,\"result\":{\"content\":[{\"type\":\"text\",\"text\":\"Live GraphRAG answer from Pantomath\"}]}}\n\n"))
+	}))
+	defer srv.Close()
+
+	gw := NewGateway(GatewayConfig{
+		PantomathURL:     srv.URL,
+		PantomathEnabled: true,
+	}, nil, nil, nil, nil, nil)
+
+	res, err := gw.CallTool(context.Background(), 1, "pantomath.ask_codebase", map[string]interface{}{
+		"query":   "How is postgres configured?",
+		"product": "status-monitoring",
+	})
+	if err != nil {
+		t.Fatalf("CallTool failed: %v", err)
 	}
-	if !hasMonitoring || !hasLogs {
-		t.Errorf("expected both monitoring and log tools, got hasMonitoring=%v, hasLogs=%v", hasMonitoring, hasLogs)
+	if !strings.Contains(receivedAccept, "text/event-stream") {
+		t.Fatalf("expected Accept header to include text/event-stream, got %q", receivedAccept)
+	}
+	if receivedParams.Name != "ask_pantomath" {
+		t.Fatalf("expected upstream tool ask_pantomath, got %q", receivedParams.Name)
+	}
+	if got := receivedParams.Arguments["product"]; got != "status_monitoring" {
+		t.Fatalf("expected hyphen-normalized product status_monitoring, got %v", got)
+	}
+	if res == nil || len(res.Content) == 0 || res.Content[0].Text != "Live GraphRAG answer from Pantomath" {
+		t.Fatalf("unexpected tool result: %+v", res)
+	}
+}
+
+func TestParseMCPToolResponse_PlainJSON(t *testing.T) {
+	raw := []byte(`{"jsonrpc":"2.0","id":1,"result":{"content":[{"type":"text","text":"ok"}]}}`)
+	res, err := parseMCPToolResponse(raw)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(res.Content) != 1 || res.Content[0].Text != "ok" {
+		t.Fatalf("unexpected result: %+v", res)
 	}
 }

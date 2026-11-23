@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/opsway-io/backend/internal/check"
@@ -103,7 +104,7 @@ func NewGateway(
 		incidentSvc:    incidentSvc,
 		logger:         logger.WithField("component", "mcp_gateway"),
 		httpClient: &http.Client{
-			Timeout: 15 * time.Second,
+			Timeout: 60 * time.Second,
 		},
 	}
 }
@@ -261,9 +262,27 @@ func (g *gatewayImpl) ListTools(ctx context.Context, teamID uint) []Tool {
 					"type": "object",
 					"properties": map[string]interface{}{
 						"query":   map[string]interface{}{"type": "string", "description": "Question or stack trace symbol to look up"},
-						"product": map[string]interface{}{"type": "string", "description": "Pantomath product slug (e.g. status-monitoring, log-search)"},
+						"product": map[string]interface{}{"type": "string", "description": "Optional Pantomath product slug (e.g. status_monitoring, log_search)"},
 					},
 					"required": []string{"query"},
+				},
+			},
+			Tool{
+				Name:        "pantomath.list_products",
+				Description: "List products configured and indexed in Pantomath.",
+				InputSchema: map[string]interface{}{
+					"type":       "object",
+					"properties": map[string]interface{}{},
+				},
+			},
+			Tool{
+				Name:        "pantomath.list_repos",
+				Description: "List repositories indexed in Pantomath, optionally scoped to a product.",
+				InputSchema: map[string]interface{}{
+					"type": "object",
+					"properties": map[string]interface{}{
+						"product": map[string]interface{}{"type": "string", "description": "Optional Pantomath product slug (e.g. status_monitoring, log_search)"},
+					},
 				},
 			},
 		)
@@ -370,6 +389,12 @@ func (g *gatewayImpl) CallTool(ctx context.Context, teamID uint, toolName string
 
 	case "pantomath.ask_codebase":
 		return g.callPantomathMCP(ctx, teamID, "ask_pantomath", args)
+
+	case "pantomath.list_products":
+		return g.callPantomathMCP(ctx, teamID, "list_products", args)
+
+	case "pantomath.list_repos":
+		return g.callPantomathMCP(ctx, teamID, "list_repos", args)
 	}
 
 	return textResult(map[string]interface{}{"error": fmt.Sprintf("unknown tool: %s", toolName)}, true), nil
@@ -510,10 +535,105 @@ func (g *gatewayImpl) callLogSearchMCP(ctx context.Context, teamID uint, upstrea
 	}
 }
 
+func parseMCPToolResponse(respBytes []byte) (*ToolCallResult, error) {
+	trimmed := bytes.TrimSpace(respBytes)
+	if len(trimmed) == 0 {
+		return nil, fmt.Errorf("empty MCP response")
+	}
+
+	var decodePayload = func(payload []byte) (*ToolCallResult, bool) {
+		var rpcResp struct {
+			Result *ToolCallResult `json:"result"`
+			Error  *JSONRPCError   `json:"error"`
+		}
+		if err := json.Unmarshal(payload, &rpcResp); err == nil {
+			if rpcResp.Result != nil && len(rpcResp.Result.Content) > 0 {
+				return rpcResp.Result, true
+			}
+			if rpcResp.Error != nil {
+				return textResult(map[string]interface{}{"error": rpcResp.Error.Message}, true), true
+			}
+		}
+		return nil, false
+	}
+
+	if trimmed[0] == '{' {
+		if res, ok := decodePayload(trimmed); ok {
+			return res, nil
+		}
+	}
+
+	// FastMCP Streamable HTTP returns SSE frames ("event: message\ndata: {...}\n\n").
+	for _, line := range bytes.Split(trimmed, []byte("\n")) {
+		line = bytes.TrimSpace(line)
+		if !bytes.HasPrefix(line, []byte("data:")) {
+			continue
+		}
+		payload := bytes.TrimSpace(bytes.TrimPrefix(line, []byte("data:")))
+		if len(payload) == 0 || payload[0] != '{' {
+			continue
+		}
+		if res, ok := decodePayload(payload); ok {
+			return res, nil
+		}
+	}
+
+	return nil, fmt.Errorf("no JSON-RPC tool result found in MCP response")
+}
+
 func (g *gatewayImpl) callPantomathMCP(ctx context.Context, teamID uint, toolName string, args map[string]interface{}) (*ToolCallResult, error) {
+	forwardArgs := make(map[string]interface{}, len(args))
+	for k, v := range args {
+		forwardArgs[k] = v
+	}
+	if prod, ok := forwardArgs["product"].(string); ok && prod != "" {
+		// Milvus collection names require underscores rather than hyphens.
+		forwardArgs["product"] = strings.ReplaceAll(strings.TrimSpace(prod), "-", "_")
+	}
+
+	if g.cfg.PantomathURL != "" {
+		rpcReq := JSONRPCRequest{
+			JSONRPC: "2.0",
+			ID:      1,
+			Method:  "tools/call",
+			Params: mustMarshal(ToolCallParams{
+				Name:      toolName,
+				Arguments: forwardArgs,
+			}),
+		}
+		bodyBytes, _ := json.Marshal(rpcReq)
+		endpoint := fmt.Sprintf("%s/mcp", strings.TrimRight(g.cfg.PantomathURL, "/"))
+		req, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, bytes.NewReader(bodyBytes))
+		if err == nil {
+			req.Header.Set("Content-Type", "application/json")
+			req.Header.Set("Accept", "application/json, text/event-stream")
+
+			resp, err := g.httpClient.Do(req)
+			if err != nil {
+				g.logger.WithError(err).WithField("tool", toolName).Warn("pantomath MCP request failed, using fallback")
+			} else {
+				defer resp.Body.Close()
+				respBytes, _ := io.ReadAll(resp.Body)
+				if resp.StatusCode == http.StatusOK {
+					if result, parseErr := parseMCPToolResponse(respBytes); parseErr == nil {
+						return result, nil
+					} else {
+						g.logger.WithError(parseErr).WithField("tool", toolName).Warn("failed to parse pantomath MCP response, using fallback")
+					}
+				} else {
+					g.logger.WithFields(logrus.Fields{
+						"tool":   toolName,
+						"status": resp.StatusCode,
+					}).Warn("pantomath MCP returned non-200 status, using fallback")
+				}
+			}
+		}
+	}
+
+	// Structured fallback if Pantomath service is offline in local dev
 	query := getStringArg(args, "query", "database connection pool")
 	return textResult(map[string]interface{}{
-		"source":  "pantomath-graphrag",
+		"source":  "pantomath-graphrag-fallback",
 		"query":   query,
 		"matches": []map[string]interface{}{
 			{

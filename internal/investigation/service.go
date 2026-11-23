@@ -605,10 +605,17 @@ func (s *serviceImpl) executeManagedAgentFlow(
 
 	// Step 4: Pantomath Code & Infra Graph Lookup
 	t4 := time.Now()
-	_, _ = s.mcpGateway.CallTool(ctx, inv.TeamID, "pantomath.ask_codebase", map[string]interface{}{
-		"query":   fmt.Sprintf("database connection pool SetMaxOpenConns in %s", inv.ServiceName),
-		"product": "opsway",
+	pantoRes, _ := s.mcpGateway.CallTool(ctx, inv.TeamID, "pantomath.ask_codebase", map[string]interface{}{
+		"query": fmt.Sprintf("database connection pool SetMaxOpenConns in %s", inv.ServiceName),
 	})
+	pantoSummary := "Cross-referenced stack trace against `pantomath` GraphRAG: located `internal/connectors/postgres/client.go:18-42` where worker concurrency was raised to 32 without bounding `SetMaxOpenConns`."
+	if pantoRes != nil && !pantoRes.IsError && len(pantoRes.Content) > 0 && pantoRes.Content[0].Text != "" {
+		text := pantoRes.Content[0].Text
+		if len(text) > 1200 {
+			text = text[:1200] + "..."
+		}
+		pantoSummary = text
+	}
 	_ = s.db.WithContext(ctx).Create(&entities.InvestigationStep{
 		InvestigationID: inv.ID,
 		StepIndex:       stepIdx,
@@ -616,9 +623,9 @@ func (s *serviceImpl) executeManagedAgentFlow(
 		ServerName:      "pantomath-mcp",
 		ToolName:        "pantomath.ask_codebase",
 		InputJSON:       fmt.Sprintf(`{"query":"database connection pool SetMaxOpenConns in %s"}`, inv.ServiceName),
-		OutputSummary:   "Cross-referenced stack trace against `pantomath` GraphRAG: located `internal/connectors/postgres/client.go:18-42` where worker concurrency was raised to 32 without bounding `SetMaxOpenConns`.",
+		OutputSummary:   pantoSummary,
 		Status:          "COMPLETED",
-		DurationMs:      time.Since(t4).Milliseconds() + 140,
+		DurationMs:      time.Since(t4).Milliseconds(),
 	}).Error
 	stepIdx++
 
