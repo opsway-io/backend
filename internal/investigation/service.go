@@ -9,8 +9,10 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"net/url"
+	"regexp"
 	"strings"
 	"time"
 
@@ -24,6 +26,13 @@ import (
 	"gorm.io/gorm"
 )
 
+const (
+	maxAgentIterations    = 6
+	maxToolOutputForLLM   = 1600
+	maxStepOutputSummary  = 1200
+	investigationTimeout  = 3 * time.Minute
+)
+
 var (
 	ErrQuotaExceeded = errors.New("monthly managed agent investigation quota exceeded; upgrade plan or switch to BYOA mode")
 	ErrNotFound      = errors.New("record not found")
@@ -35,6 +44,7 @@ type TriggerRequest struct {
 	TriggerSource string // "AUTOMATIC", "MANUAL_UI", "MANUAL_SLACK", "LOG_SPIKE", "API"
 	UserPrompt    *string
 	Force         bool
+	Sync          bool // When true, runs inline instead of background goroutine (useful for tests/CLI)
 }
 
 type ByoaCallbackPayload struct {
@@ -79,6 +89,7 @@ type serviceImpl struct {
 	logSearchPublicURL string
 	logger             *logrus.Entry
 	httpClient         *http.Client
+	managedGPUSem      chan struct{}
 }
 
 func NewService(
@@ -105,8 +116,10 @@ func NewService(
 		logSearchPublicURL: strings.TrimRight(logSearchPublicURL, "/"),
 		logger:             logger.WithField("component", "investigation_service"),
 		httpClient: &http.Client{
-			Timeout: 15 * time.Second,
+			Timeout: 20 * time.Second,
 		},
+		// Serialize local managed GPU inference (4 GiB VRAM RTX 3050 Ti) so concurrent investigations don't OOM VRAM.
+		managedGPUSem: make(chan struct{}, 1),
 	}
 }
 
@@ -221,17 +234,7 @@ func (s *serviceImpl) GetAgentConfig(ctx context.Context, teamID uint) (*entitie
 			CooldownMinutes:        30,
 			RemediationLevel:       entities.RemediationApprovalRequired,
 			ExternalMCPServers:     []entities.ExternalMCPServerConfig{},
-			RemediationPlaybooks: []entities.RemediationPlaybookConfig{
-				{
-					ID:               "pb_rollout_restart",
-					Name:             "Kubernetes Rollout Restart & Connection Pool Drain",
-					TriggerPattern:   "too many clients|timeout|502|503|Target Down",
-					ActionType:       "K8S_ROLLOUT_RESTART",
-					TargetURL:        "https://api.opsway.eu/v1/remediation/k8s/rollout-restart",
-					Method:           "POST",
-					RequiresApproval: true,
-				},
-			},
+			RemediationPlaybooks:   []entities.RemediationPlaybookConfig{},
 		}
 		_ = s.db.WithContext(ctx).Create(&cfg).Error
 		return &cfg, nil
@@ -330,7 +333,6 @@ func (s *serviceImpl) TriggerInvestigation(ctx context.Context, req TriggerReque
 		if !agentCfg.Enabled {
 			return nil, nil
 		}
-		// Skip static TLS expiry notices from automatic log investigation
 		lowerTitle := strings.ToLower(inc.Title)
 		if strings.Contains(lowerTitle, "cert expiry") || strings.Contains(lowerTitle, "deprecated tls") {
 			return nil, nil
@@ -345,7 +347,6 @@ func (s *serviceImpl) TriggerInvestigation(ctx context.Context, req TriggerReque
 			return nil, nil
 		}
 
-		// Cooldown check
 		if agentCfg.CooldownMinutes > 0 {
 			cutoff := time.Now().Add(-time.Duration(agentCfg.CooldownMinutes) * time.Minute)
 			var recentCount int64
@@ -359,9 +360,9 @@ func (s *serviceImpl) TriggerInvestigation(ctx context.Context, req TriggerReque
 	}
 
 	// Resolve monitor & linked log-search service name
-	serviceName := "checkout-service"
+	serviceName := ""
 	var monitorEntity *entities.Monitor
-	if inc.MonitorID != nil {
+	if inc.MonitorID != nil && s.monitorService != nil {
 		monitorEntity, _ = s.monitorService.GetMonitorAndSettingsByTeamIDAndID(ctx, req.TeamID, *inc.MonitorID)
 		if monitorEntity != nil {
 			if monitorEntity.Settings.InvestigationPolicy == "OFF" && req.TriggerSource == "AUTOMATIC" {
@@ -378,7 +379,7 @@ func (s *serviceImpl) TriggerInvestigation(ctx context.Context, req TriggerReque
 		}
 	}
 
-	// Also check ServiceCatalogItem mapping if monitor is linked
+	// Check ServiceCatalogItem mapping if monitor is linked
 	var catalogItems []entities.ServiceCatalogItem
 	_ = s.db.WithContext(ctx).Where("team_id = ?", req.TeamID).Find(&catalogItems).Error
 	for _, item := range catalogItems {
@@ -390,6 +391,9 @@ func (s *serviceImpl) TriggerInvestigation(ctx context.Context, req TriggerReque
 				}
 			}
 		}
+	}
+	if serviceName == "" {
+		serviceName = fmt.Sprintf("incident-%d", inc.ID)
 	}
 
 	// Check & increment quota if running in MANAGED mode
@@ -409,6 +413,11 @@ func (s *serviceImpl) TriggerInvestigation(ctx context.Context, req TriggerReque
 	}
 
 	startedAt := time.Now().UTC()
+	initialStatus := entities.InvestigationStatusQueued
+	if req.Sync {
+		initialStatus = entities.InvestigationStatusRunning
+	}
+
 	inv := &entities.IncidentInvestigation{
 		UUID:          "inv_" + strings.ReplaceAll(uuid.New().String(), "-", "")[:16],
 		TeamID:        req.TeamID,
@@ -417,7 +426,7 @@ func (s *serviceImpl) TriggerInvestigation(ctx context.Context, req TriggerReque
 		ServiceName:   serviceName,
 		TriggerSource: req.TriggerSource,
 		ExecutionMode: agentCfg.ExecutionMode,
-		Status:        entities.InvestigationStatusRunning,
+		Status:        initialStatus,
 		UserPrompt:    req.UserPrompt,
 		StartedAt:     startedAt,
 	}
@@ -426,23 +435,33 @@ func (s *serviceImpl) TriggerInvestigation(ctx context.Context, req TriggerReque
 		return nil, err
 	}
 
-	// Execute investigation (Managed / BYO_LLM vs BYOA_WEBHOOK)
-	if agentCfg.ExecutionMode == entities.AgentModeByoaWebhook && agentCfg.ByoaWebhookURL != nil && *agentCfg.ByoaWebhookURL != "" {
-		s.executeByoaWebhookFlow(ctx, inv, inc, monitorEntity, agentCfg)
-	} else {
-		s.executeManagedAgentFlow(ctx, inv, inc, monitorEntity, agentCfg)
+	run := func(runCtx context.Context) {
+		if agentCfg.ExecutionMode == entities.AgentModeByoaWebhook && agentCfg.ByoaWebhookURL != nil && *agentCfg.ByoaWebhookURL != "" {
+			s.executeByoaWebhookFlow(runCtx, inv, inc, monitorEntity, agentCfg)
+			return
+		}
+		s.executeManagedAgentFlow(runCtx, inv, inc, monitorEntity, agentCfg)
 	}
 
-	// Reload complete investigation with steps and actions
-	var completed entities.IncidentInvestigation
-	_ = s.db.WithContext(ctx).
-		Preload("Steps", func(db *gorm.DB) *gorm.DB {
-			return db.Order("step_index asc")
-		}).
-		Preload("RemediationActions").
-		First(&completed, inv.ID).Error
+	if req.Sync {
+		run(ctx)
+		var completed entities.IncidentInvestigation
+		_ = s.db.WithContext(ctx).
+			Preload("Steps", func(db *gorm.DB) *gorm.DB {
+				return db.Order("step_index asc")
+			}).
+			Preload("RemediationActions").
+			First(&completed, inv.ID).Error
+		return &completed, nil
+	}
 
-	return &completed, nil
+	go func() {
+		bgCtx, cancel := context.WithTimeout(context.Background(), investigationTimeout)
+		defer cancel()
+		run(bgCtx)
+	}()
+
+	return inv, nil
 }
 
 func (s *serviceImpl) executeByoaWebhookFlow(
@@ -452,6 +471,9 @@ func (s *serviceImpl) executeByoaWebhookFlow(
 	mon *entities.Monitor,
 	cfg *entities.AgentConfig,
 ) {
+	inv.Status = entities.InvestigationStatusRunning
+	_ = s.db.WithContext(ctx).Save(inv).Error
+
 	stepStart := time.Now()
 	webhookPayload := map[string]interface{}{
 		"event":            "incident.investigation.requested",
@@ -475,10 +497,14 @@ func (s *serviceImpl) executeByoaWebhookFlow(
 	}
 
 	payloadBytes, _ := json.Marshal(webhookPayload)
-	dispatchSummary := fmt.Sprintf("Dispatched signed BYOA investigation request to %s with Unified MCP Gateway access (`api.opsway.eu/v1/mcp` & `logs.opsway.eu/mcp`).", *cfg.ByoaWebhookURL)
+	dispatchSummary := fmt.Sprintf("Dispatched signed BYOA investigation request to %s.", *cfg.ByoaWebhookURL)
+	stepStatus := "COMPLETED"
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, *cfg.ByoaWebhookURL, bytes.NewReader(payloadBytes))
-	if err == nil {
+	if err != nil {
+		stepStatus = "FAILED"
+		dispatchSummary = fmt.Sprintf("Failed to construct BYOA webhook request: %v", err)
+	} else {
 		req.Header.Set("Content-Type", "application/json")
 		if cfg.ByoaWebhookSecret != nil && *cfg.ByoaWebhookSecret != "" {
 			mac := hmac.New(sha256.New, []byte(*cfg.ByoaWebhookSecret))
@@ -486,13 +512,22 @@ func (s *serviceImpl) executeByoaWebhookFlow(
 			req.Header.Set("X-Opsway-Signature-256", "sha256="+hex.EncodeToString(mac.Sum(nil)))
 		}
 		resp, doErr := s.httpClient.Do(req)
-		if doErr == nil {
-			resp.Body.Close()
-			dispatchSummary += fmt.Sprintf(" Remote agent responded HTTP %d.", resp.StatusCode)
+		if doErr != nil {
+			stepStatus = "FAILED"
+			dispatchSummary = fmt.Sprintf("BYOA webhook dispatch to %s failed: %v", *cfg.ByoaWebhookURL, doErr)
+		} else {
+			defer resp.Body.Close()
+			if resp.StatusCode >= 200 && resp.StatusCode < 300 {
+				dispatchSummary += fmt.Sprintf(" Remote agent accepted request (HTTP %d). Awaiting callback.", resp.StatusCode)
+			} else {
+				stepStatus = "FAILED"
+				body, _ := io.ReadAll(io.LimitReader(resp.Body, 512))
+				dispatchSummary += fmt.Sprintf(" Remote agent returned HTTP %d: %s", resp.StatusCode, strings.TrimSpace(string(body)))
+			}
 		}
 	}
 
-	step1 := entities.InvestigationStep{
+	_ = s.db.WithContext(ctx).Create(&entities.InvestigationStep{
 		InvestigationID: inv.ID,
 		StepIndex:       1,
 		StepType:        "MCP_TOOL_CALL",
@@ -500,13 +535,34 @@ func (s *serviceImpl) executeByoaWebhookFlow(
 		ToolName:        "byoa.dispatch_incident_webhook",
 		InputJSON:       string(payloadBytes),
 		OutputSummary:   dispatchSummary,
-		Status:          "COMPLETED",
-		DurationMs:      time.Since(stepStart).Milliseconds() + 45,
-	}
-	_ = s.db.WithContext(ctx).Create(&step1).Error
+		Status:          stepStatus,
+		DurationMs:      time.Since(stepStart).Milliseconds(),
+	}).Error
 
-	// Also run log-search correlation via MCP gateway so the Hub UI immediately shows correlated context while external agent works
-	s.executeManagedAgentFlow(ctx, inv, inc, mon, cfg)
+	if stepStatus == "FAILED" {
+		now := time.Now().UTC()
+		inv.Status = entities.InvestigationStatusFailed
+		inv.RootCauseSummary = &dispatchSummary
+		inv.CompletedAt = &now
+		inv.DurationMs = now.Sub(inv.StartedAt).Milliseconds()
+		_ = s.db.WithContext(ctx).Save(inv).Error
+	}
+}
+
+type agentRemediationProposal struct {
+	Title         string `json:"title"`
+	Description   string `json:"description"`
+	ActionType    string `json:"actionType"`
+	TargetService string `json:"targetService"`
+	DiffOrCommand string `json:"diffOrCommand"`
+	PayloadJSON   string `json:"payloadJson"`
+}
+
+type agentSynthesisResult struct {
+	RootCauseSummary   string                     `json:"rootCauseSummary"`
+	DetailedDiagnosis  string                     `json:"detailedDiagnosis"`
+	ConfidenceScore    float64                    `json:"confidenceScore"`
+	RemediationActions []agentRemediationProposal `json:"remediationActions"`
 }
 
 func (s *serviceImpl) executeManagedAgentFlow(
@@ -516,280 +572,258 @@ func (s *serviceImpl) executeManagedAgentFlow(
 	mon *entities.Monitor,
 	cfg *entities.AgentConfig,
 ) {
+	// Serialize local managed GPU investigations so 4 GiB VRAM RTX 3050 Ti never OOMs.
+	if cfg.ExecutionMode == entities.AgentModeManaged {
+		select {
+		case s.managedGPUSem <- struct{}{}:
+			defer func() { <-s.managedGPUSem }()
+		case <-ctx.Done():
+			s.markInvestigationFailed(inv, fmt.Sprintf("Investigation timed out waiting for GPU slot: %v", ctx.Err()))
+			return
+		}
+	}
+
+	inv.Status = entities.InvestigationStatusRunning
+	_ = s.db.WithContext(ctx).Save(inv).Error
+
+	activeLLM := llm.NewClientForConfig(cfg, s.llmClient)
+	if activeLLM == nil {
+		s.markInvestigationFailed(inv, "No LLM client configured for managed or BYO_LLM investigation.")
+		return
+	}
+
+	// Build focused tool catalog for compact 8k-16k context windows (4 GiB VRAM friendly).
+	toolDefs, externalTools := s.buildAgentTools(ctx, inv.TeamID, cfg)
+
+	incidentContext := s.buildIncidentPrompt(inv, inc, mon)
+	messages := []llm.Message{
+		{
+			Role:    "system",
+			Content: buildAgentSystemPrompt(),
+		},
+		{
+			Role:    "user",
+			Content: incidentContext,
+		},
+	}
+
 	stepIdx := 1
-	var existingSteps int64
-	s.db.WithContext(ctx).Model(&entities.InvestigationStep{}).Where("investigation_id = ?", inv.ID).Count(&existingSteps)
-	if existingSteps > 0 {
-		stepIdx = int(existingSteps) + 1
-	}
+	totalTokens := 0
+	var correlatedLogs []entities.CorrelatedLogEntry
+	var finalContent string
+	var llmErr error
 
-	// Step 1: Query ClickHouse Check Timings & Incident Metrics via Monitoring MCP
-	monID := uint(1)
-	if inc.MonitorID != nil {
-		monID = *inc.MonitorID
-	}
-	t1 := time.Now()
-	timingsRes, _ := s.mcpGateway.CallTool(ctx, inv.TeamID, "monitoring.get_monitor_check_timings", map[string]interface{}{
-		"monitor_id": monID,
-		"limit":      10,
-	})
-	timingsOut := extractFirstText(timingsRes)
-	_ = s.db.WithContext(ctx).Create(&entities.InvestigationStep{
-		InvestigationID: inv.ID,
-		StepIndex:       stepIdx,
-		StepType:        "MCP_TOOL_CALL",
-		ServerName:      "monitoring-mcp",
-		ToolName:        "monitoring.get_monitor_check_timings",
-		InputJSON:       fmt.Sprintf(`{"monitor_id":%d,"limit":10}`, monID),
-		OutputSummary:   truncateText(fmt.Sprintf("Inspected last 10 multi-location probe checks from ClickHouse for monitor #%d (`%s`). ServerProcessing phase spiked >4800ms prior to HTTP 502/assertion failure.", monID, inv.ServiceName), 500),
-		Status:          "COMPLETED",
-		DurationMs:      time.Since(t1).Milliseconds() + 62,
-	}).Error
-	stepIdx++
-
-	// Step 2: Query Log-Search MCP Error Summary
-	t2 := time.Now()
-	errSumRes, _ := s.mcpGateway.CallTool(ctx, inv.TeamID, "logs.get_error_summary", map[string]interface{}{
-		"service_name": inv.ServiceName,
-		"start_time":   "-30m",
-		"end_time":     "now",
-	})
-	errSumOut := extractFirstText(errSumRes)
-	_ = s.db.WithContext(ctx).Create(&entities.InvestigationStep{
-		InvestigationID: inv.ID,
-		StepIndex:       stepIdx,
-		StepType:        "MCP_TOOL_CALL",
-		ServerName:      "log-search-mcp",
-		ToolName:        "logs.get_error_summary",
-		InputJSON:       fmt.Sprintf(`{"service_name":"%s","start_time":"-30m","end_time":"now"}`, inv.ServiceName),
-		OutputSummary:   fmt.Sprintf("Queried `log-search` MCP error summary for `%s`: detected 48 ERROR logs and 19 WARN logs (3.38%% error rate). Primary signature: `FATAL: pq: sorry, too many clients already (SQLSTATE 53300)`.", inv.ServiceName),
-		Status:          "COMPLETED",
-		DurationMs:      time.Since(t2).Milliseconds() + 118,
-	}).Error
-	stepIdx++
-
-	// Step 3: Semantic Search & Context Window in Log-Search MCP
-	t3 := time.Now()
-	queryText := inc.Title
-	if inc.Description != nil && *inc.Description != "" {
-		queryText = fmt.Sprintf("%s %s", inc.Title, *inc.Description)
-	}
-	semRes, _ := s.mcpGateway.CallTool(ctx, inv.TeamID, "logs.semantic_search", map[string]interface{}{
-		"query":        queryText,
-		"service_name": inv.ServiceName,
-		"log_level":    "ERROR",
-		"start_time":   "-30m",
-		"limit":        10,
-	})
-	semOut := extractFirstText(semRes)
-
-	_, _ = s.mcpGateway.CallTool(ctx, inv.TeamID, "logs.get_log_context", map[string]interface{}{
-		"timestamp":    time.Now().UTC().Add(-4 * time.Minute).Format(time.RFC3339),
-		"service_name": inv.ServiceName,
-		"lines_before": 20,
-		"lines_after":  20,
-	})
-
-	_ = s.db.WithContext(ctx).Create(&entities.InvestigationStep{
-		InvestigationID: inv.ID,
-		StepIndex:       stepIdx,
-		StepType:        "MCP_TOOL_CALL",
-		ServerName:      "log-search-mcp",
-		ToolName:        "logs.semantic_search & logs.get_log_context",
-		InputJSON:       fmt.Sprintf(`{"service_name":"%s","log_level":"ERROR","lines_before":20,"lines_after":20}`, inv.ServiceName),
-		OutputSummary:   fmt.Sprintf("Retrieved correlated error logs and ±20 surrounding context lines from Milvus (`log-search`). Found connection pool exhaustion (`96/100 leased connections` -> `SQLSTATE 53300`) triggered by batch reconciliation worker."),
-		Status:          "COMPLETED",
-		DurationMs:      time.Since(t3).Milliseconds() + 184,
-	}).Error
-	stepIdx++
-
-	// Step 4: Pantomath Code & Infra Graph Lookup
-	t4 := time.Now()
-	pantoRes, _ := s.mcpGateway.CallTool(ctx, inv.TeamID, "pantomath.ask_codebase", map[string]interface{}{
-		"query": fmt.Sprintf("database connection pool SetMaxOpenConns in %s", inv.ServiceName),
-	})
-	pantoSummary := "Cross-referenced stack trace against `pantomath` GraphRAG: located `internal/connectors/postgres/client.go:18-42` where worker concurrency was raised to 32 without bounding `SetMaxOpenConns`."
-	if pantoRes != nil && !pantoRes.IsError && len(pantoRes.Content) > 0 && pantoRes.Content[0].Text != "" {
-		text := pantoRes.Content[0].Text
-		if len(text) > 1200 {
-			text = text[:1200] + "..."
+	temp := 0.1
+	for iter := 0; iter < maxAgentIterations; iter++ {
+		callStart := time.Now()
+		resp, err := activeLLM.Chat(ctx, llm.ChatCompletionRequest{
+			Messages:    messages,
+			Tools:       toolDefs,
+			ToolChoice:  "auto",
+			Temperature: &temp,
+			MaxTokens:   1024,
+		})
+		if err != nil {
+			llmErr = err
+			s.logger.WithError(err).WithField("investigation_uuid", inv.UUID).Warn("LLM chat turn failed")
+			break
 		}
-		pantoSummary = text
-	}
-	_ = s.db.WithContext(ctx).Create(&entities.InvestigationStep{
-		InvestigationID: inv.ID,
-		StepIndex:       stepIdx,
-		StepType:        "MCP_TOOL_CALL",
-		ServerName:      "pantomath-mcp",
-		ToolName:        "pantomath.ask_codebase",
-		InputJSON:       fmt.Sprintf(`{"query":"database connection pool SetMaxOpenConns in %s"}`, inv.ServiceName),
-		OutputSummary:   pantoSummary,
-		Status:          "COMPLETED",
-		DurationMs:      time.Since(t4).Milliseconds(),
-	}).Error
-	stepIdx++
 
-	// Build correlated log entries with deep links to logs.opsway.eu
-	now := time.Now().UTC()
-	startMs := now.Add(-30 * time.Minute).UnixMilli()
-	endMs := now.UnixMilli()
-	deepLink := fmt.Sprintf("%s/?query=%s&timeRange=1h&start_ts=%d&end_ts=%d",
-		s.logSearchPublicURL,
-		url.QueryEscape(fmt.Sprintf(`{service="%s"}`, inv.ServiceName)),
-		startMs,
-		endMs,
-	)
+		totalTokens += resp.Usage.TotalTokens
+		assistantMsg := resp.Choices[0].Message
 
-	correlatedLogs := []entities.CorrelatedLogEntry{
-		{
-			LogID:       "94810293841",
-			Timestamp:   now.Add(-4 * time.Minute).Format(time.RFC3339),
-			ServiceName: inv.ServiceName,
-			LogLevel:    "ERROR",
-			Message:     "FATAL: pq: sorry, too many clients already (SQLSTATE 53300) — active_conns=100 max_conns=100",
-			Labels: map[string]string{
-				"kubernetes.namespace": "production",
-				"kubernetes.pod_name":  fmt.Sprintf("%s-7d9f8b6c4-x9k2p", inv.ServiceName),
-				"trace_id":             "4bf92f3577b34da6a3ce929d0e0e4736",
-			},
-			DeepLinkURL: deepLink,
-		},
-		{
-			LogID:       "94810293812",
-			Timestamp:   now.Add(-5 * time.Minute).Format(time.RFC3339),
-			ServiceName: inv.ServiceName,
-			LogLevel:    "WARN",
-			Message:     "Database connection pool utilization exceeded 95% threshold (96/100 leased connections)",
-			Labels: map[string]string{
-				"kubernetes.namespace": "production",
-				"kubernetes.pod_name":  fmt.Sprintf("%s-7d9f8b6c4-x9k2p", inv.ServiceName),
-			},
-			DeepLinkURL: deepLink,
-		},
-		{
-			LogID:       "94810293790",
-			Timestamp:   now.Add(-5*time.Minute - 12*time.Second).Format(time.RFC3339),
-			ServiceName: inv.ServiceName,
-			LogLevel:    "INFO",
-			Message:     "Starting batch reconciliation worker with concurrency=32 (unbounded DB connections)",
-			Labels: map[string]string{
-				"kubernetes.namespace": "production",
-				"component":            "reconciler",
-			},
-			DeepLinkURL: deepLink,
-		},
+		if len(assistantMsg.ToolCalls) == 0 {
+			finalContent = strings.TrimSpace(assistantMsg.Content)
+			break
+		}
+
+		messages = append(messages, assistantMsg)
+
+		for _, tc := range assistantMsg.ToolCalls {
+			toolStart := time.Now()
+			argsMap := parseToolArguments(tc.Function.Arguments)
+			toolRes, callErr := s.invokeAgentTool(ctx, inv.TeamID, tc.Function.Name, argsMap, externalTools)
+
+			toolText := extractFirstText(toolRes)
+			stepStatus := "COMPLETED"
+			if callErr != nil {
+				stepStatus = "FAILED"
+				toolText = fmt.Sprintf("Tool error: %v", callErr)
+			} else if toolRes != nil && toolRes.IsError {
+				stepStatus = "FAILED"
+			}
+			if strings.TrimSpace(toolText) == "" {
+				toolText = "(empty tool response)"
+			}
+
+			// Extract real correlated log entries from log-search MCP tool outputs.
+			if strings.HasPrefix(tc.Function.Name, "logs.") && stepStatus == "COMPLETED" {
+				extracted := s.extractCorrelatedLogs(toolText, inv.ServiceName)
+				correlatedLogs = appendUniqueLogs(correlatedLogs, extracted, 10)
+			}
+
+			_ = s.db.WithContext(ctx).Create(&entities.InvestigationStep{
+				InvestigationID: inv.ID,
+				StepIndex:       stepIdx,
+				StepType:        "MCP_TOOL_CALL",
+				ServerName:      inferServerName(tc.Function.Name),
+				ToolName:        tc.Function.Name,
+				InputJSON:       truncateText(tc.Function.Arguments, 1000),
+				OutputSummary:   truncateText(toolText, maxStepOutputSummary),
+				Status:          stepStatus,
+				DurationMs:      time.Since(toolStart).Milliseconds(),
+			}).Error
+			stepIdx++
+
+			messages = append(messages, llm.Message{
+				Role:       "tool",
+				ToolCallID: tc.ID,
+				Name:       tc.Function.Name,
+				Content:    truncateText(toolText, maxToolOutputForLLM),
+			})
+		}
+
+		_ = callStart
 	}
 
-	// Attempt LLM synthesis enriched with actual MCP outputs, with deterministic fallback
-	llmPrompt := fmt.Sprintf(
-		"Incident: %s\nService: %s\nClickHouse Timings: %s\nLog-Search Error Summary: %s\nLog-Search Matches: %s\nProvide a concise root cause summary.",
-		inc.Title, inv.ServiceName, truncateText(timingsOut, 400), truncateText(errSumOut, 400), truncateText(semOut, 400),
-	)
-	if inv.UserPrompt != nil && *inv.UserPrompt != "" {
-		llmPrompt += "\nOperator Hint: " + *inv.UserPrompt
-	}
-
-	rootCauseSummary := fmt.Sprintf(
-		"PostgreSQL connection pool exhaustion (`SQLSTATE 53300: too many clients already`) in `%s` caused by an unthrottled batch reconciliation worker (`concurrency=32`), leading to 5000ms transaction acquisition timeouts and HTTP 502 probe failures.",
-		inv.ServiceName,
-	)
-	if s.llmClient != nil {
-		if gen, err := s.llmClient.GenerateRCA(ctx, llmPrompt); err == nil && strings.TrimSpace(gen) != "" {
-			rootCauseSummary = strings.TrimSpace(gen)
+	// If loop exhausted max iterations without final synthesis, request one final JSON synthesis without tools.
+	if finalContent == "" && llmErr == nil {
+		messages = append(messages, llm.Message{
+			Role:    "user",
+			Content: "You have reached the tool call budget. Based strictly on the evidence collected above, output the final JSON diagnosis object now.",
+		})
+		resp, err := activeLLM.Chat(ctx, llm.ChatCompletionRequest{
+			Messages:    messages,
+			Temperature: &temp,
+			MaxTokens:   1024,
+		})
+		if err != nil {
+			llmErr = err
+		} else {
+			totalTokens += resp.Usage.TotalTokens
+			finalContent = strings.TrimSpace(resp.Choices[0].Message.Content)
 		}
 	}
 
-	detailedDiagnosis := fmt.Sprintf(`### Root Cause Analysis
-1. **Monitoring Detection**: Multi-location probes for **%s** recorded a sudden spike in server processing latency (`+"`>4,800ms`"+`) followed by **%s** across consensus locations.
-2. **Log-Search Correlation (`+"`log-search-mcp`"+`)**: Querying `+"`logs.get_error_summary`"+` and `+"`logs.get_log_context`"+` for service `+"`%s`"+` revealed **48 ERROR logs** (`+"`3.38%%`"+` error rate). At `+"`%s`"+`, a batch reconciliation job started with `+"`concurrency=32`"+`, saturating all 100 PostgreSQL connections (`+"`FATAL: pq: sorry, too many clients already`"+`).
-3. **Codebase & Infra Context (`+"`pantomath-mcp`"+`)**: `+"`internal/connectors/postgres/client.go`"+` initializes GORM without bounding `+"`sqlDB.SetMaxOpenConns(25)`"+` per replica.
+	if llmErr != nil {
+		errMsg := fmt.Sprintf("Agent LLM inference failed (%s): %v", activeLLM.Model(), llmErr)
+		_ = s.db.WithContext(ctx).Create(&entities.InvestigationStep{
+			InvestigationID: inv.ID,
+			StepIndex:       stepIdx,
+			StepType:        "SYNTHESIS",
+			ServerName:      "opsway-agent",
+			ToolName:        "agent.synthesize_diagnosis",
+			OutputSummary:   errMsg,
+			Status:          "FAILED",
+			DurationMs:      0,
+		}).Error
+		inv.TokensUsed = totalTokens
+		inv.CorrelatedLogs = correlatedLogs
+		s.markInvestigationFailed(inv, errMsg)
+		return
+	}
 
-### Recommended Remediation
-- **Immediate Mitigation**: Execute a rolling restart of `+"`deployment/%s`"+` and drain leaked idle connections via PgBouncer / Kubernetes rollout.
-- **Permanent Code Fix**: Set `+"`sqlDB.SetMaxOpenConns(25)`"+` and `+"`sqlDB.SetConnMaxIdleTime(5 * time.Minute)`"+` in `+"`postgres/client.go`"+`.`,
-		inv.ServiceName,
-		inc.Title,
-		inv.ServiceName,
-		now.Add(-5*time.Minute).Format("15:04:05 UTC"),
-		inv.ServiceName,
-	)
+	synthesis := parseSynthesisResult(finalContent, inv.ServiceName)
+	if synthesis.ConfidenceScore <= 0 || synthesis.ConfidenceScore > 1 {
+		synthesis.ConfidenceScore = 0.70
+	}
 
-	confidence := 0.94
-	inv.RootCauseSummary = &rootCauseSummary
-	inv.DetailedDiagnosis = &detailedDiagnosis
-	inv.ConfidenceScore = &confidence
+	inv.RootCauseSummary = &synthesis.RootCauseSummary
+	inv.DetailedDiagnosis = &synthesis.DetailedDiagnosis
+	inv.ConfidenceScore = &synthesis.ConfidenceScore
 	inv.CorrelatedLogs = correlatedLogs
-	inv.TokensUsed = 1840
+	inv.TokensUsed = totalTokens
 
-	// Step 5: Synthesis step
 	_ = s.db.WithContext(ctx).Create(&entities.InvestigationStep{
 		InvestigationID: inv.ID,
 		StepIndex:       stepIdx,
 		StepType:        "SYNTHESIS",
 		ServerName:      "opsway-agent",
 		ToolName:        "agent.synthesize_diagnosis",
-		OutputSummary:   rootCauseSummary,
+		OutputSummary:   truncateText(synthesis.RootCauseSummary, maxStepOutputSummary),
 		Status:          "COMPLETED",
-		DurationMs:      310,
+		DurationMs:      0,
 	}).Error
 	stepIdx++
 
-	// Create RemediationActions based on team's RemediationLevel
+	// Build remediation actions from LLM proposals + matching configured playbooks.
 	actionStatus := "PENDING_APPROVAL"
 	if cfg.RemediationLevel == entities.RemediationAdvisory {
 		actionStatus = "SUGGESTED"
 	}
 
-	remAction1 := entities.RemediationAction{
-		InvestigationID: inv.ID,
-		TeamID:          inv.TeamID,
-		IncidentID:      inc.ID,
-		Title:           fmt.Sprintf("Rollout Restart `%s` & Drain Idle DB Connections", inv.ServiceName),
-		Description:     "Executes a zero-downtime Kubernetes rolling restart on the degraded deployment and resets stuck PostgreSQL pool connections.",
-		ActionType:      "K8S_ROLLOUT_RESTART",
-		TargetService:   inv.ServiceName,
-		DiffOrCommand:   fmt.Sprintf("kubectl rollout restart deployment/%s -n production && kubectl rollout status deployment/%s -n production", inv.ServiceName, inv.ServiceName),
-		PayloadJSON:     fmt.Sprintf(`{"namespace":"production","deployment":"%s","action":"rollout_restart"}`, inv.ServiceName),
-		Status:          actionStatus,
-	}
-	_ = s.db.WithContext(ctx).Create(&remAction1).Error
-
-	remAction2 := entities.RemediationAction{
-		InvestigationID: inv.ID,
-		TeamID:          inv.TeamID,
-		IncidentID:      inc.ID,
-		Title:           "Open GitHub PR: Bound GORM PostgreSQL Pool (`SetMaxOpenConns(25)`)",
-		Description:     "Drafts a pull request capping per-pod PostgreSQL open connections to prevent worker concurrency spikes from exhausting `max_connections`.",
-		ActionType:      "GITHUB_PR",
-		TargetService:   inv.ServiceName,
-		DiffOrCommand:   "+ sqlDB, err := db.DB()\n+ sqlDB.SetMaxOpenConns(25)\n+ sqlDB.SetMaxIdleConns(10)\n+ sqlDB.SetConnMaxLifetime(30 * time.Minute)",
-		PayloadJSON:     `{"repo":"opsway-io/backend","file":"internal/connectors/postgres/client.go","branch":"fix/pg-pool-limits"}`,
-		Status:          actionStatus,
-	}
-	_ = s.db.WithContext(ctx).Create(&remAction2).Error
-
-	if cfg.RemediationLevel == entities.RemediationAutonomous {
-		// Level 3: Autonomous execution + post-fix verification
-		execNow := time.Now().UTC()
-		verifyMsg := "Executed rolling restart; verified via `logs.tail_recent_logs` (0 errors in last 20 log lines) and `monitoring.trigger_monitor_recheck` (HTTP 200 OK in 118ms)."
-		remAction1.Status = "VERIFIED"
-		remAction1.ExecutedAt = &execNow
-		remAction1.VerificationSummary = &verifyMsg
-		_ = s.db.WithContext(ctx).Save(&remAction1).Error
-
-		_ = s.db.WithContext(ctx).Create(&entities.InvestigationStep{
+	createdActions := make([]entities.RemediationAction, 0, len(synthesis.RemediationActions)+2)
+	for _, prop := range synthesis.RemediationActions {
+		if strings.TrimSpace(prop.Title) == "" {
+			continue
+		}
+		targetSvc := strings.TrimSpace(prop.TargetService)
+		if targetSvc == "" {
+			targetSvc = inv.ServiceName
+		}
+		actType := strings.TrimSpace(prop.ActionType)
+		if actType == "" {
+			actType = "CLI_COMMAND"
+		}
+		act := entities.RemediationAction{
 			InvestigationID: inv.ID,
-			StepIndex:       stepIdx,
-			StepType:        "VERIFICATION",
-			ServerName:      "opsway-agent",
-			ToolName:        "logs.tail_recent_logs & monitoring.trigger_monitor_recheck",
-			OutputSummary:   verifyMsg,
-			Status:          "COMPLETED",
-			DurationMs:      240,
-		}).Error
+			TeamID:          inv.TeamID,
+			IncidentID:      inc.ID,
+			Title:           prop.Title,
+			Description:     prop.Description,
+			ActionType:      actType,
+			TargetService:   targetSvc,
+			DiffOrCommand:   prop.DiffOrCommand,
+			PayloadJSON:     prop.PayloadJSON,
+			Status:          actionStatus,
+		}
+		if err := s.db.WithContext(ctx).Create(&act).Error; err == nil {
+			createdActions = append(createdActions, act)
+		}
+	}
 
+	// Match team's configured RemediationPlaybooks against incident title + root cause.
+	matchCorpus := inc.Title + "\n" + synthesis.RootCauseSummary
+	for _, pb := range cfg.RemediationPlaybooks {
+		if pb.TriggerPattern == "" {
+			continue
+		}
+		re, err := regexp.Compile("(?i)" + pb.TriggerPattern)
+		if err != nil || !re.MatchString(matchCorpus) {
+			continue
+		}
+		pbPayload, _ := json.Marshal(map[string]interface{}{
+			"playbook_id": pb.ID,
+			"target_url":  pb.TargetURL,
+			"method":      pb.Method,
+			"service":     inv.ServiceName,
+			"incident_id": inc.ID,
+		})
+		act := entities.RemediationAction{
+			InvestigationID: inv.ID,
+			TeamID:          inv.TeamID,
+			IncidentID:      inc.ID,
+			Title:           pb.Name,
+			Description:     fmt.Sprintf("Matched allowlisted playbook `%s` (pattern `%s`).", pb.ID, pb.TriggerPattern),
+			ActionType:      pb.ActionType,
+			TargetService:   inv.ServiceName,
+			DiffOrCommand:   fmt.Sprintf("%s %s", defaultHTTPMethod(pb.Method), pb.TargetURL),
+			PayloadJSON:     string(pbPayload),
+			Status:          actionStatus,
+		}
+		if err := s.db.WithContext(ctx).Create(&act).Error; err == nil {
+			createdActions = append(createdActions, act)
+		}
+	}
+
+	if cfg.RemediationLevel == entities.RemediationAutonomous && len(createdActions) > 0 {
+		for i := range createdActions {
+			if isExecutableActionType(createdActions[i].ActionType) {
+				s.executeAndVerifyAction(ctx, inv, &createdActions[i], cfg, &stepIdx)
+			}
+		}
 		inv.Status = entities.InvestigationStatusCompleted
-	} else if cfg.RemediationLevel == entities.RemediationApprovalRequired {
+	} else if cfg.RemediationLevel == entities.RemediationApprovalRequired && len(createdActions) > 0 {
 		inv.Status = entities.InvestigationStatusAwaitingApproval
 	} else {
 		inv.Status = entities.InvestigationStatusCompleted
@@ -798,14 +832,461 @@ func (s *serviceImpl) executeManagedAgentFlow(
 	completedAt := time.Now().UTC()
 	inv.CompletedAt = &completedAt
 	inv.DurationMs = completedAt.Sub(inv.StartedAt).Milliseconds()
-	if inv.DurationMs < 500 {
-		inv.DurationMs = 854
-	}
 	_ = s.db.WithContext(ctx).Save(inv).Error
 
-	// Sync RootCauseSummary to Incident.RootCauseAnalysis for backward compatibility
-	inc.RootCauseAnalysis = &rootCauseSummary
+	// Sync RootCauseSummary to Incident.RootCauseAnalysis for backward compatibility.
+	inc.RootCauseAnalysis = &synthesis.RootCauseSummary
 	_ = s.incidentService.Update(ctx, inc)
+}
+
+func (s *serviceImpl) markInvestigationFailed(inv *entities.IncidentInvestigation, reason string) {
+	now := time.Now().UTC()
+	inv.Status = entities.InvestigationStatusFailed
+	inv.RootCauseSummary = &reason
+	inv.CompletedAt = &now
+	inv.DurationMs = now.Sub(inv.StartedAt).Milliseconds()
+	_ = s.db.WithContext(context.Background()).Save(inv).Error
+}
+
+func buildAgentSystemPrompt() string {
+	return `You are Opsway's Autonomous SRE Agent. Investigate the production incident using the available MCP tools and return a grounded, factual Root Cause Analysis.
+
+Rules:
+1. Never invent log lines, SQL errors, or metrics that were not returned by a tool.
+2. Call only the tools needed (typically: monitoring probe timings -> log error summary / semantic search -> codebase lookup if relevant).
+3. When you have enough evidence, stop calling tools and respond ONLY with a valid JSON object matching this exact schema:
+{
+  "rootCauseSummary": "Concise 2-3 sentence root cause grounded in tool outputs.",
+  "detailedDiagnosis": "Markdown breakdown citing exact tool findings (probe latencies/status codes, log signatures, or codebase references).",
+  "confidenceScore": 0.85,
+  "remediationActions": [
+    {
+      "title": "Short action title",
+      "description": "What this fixes and why",
+      "actionType": "CLI_COMMAND | K8S_ROLLOUT_RESTART | WEBHOOK_CALL | GITHUB_PR",
+      "targetService": "service-name",
+      "diffOrCommand": "Exact command or patch snippet",
+      "payloadJson": "{}"
+    }
+  ]
+}`
+}
+
+func (s *serviceImpl) buildIncidentPrompt(inv *entities.IncidentInvestigation, inc *entities.Incident, mon *entities.Monitor) string {
+	var sb strings.Builder
+	sb.WriteString(fmt.Sprintf("Incident ID: %d\n", inc.ID))
+	sb.WriteString(fmt.Sprintf("Title: %s\n", inc.Title))
+	if inc.Description != nil && *inc.Description != "" {
+		sb.WriteString(fmt.Sprintf("Description: %s\n", *inc.Description))
+	}
+	sb.WriteString(fmt.Sprintf("Occurrences: %d\n", inc.Occurrences))
+	sb.WriteString(fmt.Sprintf("Created At: %s\n", inc.CreatedAt.UTC().Format(time.RFC3339)))
+	if inc.MonitorID != nil {
+		sb.WriteString(fmt.Sprintf("Monitor ID: %d\n", *inc.MonitorID))
+	}
+	if mon != nil && mon.Name != "" {
+		sb.WriteString(fmt.Sprintf("Monitor Name: %s\n", mon.Name))
+	}
+	sb.WriteString(fmt.Sprintf("Service Name: %s\n", inv.ServiceName))
+	if inv.UserPrompt != nil && strings.TrimSpace(*inv.UserPrompt) != "" {
+		sb.WriteString(fmt.Sprintf("Operator Hint: %s\n", strings.TrimSpace(*inv.UserPrompt)))
+	}
+	sb.WriteString("\nInvestigate this incident using the MCP tools and produce the final JSON diagnosis.")
+	return sb.String()
+}
+
+var coreAgentToolAllowlist = map[string]bool{
+	"monitoring.get_incident_details":      true,
+	"monitoring.get_monitor_check_timings": true,
+	"monitoring.list_active_incidents":     true,
+	"logs.get_error_summary":               true,
+	"logs.semantic_search":                 true,
+	"logs.get_log_context":                 true,
+	"logs.tail_recent_logs":                true,
+	"pantomath.ask_codebase":               true,
+}
+
+type externalToolRoute struct {
+	server   entities.ExternalMCPServerConfig
+	origName string
+}
+
+func (s *serviceImpl) buildAgentTools(
+	ctx context.Context,
+	teamID uint,
+	cfg *entities.AgentConfig,
+) ([]llm.ToolDefinition, map[string]externalToolRoute) {
+	defs := make([]llm.ToolDefinition, 0, 10)
+	if s.mcpGateway != nil {
+		for _, t := range s.mcpGateway.ListTools(ctx, teamID) {
+			if !coreAgentToolAllowlist[t.Name] {
+				continue
+			}
+			defs = append(defs, llm.ToolDefinition{
+				Type: "function",
+				Function: llm.FunctionDefinition{
+					Name:        t.Name,
+					Description: t.Description,
+					Parameters:  t.InputSchema,
+				},
+			})
+		}
+	}
+
+	extRoutes := make(map[string]externalToolRoute)
+	for _, srv := range cfg.ExternalMCPServers {
+		if !srv.Enabled || strings.TrimSpace(srv.URL) == "" {
+			continue
+		}
+		tools := s.discoverExternalMCPTools(ctx, srv)
+		for _, t := range tools {
+			qualified := fmt.Sprintf("ext.%s.%s", sanitizeIdentifier(srv.Name), t.Name)
+			extRoutes[qualified] = externalToolRoute{server: srv, origName: t.Name}
+			defs = append(defs, llm.ToolDefinition{
+				Type: "function",
+				Function: llm.FunctionDefinition{
+					Name:        qualified,
+					Description: t.Description,
+					Parameters:  t.InputSchema,
+				},
+			})
+		}
+	}
+	return defs, extRoutes
+}
+
+func (s *serviceImpl) discoverExternalMCPTools(ctx context.Context, srv entities.ExternalMCPServerConfig) []mcp.Tool {
+	rpcReq := mcp.JSONRPCRequest{JSONRPC: "2.0", ID: 1, Method: "tools/list"}
+	bodyBytes, _ := json.Marshal(rpcReq)
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, srv.URL, bytes.NewReader(bodyBytes))
+	if err != nil {
+		return nil
+	}
+	req.Header.Set("Content-Type", "application/json")
+	if srv.AuthHeader != "" {
+		req.Header.Set("Authorization", srv.AuthHeader)
+	}
+	resp, err := s.httpClient.Do(req)
+	if err != nil {
+		return nil
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return nil
+	}
+	var rpcResp struct {
+		Result struct {
+			Tools []mcp.Tool `json:"tools"`
+		} `json:"result"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&rpcResp); err != nil {
+		return nil
+	}
+	if len(rpcResp.Result.Tools) > 6 {
+		return rpcResp.Result.Tools[:6]
+	}
+	return rpcResp.Result.Tools
+}
+
+func (s *serviceImpl) invokeAgentTool(
+	ctx context.Context,
+	teamID uint,
+	toolName string,
+	args map[string]interface{},
+	extRoutes map[string]externalToolRoute,
+) (*mcp.ToolCallResult, error) {
+	if route, ok := extRoutes[toolName]; ok {
+		return s.callExternalMCPTool(ctx, route.server, route.origName, args)
+	}
+	if s.mcpGateway == nil {
+		return nil, errors.New("mcp gateway not configured")
+	}
+	return s.mcpGateway.CallTool(ctx, teamID, toolName, args)
+}
+
+func (s *serviceImpl) callExternalMCPTool(
+	ctx context.Context,
+	srv entities.ExternalMCPServerConfig,
+	toolName string,
+	args map[string]interface{},
+) (*mcp.ToolCallResult, error) {
+	paramsBytes, _ := json.Marshal(mcp.ToolCallParams{Name: toolName, Arguments: args})
+	rpcReq := mcp.JSONRPCRequest{
+		JSONRPC: "2.0",
+		ID:      1,
+		Method:  "tools/call",
+		Params:  paramsBytes,
+	}
+	bodyBytes, _ := json.Marshal(rpcReq)
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, srv.URL, bytes.NewReader(bodyBytes))
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Content-Type", "application/json")
+	if srv.AuthHeader != "" {
+		req.Header.Set("Authorization", srv.AuthHeader)
+	}
+	resp, err := s.httpClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	respBytes, err := io.ReadAll(io.LimitReader(resp.Body, 64*1024))
+	if err != nil {
+		return nil, err
+	}
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return nil, fmt.Errorf("external MCP %s returned HTTP %d: %s", srv.Name, resp.StatusCode, string(respBytes))
+	}
+	var rpcResp struct {
+		Result *mcp.ToolCallResult `json:"result"`
+		Error  *mcp.JSONRPCError   `json:"error"`
+	}
+	if err := json.Unmarshal(respBytes, &rpcResp); err != nil {
+		return &mcp.ToolCallResult{Content: []mcp.ContentItem{{Type: "text", Text: string(respBytes)}}}, nil
+	}
+	if rpcResp.Error != nil {
+		return nil, errors.New(rpcResp.Error.Message)
+	}
+	return rpcResp.Result, nil
+}
+
+func (s *serviceImpl) extractCorrelatedLogs(toolText string, serviceName string) []entities.CorrelatedLogEntry {
+	var parsed map[string]interface{}
+	if err := json.Unmarshal([]byte(toolText), &parsed); err != nil {
+		return nil
+	}
+
+	var rawLogs []interface{}
+	for _, key := range []string{"logs", "results", "matches", "entries"} {
+		if arr, ok := parsed[key].([]interface{}); ok && len(arr) > 0 {
+			rawLogs = arr
+			break
+		}
+	}
+	if len(rawLogs) == 0 {
+		return nil
+	}
+
+	now := time.Now().UTC()
+	deepLink := fmt.Sprintf("%s/?query=%s&timeRange=1h&start_ts=%d&end_ts=%d",
+		s.logSearchPublicURL,
+		url.QueryEscape(fmt.Sprintf(`{service="%s"}`, serviceName)),
+		now.Add(-30*time.Minute).UnixMilli(),
+		now.UnixMilli(),
+	)
+
+	out := make([]entities.CorrelatedLogEntry, 0, len(rawLogs))
+	for _, item := range rawLogs {
+		m, ok := item.(map[string]interface{})
+		if !ok {
+			continue
+		}
+		msg := firstNonEmptyString(m, "message", "body", "log", "text")
+		if msg == "" {
+			continue
+		}
+		svc := firstNonEmptyString(m, "service_name", "serviceName", "service")
+		if svc == "" {
+			svc = serviceName
+		}
+		level := firstNonEmptyString(m, "log_level", "logLevel", "level", "severity")
+		if level == "" {
+			level = "INFO"
+		}
+		ts := firstNonEmptyString(m, "timestamp", "time", "created_at")
+		if ts == "" {
+			ts = now.Format(time.RFC3339)
+		}
+		logID := firstNonEmptyString(m, "id", "log_id", "logId")
+		if logID == "" {
+			logID = fmt.Sprintf("log_%d", len(out)+1)
+		}
+		labels := map[string]string{}
+		if rawLabels, ok := m["labels"].(map[string]interface{}); ok {
+			for k, v := range rawLabels {
+				labels[k] = fmt.Sprintf("%v", v)
+			}
+		}
+		out = append(out, entities.CorrelatedLogEntry{
+			LogID:       logID,
+			Timestamp:   ts,
+			ServiceName: svc,
+			LogLevel:    strings.ToUpper(level),
+			Message:     truncateText(msg, 400),
+			Labels:      labels,
+			DeepLinkURL: deepLink,
+		})
+	}
+	return out
+}
+
+func (s *serviceImpl) executeAndVerifyAction(
+	ctx context.Context,
+	inv *entities.IncidentInvestigation,
+	action *entities.RemediationAction,
+	cfg *entities.AgentConfig,
+	stepIdx *int,
+) {
+	execNow := time.Now().UTC()
+	action.ExecutedAt = &execNow
+
+	execSummary, execErr := s.runRemediationAction(ctx, inv, action, cfg)
+	if execErr != nil {
+		action.Status = "FAILED"
+		msg := fmt.Sprintf("Execution failed: %v", execErr)
+		action.VerificationSummary = &msg
+		_ = s.db.WithContext(ctx).Save(action).Error
+		_ = s.db.WithContext(ctx).Create(&entities.InvestigationStep{
+			InvestigationID: inv.ID,
+			StepIndex:       *stepIdx,
+			StepType:        "REMEDIATION",
+			ServerName:      "opsway-agent",
+			ToolName:        "remediation.execute",
+			InputJSON:       action.PayloadJSON,
+			OutputSummary:   msg,
+			Status:          "FAILED",
+			DurationMs:      time.Since(execNow).Milliseconds(),
+		}).Error
+		*stepIdx++
+		return
+	}
+
+	// Post-fix verification using real MCP Gateway calls.
+	verifyStart := time.Now()
+	var verifyParts []string
+	verifyParts = append(verifyParts, execSummary)
+
+	verified := true
+	if s.mcpGateway != nil {
+		if logRes, err := s.mcpGateway.CallTool(ctx, inv.TeamID, "logs.tail_recent_logs", map[string]interface{}{
+			"service_name": inv.ServiceName,
+			"limit":        20,
+		}); err == nil && logRes != nil {
+			verifyParts = append(verifyParts, "Recent logs: "+truncateText(extractFirstText(logRes), 250))
+		}
+		if inv.MonitorID != nil {
+			if chkRes, err := s.mcpGateway.CallTool(ctx, inv.TeamID, "monitoring.trigger_monitor_recheck", map[string]interface{}{
+				"monitor_id": *inv.MonitorID,
+			}); err == nil && chkRes != nil {
+				chkText := extractFirstText(chkRes)
+				verifyParts = append(verifyParts, "Monitor recheck: "+truncateText(chkText, 250))
+				var chkObj map[string]interface{}
+				if json.Unmarshal([]byte(chkText), &chkObj) == nil {
+					if v, ok := chkObj["verified"].(bool); ok && !v {
+						verified = false
+					}
+				}
+			}
+		}
+	}
+
+	if verified {
+		action.Status = "VERIFIED"
+	} else {
+		action.Status = "EXECUTED"
+	}
+	verifySummary := strings.Join(verifyParts, " | ")
+	action.VerificationSummary = &verifySummary
+	_ = s.db.WithContext(ctx).Save(action).Error
+
+	_ = s.db.WithContext(ctx).Create(&entities.InvestigationStep{
+		InvestigationID: inv.ID,
+		StepIndex:       *stepIdx,
+		StepType:        "VERIFICATION",
+		ServerName:      "opsway-agent",
+		ToolName:        "remediation.execute_and_verify",
+		InputJSON:       action.PayloadJSON,
+		OutputSummary:   truncateText(verifySummary, maxStepOutputSummary),
+		Status:          "COMPLETED",
+		DurationMs:      time.Since(verifyStart).Milliseconds(),
+	}).Error
+	*stepIdx++
+}
+
+func (s *serviceImpl) runRemediationAction(
+	ctx context.Context,
+	inv *entities.IncidentInvestigation,
+	action *entities.RemediationAction,
+	cfg *entities.AgentConfig,
+) (string, error) {
+	// Resolve target URL / headers / payload from matching playbook or action PayloadJSON.
+	var payloadMap map[string]interface{}
+	_ = json.Unmarshal([]byte(action.PayloadJSON), &payloadMap)
+
+	var targetURL, method, payloadTemplate string
+	var headers map[string]string
+
+	if pbID, ok := payloadMap["playbook_id"].(string); ok && pbID != "" {
+		for _, pb := range cfg.RemediationPlaybooks {
+			if pb.ID == pbID {
+				targetURL = pb.TargetURL
+				method = pb.Method
+				headers = pb.Headers
+				payloadTemplate = pb.PayloadTemplate
+				break
+			}
+		}
+	}
+	if targetURL == "" {
+		if u, ok := payloadMap["target_url"].(string); ok && u != "" {
+			targetURL = u
+		} else if u, ok := payloadMap["url"].(string); ok && u != "" {
+			targetURL = u
+		}
+	}
+	if method == "" {
+		if m, ok := payloadMap["method"].(string); ok && m != "" {
+			method = m
+		}
+	}
+
+	// Non-webhook advisory actions (CLI_COMMAND, GITHUB_PR without webhook) are marked approved/recorded without fake execution.
+	if strings.TrimSpace(targetURL) == "" {
+		return fmt.Sprintf("Approved advisory action `%s` (%s); no automated webhook endpoint configured.", action.Title, action.ActionType), nil
+	}
+
+	bodyStr := payloadTemplate
+	if strings.TrimSpace(bodyStr) == "" {
+		defaultBody, _ := json.Marshal(map[string]interface{}{
+			"investigation_id": inv.UUID,
+			"incident_id":      inv.IncidentID,
+			"team_id":          inv.TeamID,
+			"service":          inv.ServiceName,
+			"action_type":      action.ActionType,
+			"action_title":     action.Title,
+		})
+		bodyStr = string(defaultBody)
+	} else {
+		bodyStr = strings.ReplaceAll(bodyStr, "{{service}}", inv.ServiceName)
+		bodyStr = strings.ReplaceAll(bodyStr, "{{incident_id}}", fmt.Sprintf("%d", inv.IncidentID))
+		bodyStr = strings.ReplaceAll(bodyStr, "{{investigation_id}}", inv.UUID)
+	}
+
+	req, err := http.NewRequestWithContext(ctx, defaultHTTPMethod(method), targetURL, strings.NewReader(bodyStr))
+	if err != nil {
+		return "", err
+	}
+	req.Header.Set("Content-Type", "application/json")
+	for k, v := range headers {
+		req.Header.Set(k, v)
+	}
+	if cfg != nil && cfg.ByoaWebhookSecret != nil && *cfg.ByoaWebhookSecret != "" {
+		mac := hmac.New(sha256.New, []byte(*cfg.ByoaWebhookSecret))
+		mac.Write([]byte(bodyStr))
+		req.Header.Set("X-Opsway-Signature-256", "sha256="+hex.EncodeToString(mac.Sum(nil)))
+	}
+
+	resp, err := s.httpClient.Do(req)
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+	respBody, _ := io.ReadAll(io.LimitReader(resp.Body, 512))
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return "", fmt.Errorf("playbook endpoint %s returned HTTP %d: %s", targetURL, resp.StatusCode, strings.TrimSpace(string(respBody)))
+	}
+	return fmt.Sprintf("Executed %s %s (HTTP %d).", defaultHTTPMethod(method), targetURL, resp.StatusCode), nil
 }
 
 func (s *serviceImpl) HandleByoaCallback(
@@ -839,6 +1320,7 @@ func (s *serviceImpl) HandleByoaCallback(
 	}
 	now := time.Now().UTC()
 	inv.CompletedAt = &now
+	inv.DurationMs = now.Sub(inv.StartedAt).Milliseconds()
 	_ = s.db.WithContext(ctx).Save(&inv).Error
 
 	for i, step := range payload.Steps {
@@ -884,50 +1366,19 @@ func (s *serviceImpl) ApproveRemediationAction(
 		return nil, ErrNotFound
 	}
 
-	now := time.Now().UTC()
+	cfg, _ := s.GetAgentConfig(ctx, teamID)
 	action.ApprovedByUserID = userID
-	action.ExecutedAt = &now
-	action.Status = "VERIFIED"
 
-	// Run post-fix verification via MCP Gateway (logs.tail_recent_logs + monitoring.trigger_monitor_recheck)
-	_, _ = s.mcpGateway.CallTool(ctx, teamID, "logs.tail_recent_logs", map[string]interface{}{
-		"service_name": inv.ServiceName,
-		"limit":        20,
-	})
-	if inv.MonitorID != nil {
-		_, _ = s.mcpGateway.CallTool(ctx, teamID, "monitoring.trigger_monitor_recheck", map[string]interface{}{
-			"monitor_id": *inv.MonitorID,
-		})
-	}
-
-	verifySummary := fmt.Sprintf(
-		"Remediation `%s` executed at %s. Verified via `logs.tail_recent_logs` on `%s` (0 new ERROR entries) and `monitoring.trigger_monitor_recheck` (HTTP 200 OK).",
-		action.Title,
-		now.Format("15:04:05 UTC"),
-		inv.ServiceName,
-	)
-	action.VerificationSummary = &verifySummary
-	if err := s.db.WithContext(ctx).Save(&action).Error; err != nil {
-		return nil, err
-	}
-
-	// Append verification step to the investigation timeline
 	var stepCount int64
 	s.db.WithContext(ctx).Model(&entities.InvestigationStep{}).Where("investigation_id = ?", inv.ID).Count(&stepCount)
-	_ = s.db.WithContext(ctx).Create(&entities.InvestigationStep{
-		InvestigationID: inv.ID,
-		StepIndex:       int(stepCount) + 1,
-		StepType:        "VERIFICATION",
-		ServerName:      "opsway-agent",
-		ToolName:        "remediation.execute_and_verify",
-		InputJSON:       action.PayloadJSON,
-		OutputSummary:   verifySummary,
-		Status:          "COMPLETED",
-		DurationMs:      195,
-	}).Error
+	nextStep := int(stepCount) + 1
 
-	inv.Status = entities.InvestigationStatusCompleted
-	_ = s.db.WithContext(ctx).Save(&inv).Error
+	s.executeAndVerifyAction(ctx, &inv, &action, cfg, &nextStep)
+
+	if action.Status != "FAILED" {
+		inv.Status = entities.InvestigationStatusCompleted
+		_ = s.db.WithContext(ctx).Save(&inv).Error
+	}
 
 	var updated entities.IncidentInvestigation
 	_ = s.db.WithContext(ctx).
@@ -962,6 +1413,135 @@ func (s *serviceImpl) RejectRemediationAction(
 		First(&updated, investigationID).Error
 
 	return &updated, nil
+}
+
+func parseSynthesisResult(raw string, serviceName string) agentSynthesisResult {
+	cleaned := strings.TrimSpace(raw)
+	// Strip markdown code fences if present
+	if strings.HasPrefix(cleaned, "```") {
+		if idx := strings.Index(cleaned, "\n"); idx != -1 {
+			cleaned = cleaned[idx+1:]
+		}
+		if end := strings.LastIndex(cleaned, "```"); end != -1 {
+			cleaned = cleaned[:end]
+		}
+		cleaned = strings.TrimSpace(cleaned)
+	}
+	// Extract outermost JSON object if surrounded by prose
+	if start := strings.Index(cleaned, "{"); start != -1 {
+		if end := strings.LastIndex(cleaned, "}"); end > start {
+			candidate := cleaned[start : end+1]
+			var res agentSynthesisResult
+			if err := json.Unmarshal([]byte(candidate), &res); err == nil && strings.TrimSpace(res.RootCauseSummary) != "" {
+				if strings.TrimSpace(res.DetailedDiagnosis) == "" {
+					res.DetailedDiagnosis = res.RootCauseSummary
+				}
+				return res
+			}
+		}
+	}
+
+	summary := cleaned
+	if summary == "" {
+		summary = fmt.Sprintf("Investigation completed for `%s`, but the model returned an empty diagnosis.", serviceName)
+	}
+	return agentSynthesisResult{
+		RootCauseSummary:  truncateText(summary, 500),
+		DetailedDiagnosis: summary,
+		ConfidenceScore:   0.65,
+	}
+}
+
+func parseToolArguments(raw string) map[string]interface{} {
+	args := map[string]interface{}{}
+	if strings.TrimSpace(raw) == "" {
+		return args
+	}
+	_ = json.Unmarshal([]byte(raw), &args)
+	return args
+}
+
+func inferServerName(toolName string) string {
+	switch {
+	case strings.HasPrefix(toolName, "monitoring."):
+		return "monitoring-mcp"
+	case strings.HasPrefix(toolName, "logs."):
+		return "log-search-mcp"
+	case strings.HasPrefix(toolName, "pantomath."):
+		return "pantomath-mcp"
+	case strings.HasPrefix(toolName, "ext."):
+		parts := strings.SplitN(toolName, ".", 3)
+		if len(parts) >= 2 {
+			return parts[1]
+		}
+		return "external-mcp"
+	default:
+		return "opsway-mcp"
+	}
+}
+
+func sanitizeIdentifier(s string) string {
+	s = strings.ToLower(strings.TrimSpace(s))
+	var b strings.Builder
+	for _, r := range s {
+		if (r >= 'a' && r <= 'z') || (r >= '0' && r <= '9') || r == '_' {
+			b.WriteRune(r)
+		} else {
+			b.WriteRune('_')
+		}
+	}
+	if b.Len() == 0 {
+		return "server"
+	}
+	return b.String()
+}
+
+func isExecutableActionType(t string) bool {
+	switch strings.ToUpper(strings.TrimSpace(t)) {
+	case "WEBHOOK_CALL", "GITHUB_WORKFLOW", "K8S_ROLLOUT_RESTART":
+		return true
+	default:
+		return false
+	}
+}
+
+func defaultHTTPMethod(m string) string {
+	m = strings.ToUpper(strings.TrimSpace(m))
+	if m == "" {
+		return http.MethodPost
+	}
+	return m
+}
+
+func firstNonEmptyString(m map[string]interface{}, keys ...string) string {
+	for _, k := range keys {
+		if v, ok := m[k]; ok && v != nil {
+			s := strings.TrimSpace(fmt.Sprintf("%v", v))
+			if s != "" && s != "<nil>" {
+				return s
+			}
+		}
+	}
+	return ""
+}
+
+func appendUniqueLogs(dst []entities.CorrelatedLogEntry, src []entities.CorrelatedLogEntry, limit int) []entities.CorrelatedLogEntry {
+	seen := make(map[string]bool, len(dst))
+	for _, e := range dst {
+		seen[e.LogID+"|"+e.Message] = true
+	}
+	for _, e := range src {
+		if len(dst) >= limit {
+			break
+		}
+		key := e.LogID + "|" + e.Message
+		if seen[key] {
+			continue
+		}
+		seen[key] = true
+		dst = append(dst, e)
+	}
+	return dst
 }
 
 func extractFirstText(res *mcp.ToolCallResult) string {

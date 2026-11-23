@@ -74,6 +74,8 @@ func Register(
 	db *gorm.DB,
 	ch *gorm.DB,
 	statusPageBaseURL string,
+	agentLLMClient llm.Client,
+	mcpGatewayCfg mcp.GatewayConfig,
 ) {
 	AuthGuard := middleware.AuthGuardFactory(logger, authenticationService)
 
@@ -153,28 +155,36 @@ func Register(
 	metrics.Register(root, logger, checkService, apiKeyService, db)
 
 	// Opsway Umbrella Suite, Unified MCP Gateway & Agent Investigation Engine
+	if mcpGatewayCfg.LogSearchURL == "" {
+		mcpGatewayCfg.LogSearchURL = "http://log-search.log-search.svc.cluster.local:8080"
+	}
+	if mcpGatewayCfg.LogSearchPublicURL == "" {
+		mcpGatewayCfg.LogSearchPublicURL = "https://logs.opsway.eu"
+	}
+	if mcpGatewayCfg.LogSearchAgentKey == "" {
+		mcpGatewayCfg.LogSearchAgentKey = "valid_agent_key"
+	}
+	if mcpGatewayCfg.PantomathURL == "" {
+		mcpGatewayCfg.PantomathURL = "http://pantomath.pantomath.svc.cluster.local:8000"
+	}
 	mcpGateway := mcp.NewGateway(
-		mcp.GatewayConfig{
-			LogSearchURL:       "http://log-search.log-search.svc.cluster.local:8080",
-			LogSearchPublicURL: "https://logs.opsway.eu",
-			LogSearchAgentKey:  "valid_agent_key",
-			PantomathURL:       "http://pantomath.pantomath.svc.cluster.local:8000",
-			PantomathEnabled:   true,
-		},
+		mcpGatewayCfg,
 		db,
 		monitorService,
 		checkService,
 		incidentService,
 		logger,
 	)
-	llmClient := llm.NewClient("", "", "")
+	if agentLLMClient == nil {
+		agentLLMClient = llm.NewClient("", "", "")
+	}
 	investigationService := investigation.NewService(
 		db,
 		mcpGateway,
 		incidentService,
 		monitorService,
-		llmClient,
-		"https://logs.opsway.eu",
+		agentLLMClient,
+		mcpGatewayCfg.LogSearchPublicURL,
 		logger,
 	)
 	suite.Register(

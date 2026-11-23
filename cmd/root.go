@@ -69,7 +69,7 @@ type PantomathConfig struct {
 type AgentRunnerConfig struct {
 	LLMBaseURL string `mapstructure:"llm_base_url" default:"http://localhost:11434/v1"`
 	LLMAPIKey  string `mapstructure:"llm_api_key" default:""`
-	LLMModel   string `mapstructure:"llm_model" default:"llama3"`
+	LLMModel   string `mapstructure:"llm_model" default:"qwen2.5-3b-instruct"`
 }
 
 type ForecasterConfig struct {

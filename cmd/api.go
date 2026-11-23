@@ -19,7 +19,9 @@ import (
 	"github.com/opsway-io/backend/internal/heartbeats"
 	"github.com/opsway-io/backend/internal/incident"
 	"github.com/opsway-io/backend/internal/k8s"
+	"github.com/opsway-io/backend/internal/llm"
 	"github.com/opsway-io/backend/internal/maintenance"
+	"github.com/opsway-io/backend/internal/mcp"
 	"github.com/opsway-io/backend/internal/monitor"
 	"github.com/opsway-io/backend/internal/notification/email"
 	proberPkg "github.com/opsway-io/backend/internal/prober"
@@ -279,6 +281,15 @@ func runAPI(cmd *cobra.Command, args []string) {
 
 	proberService := proberPkg.NewService(redisClient, fallbackLocations)
 
+	agentLLMClient := llm.NewClient(conf.Agent.LLMBaseURL, conf.Agent.LLMAPIKey, conf.Agent.LLMModel)
+	mcpGatewayCfg := mcp.GatewayConfig{
+		LogSearchURL:       conf.LogSearch.URL,
+		LogSearchPublicURL: conf.LogSearch.PublicURL,
+		LogSearchAgentKey:  conf.LogSearch.AgentAPIKey,
+		PantomathURL:       conf.Pantomath.URL,
+		PantomathEnabled:   conf.Pantomath.Enabled,
+	}
+
 	srv, err := rest.NewServer(
 		conf.REST,
 		conf.OAuth,
@@ -305,6 +316,8 @@ func runAPI(cmd *cobra.Command, args []string) {
 		db,
 		ch_db,
 		conf.StatusPage.BaseURL,
+		agentLLMClient,
+		mcpGatewayCfg,
 	)
 	if err != nil {
 		l.WithError(err).Fatal("Failed to create REST server")

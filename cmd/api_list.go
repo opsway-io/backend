@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/labstack/echo/v4"
+	"github.com/opsway-io/backend/internal/mcp"
 	"github.com/opsway-io/backend/internal/rest/controllers"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
@@ -57,6 +58,8 @@ func runGenerate(cmd *cobra.Command, args []string) {
 		nil,
 		nil,
 		"",
+		nil,
+		mcp.GatewayConfig{},
 	)
 
 	var routes []Route

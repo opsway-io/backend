@@ -16,7 +16,9 @@ import (
 	"github.com/opsway-io/backend/internal/event"
 	"github.com/opsway-io/backend/internal/heartbeats"
 	"github.com/opsway-io/backend/internal/incident"
+	"github.com/opsway-io/backend/internal/llm"
 	"github.com/opsway-io/backend/internal/maintenance"
+	"github.com/opsway-io/backend/internal/mcp"
 	"github.com/opsway-io/backend/internal/monitor"
 	"github.com/opsway-io/backend/internal/notification/email"
 	proberService "github.com/opsway-io/backend/internal/prober"
@@ -68,6 +70,8 @@ func NewServer(
 	db *gorm.DB,
 	ch *gorm.DB,
 	statusPageBaseURL string,
+	agentLLMClient llm.Client,
+	mcpGatewayCfg mcp.GatewayConfig,
 ) (*Server, error) {
 	cookieService := helpers.NewCookieService(authConfig)
 
@@ -134,6 +138,8 @@ func NewServer(
 		db,
 		ch,
 		statusPageBaseURL,
+		agentLLMClient,
+		mcpGatewayCfg,
 	)
 
 	return &Server{

@@ -366,12 +366,42 @@ func (g *gatewayImpl) CallTool(ctx context.Context, teamID uint, toolName string
 
 	case "monitoring.trigger_monitor_recheck":
 		monID := uint(getIntArg(args, "monitor_id", 0))
+		if monID == 0 || g.checkService == nil {
+			return textResult(map[string]interface{}{
+				"monitor_id": monID,
+				"status":     "NO_DATA",
+				"verified":   false,
+				"checked_at": time.Now().UTC().Format(time.RFC3339),
+				"message":    "Monitor ID missing or check service unavailable; cannot verify probe state.",
+			}, false), nil
+		}
+		offset := 0
+		limit := 3
+		checks, err := g.checkService.GetByTeamIDAndMonitorIDPaginated(ctx, teamID, monID, &offset, &limit)
+		if err != nil || checks == nil || len(*checks) == 0 {
+			return textResult(map[string]interface{}{
+				"monitor_id": monID,
+				"status":     "NO_RECENT_CHECKS",
+				"verified":   false,
+				"checked_at": time.Now().UTC().Format(time.RFC3339),
+				"message":    fmt.Sprintf("No recent probe check results found in ClickHouse for monitor #%d.", monID),
+			}, false), nil
+		}
+		latest := (*checks)[0]
+		healthy := latest.StatusCode >= 200 && latest.StatusCode < 400
+		statusLabel := "UNHEALTHY"
+		if healthy {
+			statusLabel = "HEALTHY"
+		}
 		return textResult(map[string]interface{}{
-			"monitor_id": monID,
-			"status":     "RECHECK_DISPATCHED",
-			"verified":   true,
-			"checked_at": time.Now().UTC().Format(time.RFC3339),
-			"message":    "Immediate multi-location verification probe completed: HTTP 200 OK (118ms).",
+			"monitor_id":  monID,
+			"status":      statusLabel,
+			"verified":    healthy,
+			"status_code": latest.StatusCode,
+			"total_ms":    latest.Timing.Total.Milliseconds(),
+			"location":    latest.Location,
+			"checked_at":  latest.CreatedAt.UTC().Format(time.RFC3339),
+			"message":     fmt.Sprintf("Latest probe from %s at %s returned HTTP %d (%dms).", latest.Location, latest.CreatedAt.UTC().Format(time.RFC3339), latest.StatusCode, latest.Timing.Total.Milliseconds()),
 		}, false), nil
 
 	case "logs.get_error_traces":
