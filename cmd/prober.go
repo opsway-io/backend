@@ -559,29 +559,36 @@ func handleTask(ctx context.Context, logger *logrus.Logger, httpProber http.Serv
 		}
 	}
 
-	openIncidents, err := i.GetByMonitorIDWithAssertionPaginated(ctx, m.ID, nil, nil)
-	if err == nil && openIncidents != nil {
-		failedAssertionIDs := make(map[uint]bool)
-		for _, f := range allFailedAssertions {
-			failedAssertionIDs[f.ID] = true
-		}
-
-		for _, inc := range *openIncidents {
-			if !inc.Incident.Resolved && inc.Incident.Title != "Anomaly Detected" && inc.Incident.Title != "SSL/TLS Cert Expiry" && inc.Incident.Title != "Target Down" && inc.Incident.Title != "Authentication Failed" {
-				if inc.Incident.MonitorAssertionID == nil || !failedAssertionIDs[*inc.Incident.MonitorAssertionID] {
-					l.WithField("incident_id", inc.Incident.ID).Info("auto-resolving incident")
-					inc.Incident.Resolved = true
-					now := time.Now()
-					inc.Incident.ResolvedAt = &now
-					if err := i.Update(ctx, &inc.Incident); err != nil {
-						l.WithError(err).Error("failed to resolve incident")
+	assertionOkKey := fmt.Sprintf("monitor:%d:assertion_ok_count", m.ID)
+	if len(allFailedAssertions) > 0 {
+		rc.Del(ctx, assertionOkKey)
+	} else {
+		assertionOkCount, _ := rc.Incr(ctx, assertionOkKey).Result()
+		rc.Expire(ctx, assertionOkKey, 30*time.Minute)
+		if assertionOkCount >= 2 {
+			openIncidents, err := i.GetByMonitorIDWithAssertionPaginated(ctx, m.ID, nil, nil)
+			if err == nil && openIncidents != nil {
+				for _, inc := range *openIncidents {
+					if !inc.Incident.Resolved && inc.Incident.Title != "Anomaly Detected" && inc.Incident.Title != "SSL/TLS Cert Expiry" && inc.Incident.Title != "Target Down" && inc.Incident.Title != "Authentication Failed" {
+						l.WithField("incident_id", inc.Incident.ID).Info("auto-resolving assertion incident after consecutive healthy checks")
+						inc.Incident.Resolved = true
+						now := time.Now()
+						inc.Incident.ResolvedAt = &now
+						if err := i.Update(ctx, &inc.Incident); err != nil {
+							l.WithError(err).Error("failed to resolve incident")
+						}
 					}
 				}
 			}
 		}
 	}
 
+	downOkKey := fmt.Sprintf("monitor:%d:down_ok_count", m.ID)
+	anomalyFailKey := fmt.Sprintf("monitor:%d:anomaly_fail_count", m.ID)
+	anomalyOkKey := fmt.Sprintf("monitor:%d:anomaly_ok_count", m.ID)
+
 	if targetDown {
+		rc.Del(ctx, downOkKey)
 		hasOpenDownIncident := false
 		openIncidents, err := i.GetByMonitorIDWithAssertionPaginated(ctx, m.ID, nil, nil)
 		if err == nil && openIncidents != nil {
@@ -616,11 +623,13 @@ func handleTask(ctx context.Context, logger *logrus.Logger, httpProber http.Serv
 			}
 		}
 	} else {
+		downOkCount, _ := rc.Incr(ctx, downOkKey).Result()
+		rc.Expire(ctx, downOkKey, 30*time.Minute)
 		openIncidents, err := i.GetByMonitorIDWithAssertionPaginated(ctx, m.ID, nil, nil)
-		if err == nil && openIncidents != nil {
+		if err == nil && openIncidents != nil && downOkCount >= 2 {
 			for _, inc := range *openIncidents {
 				if inc.Title == "Target Down" && !inc.Resolved {
-					l.Info("target is now responding, resolving open Target Down incident")
+					l.Info("target responded for 2 consecutive checks, resolving open Target Down incident")
 					inc.Incident.Resolved = true
 					now := time.Now()
 					inc.Incident.ResolvedAt = &now
@@ -635,6 +644,10 @@ func handleTask(ctx context.Context, logger *logrus.Logger, httpProber http.Serv
 		if err != nil {
 			l.WithError(err).Error("failed to check for anomaly")
 		} else if anomalyResp != nil && len(anomalyResp.Anomalies) > 0 && anomalyResp.Anomalies[0] {
+			rc.Del(ctx, anomalyOkKey)
+			anomalyFailCount, _ := rc.Incr(ctx, anomalyFailKey).Result()
+			rc.Expire(ctx, anomalyFailKey, 30*time.Minute)
+
 			hasOpenAnomalyIncident := false
 			if openIncidents != nil {
 				for _, inc := range *openIncidents {
@@ -645,8 +658,8 @@ func handleTask(ctx context.Context, logger *logrus.Logger, httpProber http.Serv
 				}
 			}
 
-			if !hasOpenAnomalyIncident {
-				l.Info("anomaly detected, triggering incident")
+			if !hasOpenAnomalyIncident && anomalyFailCount >= 3 {
+				l.WithField("consecutive_anomalies", anomalyFailCount).Info("confirmed anomaly streak, triggering incident")
 				desc := formatAnomalyDescription(m, res, anomalyResp)
 				anomalyIncidents := []entities.Incident{{
 					MonitorID:   &m.ID,
@@ -660,7 +673,7 @@ func handleTask(ctx context.Context, logger *logrus.Logger, httpProber http.Serv
 				} else if len(anomalyIncidents) > 0 && anomalyIncidents[0].ID != 0 {
 					_ = i.CreateOccurrence(ctx, &entities.IncidentOccurrence{IncidentID: anomalyIncidents[0].ID, CreatedAt: time.Now()})
 				}
-			} else {
+			} else if hasOpenAnomalyIncident {
 				for _, inc := range *openIncidents {
 					if inc.Title == "Anomaly Detected" && !inc.Resolved {
 						inc.Incident.UpdatedAt = time.Now()
@@ -674,10 +687,13 @@ func handleTask(ctx context.Context, logger *logrus.Logger, httpProber http.Serv
 				}
 			}
 		} else if anomalyResp != nil && len(anomalyResp.Anomalies) > 0 && !anomalyResp.Anomalies[0] {
-			if openIncidents != nil {
+			rc.Del(ctx, anomalyFailKey)
+			anomalyOkCount, _ := rc.Incr(ctx, anomalyOkKey).Result()
+			rc.Expire(ctx, anomalyOkKey, 30*time.Minute)
+			if openIncidents != nil && anomalyOkCount >= 3 {
 				for _, inc := range *openIncidents {
 					if inc.Title == "Anomaly Detected" && !inc.Resolved {
-						l.Info("response time returned to normal baseline, resolving open Anomaly Detected incident")
+						l.Info("response time stayed within normal baseline for 3 consecutive checks, resolving open Anomaly Detected incident")
 						inc.Incident.Resolved = true
 						now := time.Now()
 						inc.Incident.ResolvedAt = &now

@@ -80,7 +80,20 @@ func (s *ServiceImpl) Create(ctx context.Context, incidents *[]entities.Incident
 }
 
 func (s *ServiceImpl) Update(ctx context.Context, incident *entities.Incident) error {
-	return s.repository.Update(ctx, incident)
+	wasUnresolved := false
+	if incident != nil && incident.ID != 0 && incident.Resolved {
+		if prev, err := s.repository.GetByID(ctx, incident.ID); err == nil && prev != nil && !prev.Resolved {
+			wasUnresolved = true
+		}
+	}
+
+	err := s.repository.Update(ctx, incident)
+	if err == nil && wasUnresolved && s.eventService != nil {
+		_ = s.eventService.Publish(events.IncidentResolvedEvent{
+			Incident: incident,
+		})
+	}
+	return err
 }
 
 func (s *ServiceImpl) Delete(ctx context.Context, incident *entities.Incident) error {

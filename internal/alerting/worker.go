@@ -83,6 +83,11 @@ func (w *worker) Start(ctx context.Context) error {
 		return fmt.Errorf("failed to subscribe to incident stream: %w", err)
 	}
 
+	incidentResolvedMessages, err := w.eventService.Subscribe(ctx, string(events.EventTypeIncidentResolved))
+	if err != nil {
+		return fmt.Errorf("failed to subscribe to incident resolved stream: %w", err)
+	}
+
 	maintenanceMessages, err := w.eventService.Subscribe(ctx, string(events.EventTypeMaintenance))
 	if err != nil {
 		return fmt.Errorf("failed to subscribe to maintenance stream: %w", err)
@@ -101,6 +106,13 @@ func (w *worker) Start(ctx context.Context) error {
 	go func() {
 		for msg := range incidentMessages {
 			w.processMessage(ctx, msg.Payload)
+			msg.Ack()
+		}
+	}()
+
+	go func() {
+		for msg := range incidentResolvedMessages {
+			w.processResolvedMessage(ctx, msg.Payload)
 			msg.Ack()
 		}
 	}()
@@ -362,6 +374,38 @@ func (w *worker) processMessage(ctx context.Context, payload []byte) {
 		if rule.Condition == "*" || strings.Contains(strings.ToLower(incident.Title), strings.ToLower(rule.Condition)) {
 			w.scheduleEscalationCheck(ctx, incident, &rule)
 			break // Only schedule once per incident
+		}
+	}
+}
+
+func (w *worker) processResolvedMessage(ctx context.Context, payload []byte) {
+	var ev events.IncidentResolvedEvent
+	if err := json.Unmarshal(payload, &ev); err != nil {
+		w.logger.WithError(err).Error("failed to unmarshal incident resolved event")
+		return
+	}
+
+	incident := ev.Incident
+	if incident == nil {
+		return
+	}
+
+	rules, err := w.alertService.GetAllByTeamID(ctx, incident.TeamID)
+	if err != nil {
+		w.logger.WithError(err).Error("failed to get alert rules for resolved incident")
+		return
+	}
+
+	if incident.IsStatusPageVisible {
+		w.notifyStatusPageSubscribers(ctx, incident)
+	}
+
+	for _, rule := range rules {
+		if !rule.Enabled {
+			continue
+		}
+		if rule.Condition == "*" || strings.Contains(strings.ToLower(incident.Title), strings.ToLower(rule.Condition)) {
+			w.triggerRule(ctx, incident, &rule, 1)
 		}
 	}
 }
@@ -783,6 +827,26 @@ func (w *worker) sendFuncEmail(ctx context.Context, incident *entities.Incident,
 	}
 
 	dashboardURL := fmt.Sprintf("%s/incidents/incident/%d", w.config.ApplicationURL, incident.ID)
+
+	if incident.Resolved {
+		durLabel := ""
+		if incident.ResolvedAt != nil && !incident.CreatedAt.IsZero() {
+			dur := incident.ResolvedAt.Sub(incident.CreatedAt).Round(time.Second)
+			if dur >= 0 {
+				durLabel = fmt.Sprintf(" (duration: %s)", dur.String())
+			}
+		}
+		tpl := &templates.IncidentAlertTemplate{
+			Name:          un,
+			MonitorName:   monitorName,
+			IncidentTitle: fmt.Sprintf("[RESOLVED] %s%s", incident.Title, durLabel),
+			DashboardURL:  dashboardURL,
+		}
+		if err := w.emailSender.Send(ctx, "", usr.Email, tpl); err != nil {
+			w.logger.WithError(err).Error("failed to send incident resolved email")
+		}
+		return
+	}
 
 	if incident.Title == "Anomaly Detected" {
 		tpl := &templates.PerformanceDegradationTemplate{
