@@ -613,6 +613,16 @@ func (s *serviceImpl) executeManagedAgentFlow(
 	var finalContent string
 	var llmErr error
 
+	hasLogSearchTool := false
+	for _, td := range toolDefs {
+		if strings.HasPrefix(td.Function.Name, "logs.") {
+			hasLogSearchTool = true
+			break
+		}
+	}
+	calledLogSearch := false
+	nudgedLogSearch := false
+
 	temp := 0.1
 	for iter := 0; iter < maxAgentIterations; iter++ {
 		callStart := time.Now()
@@ -633,6 +643,14 @@ func (s *serviceImpl) executeManagedAgentFlow(
 		assistantMsg := resp.Choices[0].Message
 
 		if len(assistantMsg.ToolCalls) == 0 {
+			if hasLogSearchTool && !calledLogSearch && !nudgedLogSearch && iter < maxAgentIterations-1 {
+				nudgedLogSearch = true
+				messages = append(messages, assistantMsg, llm.Message{
+					Role:    "user",
+					Content: fmt.Sprintf("Before finalizing your diagnosis, you MUST check application logs using `logs.get_error_summary` (and `logs.semantic_search` if errors exist) for service `%s`.", inv.ServiceName),
+				})
+				continue
+			}
 			finalContent = strings.TrimSpace(assistantMsg.Content)
 			break
 		}
@@ -640,6 +658,9 @@ func (s *serviceImpl) executeManagedAgentFlow(
 		messages = append(messages, assistantMsg)
 
 		for _, tc := range assistantMsg.ToolCalls {
+			if strings.HasPrefix(tc.Function.Name, "logs.") {
+				calledLogSearch = true
+			}
 			toolStart := time.Now()
 			argsMap := parseToolArguments(tc.Function.Arguments)
 			toolRes, callErr := s.invokeAgentTool(ctx, inv.TeamID, tc.Function.Name, argsMap, externalTools)
@@ -853,7 +874,7 @@ func buildAgentSystemPrompt() string {
 
 Rules:
 1. Never invent log lines, SQL errors, or metrics that were not returned by a tool.
-2. Call only the tools needed (typically: monitoring probe timings -> log error summary / semantic search -> codebase lookup if relevant).
+2. Always correlate monitoring AND application logs before finalizing: inspect monitoring incident/probe timings AND call logs.get_error_summary (plus logs.semantic_search / logs.get_log_context if errors are found) for the affected service, and pantomath.ask_codebase if stack traces or code issues appear.
 3. When you have enough evidence, stop calling tools and respond ONLY with a valid JSON object matching this exact schema:
 {
   "rootCauseSummary": "Concise 2-3 sentence root cause grounded in tool outputs.",
