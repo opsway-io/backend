@@ -650,9 +650,13 @@ func (s *serviceImpl) executeManagedAgentFlow(
 		if len(assistantMsg.ToolCalls) == 0 {
 			if hasPantomathTool && !calledPantomath && !nudgedPantomath && iter < maxAgentIterations-2 {
 				nudgedPantomath = true
+				targetHint := inv.ServiceName
+				if mon != nil && len(mon.Steps) > 0 && strings.TrimSpace(mon.Steps[0].URL) != "" {
+					targetHint = fmt.Sprintf("%s %s", inv.ServiceName, mon.Steps[0].URL)
+				}
 				messages = append(messages, assistantMsg, llm.Message{
 					Role:    "user",
-					Content: fmt.Sprintf("Before finalizing, call pantomath.ask_codebase to identify which Kubernetes deployments, pods, and upstream/downstream services back `%s` so you know all candidate services to inspect for logs.", inv.ServiceName),
+					Content: fmt.Sprintf("Before finalizing, call pantomath.ask_codebase with a descriptive multi-word query (for example: \"%s kubernetes deployment pods and backend dependencies\") so you can identify all candidate services and workloads to inspect for logs.", targetHint),
 				})
 				continue
 			}
@@ -892,7 +896,7 @@ Rules:
 1. Never invent log lines, SQL errors, Kubernetes deployments, or metrics that were not returned by a tool.
 2. Follow this investigation workflow before finalizing:
    a) Inspect monitoring incident/probe timings (monitoring.get_incident_details / monitoring.get_monitor_check_timings).
-   b) Query pantomath.ask_codebase to map the failing monitor/service/URL to its owning Kubernetes namespaces, deployments, pods, and upstream/downstream dependencies so you know where to look for logs.
+   b) Query pantomath.ask_codebase with a descriptive multi-word query (including the service name, target URL/path, and "kubernetes deployment dependencies" — never a single word like "api") to map the failing monitor to its owning Kubernetes namespaces, deployments, pods, and upstream/downstream dependencies so you know where to look for logs.
    c) Correlate application logs via log-search (logs.list_services if exact service labels are unclear, logs.get_error_summary, and logs.semantic_search / logs.get_log_context if errors are found) across both the primary service and any suspect backing services discovered by Pantomath.
 3. When you have enough evidence, stop calling tools and respond ONLY with a valid JSON object matching this exact schema:
 {
