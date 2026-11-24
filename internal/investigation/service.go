@@ -27,7 +27,7 @@ import (
 )
 
 const (
-	maxAgentIterations    = 6
+	maxAgentIterations    = 8
 	maxToolOutputForLLM   = 1600
 	maxStepOutputSummary  = 1200
 	investigationTimeout  = 3 * time.Minute
@@ -614,14 +614,19 @@ func (s *serviceImpl) executeManagedAgentFlow(
 	var llmErr error
 
 	hasLogSearchTool := false
+	hasPantomathTool := false
 	for _, td := range toolDefs {
 		if strings.HasPrefix(td.Function.Name, "logs.") {
 			hasLogSearchTool = true
-			break
+		}
+		if strings.HasPrefix(td.Function.Name, "pantomath.") {
+			hasPantomathTool = true
 		}
 	}
 	calledLogSearch := false
 	nudgedLogSearch := false
+	calledPantomath := false
+	nudgedPantomath := false
 
 	temp := 0.1
 	for iter := 0; iter < maxAgentIterations; iter++ {
@@ -643,11 +648,19 @@ func (s *serviceImpl) executeManagedAgentFlow(
 		assistantMsg := resp.Choices[0].Message
 
 		if len(assistantMsg.ToolCalls) == 0 {
+			if hasPantomathTool && !calledPantomath && !nudgedPantomath && iter < maxAgentIterations-2 {
+				nudgedPantomath = true
+				messages = append(messages, assistantMsg, llm.Message{
+					Role:    "user",
+					Content: fmt.Sprintf("Before finalizing, call pantomath.ask_codebase to identify which Kubernetes deployments, pods, and upstream/downstream services back `%s` so you know all candidate services to inspect for logs.", inv.ServiceName),
+				})
+				continue
+			}
 			if hasLogSearchTool && !calledLogSearch && !nudgedLogSearch && iter < maxAgentIterations-1 {
 				nudgedLogSearch = true
 				messages = append(messages, assistantMsg, llm.Message{
 					Role:    "user",
-					Content: fmt.Sprintf("Before finalizing your diagnosis, you MUST check application logs using `logs.get_error_summary` (and `logs.semantic_search` if errors exist) for service `%s`.", inv.ServiceName),
+					Content: fmt.Sprintf("Before finalizing your diagnosis, you MUST check application logs using logs.get_error_summary (and logs.semantic_search if errors exist) for service `%s` and any relevant backing services discovered from Pantomath.", inv.ServiceName),
 				})
 				continue
 			}
@@ -660,6 +673,9 @@ func (s *serviceImpl) executeManagedAgentFlow(
 		for _, tc := range assistantMsg.ToolCalls {
 			if strings.HasPrefix(tc.Function.Name, "logs.") {
 				calledLogSearch = true
+			}
+			if strings.HasPrefix(tc.Function.Name, "pantomath.") {
+				calledPantomath = true
 			}
 			toolStart := time.Now()
 			argsMap := parseToolArguments(tc.Function.Arguments)
@@ -873,8 +889,11 @@ func buildAgentSystemPrompt() string {
 	return `You are Opsway's Autonomous SRE Agent. Investigate the production incident using the available MCP tools and return a grounded, factual Root Cause Analysis.
 
 Rules:
-1. Never invent log lines, SQL errors, or metrics that were not returned by a tool.
-2. Always correlate monitoring AND application logs before finalizing: inspect monitoring incident/probe timings AND call logs.get_error_summary (plus logs.semantic_search / logs.get_log_context if errors are found) for the affected service, and pantomath.ask_codebase if stack traces or code issues appear.
+1. Never invent log lines, SQL errors, Kubernetes deployments, or metrics that were not returned by a tool.
+2. Follow this investigation workflow before finalizing:
+   a) Inspect monitoring incident/probe timings (monitoring.get_incident_details / monitoring.get_monitor_check_timings).
+   b) Query pantomath.ask_codebase to map the failing monitor/service/URL to its owning Kubernetes namespaces, deployments, pods, and upstream/downstream dependencies so you know where to look for logs.
+   c) Correlate application logs via log-search (logs.list_services if exact service labels are unclear, logs.get_error_summary, and logs.semantic_search / logs.get_log_context if errors are found) across both the primary service and any suspect backing services discovered by Pantomath.
 3. When you have enough evidence, stop calling tools and respond ONLY with a valid JSON object matching this exact schema:
 {
   "rootCauseSummary": "Concise 2-3 sentence root cause grounded in tool outputs.",
@@ -908,6 +927,9 @@ func (s *serviceImpl) buildIncidentPrompt(inv *entities.IncidentInvestigation, i
 	if mon != nil && mon.Name != "" {
 		sb.WriteString(fmt.Sprintf("Monitor Name: %s\n", mon.Name))
 	}
+	if mon != nil && len(mon.Steps) > 0 && strings.TrimSpace(mon.Steps[0].URL) != "" {
+		sb.WriteString(fmt.Sprintf("Monitor Target URL: %s %s\n", mon.Steps[0].Method, mon.Steps[0].URL))
+	}
 	sb.WriteString(fmt.Sprintf("Service Name: %s\n", inv.ServiceName))
 	if inv.UserPrompt != nil && strings.TrimSpace(*inv.UserPrompt) != "" {
 		sb.WriteString(fmt.Sprintf("Operator Hint: %s\n", strings.TrimSpace(*inv.UserPrompt)))
@@ -920,6 +942,7 @@ var coreAgentToolAllowlist = map[string]bool{
 	"monitoring.get_incident_details":      true,
 	"monitoring.get_monitor_check_timings": true,
 	"monitoring.list_active_incidents":     true,
+	"logs.list_services":                   true,
 	"logs.get_error_summary":               true,
 	"logs.semantic_search":                 true,
 	"logs.get_log_context":                 true,
