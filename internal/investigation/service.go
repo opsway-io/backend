@@ -28,9 +28,10 @@ import (
 
 const (
 	maxAgentIterations    = 8
-	maxToolOutputForLLM   = 1600
+	maxToolOutputForLLM   = 1400
 	maxStepOutputSummary  = 1200
-	investigationTimeout  = 3 * time.Minute
+	queueWaitTimeout      = 10 * time.Minute
+	investigationTimeout  = 4 * time.Minute
 )
 
 var (
@@ -347,12 +348,34 @@ func (s *serviceImpl) TriggerInvestigation(ctx context.Context, req TriggerReque
 			return nil, nil
 		}
 
+		// Prevent simultaneous duplicate automatic investigations for the same incident or monitor.
+		var inFlightCount int64
+		inFlightQ := s.db.WithContext(ctx).Model(&entities.IncidentInvestigation{}).
+			Where("team_id = ? AND status IN ?", req.TeamID, []entities.InvestigationStatus{
+				entities.InvestigationStatusQueued,
+				entities.InvestigationStatusRunning,
+			})
+		if inc.MonitorID != nil {
+			inFlightQ = inFlightQ.Where("incident_id = ? OR monitor_id = ?", req.IncidentID, *inc.MonitorID)
+		} else {
+			inFlightQ = inFlightQ.Where("incident_id = ?", req.IncidentID)
+		}
+		inFlightQ.Count(&inFlightCount)
+		if inFlightCount > 0 {
+			return nil, nil
+		}
+
 		if agentCfg.CooldownMinutes > 0 {
 			cutoff := time.Now().Add(-time.Duration(agentCfg.CooldownMinutes) * time.Minute)
 			var recentCount int64
-			s.db.WithContext(ctx).Model(&entities.IncidentInvestigation{}).
-				Where("team_id = ? AND incident_id = ? AND created_at > ?", req.TeamID, req.IncidentID, cutoff).
-				Count(&recentCount)
+			cooldownQ := s.db.WithContext(ctx).Model(&entities.IncidentInvestigation{}).
+				Where("team_id = ? AND created_at > ?", req.TeamID, cutoff)
+			if inc.MonitorID != nil {
+				cooldownQ = cooldownQ.Where("incident_id = ? OR monitor_id = ?", req.IncidentID, *inc.MonitorID)
+			} else {
+				cooldownQ = cooldownQ.Where("incident_id = ?", req.IncidentID)
+			}
+			cooldownQ.Count(&recentCount)
 			if recentCount > 0 {
 				return nil, nil
 			}
@@ -456,7 +479,7 @@ func (s *serviceImpl) TriggerInvestigation(ctx context.Context, req TriggerReque
 	}
 
 	go func() {
-		bgCtx, cancel := context.WithTimeout(context.Background(), investigationTimeout)
+		bgCtx, cancel := context.WithTimeout(context.Background(), queueWaitTimeout+investigationTimeout)
 		defer cancel()
 		run(bgCtx)
 	}()
@@ -573,16 +596,28 @@ func (s *serviceImpl) executeManagedAgentFlow(
 	cfg *entities.AgentConfig,
 ) {
 	// Serialize local managed GPU investigations so 4 GiB VRAM RTX 3050 Ti never OOMs.
+	// Queue wait has its own budget so waiting behind another burst investigation doesn't eat active inference time.
 	if cfg.ExecutionMode == entities.AgentModeManaged {
+		waitTimer := time.NewTimer(queueWaitTimeout)
 		select {
 		case s.managedGPUSem <- struct{}{}:
+			waitTimer.Stop()
 			defer func() { <-s.managedGPUSem }()
+		case <-waitTimer.C:
+			s.markInvestigationFailed(inv, "Investigation timed out waiting in GPU queue.")
+			return
 		case <-ctx.Done():
+			waitTimer.Stop()
 			s.markInvestigationFailed(inv, fmt.Sprintf("Investigation timed out waiting for GPU slot: %v", ctx.Err()))
 			return
 		}
 	}
 
+	// Start the active execution timeout only AFTER acquiring the GPU slot.
+	execCtx, execCancel := context.WithTimeout(ctx, investigationTimeout)
+	defer execCancel()
+	ctx = execCtx
+	inv.StartedAt = time.Now().UTC()
 	inv.Status = entities.InvestigationStatusRunning
 	_ = s.db.WithContext(ctx).Save(inv).Error
 
@@ -636,7 +671,7 @@ func (s *serviceImpl) executeManagedAgentFlow(
 			Tools:       toolDefs,
 			ToolChoice:  "auto",
 			Temperature: &temp,
-			MaxTokens:   1024,
+			MaxTokens:   768,
 		})
 		if err != nil {
 			llmErr = err
@@ -736,7 +771,7 @@ func (s *serviceImpl) executeManagedAgentFlow(
 		resp, err := activeLLM.Chat(ctx, llm.ChatCompletionRequest{
 			Messages:    messages,
 			Temperature: &temp,
-			MaxTokens:   1024,
+			MaxTokens:   768,
 		})
 		if err != nil {
 			llmErr = err
