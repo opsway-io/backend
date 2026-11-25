@@ -194,6 +194,7 @@ func Register(
 		investigationService,
 		mcpGatewayCfg.LogSearchURL,
 		mcpGatewayCfg.LogSearchAgentKey,
+		mcpGatewayCfg.PantomathURL,
 		logger.WithField("module", "usage"),
 	)
 	suite.Register(

@@ -77,6 +77,9 @@ type PantomathUsage struct {
 	Enabled                          bool                     `json:"enabled"`
 	Quotas                           []QuotaItem              `json:"quotas"`
 	LinkedRepositories               int64                    `json:"linkedRepositories"`
+	VectorChunks                     int64                    `json:"vectorChunks"`
+	GraphEdges                       int64                    `json:"graphEdges"`
+	QueriesExecuted                  int64                    `json:"queriesExecuted"`
 	PantomathTriggeredInvestigations int64                    `json:"pantomathTriggeredInvestigations"`
 	MCPCalls                         int64                    `json:"mcpCalls"`
 }
@@ -136,11 +139,19 @@ type TopServiceConsumer struct {
 	TokensUsed  int64  `json:"tokensUsed"`
 }
 
+type TopPantomathProductConsumer struct {
+	Product      string `json:"product"`
+	RepoCount    int64  `json:"repoCount"`
+	VectorChunks int64  `json:"vectorChunks"`
+	Source       string `json:"source"`
+}
+
 type TopConsumers struct {
-	Monitors      []TopMonitorConsumer    `json:"monitors"`
-	LogServices   []TopLogServiceConsumer `json:"logServices"`
-	AgentTriggers []TopTriggerConsumer    `json:"agentTriggers"`
-	Services      []TopServiceConsumer    `json:"services"`
+	Monitors          []TopMonitorConsumer          `json:"monitors"`
+	LogServices       []TopLogServiceConsumer       `json:"logServices"`
+	PantomathProducts []TopPantomathProductConsumer `json:"pantomathProducts"`
+	AgentTriggers     []TopTriggerConsumer          `json:"agentTriggers"`
+	Services          []TopServiceConsumer          `json:"services"`
 }
 
 type TeamUsageResponse struct {
@@ -166,6 +177,7 @@ type serviceImpl struct {
 	investigationService investigation.Service
 	logSearchURL         string
 	logSearchAgentKey    string
+	pantomathURL         string
 	httpClient           *http.Client
 	logger               *logrus.Entry
 }
@@ -176,6 +188,7 @@ func NewService(
 	investigationService investigation.Service,
 	logSearchURL string,
 	logSearchAgentKey string,
+	pantomathURL string,
 	logger *logrus.Entry,
 ) Service {
 	return &serviceImpl{
@@ -184,9 +197,75 @@ func NewService(
 		investigationService: investigationService,
 		logSearchURL:         strings.TrimRight(logSearchURL, "/"),
 		logSearchAgentKey:    logSearchAgentKey,
+		pantomathURL:         strings.TrimRight(pantomathURL, "/"),
 		httpClient:           &http.Client{Timeout: 5 * time.Second},
 		logger:               logger,
 	}
+}
+
+type pantomathUsageAPIResp struct {
+	Tenant          string `json:"tenant"`
+	IndexedProducts int64  `json:"indexed_products"`
+	IndexedRepos    int64  `json:"indexed_repos"`
+	VectorChunks    int64  `json:"vector_chunks"`
+	GraphEdges      int64  `json:"graph_edges"`
+	QueriesExecuted int64  `json:"queries_executed"`
+	Products        []struct {
+		Product      string `json:"product"`
+		RepoCount    int64  `json:"repo_count"`
+		VectorChunks int64  `json:"vector_chunks"`
+		Source       string `json:"source"`
+	} `json:"products"`
+}
+
+func (s *serviceImpl) fetchPantomathUsageForTenant(ctx context.Context, tenant string) (*pantomathUsageAPIResp, error) {
+	if s.pantomathURL == "" {
+		return nil, nil
+	}
+	u := fmt.Sprintf("%s/v1/usage", s.pantomathURL)
+	if tenant != "" {
+		u = fmt.Sprintf("%s?tenant=%s", u, tenant)
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u, nil)
+	if err != nil {
+		return nil, err
+	}
+	if tenant != "" {
+		req.Header.Set("X-Opsway-Tenant-ID", tenant)
+	}
+	resp, err := s.httpClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("pantomath /v1/usage returned status %d", resp.StatusCode)
+	}
+	var parsed pantomathUsageAPIResp
+	if err := json.NewDecoder(resp.Body).Decode(&parsed); err != nil {
+		return nil, err
+	}
+	return &parsed, nil
+}
+
+func (s *serviceImpl) fetchPantomathUsage(ctx context.Context, teamID uint) *pantomathUsageAPIResp {
+	if s.pantomathURL == "" {
+		return nil
+	}
+	teamTenant := fmt.Sprintf("team_%d", teamID)
+	res, err := s.fetchPantomathUsageForTenant(ctx, teamTenant)
+	if err != nil {
+		if s.logger != nil {
+			s.logger.WithError(err).Warn("failed to fetch pantomath usage")
+		}
+		return nil
+	}
+	if res != nil && res.IndexedProducts == 0 && res.VectorChunks == 0 {
+		if fallback, err := s.fetchPantomathUsageForTenant(ctx, ""); err == nil && fallback != nil && (fallback.IndexedProducts > 0 || fallback.VectorChunks > 0) {
+			return fallback
+		}
+	}
+	return res
 }
 
 type logSearchUsageAPIResp struct {
@@ -733,6 +812,25 @@ func (s *serviceImpl) GetTeamUsage(ctx context.Context, teamID uint, from, to ti
 		}
 	}
 
+	// 7f. Live Pantomath usage (indexed products, repos, vector chunks, graph edges)
+	var livePantoProducts, livePantoRepos, pantoVectorChunks, pantoGraphEdges, pantoQueries int64
+	topPantoProducts := make([]TopPantomathProductConsumer, 0)
+	if pmUsage := s.fetchPantomathUsage(ctx, teamID); pmUsage != nil {
+		livePantoProducts = pmUsage.IndexedProducts
+		livePantoRepos = pmUsage.IndexedRepos
+		pantoVectorChunks = pmUsage.VectorChunks
+		pantoGraphEdges = pmUsage.GraphEdges
+		pantoQueries = pmUsage.QueriesExecuted
+		for _, p := range pmUsage.Products {
+			topPantoProducts = append(topPantoProducts, TopPantomathProductConsumer{
+				Product:      p.Product,
+				RepoCount:    p.RepoCount,
+				VectorChunks: p.VectorChunks,
+				Source:       p.Source,
+			})
+		}
+	}
+
 	timeseries := make([]DailyUsagePoint, 0, len(dates))
 	for _, d := range dates {
 		timeseries = append(timeseries, *byDate[d])
@@ -818,10 +916,21 @@ func (s *serviceImpl) GetTeamUsage(ctx context.Context, teamID uint, from, to ti
 	}
 
 	pantoUsed := float64(len(pantoProductSet))
+	if float64(livePantoProducts) > pantoUsed {
+		pantoUsed = float64(livePantoProducts)
+	}
 	if float64(pantoEnt.CurrentUsage) > pantoUsed {
 		pantoUsed = float64(pantoEnt.CurrentUsage)
 	}
 	pantoLimit := float64(pantoEnt.MonthlyQuota)
+	pantoRepos := linkedRepos
+	if livePantoRepos > pantoRepos {
+		pantoRepos = livePantoRepos
+	}
+	pantoTotalQueries := pantoMCPCalls
+	if pantoQueries > pantoTotalQueries {
+		pantoTotalQueries = pantoQueries
+	}
 
 	resp := &TeamUsageResponse{
 		TeamID:       teamID,
@@ -877,7 +986,10 @@ func (s *serviceImpl) GetTeamUsage(ctx context.Context, teamID uint, from, to ti
 				Quotas: []QuotaItem{
 					buildQuotaItem("indexed_products", "Indexed Products", pantoUsed, pantoLimit, "products", nil),
 				},
-				LinkedRepositories:               linkedRepos,
+				LinkedRepositories:               pantoRepos,
+				VectorChunks:                     pantoVectorChunks,
+				GraphEdges:                       pantoGraphEdges,
+				QueriesExecuted:                  pantoTotalQueries,
 				PantomathTriggeredInvestigations: pantoTriggeredInv,
 				MCPCalls:                         pantoMCPCalls,
 			},
@@ -892,10 +1004,11 @@ func (s *serviceImpl) GetTeamUsage(ctx context.Context, teamID uint, from, to ti
 		},
 		Timeseries: timeseries,
 		TopConsumers: TopConsumers{
-			Monitors:      topMonitors,
-			LogServices:   topLogServices,
-			AgentTriggers: topTriggers,
-			Services:      topServices,
+			Monitors:          topMonitors,
+			LogServices:       topLogServices,
+			PantomathProducts: topPantoProducts,
+			AgentTriggers:     topTriggers,
+			Services:          topServices,
 		},
 	}
 
