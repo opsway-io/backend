@@ -53,6 +53,11 @@ type Config struct {
 	LogSearch      LogSearchConfig                       `mapstructure:"log_search"`
 	Pantomath      PantomathConfig                       `mapstructure:"pantomath"`
 	Agent          AgentRunnerConfig                     `mapstructure:"agent"`
+	Platform       PlatformConfig                        `mapstructure:"platform"`
+}
+
+type PlatformConfig struct {
+	Owners []string `mapstructure:"owners"`
 }
 
 type LogSearchConfig struct {

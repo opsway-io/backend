@@ -19,15 +19,16 @@ type GetUserRequest struct {
 }
 
 type GetUserResponse struct {
-	ID          uint                  `json:"id"`
-	Name        string                `json:"name"`
-	DisplayName *string               `json:"displayName"`
-	Email       string                `json:"email"`
-	AvatarURL   *string               `json:"avatarUrl"`
-	Teams       []GetUserResponseTeam `json:"teams"`
-	HasPassword bool                  `json:"hasPassword"`
-	CreatedAt   time.Time             `json:"createdAt"`
-	UpdatedAt   time.Time             `json:"updatedAt"`
+	ID              uint                  `json:"id"`
+	Name            string                `json:"name"`
+	DisplayName     *string               `json:"displayName"`
+	Email           string                `json:"email"`
+	AvatarURL       *string               `json:"avatarUrl"`
+	Teams           []GetUserResponseTeam `json:"teams"`
+	HasPassword     bool                  `json:"hasPassword"`
+	IsPlatformOwner bool                  `json:"isPlatformOwner"`
+	CreatedAt       time.Time             `json:"createdAt"`
+	UpdatedAt       time.Time             `json:"updatedAt"`
 }
 
 type GetUserResponseTeam struct {
@@ -77,14 +78,15 @@ func newGetUserResponse(u *entities.User, userService user.Service, teamService 
 	}
 
 	res := GetUserResponse{
-		ID:          u.ID,
-		Name:        u.Name,
-		DisplayName: u.DisplayName,
-		Email:       u.Email,
-		HasPassword: u.PasswordHash != nil,
-		Teams:       teams,
-		CreatedAt:   u.CreatedAt,
-		UpdatedAt:   u.UpdatedAt,
+		ID:              u.ID,
+		Name:            u.Name,
+		DisplayName:     u.DisplayName,
+		Email:           u.Email,
+		HasPassword:     u.PasswordHash != nil,
+		IsPlatformOwner: u.IsPlatformOwner,
+		Teams:           teams,
+		CreatedAt:       u.CreatedAt,
+		UpdatedAt:       u.UpdatedAt,
 	}
 
 	if u.HasAvatar {

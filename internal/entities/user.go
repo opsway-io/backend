@@ -15,8 +15,9 @@ type User struct {
 	DisplayName  *string `gorm:"index"`
 	Email        string  `gorm:"uniqueIndex"`
 	PhoneNumber  *string `gorm:"type:text"`
-	HasAvatar    bool
-	PasswordHash *string
+	HasAvatar       bool
+	PasswordHash    *string
+	IsPlatformOwner bool `gorm:"not null;default:false" json:"isPlatformOwner"`
 
 	Teams               []Team               `gorm:"many2many:team_users"`
 	MaintenanceComments []MaintenanceComment `gorm:"constraint:OnDelete:CASCADE"`

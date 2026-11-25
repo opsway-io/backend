@@ -31,9 +31,10 @@ func TeamsAndUsers(db *gorm.DB) {
 	// Users
 	defaultUsers := []entities.User{
 		{
-			Name:        "Douglas Adams",
-			DisplayName: pointer.String("I Am Admin"),
-			Email:       "admin@opsway.eu",
+			Name:            "Douglas Adams",
+			DisplayName:     pointer.String("I Am Admin"),
+			Email:           "admin@opsway.eu",
+			IsPlatformOwner: true,
 		},
 		{
 			Name:        "John Doe",

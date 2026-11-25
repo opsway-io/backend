@@ -86,3 +86,7 @@ agent:
   llm_base_url: "http://localhost:11434/v1"
   llm_api_key: ""
   llm_model: "qwen2.5-3b-instruct"
+
+platform:
+  owners:
+    - "admin@opsway.eu"

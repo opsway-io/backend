@@ -24,6 +24,7 @@ import (
 	"github.com/opsway-io/backend/internal/mcp"
 	"github.com/opsway-io/backend/internal/monitor"
 	"github.com/opsway-io/backend/internal/notification/email"
+	"github.com/opsway-io/backend/internal/platform"
 	proberPkg "github.com/opsway-io/backend/internal/prober"
 	"github.com/opsway-io/backend/internal/report"
 	"github.com/opsway-io/backend/internal/rest"
@@ -113,7 +114,16 @@ func runAPI(cmd *cobra.Command, args []string) {
 		entities.UsageDailyCounter{},
 		entities.QuotaNotificationState{},
 		entities.PantomathProductLifecycle{},
+		entities.ProductFeatureFlag{},
 	)
+
+	platformBootSvc := platform.NewService(db, l.WithField("module", "platform"))
+	if err := platformBootSvc.EnsureDefaults(ctx); err != nil {
+		l.WithError(err).Warn("Failed to ensure default product feature flags")
+	}
+	if err := platformBootSvc.BootstrapOwners(ctx, conf.Platform.Owners); err != nil {
+		l.WithError(err).Warn("Failed to bootstrap platform owners from config")
+	}
 
 	// Allow standalone (non-monitoring) agent investigations (e.g. Log-Search spikes, Pantomath deploys, Webhooks)
 	db.Exec(`ALTER TABLE incident_investigations ALTER COLUMN incident_id DROP NOT NULL`)

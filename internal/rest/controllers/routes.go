@@ -10,6 +10,7 @@ import (
 	"github.com/opsway-io/backend/internal/billing"
 	"github.com/opsway-io/backend/internal/changelog"
 	"github.com/opsway-io/backend/internal/check"
+	"github.com/opsway-io/backend/internal/entities"
 	"github.com/opsway-io/backend/internal/escalation"
 	"github.com/opsway-io/backend/internal/event"
 	"github.com/opsway-io/backend/internal/heartbeats"
@@ -20,6 +21,7 @@ import (
 	"github.com/opsway-io/backend/internal/mcp"
 	"github.com/opsway-io/backend/internal/monitor"
 	"github.com/opsway-io/backend/internal/notification/email"
+	"github.com/opsway-io/backend/internal/platform"
 	proberService "github.com/opsway-io/backend/internal/prober"
 	"github.com/opsway-io/backend/internal/report"
 	alertingController "github.com/opsway-io/backend/internal/rest/controllers/alerting"
@@ -32,6 +34,7 @@ import (
 	maintenanceController "github.com/opsway-io/backend/internal/rest/controllers/maintenance"
 	"github.com/opsway-io/backend/internal/rest/controllers/metrics"
 	"github.com/opsway-io/backend/internal/rest/controllers/monitors"
+	platformController "github.com/opsway-io/backend/internal/rest/controllers/platform"
 	"github.com/opsway-io/backend/internal/rest/controllers/prober"
 	"github.com/opsway-io/backend/internal/rest/controllers/prometheus"
 	"github.com/opsway-io/backend/internal/rest/controllers/reports"
@@ -174,30 +177,38 @@ func Register(
 
 	apikeys.Register(authRoot, logger, teamService, apiKeyService)
 
+	// Platform Feature Flags & Owners
+	platformService := platform.NewService(db, logger.WithField("module", "platform"))
+	ProductGuard := middleware.ProductGuardFactory(logger, platformService)
+	platformController.Register(authRoot, logger.WithField("module", "platform"), platformService)
+
+	// Monitoring-gated routes
+	monitoringAuthRoot := authRoot.Group("", ProductGuard(entities.ProductMonitoring))
+
 	// Monitors
 
-	monitors.Register(authRoot, logger, teamService, monitorService, checkService, maintenanceService)
+	monitors.Register(monitoringAuthRoot, logger, teamService, monitorService, checkService, maintenanceService)
 
 	// Changelogs
 
-	changelogs.Register(authRoot, logger, teamService, changelogService)
+	changelogs.Register(monitoringAuthRoot, logger, teamService, changelogService)
 
 	// Alerting
-	alertingController.Register(authRoot, logger, teamService, alertingService, eventService)
+	alertingController.Register(monitoringAuthRoot, logger, teamService, alertingService, eventService)
 
 	// Incidents
-	incidents.Register(authRoot, logger, teamService, incidentService, eventService, alertingService, userService)
+	incidents.Register(monitoringAuthRoot, logger, teamService, incidentService, eventService, alertingService, userService)
 
 	// Heartbeats
-	heartbeatsController.Register(authRoot, logger, teamService, heartbeatService)
+	heartbeatsController.Register(monitoringAuthRoot, logger, teamService, heartbeatService)
 
 	// Maintenance
-	maintenanceController.Register(authRoot, logger, teamService, maintenanceService, monitorService)
+	maintenanceController.Register(monitoringAuthRoot, logger, teamService, maintenanceService, monitorService)
 
 	// Reports
-	reports.Register(authRoot, logger, teamService, reportsService, checkService, eventService)
+	reports.Register(monitoringAuthRoot, logger, teamService, reportsService, checkService, eventService)
 
-	statuspages.Register(authRoot, logger, teamService, statusPageService)
+	statuspages.Register(monitoringAuthRoot, logger, teamService, statusPageService)
 	statuspages.RegisterPublic(root, logger, statusPageBaseURL, statusPageService, incidentService, maintenanceService, checkService, emailSender)
 
 	// Prober
@@ -219,5 +230,6 @@ func Register(
 		usageService,
 		usageGuard,
 		mcpGatewayCfg.LogSearchAgentKey,
+		ProductGuard,
 	)
 }
