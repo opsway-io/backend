@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"io"
 	"net/http"
-	"strings"
 
 	"strconv"
 
@@ -58,7 +57,14 @@ func (h *Handlers) handleWebhook(c hs.StripeContext) error {
 			return c.NoContent(http.StatusInternalServerError)
 		}
 
-		customerTeam.PaymentPlan = entities.PaymentPlan(strings.ToUpper(subscription.Items.Data[0].Price.LookupKey))
+		// Only grant a paid plan when Stripe confirms payment or an active/trialing subscription.
+		if session.PaymentStatus == stripe.CheckoutSessionPaymentStatusPaid ||
+			subscription.Status == stripe.SubscriptionStatusActive ||
+			subscription.Status == stripe.SubscriptionStatusTrialing {
+			customerTeam.PaymentPlan = h.BillingService.ResolvePlanFromSubscription(subscription)
+		} else {
+			customerTeam.PaymentPlan = entities.PaymentPlanFree
+		}
 		if customerTeam.StripeCustomerID == nil || *customerTeam.StripeCustomerID == "" {
 			customerTeam.StripeCustomerID = &session.Customer.ID
 		}
@@ -85,11 +91,7 @@ func (h *Handlers) handleWebhook(c hs.StripeContext) error {
 			return c.NoContent(http.StatusInternalServerError)
 		}
 
-		team.PaymentPlan = entities.PaymentPlan(strings.ToUpper(subscription.Items.Data[0].Price.LookupKey))
-
-		if subscription.Status == "canceled" {
-			team.PaymentPlan = "FREE"
-		}
+		team.PaymentPlan = h.BillingService.ResolvePlanFromSubscription(&subscription)
 
 		err = h.TeamService.UpdateTeam(c.Request().Context(), team)
 		if err != nil {
@@ -113,10 +115,16 @@ func (h *Handlers) handleWebhook(c hs.StripeContext) error {
 			c.Log.WithError(err).Debug("Error getting team by stripe id")
 			return c.NoContent(http.StatusInternalServerError)
 		}
-		team.PaymentPlan = entities.PaymentPlan(strings.ToUpper(subscription.Items.Data[0].Price.LookupKey))
 
-		if subscription.Status == "canceled" {
-			team.PaymentPlan = "FREE"
+		// A deleted subscription always reverts to FREE unless another active subscription exists.
+		team.PaymentPlan = entities.PaymentPlanFree
+		if iter := h.BillingService.GetCustomerSubscription(subscription.Customer.ID); iter != nil {
+			for iter.Next() {
+				if resolved := h.BillingService.ResolvePlanFromSubscription(iter.Subscription()); resolved != entities.PaymentPlanFree {
+					team.PaymentPlan = resolved
+					break
+				}
+			}
 		}
 
 		err = h.TeamService.UpdateTeam(c.Request().Context(), team)
@@ -154,6 +162,19 @@ func (h *Handlers) handleWebhook(c hs.StripeContext) error {
 			_ = h.UsageGuard.SyncPlanEntitlements(c.Request().Context(), team)
 		}
 
+	case "invoice.paid":
+		var invoice stripe.Invoice
+		if err := json.Unmarshal(event.Data.Raw, &invoice); err != nil {
+			return echo.ErrBadRequest
+		}
+		if invoice.Customer != nil && invoice.Customer.ID != "" {
+			if team, err := h.TeamService.GetByStripeID(c.Request().Context(), invoice.Customer.ID); err == nil && team != nil {
+				if h.UsageGuard != nil {
+					h.UsageGuard.ReconcileTeamStripePlan(c.Request().Context(), team)
+				}
+			}
+		}
+
 	case "invoice.payment_failed":
 		var invoice stripe.Invoice
 		err := json.Unmarshal(event.Data.Raw, &invoice)
@@ -166,6 +187,10 @@ func (h *Handlers) handleWebhook(c hs.StripeContext) error {
 		if err != nil {
 			c.Log.WithError(err).Debug("Error getting team by stripe id")
 			return c.NoContent(http.StatusInternalServerError)
+		}
+
+		if h.UsageGuard != nil {
+			h.UsageGuard.ReconcileTeamStripePlan(c.Request().Context(), team)
 		}
 
 		// fetch owner

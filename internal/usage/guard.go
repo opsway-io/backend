@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/opsway-io/backend/internal/billing"
 	"github.com/opsway-io/backend/internal/entities"
 	"github.com/opsway-io/backend/internal/notification/email"
 	"github.com/sirupsen/logrus"
@@ -186,6 +187,7 @@ func (t quotaAlertTemplate) HTML() string      { return t.html }
 type Guard struct {
 	db          *gorm.DB
 	usageSvc    Service
+	billingSvc  billing.Service
 	emailSender email.Sender
 	appDomain   string
 	httpClient  *http.Client
@@ -195,6 +197,7 @@ type Guard struct {
 func NewGuard(
 	db *gorm.DB,
 	usageSvc Service,
+	billingSvc billing.Service,
 	emailSender email.Sender,
 	appDomain string,
 	logger *logrus.Entry,
@@ -205,6 +208,7 @@ func NewGuard(
 	return &Guard{
 		db:          db,
 		usageSvc:    usageSvc,
+		billingSvc:  billingSvc,
 		emailSender: emailSender,
 		appDomain:   strings.TrimRight(appDomain, "/"),
 		httpClient:  &http.Client{Timeout: 5 * time.Second},
@@ -243,6 +247,7 @@ func (g *Guard) EvaluateAllTeams(ctx context.Context) {
 		return
 	}
 	for i := range teams {
+		g.ReconcileTeamStripePlan(ctx, &teams[i])
 		if _, err := g.EvaluateTeam(ctx, teams[i].ID); err != nil && g.logger != nil {
 			g.logger.WithError(err).WithField("teamId", teams[i].ID).Warn("usage-guard: failed to evaluate team")
 		}

@@ -59,6 +59,47 @@ func (g *Guard) SyncPlanEntitlements(ctx context.Context, team *entities.Team) e
 	return nil
 }
 
+// ReconcileTeamStripePlan verifies a team's active Stripe subscription and ensures
+// team.PaymentPlan and all product entitlements match paid Stripe state.
+func (g *Guard) ReconcileTeamStripePlan(ctx context.Context, team *entities.Team) {
+	if g == nil || g.db == nil || g.billingSvc == nil || !g.billingSvc.IsConfigured() || team == nil {
+		return
+	}
+
+	resolvedPlan := entities.PaymentPlanFree
+	if team.StripeCustomerID != nil && *team.StripeCustomerID != "" {
+		iter := g.billingSvc.GetCustomerSubscription(*team.StripeCustomerID)
+		if iter == nil {
+			return
+		}
+		for iter.Next() {
+			if p := g.billingSvc.ResolvePlanFromSubscription(iter.Subscription()); p != entities.PaymentPlanFree {
+				resolvedPlan = p
+				break
+			}
+		}
+		if err := iter.Err(); err != nil {
+			if g.logger != nil {
+				g.logger.WithError(err).WithField("teamId", team.ID).Warn("stripe reconciliation: failed to query subscriptions")
+			}
+			return
+		}
+	}
+
+	if team.PaymentPlan != resolvedPlan {
+		if g.logger != nil {
+			g.logger.WithFields(map[string]interface{}{
+				"teamId": team.ID,
+				"from":   team.PaymentPlan,
+				"to":     resolvedPlan,
+			}).Info("stripe reconciliation: syncing team plan to match paid Stripe subscription")
+		}
+		team.PaymentPlan = resolvedPlan
+		_ = g.db.WithContext(ctx).Model(&entities.Team{}).Where("id = ?", team.ID).Update("payment_plan", resolvedPlan).Error
+		_ = g.SyncPlanEntitlements(ctx, team)
+	}
+}
+
 // ReconcilePantomathLifecycle enforces the plan's max indexed products limit:
 //   - Only up to `maxProducts` remain ACTIVE and searchable.
 //   - Excess products are marked SCHEDULED_DELETE with deleteAt = now + 7 days.

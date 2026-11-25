@@ -135,6 +135,7 @@ func Register(
 	usageGuard := usage.NewGuard(
 		db,
 		usageService,
+		billingService,
 		emailSender,
 		"https://my.opsway.eu",
 		logger.WithField("module", "usage-guard"),

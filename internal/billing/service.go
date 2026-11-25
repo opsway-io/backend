@@ -2,6 +2,7 @@ package billing
 
 import (
 	"strconv"
+	"strings"
 
 	"github.com/opsway-io/backend/internal/entities"
 	"github.com/pkg/errors"
@@ -26,6 +27,8 @@ type Config struct {
 }
 
 type Service interface {
+	IsConfigured() bool
+	ResolvePlanFromSubscription(sub *stripe.Subscription) entities.PaymentPlan
 	PostConfig() StripeConfig
 	CreateCheckoutSession(team *entities.Team, priceID string) (*stripe.CheckoutSession, error)
 	UpdateSubscription(team *entities.Team, priceID string) (*stripe.Subscription, error)
@@ -58,6 +61,40 @@ type StripeConfig struct {
 	PublishableKey  string `json:"publishableKey"`
 	TeamPrice       string `json:"teamPrice"`
 	EnterprisePrice string `json:"enterprisePrice"`
+}
+
+func (s *ServiceImpl) IsConfigured() bool {
+	return strings.TrimSpace(s.Config.SecretKey) != ""
+}
+
+// ResolvePlanFromSubscription maps a Stripe subscription to a verified PaymentPlan.
+// Only active or trialing subscriptions grant a paid plan; unpaid, canceled, or past_due
+// subscriptions revert to FREE across all products.
+func (s *ServiceImpl) ResolvePlanFromSubscription(sub *stripe.Subscription) entities.PaymentPlan {
+	if sub == nil {
+		return entities.PaymentPlanFree
+	}
+	if sub.Status != stripe.SubscriptionStatusActive && sub.Status != stripe.SubscriptionStatusTrialing {
+		return entities.PaymentPlanFree
+	}
+	if sub.Items == nil || len(sub.Items.Data) == 0 || sub.Items.Data[0].Price == nil {
+		return entities.PaymentPlanFree
+	}
+	p := sub.Items.Data[0].Price
+	if s.Config.EnterprisePriceID != "" && p.ID == s.Config.EnterprisePriceID {
+		return entities.PaymentPlanEnterprise
+	}
+	if s.Config.TeamPriceID != "" && p.ID == s.Config.TeamPriceID {
+		return entities.PaymentPlanTeam
+	}
+	switch strings.ToUpper(strings.TrimSpace(p.LookupKey)) {
+	case string(entities.PaymentPlanEnterprise):
+		return entities.PaymentPlanEnterprise
+	case string(entities.PaymentPlanTeam):
+		return entities.PaymentPlanTeam
+	default:
+		return entities.PaymentPlanFree
+	}
 }
 
 func (s *ServiceImpl) PostConfig() StripeConfig {
@@ -104,6 +141,7 @@ func (s *ServiceImpl) UpdateSubscription(team *entities.Team, priceID string) (*
 	}
 
 	params := &stripe.SubscriptionParams{
+		PaymentBehavior: stripe.String("error_if_incomplete"),
 		Items: []*stripe.SubscriptionItemsParams{
 			{
 				ID:    stripe.String(teamSubscription.Items.Data[0].ID),
