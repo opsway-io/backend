@@ -28,12 +28,32 @@ const (
 	WarningThresholdPct = 80.0
 )
 
-// Unit overage rates in cents for Pay-As-You-Go overage billing on paid plans.
+// Unit overage rates in cents per unit (or per block for high-count metrics) on paid plans.
 var overageUnitCents = map[string]int{
 	"ingestion_gb":           50,   // $0.50 / GB
 	"managed_investigations": 25,   // $0.25 / AI run
 	"monitors":               100,  // $1.00 / monitor
 	"indexed_products":       1000, // $10.00 / Pantomath product
+	"indexed_repos":          200,  // $2.00 / Pantomath repo
+}
+
+func estimateOverageCents(quotaKey string, overUnits float64) int {
+	if overUnits <= 0 {
+		return 0
+	}
+	switch quotaKey {
+	case "monthly_tokens":
+		// $5.00 per 1M overage tokens
+		return int(math.Ceil((overUnits / 1_000_000.0) * 500.0))
+	case "vector_chunks":
+		// $0.50 per 10k overage vector chunks
+		return int(math.Ceil((overUnits / 10_000.0) * 50.0))
+	default:
+		if unitPrice := overageUnitCents[quotaKey]; unitPrice > 0 {
+			return int(math.Ceil(overUnits * float64(unitPrice)))
+		}
+		return 0
+	}
 }
 
 type OverageSettings struct {
@@ -84,10 +104,7 @@ func ComputeEnforcementTransition(
 
 	// Over 100% — calculate overage units & estimated cost
 	overUnits := math.Max(0, used-limit)
-	unitPrice := overageUnitCents[quotaKey]
-	if unitPrice > 0 && overUnits > 0 {
-		overageCents = int(math.Ceil(overUnits * float64(unitPrice)))
-	}
+	overageCents = estimateOverageCents(quotaKey, overUnits)
 
 	isPaid := plan == entities.PaymentPlanTeam || plan == entities.PaymentPlanEnterprise
 
@@ -406,15 +423,50 @@ func (g *Guard) EvaluateTeam(ctx context.Context, teamID uint) ([]ProductEnforce
 
 func (g *Guard) GetProductEnforcementState(ctx context.Context, teamID uint, product entities.ProductSlug) entities.QuotaEnforcementState {
 	cycleStart := calculateBillingCycle(time.Now().UTC()).Start.Format("2006-01-02")
-	var row entities.QuotaNotificationState
-	err := g.db.WithContext(ctx).
+	var rows []entities.QuotaNotificationState
+	if err := g.db.WithContext(ctx).
 		Where("team_id = ? AND product = ? AND billing_cycle_start = ?", teamID, product, cycleStart).
-		Order("updated_at DESC").
-		First(&row).Error
-	if err != nil {
+		Find(&rows).Error; err != nil || len(rows) == 0 {
 		return entities.QuotaStateNormal
 	}
-	return row.State
+	// Return the strictest active enforcement state across all quotas for this product.
+	rank := func(s entities.QuotaEnforcementState) int {
+		switch s {
+		case entities.QuotaStateThrottled:
+			return 4
+		case entities.QuotaStateGrace:
+			return 3
+		case entities.QuotaStateOverageBilling:
+			return 2
+		case entities.QuotaStateWarning:
+			return 1
+		default:
+			return 0
+		}
+	}
+	worst := entities.QuotaStateNormal
+	for _, r := range rows {
+		if rank(r.State) > rank(worst) {
+			worst = r.State
+		}
+	}
+	return worst
+}
+
+func (g *Guard) GetTeamMCPRateLimit(ctx context.Context, teamID uint) int {
+	var team entities.Team
+	if err := g.db.WithContext(ctx).Select("id, payment_plan").First(&team, teamID).Error; err != nil {
+		return 60
+	}
+	return team.GetMCPGatewayRateLimitPerMin()
+}
+
+func (g *Guard) GetTeamTriggerRuleLimit(ctx context.Context, teamID uint) int {
+	var team entities.Team
+	if err := g.db.WithContext(ctx).Select("id, payment_plan").First(&team, teamID).Error; err != nil {
+		return 3
+	}
+	return team.GetAgentTriggerRuleLimit()
 }
 
 func (g *Guard) dispatchUnifiedNotification(

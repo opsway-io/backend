@@ -57,6 +57,23 @@ func (h *Handlers) PostAgentTrigger(c hs.AuthenticatedContext) error {
 	if req.Product == "" || req.TriggerType == "" || req.Name == "" {
 		return echo.NewHTTPError(http.StatusBadRequest, "product, triggerType, and name are required")
 	}
+	if h.UsageGuard != nil {
+		limit := h.UsageGuard.GetTeamTriggerRuleLimit(c.Request().Context(), req.TeamID)
+		if limit >= 0 {
+			existing, err := h.InvestigationService.ListTriggerRules(c.Request().Context(), req.TeamID)
+			if err == nil && len(existing) >= limit {
+				return c.JSON(http.StatusPaymentRequired, map[string]interface{}{
+					"code":       "QUOTA_EXCEEDED",
+					"product":    entities.ProductManagedAgent,
+					"quotaKey":   "trigger_rules",
+					"used":       len(existing),
+					"limit":      limit,
+					"message":    "Active trigger rule limit reached for your plan.",
+					"upgradeUrl": "/settings/billing",
+				})
+			}
+		}
+	}
 	rule, err := h.InvestigationService.CreateTriggerRule(c.Request().Context(), &entities.AgentTriggerRule{
 		TeamID:                   req.TeamID,
 		Product:                  req.Product,

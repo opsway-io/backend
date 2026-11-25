@@ -120,6 +120,84 @@ func (t *Team) GetManagedInvestigationLimit() int {
 	}
 }
 
+func (t *Team) GetAgentTokenLimitPerRun() int {
+	switch t.PaymentPlan {
+	case PaymentPlanFree:
+		return 32000
+	case PaymentPlanTeam:
+		return 100000
+	case PaymentPlanEnterprise:
+		return 250000
+	default:
+		return 32000
+	}
+}
+
+func (t *Team) GetAgentMonthlyTokenLimit() int {
+	switch t.PaymentPlan {
+	case PaymentPlanFree:
+		return 100000
+	case PaymentPlanTeam:
+		return 2000000
+	case PaymentPlanEnterprise:
+		return -1
+	default:
+		return 100000
+	}
+}
+
+func (t *Team) GetAgentTriggerRuleLimit() int {
+	switch t.PaymentPlan {
+	case PaymentPlanFree:
+		return 3
+	case PaymentPlanTeam:
+		return 25
+	case PaymentPlanEnterprise:
+		return -1
+	default:
+		return 3
+	}
+}
+
+func (t *Team) GetMCPGatewayRateLimitPerMin() int {
+	switch t.PaymentPlan {
+	case PaymentPlanFree:
+		return 60
+	case PaymentPlanTeam:
+		return 300
+	case PaymentPlanEnterprise:
+		return 1000
+	default:
+		return 60
+	}
+}
+
+func (t *Team) GetPantomathRepoLimit() int {
+	switch t.PaymentPlan {
+	case PaymentPlanFree:
+		return 3
+	case PaymentPlanTeam:
+		return 25
+	case PaymentPlanEnterprise:
+		return -1
+	default:
+		return 3
+	}
+}
+
+func (t *Team) GetPantomathVectorChunkLimit() int {
+	switch t.PaymentPlan {
+	case PaymentPlanFree:
+		return 25000
+	case PaymentPlanTeam:
+		return 250000
+	case PaymentPlanEnterprise:
+		return -1
+	default:
+		return 25000
+	}
+}
+
 func (t *Team) BeforeCreate(tx *gorm.DB) (err error) {
 	if ok := checkTeamNameFormat(t.Name); !ok {
 		return ErrIllegalTeamNameFormat

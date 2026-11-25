@@ -979,7 +979,11 @@ func (s *serviceImpl) GetTeamUsage(ctx context.Context, teamID uint, from, to ti
 	monQuota := buildQuotaItem("monitors", "Active Monitors", float64(monitorCount), monitorLimit, "monitors", nil)
 	logQuota := buildQuotaItem("ingestion_gb", "Log Ingestion", logUsedGB, logLimitGB, "GB", projectMonthlyUsage(logUsedGB, cycle))
 	agentQuota := buildQuotaItem("managed_investigations", "Managed AI Investigations", agentUsed, agentLimit, "runs", projectMonthlyUsage(agentUsed, cycle))
+	agentTokenQuota := buildQuotaItem("monthly_tokens", "Monthly LLM Tokens", float64(agg.TotalTokens), float64(team.GetAgentMonthlyTokenLimit()), "tokens", projectMonthlyUsage(float64(agg.TotalTokens), cycle))
+	agentTriggerQuota := buildQuotaItem("trigger_rules", "Active Trigger Rules", float64(activeTriggerRules), float64(team.GetAgentTriggerRuleLimit()), "rules", nil)
 	pantoQuota := buildQuotaItem("indexed_products", "Indexed Products", pantoUsed, pantoLimit, "products", nil)
+	pantoRepoQuota := buildQuotaItem("indexed_repos", "Indexed Repositories", float64(pantoRepos), float64(team.GetPantomathRepoLimit()), "repos", nil)
+	pantoChunkQuota := buildQuotaItem("vector_chunks", "Graph Vector Chunks", float64(pantoVectorChunks), float64(team.GetPantomathVectorChunkLimit()), "chunks", nil)
 
 	topLogHint := ""
 	if len(topLogServices) > 0 {
@@ -989,7 +993,10 @@ func (s *serviceImpl) GetTeamUsage(ctx context.Context, teamID uint, from, to ti
 		buildEnforcement(entities.ProductMonitoring, monQuota, ""),
 		buildEnforcement(entities.ProductLogSearch, logQuota, topLogHint),
 		buildEnforcement(entities.ProductManagedAgent, agentQuota, ""),
+		buildEnforcement(entities.ProductManagedAgent, agentTokenQuota, ""),
 		buildEnforcement(entities.ProductPantomath, pantoQuota, ""),
+		buildEnforcement(entities.ProductPantomath, pantoRepoQuota, ""),
+		buildEnforcement(entities.ProductPantomath, pantoChunkQuota, ""),
 	}
 	totalOverageCents := 0
 	for _, e := range enforcement {
@@ -1041,6 +1048,8 @@ func (s *serviceImpl) GetTeamUsage(ctx context.Context, teamID uint, from, to ti
 				Enabled: agentEnt.Enabled,
 				Quotas: []QuotaItem{
 					agentQuota,
+					agentTokenQuota,
+					agentTriggerQuota,
 				},
 				ManagedRuns:           managedRuns,
 				ByoaRuns:              byoaRuns,
@@ -1056,6 +1065,8 @@ func (s *serviceImpl) GetTeamUsage(ctx context.Context, teamID uint, from, to ti
 				Enabled: pantoEnt.Enabled,
 				Quotas: []QuotaItem{
 					pantoQuota,
+					pantoRepoQuota,
+					pantoChunkQuota,
 				},
 				LinkedRepositories:               pantoRepos,
 				VectorChunks:                     pantoVectorChunks,

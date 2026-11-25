@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/labstack/echo/v4"
@@ -15,6 +16,35 @@ import (
 	hs "github.com/opsway-io/backend/internal/rest/handlers"
 	"github.com/opsway-io/backend/internal/rest/helpers"
 )
+
+type mcpRateWindow struct {
+	minute int64
+	count  int
+}
+
+var (
+	mcpRateMu      sync.Mutex
+	mcpRateWindows = map[uint]*mcpRateWindow{}
+)
+
+func allowMCPRate(teamID uint, limitPerMin int) bool {
+	if limitPerMin <= 0 {
+		return true
+	}
+	nowMin := time.Now().UTC().Unix() / 60
+	mcpRateMu.Lock()
+	defer mcpRateMu.Unlock()
+	w, ok := mcpRateWindows[teamID]
+	if !ok || w.minute != nowMin {
+		mcpRateWindows[teamID] = &mcpRateWindow{minute: nowMin, count: 1}
+		return true
+	}
+	if w.count >= limitPerMin {
+		return false
+	}
+	w.count++
+	return true
+}
 
 func (h *Handlers) PostMCPGateway(c echo.Context) error {
 	var rpcReq mcp.JSONRPCRequest
@@ -40,6 +70,22 @@ func (h *Handlers) PostMCPGateway(c echo.Context) error {
 				teamID = apiKey.TeamID
 			}
 		}
+	}
+
+	// Enforce per-tier MCP Gateway rate limit (60 Free / 300 Team / 1000 Enterprise req/min)
+	mcpLimit := 60
+	if h.UsageGuard != nil {
+		mcpLimit = h.UsageGuard.GetTeamMCPRateLimit(c.Request().Context(), teamID)
+	}
+	if !allowMCPRate(teamID, mcpLimit) {
+		return c.JSON(http.StatusTooManyRequests, mcp.JSONRPCResponse{
+			JSONRPC: "2.0",
+			ID:      rpcReq.ID,
+			Error: &mcp.JSONRPCError{
+				Code:    -32029,
+				Message: "MCP Gateway rate limit exceeded for your plan. Upgrade in Opsway Settings -> Billing for higher throughput.",
+			},
+		})
 	}
 
 	resp := h.MCPGateway.HandleJSONRPC(c.Request().Context(), teamID, rpcReq)

@@ -685,6 +685,11 @@ func (s *serviceImpl) executeManagedAgentFlow(
 
 	stepIdx := 1
 	totalTokens := 0
+	var runTeam entities.Team
+	tokenCapPerRun := 32000
+	if err := s.db.WithContext(ctx).Select("id, payment_plan").First(&runTeam, inv.TeamID).Error; err == nil {
+		tokenCapPerRun = runTeam.GetAgentTokenLimitPerRun()
+	}
 	var correlatedLogs []entities.CorrelatedLogEntry
 	var finalContent string
 	var llmErr error
@@ -706,6 +711,9 @@ func (s *serviceImpl) executeManagedAgentFlow(
 
 	temp := 0.1
 	for iter := 0; iter < maxAgentIterations; iter++ {
+		if inv.ExecutionMode == entities.AgentModeManaged && tokenCapPerRun > 0 && totalTokens >= tokenCapPerRun {
+			break // Enforce per-run token ceiling cleanly and synthesize from collected evidence
+		}
 		callStart := time.Now()
 		resp, err := activeLLM.Chat(ctx, llm.ChatCompletionRequest{
 			Messages:    messages,
