@@ -91,6 +91,56 @@ func Register(
 		AuthGuard(),
 	)
 
+	if mcpGatewayCfg.LogSearchURL == "" {
+		mcpGatewayCfg.LogSearchURL = "http://log-search.log-search.svc.cluster.local:8080"
+	}
+	if mcpGatewayCfg.LogSearchPublicURL == "" {
+		mcpGatewayCfg.LogSearchPublicURL = "https://logs.opsway.eu"
+	}
+	if mcpGatewayCfg.LogSearchAgentKey == "" {
+		mcpGatewayCfg.LogSearchAgentKey = "valid_agent_key"
+	}
+	if mcpGatewayCfg.PantomathURL == "" {
+		mcpGatewayCfg.PantomathURL = "http://pantomath.pantomath.svc.cluster.local:8000"
+	}
+	mcpGateway := mcp.NewGateway(
+		mcpGatewayCfg,
+		db,
+		monitorService,
+		checkService,
+		incidentService,
+		logger,
+	)
+	if agentLLMClient == nil {
+		agentLLMClient = llm.NewClient("", "", "")
+	}
+	investigationService := investigation.NewService(
+		db,
+		mcpGateway,
+		incidentService,
+		monitorService,
+		agentLLMClient,
+		mcpGatewayCfg.LogSearchPublicURL,
+		logger,
+	)
+	usageService := usage.NewService(
+		db,
+		ch,
+		investigationService,
+		mcpGatewayCfg.LogSearchURL,
+		mcpGatewayCfg.LogSearchAgentKey,
+		mcpGatewayCfg.PantomathURL,
+		logger.WithField("module", "usage"),
+	)
+	usageGuard := usage.NewGuard(
+		db,
+		usageService,
+		emailSender,
+		"https://my.opsway.eu",
+		logger.WithField("module", "usage-guard"),
+	)
+	usageGuard.Start(context.Background())
+
 	// Webhooks
 
 	webhooks.Register(
@@ -100,6 +150,7 @@ func Register(
 		teamService,
 		incidentService,
 		emailSender,
+		usageGuard,
 	)
 
 	// Healthz
@@ -156,57 +207,6 @@ func Register(
 
 	// API Key Metrics
 	metrics.Register(root, logger, checkService, apiKeyService, db)
-
-	// Opsway Umbrella Suite, Unified MCP Gateway & Agent Investigation Engine
-	if mcpGatewayCfg.LogSearchURL == "" {
-		mcpGatewayCfg.LogSearchURL = "http://log-search.log-search.svc.cluster.local:8080"
-	}
-	if mcpGatewayCfg.LogSearchPublicURL == "" {
-		mcpGatewayCfg.LogSearchPublicURL = "https://logs.opsway.eu"
-	}
-	if mcpGatewayCfg.LogSearchAgentKey == "" {
-		mcpGatewayCfg.LogSearchAgentKey = "valid_agent_key"
-	}
-	if mcpGatewayCfg.PantomathURL == "" {
-		mcpGatewayCfg.PantomathURL = "http://pantomath.pantomath.svc.cluster.local:8000"
-	}
-	mcpGateway := mcp.NewGateway(
-		mcpGatewayCfg,
-		db,
-		monitorService,
-		checkService,
-		incidentService,
-		logger,
-	)
-	if agentLLMClient == nil {
-		agentLLMClient = llm.NewClient("", "", "")
-	}
-	investigationService := investigation.NewService(
-		db,
-		mcpGateway,
-		incidentService,
-		monitorService,
-		agentLLMClient,
-		mcpGatewayCfg.LogSearchPublicURL,
-		logger,
-	)
-	usageService := usage.NewService(
-		db,
-		ch,
-		investigationService,
-		mcpGatewayCfg.LogSearchURL,
-		mcpGatewayCfg.LogSearchAgentKey,
-		mcpGatewayCfg.PantomathURL,
-		logger.WithField("module", "usage"),
-	)
-	usageGuard := usage.NewGuard(
-		db,
-		usageService,
-		emailSender,
-		"https://my.opsway.eu",
-		logger.WithField("module", "usage-guard"),
-	)
-	usageGuard.Start(context.Background())
 
 	suite.Register(
 		root,

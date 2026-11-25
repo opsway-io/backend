@@ -9,6 +9,7 @@ import (
 	"github.com/opsway-io/backend/internal/rest/handlers"
 	"github.com/opsway-io/backend/internal/rest/middleware"
 	"github.com/opsway-io/backend/internal/team"
+	"github.com/opsway-io/backend/internal/usage"
 	"github.com/sirupsen/logrus"
 )
 
@@ -18,6 +19,7 @@ type Handlers struct {
 	TeamService           team.Service
 	IncidentService       incident.Service
 	EmailSender           email.Sender
+	UsageGuard            *usage.Guard
 }
 
 func Register(
@@ -27,12 +29,18 @@ func Register(
 	teamService team.Service,
 	incidentService incident.Service,
 	emailSender email.Sender,
+	usageGuard ...*usage.Guard,
 ) {
+	var guard *usage.Guard
+	if len(usageGuard) > 0 {
+		guard = usageGuard[0]
+	}
 	h := &Handlers{
 		BillingService:  billingService,
 		TeamService:     teamService,
 		IncidentService: incidentService,
 		EmailSender:     emailSender,
+		UsageGuard:      guard,
 	}
 
 	root := e.Group(

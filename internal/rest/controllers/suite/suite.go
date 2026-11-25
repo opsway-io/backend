@@ -644,16 +644,46 @@ func (h *Handlers) GetInternalQuotaState(c echo.Context) error {
 
 	state := entities.QuotaStateNormal
 	var limits map[string]interface{}
+	var allowedProducts []string
+	var scheduledDeleteProducts []string
 	if h.UsageGuard != nil {
 		state = h.UsageGuard.GetProductEnforcementState(c.Request().Context(), teamID, product)
 		limits = h.UsageGuard.GetTeamPlanLimits(c.Request().Context(), teamID)
+		if product == entities.ProductPantomath {
+			allowedProducts, scheduledDeleteProducts = h.UsageGuard.GetPantomathAllowedProducts(c.Request().Context(), teamID)
+		}
 	}
 
 	return c.JSON(http.StatusOK, map[string]interface{}{
-		"teamId":  teamID,
-		"tenant":  tenant,
-		"product": product,
-		"state":   state,
-		"limits":  limits,
+		"teamId":                  teamID,
+		"tenant":                  tenant,
+		"product":                 product,
+		"state":                   state,
+		"limits":                  limits,
+		"allowedProducts":         allowedProducts,
+		"scheduledDeleteProducts": scheduledDeleteProducts,
+	})
+}
+
+type PutActivePantomathProductRequest struct {
+	TeamID  uint   `param:"teamId" validate:"required,numeric,gte=0"`
+	Product string `json:"product" validate:"required"`
+}
+
+func (h *Handlers) PutActivePantomathProduct(c hs.AuthenticatedContext) error {
+	req, err := helpers.Bind[PutActivePantomathProductRequest](c)
+	if err != nil {
+		return echo.ErrBadRequest
+	}
+	if h.UsageGuard == nil {
+		return echo.ErrServiceUnavailable
+	}
+	if err := h.UsageGuard.SetActivePantomathProduct(c.Request().Context(), req.TeamID, req.Product); err != nil {
+		c.Log.WithError(err).Error("failed to set active pantomath product")
+		return echo.ErrInternalServerError
+	}
+	return c.JSON(http.StatusOK, map[string]interface{}{
+		"product": req.Product,
+		"status":  "ACTIVE",
 	})
 }

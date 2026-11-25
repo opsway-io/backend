@@ -140,10 +140,12 @@ type TopServiceConsumer struct {
 }
 
 type TopPantomathProductConsumer struct {
-	Product      string `json:"product"`
-	RepoCount    int64  `json:"repoCount"`
-	VectorChunks int64  `json:"vectorChunks"`
-	Source       string `json:"source"`
+	Product      string     `json:"product"`
+	RepoCount    int64      `json:"repoCount"`
+	VectorChunks int64      `json:"vectorChunks"`
+	Source       string     `json:"source"`
+	Status       string     `json:"status"` // "active" | "scheduled_delete" | "deleted"
+	DeleteAt     *time.Time `json:"deleteAt,omitempty"`
 }
 
 type TopConsumers struct {
@@ -815,9 +817,10 @@ func (s *serviceImpl) GetTeamUsage(ctx context.Context, teamID uint, from, to ti
 		}
 	}
 
-	// 7f. Live Pantomath usage (indexed products, repos, vector chunks, graph edges)
+	// 7f. Live Pantomath usage (indexed products, repos, vector chunks, graph edges) + downgrade lifecycle
 	var livePantoProducts, livePantoRepos, pantoVectorChunks, pantoGraphEdges, pantoQueries int64
 	topPantoProducts := make([]TopPantomathProductConsumer, 0)
+	var discoveredPantoNames []string
 	if pmUsage := s.fetchPantomathUsage(ctx, teamID); pmUsage != nil {
 		livePantoProducts = pmUsage.IndexedProducts
 		livePantoRepos = pmUsage.IndexedRepos
@@ -825,12 +828,24 @@ func (s *serviceImpl) GetTeamUsage(ctx context.Context, teamID uint, from, to ti
 		pantoGraphEdges = pmUsage.GraphEdges
 		pantoQueries = pmUsage.QueriesExecuted
 		for _, p := range pmUsage.Products {
+			discoveredPantoNames = append(discoveredPantoNames, p.Product)
 			topPantoProducts = append(topPantoProducts, TopPantomathProductConsumer{
 				Product:      p.Product,
 				RepoCount:    p.RepoCount,
 				VectorChunks: p.VectorChunks,
 				Source:       p.Source,
+				Status:       "active",
 			})
+		}
+	}
+	if len(discoveredPantoNames) > 0 {
+		gHelper := &Guard{db: s.db, usageSvc: s, httpClient: s.httpClient, logger: s.logger}
+		_, lcMap := gHelper.ReconcilePantomathLifecycle(ctx, teamID, team.PaymentPlan, team.AllowOverage, discoveredPantoNames)
+		for i := range topPantoProducts {
+			if lc, ok := lcMap[topPantoProducts[i].Product]; ok {
+				topPantoProducts[i].Status = strings.ToLower(string(lc.Status))
+				topPantoProducts[i].DeleteAt = lc.DeleteAt
+			}
 		}
 	}
 

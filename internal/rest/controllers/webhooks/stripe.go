@@ -68,6 +68,9 @@ func (h *Handlers) handleWebhook(c hs.StripeContext) error {
 			c.Log.WithError(err).Debug("Error updating team")
 			return c.NoContent(http.StatusInternalServerError)
 		}
+		if h.UsageGuard != nil {
+			_ = h.UsageGuard.SyncPlanEntitlements(c.Request().Context(), customerTeam)
+		}
 	case "customer.subscription.updated":
 		var subscription stripe.Subscription
 		err := json.Unmarshal(event.Data.Raw, &subscription)
@@ -92,6 +95,9 @@ func (h *Handlers) handleWebhook(c hs.StripeContext) error {
 		if err != nil {
 			c.Log.WithError(err).Debug("Error updating team")
 			return c.NoContent(http.StatusInternalServerError)
+		}
+		if h.UsageGuard != nil {
+			_ = h.UsageGuard.SyncPlanEntitlements(c.Request().Context(), team)
 		}
 
 	case "customer.subscription.deleted":
@@ -118,6 +124,9 @@ func (h *Handlers) handleWebhook(c hs.StripeContext) error {
 			c.Log.WithError(err).Debug("Error updating team")
 			return c.NoContent(http.StatusInternalServerError)
 		}
+		if h.UsageGuard != nil {
+			_ = h.UsageGuard.SyncPlanEntitlements(c.Request().Context(), team)
+		}
 
 	case "customer.deleted":
 		var customer stripe.Customer
@@ -140,6 +149,9 @@ func (h *Handlers) handleWebhook(c hs.StripeContext) error {
 		if err != nil {
 			c.Log.WithError(err).Debug("Error updating team")
 			return c.NoContent(http.StatusInternalServerError)
+		}
+		if h.UsageGuard != nil {
+			_ = h.UsageGuard.SyncPlanEntitlements(c.Request().Context(), team)
 		}
 
 	case "invoice.payment_failed":

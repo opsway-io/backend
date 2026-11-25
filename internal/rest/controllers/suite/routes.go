@@ -58,6 +58,7 @@ func Register(
 	teamGroup.PUT("/entitlements", AuthHandler(h.PutEntitlement))
 	teamGroup.GET("/usage", AuthHandler(h.GetTeamUsage))
 	teamGroup.PUT("/overage-settings", AuthHandler(h.PutOverageSettings))
+	teamGroup.PUT("/pantomath/active-product", AuthHandler(h.PutActivePantomathProduct))
 
 	// Cross-Product Service Catalog
 	teamGroup.GET("/service-catalog", AuthHandler(h.GetServiceCatalog))

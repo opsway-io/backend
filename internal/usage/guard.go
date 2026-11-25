@@ -162,7 +162,7 @@ func DescribeEnforcementBehavior(product entities.ProductSlug, state entities.Qu
 		case entities.ProductManagedAgent:
 			return "Throttled: incidents fall back to BYO-LLM/BYOA or deterministic log summary triage."
 		case entities.ProductPantomath:
-			return "Read-only snapshot: existing graph stays queryable; scheduled re-indexing paused."
+			return "Only 1 product remains searchable; excess products are locked and scheduled for deletion in 7 days unless you upgrade."
 		default:
 			return "Quota reached: existing data preserved; new resource creation paused until upgrade or reset."
 		}
