@@ -58,18 +58,49 @@ func (h *Handlers) PostMCPGateway(c echo.Context) error {
 		})
 	}
 
-	teamID := uint(1)
-	if tHeader := c.Request().Header.Get("X-Opsway-Team-ID"); tHeader != "" {
-		if parsed, err := strconv.ParseUint(tHeader, 10, 64); err == nil && parsed > 0 {
-			teamID = uint(parsed)
-		}
-	} else if authHeader := c.Request().Header.Get("Authorization"); strings.HasPrefix(authHeader, "Bearer ") {
-		rawKey := strings.TrimPrefix(authHeader, "Bearer ")
-		if h.ApiKeyService != nil {
-			if apiKey, err := h.ApiKeyService.GetByPlaintext(c.Request().Context(), rawKey); err == nil && apiKey != nil {
-				teamID = apiKey.TeamID
+	// Authenticate caller and derive teamID strictly from validated API key or internal agent key.
+	// Never trust X-Opsway-Team-ID from unauthenticated callers.
+	var teamID uint
+	authHeader := strings.TrimSpace(c.Request().Header.Get("Authorization"))
+	if !strings.HasPrefix(authHeader, "Bearer ") {
+		return c.JSON(http.StatusUnauthorized, mcp.JSONRPCResponse{
+			JSONRPC: "2.0",
+			ID:      rpcReq.ID,
+			Error:   &mcp.JSONRPCError{Code: -32001, Message: "Authorization: Bearer <api_key> header is required"},
+		})
+	}
+	rawKey := strings.TrimSpace(strings.TrimPrefix(authHeader, "Bearer "))
+	if rawKey == "" {
+		return c.JSON(http.StatusUnauthorized, mcp.JSONRPCResponse{
+			JSONRPC: "2.0",
+			ID:      rpcReq.ID,
+			Error:   &mcp.JSONRPCError{Code: -32001, Message: "Empty bearer token"},
+		})
+	}
+
+	if h.InternalAgentKey != "" && rawKey == h.InternalAgentKey {
+		teamID = 1
+		if tHeader := c.Request().Header.Get("X-Opsway-Team-ID"); tHeader != "" {
+			if parsed, err := strconv.ParseUint(tHeader, 10, 64); err == nil && parsed > 0 {
+				teamID = uint(parsed)
 			}
 		}
+	} else if h.ApiKeyService != nil {
+		apiKey, err := h.ApiKeyService.GetByPlaintext(c.Request().Context(), rawKey)
+		if err != nil || apiKey == nil || apiKey.TeamID == 0 {
+			return c.JSON(http.StatusUnauthorized, mcp.JSONRPCResponse{
+				JSONRPC: "2.0",
+				ID:      rpcReq.ID,
+				Error:   &mcp.JSONRPCError{Code: -32001, Message: "Invalid API key"},
+			})
+		}
+		teamID = apiKey.TeamID
+	} else {
+		return c.JSON(http.StatusUnauthorized, mcp.JSONRPCResponse{
+			JSONRPC: "2.0",
+			ID:      rpcReq.ID,
+			Error:   &mcp.JSONRPCError{Code: -32001, Message: "MCP authentication unavailable"},
+		})
 	}
 
 	// Enforce per-tier MCP Gateway rate limit (60 Free / 300 Team / 1000 Enterprise req/min)
@@ -149,6 +180,19 @@ func (h *Handlers) PutEntitlement(c hs.AuthenticatedContext) error {
 	req, err := helpers.Bind[PutEntitlementRequest](c)
 	if err != nil {
 		return echo.ErrBadRequest
+	}
+	// Prevent self-upgrade bypass: never allow setting an entitlement tier above the team's paid plan.
+	if h.UsageGuard != nil {
+		limits := h.UsageGuard.GetTeamPlanLimits(c.Request().Context(), req.TeamID)
+		if maxTier, ok := limits["maxEntitlementTier"].(entities.EntitlementTier); ok {
+			if entities.EntitlementTierRank(req.Tier) > entities.EntitlementTierRank(maxTier) {
+				return c.JSON(http.StatusPaymentRequired, map[string]interface{}{
+					"code":       "UPGRADE_REQUIRED",
+					"message":    "Cannot enable a higher entitlement tier than your active subscription plan.",
+					"upgradeUrl": "/settings/billing",
+				})
+			}
+		}
 	}
 	ent, err := h.InvestigationService.UpdateEntitlement(c.Request().Context(), req.TeamID, req.Product, req.Tier, req.Enabled)
 	if err != nil {
@@ -599,8 +643,10 @@ func (h *Handlers) GetInternalQuotaState(c echo.Context) error {
 	}
 
 	state := entities.QuotaStateNormal
+	var limits map[string]interface{}
 	if h.UsageGuard != nil {
 		state = h.UsageGuard.GetProductEnforcementState(c.Request().Context(), teamID, product)
+		limits = h.UsageGuard.GetTeamPlanLimits(c.Request().Context(), teamID)
 	}
 
 	return c.JSON(http.StatusOK, map[string]interface{}{
@@ -608,5 +654,6 @@ func (h *Handlers) GetInternalQuotaState(c echo.Context) error {
 		"tenant":  tenant,
 		"product": product,
 		"state":   state,
+		"limits":  limits,
 	})
 }

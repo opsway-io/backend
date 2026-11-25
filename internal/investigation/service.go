@@ -425,34 +425,14 @@ func (s *serviceImpl) TriggerInvestigation(ctx context.Context, req TriggerReque
 		serviceName = fmt.Sprintf("incident-%d", inc.ID)
 	}
 
-	// Check & increment quota if running in MANAGED mode; gracefully fall back to BYO-LLM / BYOA or pay-as-you-go overage.
-	effectiveMode := agentCfg.ExecutionMode
-	if effectiveMode == entities.AgentModeManaged {
-		var team entities.Team
-		_ = s.db.WithContext(ctx).Select("id, payment_plan, allow_overage").First(&team, req.TeamID).Error
-		allowPaidOverage := team.AllowOverage && (team.PaymentPlan == entities.PaymentPlanTeam || team.PaymentPlan == entities.PaymentPlanEnterprise)
-
-		entitlements, _ := s.GetEntitlements(ctx, req.TeamID)
-		for _, ent := range entitlements {
-			if ent.Product == entities.ProductManagedAgent {
-				if ent.MonthlyQuota != -1 && ent.CurrentUsage >= ent.MonthlyQuota && !req.Force && !allowPaidOverage {
-					// Graceful fallback: if customer configured BYO-LLM or BYOA Webhook, route there instead of failing!
-					if agentCfg.CustomLLMAPIKey != nil && *agentCfg.CustomLLMAPIKey != "" && agentCfg.CustomLLMBaseURL != nil && *agentCfg.CustomLLMBaseURL != "" {
-						effectiveMode = entities.AgentModeByoLLM
-						break
-					}
-					if agentCfg.ByoaWebhookURL != nil && *agentCfg.ByoaWebhookURL != "" {
-						effectiveMode = entities.AgentModeByoaWebhook
-						break
-					}
-					return nil, ErrQuotaExceeded
-				}
-				s.db.WithContext(ctx).Model(&entities.TeamEntitlement{}).
-					Where("id = ?", ent.ID).
-					UpdateColumn("current_usage", gorm.Expr("current_usage + 1"))
-				break
-			}
-		}
+	// Reserve managed quota atomically (or gracefully fall back to BYO-LLM / BYOA).
+	effectiveMode, quotaErr := s.reserveManagedQuotaOrFallback(ctx, req.TeamID, agentCfg)
+	if quotaErr != nil {
+		return nil, quotaErr
+	}
+	if req.UserPrompt != nil && len(*req.UserPrompt) > 4000 {
+		trimmed := (*req.UserPrompt)[:4000]
+		req.UserPrompt = &trimmed
 	}
 
 	startedAt := time.Now().UTC()

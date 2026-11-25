@@ -248,20 +248,10 @@ func (s *serviceImpl) TriggerFromEvent(ctx context.Context, req AgentEventReques
 		}
 	}
 
-	// Check & increment managed_agent quota
-	if agentCfg.ExecutionMode == entities.AgentModeManaged {
-		entitlements, _ := s.GetEntitlements(ctx, req.TeamID)
-		for _, ent := range entitlements {
-			if ent.Product == entities.ProductManagedAgent {
-				if ent.MonthlyQuota != -1 && ent.CurrentUsage >= ent.MonthlyQuota && !req.Force {
-					return nil, ErrQuotaExceeded
-				}
-				s.db.WithContext(ctx).Model(&entities.TeamEntitlement{}).
-					Where("id = ?", ent.ID).
-					UpdateColumn("current_usage", gorm.Expr("current_usage + 1"))
-				break
-			}
-		}
+	// Check & increment managed_agent quota atomically (never bypassable via req.Force)
+	effectiveMode, quotaErr := s.reserveManagedQuotaOrFallback(ctx, req.TeamID, agentCfg)
+	if quotaErr != nil {
+		return nil, quotaErr
 	}
 
 	// Optionally create a real Incident if rule or request asks for it
@@ -308,8 +298,9 @@ func (s *serviceImpl) TriggerFromEvent(ctx context.Context, req AgentEventReques
 		triggerSource = "WEBHOOK"
 	}
 
-	// Apply per-rule remediation override if configured
+	// Apply per-rule remediation override & effective execution mode
 	effectiveCfg := *agentCfg
+	effectiveCfg.ExecutionMode = effectiveMode
 	if rule != nil && rule.RemediationLevelOverride != "" {
 		effectiveCfg.RemediationLevel = rule.RemediationLevelOverride
 	}
@@ -323,6 +314,9 @@ func (s *serviceImpl) TriggerFromEvent(ctx context.Context, req AgentEventReques
 	var promptHint *string
 	if strings.TrimSpace(req.Summary) != "" {
 		s := strings.TrimSpace(req.Summary)
+		if len(s) > 4000 {
+			s = s[:4000]
+		}
 		promptHint = &s
 	}
 

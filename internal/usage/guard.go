@@ -469,6 +469,25 @@ func (g *Guard) GetTeamTriggerRuleLimit(ctx context.Context, teamID uint) int {
 	return team.GetAgentTriggerRuleLimit()
 }
 
+func (g *Guard) GetTeamPlanLimits(ctx context.Context, teamID uint) map[string]interface{} {
+	var team entities.Team
+	if err := g.db.WithContext(ctx).Select("id, payment_plan, allow_overage").First(&team, teamID).Error; err != nil {
+		team.PaymentPlan = entities.PaymentPlanFree
+	}
+	return map[string]interface{}{
+		"plan":                team.PaymentPlan,
+		"allowOverage":        team.AllowOverage,
+		"maxEntitlementTier":  team.MaxEntitlementTier(),
+		"maxRepos":            team.GetPantomathRepoLimit(),
+		"maxVectorChunks":     team.GetPantomathVectorChunkLimit(),
+		"maxTokensPerRun":     team.GetAgentTokenLimitPerRun(),
+		"maxMonthlyTokens":    team.GetAgentMonthlyTokenLimit(),
+		"mcpRateLimitPerMin":  team.GetMCPGatewayRateLimitPerMin(),
+		"minMonitorFreqSecs":  team.GetMinMonitorFrequencySeconds(),
+		"maxMonitorSteps":     team.GetMaxMonitorSteps(),
+	}
+}
+
 func (g *Guard) dispatchUnifiedNotification(
 	ctx context.Context,
 	team *entities.Team,

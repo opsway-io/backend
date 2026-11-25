@@ -198,6 +198,67 @@ func (t *Team) GetPantomathVectorChunkLimit() int {
 	}
 }
 
+func (t *Team) GetMinMonitorFrequencySeconds() uint64 {
+	switch t.PaymentPlan {
+	case PaymentPlanFree:
+		return 60
+	case PaymentPlanTeam:
+		return 30
+	case PaymentPlanEnterprise:
+		return 10
+	default:
+		return 60
+	}
+}
+
+func (t *Team) GetMaxMonitorSteps() int {
+	switch t.PaymentPlan {
+	case PaymentPlanFree:
+		return 3
+	case PaymentPlanTeam:
+		return 10
+	case PaymentPlanEnterprise:
+		return 25
+	default:
+		return 3
+	}
+}
+
+func (t *Team) GetMaxConcurrentInvestigations() int {
+	switch t.PaymentPlan {
+	case PaymentPlanFree:
+		return 1
+	case PaymentPlanTeam:
+		return 3
+	case PaymentPlanEnterprise:
+		return 10
+	default:
+		return 1
+	}
+}
+
+func (t *Team) MaxEntitlementTier() EntitlementTier {
+	switch t.PaymentPlan {
+	case PaymentPlanEnterprise:
+		return EntitlementTierEnterprise
+	case PaymentPlanTeam:
+		return EntitlementTierPro
+	default:
+		return EntitlementTierFree
+	}
+}
+
+func EntitlementTierRank(tier EntitlementTier) int {
+	switch tier {
+	case EntitlementTierEnterprise:
+		return 3
+	case EntitlementTierPro:
+		return 2
+	default:
+		return 1
+	}
+}
+
 func (t *Team) BeforeCreate(tx *gorm.DB) (err error) {
 	if ok := checkTeamNameFormat(t.Name); !ok {
 		return ErrIllegalTeamNameFormat

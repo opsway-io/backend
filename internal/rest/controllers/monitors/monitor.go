@@ -469,6 +469,14 @@ func (h *Handlers) PostMonitor(c hs.AuthenticatedContext) error {
 		}
 	}
 
+	// Anti-abuse: enforce minimum check interval and maximum multi-step count for the team's plan.
+	if minFreq := teamEntity.GetMinMonitorFrequencySeconds(); req.Settings.FrequencySeconds < minFreq {
+		return echo.NewHTTPError(http.StatusPaymentRequired, fmt.Sprintf("Minimum check interval for your plan is %d seconds", minFreq))
+	}
+	if maxSteps := teamEntity.GetMaxMonitorSteps(); len(req.Steps) > maxSteps {
+		return echo.NewHTTPError(http.StatusPaymentRequired, fmt.Sprintf("Maximum %d steps per monitor on your plan", maxSteps))
+	}
+
 	steps := make([]entities.MonitorStep, len(req.Steps))
 	for i, s := range req.Steps {
 		headers := make([]entities.MonitorStepHeader, len(s.Headers))
@@ -734,6 +742,14 @@ func (h *Handlers) PutMonitor(c hs.AuthenticatedContext) error {
 	}
 
 	m.SetStateString(req.State)
+	if teamEntity, err := h.TeamService.GetByID(ctx, req.TeamID); err == nil && teamEntity != nil {
+		if minFreq := teamEntity.GetMinMonitorFrequencySeconds(); req.Settings.FrequencySeconds < minFreq {
+			return echo.NewHTTPError(http.StatusPaymentRequired, fmt.Sprintf("Minimum check interval for your plan is %d seconds", minFreq))
+		}
+		if maxSteps := teamEntity.GetMaxMonitorSteps(); len(req.Steps) > maxSteps {
+			return echo.NewHTTPError(http.StatusPaymentRequired, fmt.Sprintf("Maximum %d steps per monitor on your plan", maxSteps))
+		}
+	}
 	m.Settings.SetFrequencySeconds(req.Settings.FrequencySeconds)
 
 	if req.State == "ACTIVE" {
