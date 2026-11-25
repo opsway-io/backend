@@ -42,6 +42,7 @@ import (
 	"github.com/opsway-io/backend/internal/rest/middleware"
 	"github.com/opsway-io/backend/internal/statuspage"
 	"github.com/opsway-io/backend/internal/team"
+	"github.com/opsway-io/backend/internal/usage"
 	"github.com/opsway-io/backend/internal/user"
 	"github.com/sirupsen/logrus"
 	"gorm.io/gorm"
@@ -187,6 +188,12 @@ func Register(
 		mcpGatewayCfg.LogSearchPublicURL,
 		logger,
 	)
+	usageService := usage.NewService(
+		db,
+		ch,
+		investigationService,
+		logger.WithField("module", "usage"),
+	)
 	suite.Register(
 		root,
 		teamsGroup,
@@ -194,6 +201,7 @@ func Register(
 		investigationService,
 		mcpGateway,
 		apiKeyService,
+		usageService,
 		mcpGatewayCfg.LogSearchAgentKey,
 	)
 }

@@ -22,12 +22,13 @@ func TestTeamsAndSuiteRouteRegistration(t *testing.T) {
 	userSvc := &mockUserService{Service: new(userMocks.Service)}
 
 	teamsGroup := teams.Register(authRoot, logger, teamSvc, userSvc, nil, nil)
-	suite.Register(authRoot, teamsGroup, logger, nil, nil, nil)
+	suite.Register(authRoot, teamsGroup, logger, nil, nil, nil, nil, "")
 
 	routes := e.Routes()
 
 	var getTeamRouteFound bool
 	var getEntitlementsRouteFound bool
+	var getUsageRouteFound bool
 	for _, r := range routes {
 		if r.Method == http.MethodGet && r.Path == "/v1/teams/:teamId" {
 			// Ensure it is not NotFoundHandler
@@ -37,8 +38,12 @@ func TestTeamsAndSuiteRouteRegistration(t *testing.T) {
 		if r.Method == http.MethodGet && r.Path == "/v1/teams/:teamId/entitlements" {
 			getEntitlementsRouteFound = true
 		}
+		if r.Method == http.MethodGet && r.Path == "/v1/teams/:teamId/usage" {
+			getUsageRouteFound = true
+		}
 	}
 
 	assert.True(t, getTeamRouteFound, "GET /v1/teams/:teamId route should be registered and not overwritten by NotFoundHandler")
 	assert.True(t, getEntitlementsRouteFound, "GET /v1/teams/:teamId/entitlements route should be registered")
+	assert.True(t, getUsageRouteFound, "GET /v1/teams/:teamId/usage route should be registered")
 }

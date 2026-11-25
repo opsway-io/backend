@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/labstack/echo/v4"
 	"github.com/opsway-io/backend/internal/entities"
@@ -42,6 +43,14 @@ func (h *Handlers) PostMCPGateway(c echo.Context) error {
 	}
 
 	resp := h.MCPGateway.HandleJSONRPC(c.Request().Context(), teamID, rpcReq)
+	if h.UsageService != nil {
+		if err := h.UsageService.IncrementCounter(c.Request().Context(), teamID, entities.ProductManagedAgent, "mcp_calls", 1); err != nil {
+			h.Logger.WithError(err).Warn("failed to record MCP usage counter")
+		}
+		if rpcReq.Method == "tools/call" && strings.Contains(string(rpcReq.Params), "pantomath") {
+			_ = h.UsageService.IncrementCounter(c.Request().Context(), teamID, entities.ProductPantomath, "mcp_calls", 1)
+		}
+	}
 	if rpcReq.ID == nil {
 		return c.NoContent(http.StatusNoContent)
 	}
@@ -433,4 +442,58 @@ func (h *Handlers) GetLogSearchServices(c hs.AuthenticatedContext) error {
 	return c.JSON(http.StatusOK, map[string]interface{}{
 		"services": services,
 	})
+}
+
+func parseUsageTime(raw string) (time.Time, bool) {
+	if raw == "" {
+		return time.Time{}, false
+	}
+	if t, err := time.Parse(time.RFC3339, raw); err == nil {
+		return t, true
+	}
+	if t, err := time.Parse("2006-01-02", raw); err == nil {
+		return t, true
+	}
+	return time.Time{}, false
+}
+
+func (h *Handlers) GetTeamUsage(c hs.AuthenticatedContext) error {
+	req, err := helpers.Bind[TeamParamRequest](c)
+	if err != nil {
+		return echo.ErrBadRequest
+	}
+	if h.UsageService == nil {
+		return echo.ErrServiceUnavailable
+	}
+
+	now := time.Now().UTC()
+	var from, to time.Time
+
+	switch c.QueryParam("range") {
+	case "7d":
+		from = now.AddDate(0, 0, -6)
+		to = now
+	case "30d":
+		from = now.AddDate(0, 0, -29)
+		to = now
+	case "90d":
+		from = now.AddDate(0, 0, -89)
+		to = now
+	default:
+		// current_cycle or explicit from/to
+		if parsedFrom, ok := parseUsageTime(c.QueryParam("from")); ok {
+			from = parsedFrom
+		}
+		if parsedTo, ok := parseUsageTime(c.QueryParam("to")); ok {
+			to = parsedTo
+		}
+	}
+
+	res, err := h.UsageService.GetTeamUsage(c.Request().Context(), req.TeamID, from, to)
+	if err != nil {
+		c.Log.WithError(err).Error("failed to get team usage")
+		return echo.ErrInternalServerError
+	}
+
+	return c.JSON(http.StatusOK, res)
 }

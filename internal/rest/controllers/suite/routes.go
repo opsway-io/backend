@@ -6,6 +6,7 @@ import (
 	"github.com/opsway-io/backend/internal/investigation"
 	"github.com/opsway-io/backend/internal/mcp"
 	"github.com/opsway-io/backend/internal/rest/handlers"
+	"github.com/opsway-io/backend/internal/usage"
 	"github.com/sirupsen/logrus"
 )
 
@@ -13,6 +14,7 @@ type Handlers struct {
 	InvestigationService investigation.Service
 	MCPGateway           mcp.Gateway
 	ApiKeyService        apikey.Service
+	UsageService         usage.Service
 	InternalAgentKey     string
 	Logger               *logrus.Entry
 }
@@ -24,6 +26,7 @@ func Register(
 	investigationService investigation.Service,
 	mcpGateway mcp.Gateway,
 	apiKeyService apikey.Service,
+	usageService usage.Service,
 	internalAgentKey string,
 ) {
 	if internalAgentKey == "" {
@@ -33,6 +36,7 @@ func Register(
 		InvestigationService: investigationService,
 		MCPGateway:           mcpGateway,
 		ApiKeyService:        apiKeyService,
+		UsageService:         usageService,
 		InternalAgentKey:     internalAgentKey,
 		Logger:               logger,
 	}
@@ -46,9 +50,10 @@ func Register(
 	// BYOA External Agent Callback (authenticated via investigation UUID & team/incident)
 	root.POST("/teams/:teamId/incidents/:incidentId/investigations/:uuid/callback", h.PostByoaCallback)
 
-	// Modular Product Entitlements
+	// Modular Product Entitlements & Usage Monitoring
 	teamGroup.GET("/entitlements", AuthHandler(h.GetEntitlements))
 	teamGroup.PUT("/entitlements", AuthHandler(h.PutEntitlement))
+	teamGroup.GET("/usage", AuthHandler(h.GetTeamUsage))
 
 	// Cross-Product Service Catalog
 	teamGroup.GET("/service-catalog", AuthHandler(h.GetServiceCatalog))
