@@ -22,7 +22,7 @@ func TestTeamsAndSuiteRouteRegistration(t *testing.T) {
 	userSvc := &mockUserService{Service: new(userMocks.Service)}
 
 	teamsGroup := teams.Register(authRoot, logger, teamSvc, userSvc, nil, nil)
-	suite.Register(authRoot, teamsGroup, logger, nil, nil, nil, nil, "")
+	suite.Register(authRoot, teamsGroup, logger, nil, nil, nil, nil, nil, "")
 
 	routes := e.Routes()
 

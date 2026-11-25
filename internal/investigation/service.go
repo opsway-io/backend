@@ -425,12 +425,26 @@ func (s *serviceImpl) TriggerInvestigation(ctx context.Context, req TriggerReque
 		serviceName = fmt.Sprintf("incident-%d", inc.ID)
 	}
 
-	// Check & increment quota if running in MANAGED mode
-	if agentCfg.ExecutionMode == entities.AgentModeManaged {
+	// Check & increment quota if running in MANAGED mode; gracefully fall back to BYO-LLM / BYOA or pay-as-you-go overage.
+	effectiveMode := agentCfg.ExecutionMode
+	if effectiveMode == entities.AgentModeManaged {
+		var team entities.Team
+		_ = s.db.WithContext(ctx).Select("id, payment_plan, allow_overage").First(&team, req.TeamID).Error
+		allowPaidOverage := team.AllowOverage && (team.PaymentPlan == entities.PaymentPlanTeam || team.PaymentPlan == entities.PaymentPlanEnterprise)
+
 		entitlements, _ := s.GetEntitlements(ctx, req.TeamID)
 		for _, ent := range entitlements {
 			if ent.Product == entities.ProductManagedAgent {
-				if ent.MonthlyQuota != -1 && ent.CurrentUsage >= ent.MonthlyQuota && !req.Force {
+				if ent.MonthlyQuota != -1 && ent.CurrentUsage >= ent.MonthlyQuota && !req.Force && !allowPaidOverage {
+					// Graceful fallback: if customer configured BYO-LLM or BYOA Webhook, route there instead of failing!
+					if agentCfg.CustomLLMAPIKey != nil && *agentCfg.CustomLLMAPIKey != "" && agentCfg.CustomLLMBaseURL != nil && *agentCfg.CustomLLMBaseURL != "" {
+						effectiveMode = entities.AgentModeByoLLM
+						break
+					}
+					if agentCfg.ByoaWebhookURL != nil && *agentCfg.ByoaWebhookURL != "" {
+						effectiveMode = entities.AgentModeByoaWebhook
+						break
+					}
 					return nil, ErrQuotaExceeded
 				}
 				s.db.WithContext(ctx).Model(&entities.TeamEntitlement{}).
@@ -467,7 +481,7 @@ func (s *serviceImpl) TriggerInvestigation(ctx context.Context, req TriggerReque
 		TriggerType:   triggerType,
 		ServiceName:   serviceName,
 		TriggerSource: req.TriggerSource,
-		ExecutionMode: agentCfg.ExecutionMode,
+		ExecutionMode: effectiveMode,
 		Status:        initialStatus,
 		UserPrompt:    req.UserPrompt,
 		StartedAt:     startedAt,

@@ -15,6 +15,7 @@ type Handlers struct {
 	MCPGateway           mcp.Gateway
 	ApiKeyService        apikey.Service
 	UsageService         usage.Service
+	UsageGuard           *usage.Guard
 	InternalAgentKey     string
 	Logger               *logrus.Entry
 }
@@ -27,6 +28,7 @@ func Register(
 	mcpGateway mcp.Gateway,
 	apiKeyService apikey.Service,
 	usageService usage.Service,
+	usageGuard *usage.Guard,
 	internalAgentKey string,
 ) {
 	if internalAgentKey == "" {
@@ -37,6 +39,7 @@ func Register(
 		MCPGateway:           mcpGateway,
 		ApiKeyService:        apiKeyService,
 		UsageService:         usageService,
+		UsageGuard:           usageGuard,
 		InternalAgentKey:     internalAgentKey,
 		Logger:               logger,
 	}
@@ -54,6 +57,7 @@ func Register(
 	teamGroup.GET("/entitlements", AuthHandler(h.GetEntitlements))
 	teamGroup.PUT("/entitlements", AuthHandler(h.PutEntitlement))
 	teamGroup.GET("/usage", AuthHandler(h.GetTeamUsage))
+	teamGroup.PUT("/overage-settings", AuthHandler(h.PutOverageSettings))
 
 	// Cross-Product Service Catalog
 	teamGroup.GET("/service-catalog", AuthHandler(h.GetServiceCatalog))
@@ -70,9 +74,10 @@ func Register(
 	teamGroup.DELETE("/agent-triggers/:ruleId", AuthHandler(h.DeleteAgentTrigger))
 	teamGroup.POST("/agent-events", AuthHandler(h.PostTeamAgentEvent))
 
-	// Internal Product Hooks (Log-Search Evaluator & Pantomath Deploy Webhooks)
+	// Internal Product Hooks (Log-Search Evaluator, Pantomath Deploy Webhooks & Quota Enforcement)
 	root.GET("/internal/agent-triggers", h.GetInternalAgentTriggers)
 	root.POST("/internal/agent-events", h.PostInternalAgentEvent)
+	root.GET("/internal/quota-state", h.GetInternalQuotaState)
 
 	// Incident Investigations & Remediation Actions
 	teamGroup.GET("/investigations", AuthHandler(h.GetTeamInvestigations))

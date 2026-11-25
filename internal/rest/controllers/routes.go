@@ -1,6 +1,8 @@
 package controllers
 
 import (
+	"context"
+
 	"github.com/labstack/echo/v4"
 	"github.com/opsway-io/backend/internal/alerting"
 	"github.com/opsway-io/backend/internal/apikey"
@@ -197,6 +199,15 @@ func Register(
 		mcpGatewayCfg.PantomathURL,
 		logger.WithField("module", "usage"),
 	)
+	usageGuard := usage.NewGuard(
+		db,
+		usageService,
+		emailSender,
+		"https://my.opsway.eu",
+		logger.WithField("module", "usage-guard"),
+	)
+	usageGuard.Start(context.Background())
+
 	suite.Register(
 		root,
 		teamsGroup,
@@ -205,6 +216,7 @@ func Register(
 		mcpGateway,
 		apiKeyService,
 		usageService,
+		usageGuard,
 		mcpGatewayCfg.LogSearchAgentKey,
 	)
 }

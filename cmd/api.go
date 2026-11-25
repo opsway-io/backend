@@ -111,6 +111,7 @@ func runAPI(cmd *cobra.Command, args []string) {
 		entities.InvestigationStep{},
 		entities.RemediationAction{},
 		entities.UsageDailyCounter{},
+		entities.QuotaNotificationState{},
 	)
 
 	// Allow standalone (non-monitoring) agent investigations (e.g. Log-Search spikes, Pantomath deploys, Webhooks)

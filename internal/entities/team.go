@@ -42,6 +42,8 @@ type Team struct {
 	DisplayName              *string     `gorm:"index"`
 	PaymentPlan              PaymentPlan `gorm:"default:FREE;not null"`
 	StripeCustomerID         *string     `gorm:"index"`
+	AllowOverage             bool        `gorm:"not null;default:false" json:"allowOverage"`
+	OverageSpendCapCents     *int        `json:"overageSpendCapCents,omitempty"`
 	SlackWebhookURL          *string     `gorm:"type:text"`
 	DiscordWebhookURL        *string     `gorm:"type:text"`
 	TelegramChatID           *string     `gorm:"type:text"`

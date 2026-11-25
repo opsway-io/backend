@@ -155,20 +155,23 @@ type TopConsumers struct {
 }
 
 type TeamUsageResponse struct {
-	TeamID       uint              `json:"teamId"`
-	Plan         string            `json:"plan"`
-	RangeStart   time.Time         `json:"rangeStart"`
-	RangeEnd     time.Time         `json:"rangeEnd"`
-	BillingCycle BillingCycleInfo  `json:"billingCycle"`
-	Products     ProductsUsage     `json:"products"`
-	Platform     PlatformUsage     `json:"platform"`
-	Timeseries   []DailyUsagePoint `json:"timeseries"`
-	TopConsumers TopConsumers      `json:"topConsumers"`
+	TeamID       uint                        `json:"teamId"`
+	Plan         string                      `json:"plan"`
+	RangeStart   time.Time                   `json:"rangeStart"`
+	RangeEnd     time.Time                   `json:"rangeEnd"`
+	BillingCycle BillingCycleInfo            `json:"billingCycle"`
+	Overage      OverageSettings             `json:"overage"`
+	Enforcement  []ProductEnforcementSummary `json:"enforcement"`
+	Products     ProductsUsage               `json:"products"`
+	Platform     PlatformUsage               `json:"platform"`
+	Timeseries   []DailyUsagePoint           `json:"timeseries"`
+	TopConsumers TopConsumers                `json:"topConsumers"`
 }
 
 type Service interface {
 	GetTeamUsage(ctx context.Context, teamID uint, from, to time.Time) (*TeamUsageResponse, error)
 	IncrementCounter(ctx context.Context, teamID uint, product entities.ProductSlug, metricKey string, delta int64) error
+	UpdateOverageSettings(ctx context.Context, teamID uint, allowOverage bool, spendCapCents *int) (*OverageSettings, error)
 }
 
 type serviceImpl struct {
@@ -932,18 +935,86 @@ func (s *serviceImpl) GetTeamUsage(ctx context.Context, teamID uint, from, to ti
 		pantoTotalQueries = pantoQueries
 	}
 
+	isPaid := team.PaymentPlan == entities.PaymentPlanTeam || team.PaymentPlan == entities.PaymentPlanEnterprise
+	cycleStart := cycle.Start.Format("2006-01-02")
+	var storedStates []entities.QuotaNotificationState
+	s.db.WithContext(ctx).
+		Where("team_id = ? AND billing_cycle_start = ?", teamID, cycleStart).
+		Find(&storedStates)
+	graceByKey := make(map[string]*time.Time, len(storedStates))
+	for i := range storedStates {
+		graceByKey[string(storedStates[i].Product)+":"+storedStates[i].QuotaKey] = storedStates[i].GraceStartedAt
+	}
+
+	buildEnforcement := func(prod entities.ProductSlug, q QuotaItem, hint string) ProductEnforcementSummary {
+		st, _, gEnd, overCents := ComputeEnforcementTransition(
+			team.PaymentPlan, team.AllowOverage, team.OverageSpendCapCents,
+			q.Key, q.Used, q.Limit, graceByKey[string(prod)+":"+q.Key], now,
+		)
+		var gHours *int
+		if gEnd != nil && st == entities.QuotaStateGrace {
+			h := int(math.Ceil(time.Until(*gEnd).Hours()))
+			if h < 0 {
+				h = 0
+			}
+			gHours = &h
+		}
+		return ProductEnforcementSummary{
+			Product:               prod,
+			QuotaKey:              q.Key,
+			Label:                 q.Label,
+			State:                 st,
+			Used:                  q.Used,
+			Limit:                 q.Limit,
+			Unit:                  q.Unit,
+			Percent:               q.Percent,
+			GraceExpiresAt:        gEnd,
+			GraceHoursRemaining:   gHours,
+			EstimatedOverageCents: overCents,
+			TopConsumerHint:       hint,
+			BehaviorSummary:       DescribeEnforcementBehavior(prod, st),
+		}
+	}
+
+	monQuota := buildQuotaItem("monitors", "Active Monitors", float64(monitorCount), monitorLimit, "monitors", nil)
+	logQuota := buildQuotaItem("ingestion_gb", "Log Ingestion", logUsedGB, logLimitGB, "GB", projectMonthlyUsage(logUsedGB, cycle))
+	agentQuota := buildQuotaItem("managed_investigations", "Managed AI Investigations", agentUsed, agentLimit, "runs", projectMonthlyUsage(agentUsed, cycle))
+	pantoQuota := buildQuotaItem("indexed_products", "Indexed Products", pantoUsed, pantoLimit, "products", nil)
+
+	topLogHint := ""
+	if len(topLogServices) > 0 {
+		topLogHint = fmt.Sprintf("Top service: %s (%.1f%%)", topLogServices[0].ServiceName, topLogServices[0].SharePct)
+	}
+	enforcement := []ProductEnforcementSummary{
+		buildEnforcement(entities.ProductMonitoring, monQuota, ""),
+		buildEnforcement(entities.ProductLogSearch, logQuota, topLogHint),
+		buildEnforcement(entities.ProductManagedAgent, agentQuota, ""),
+		buildEnforcement(entities.ProductPantomath, pantoQuota, ""),
+	}
+	totalOverageCents := 0
+	for _, e := range enforcement {
+		totalOverageCents += e.EstimatedOverageCents
+	}
+
 	resp := &TeamUsageResponse{
 		TeamID:       teamID,
 		Plan:         string(team.PaymentPlan),
 		RangeStart:   from,
 		RangeEnd:     to,
 		BillingCycle: cycle,
+		Overage: OverageSettings{
+			AllowOverage:          team.AllowOverage,
+			OverageSpendCapCents:  team.OverageSpendCapCents,
+			EstimatedOverageCents: totalOverageCents,
+			Eligible:              isPaid,
+		},
+		Enforcement: enforcement,
 		Products: ProductsUsage{
 			Monitoring: MonitoringUsage{
 				Tier:    monEnt.Tier,
 				Enabled: monEnt.Enabled,
 				Quotas: []QuotaItem{
-					buildQuotaItem("monitors", "Active Monitors", float64(monitorCount), monitorLimit, "monitors", nil),
+					monQuota,
 					buildQuotaItem("status_pages", "Status Pages", float64(statusPageCount), statusPageLimit, "pages", nil),
 					buildQuotaItem("escalation_policies", "Escalation Policies", float64(escalationPolicyCount), escalationLimit, "policies", nil),
 				},
@@ -957,7 +1028,7 @@ func (s *serviceImpl) GetTeamUsage(ctx context.Context, teamID uint, from, to ti
 				Tier:    logEnt.Tier,
 				Enabled: logEnt.Enabled,
 				Quotas: []QuotaItem{
-					buildQuotaItem("ingestion_gb", "Log Ingestion", logUsedGB, logLimitGB, "GB", projectMonthlyUsage(logUsedGB, cycle)),
+					logQuota,
 				},
 				EventsIngested:             logEventsIngested,
 				BytesIngested:              logBytesIngested,
@@ -969,7 +1040,7 @@ func (s *serviceImpl) GetTeamUsage(ctx context.Context, teamID uint, from, to ti
 				Tier:    agentEnt.Tier,
 				Enabled: agentEnt.Enabled,
 				Quotas: []QuotaItem{
-					buildQuotaItem("managed_investigations", "Managed AI Investigations", agentUsed, agentLimit, "runs", projectMonthlyUsage(agentUsed, cycle)),
+					agentQuota,
 				},
 				ManagedRuns:           managedRuns,
 				ByoaRuns:              byoaRuns,
@@ -984,7 +1055,7 @@ func (s *serviceImpl) GetTeamUsage(ctx context.Context, teamID uint, from, to ti
 				Tier:    pantoEnt.Tier,
 				Enabled: pantoEnt.Enabled,
 				Quotas: []QuotaItem{
-					buildQuotaItem("indexed_products", "Indexed Products", pantoUsed, pantoLimit, "products", nil),
+					pantoQuota,
 				},
 				LinkedRepositories:               pantoRepos,
 				VectorChunks:                     pantoVectorChunks,
@@ -1013,4 +1084,34 @@ func (s *serviceImpl) GetTeamUsage(ctx context.Context, teamID uint, from, to ti
 	}
 
 	return resp, nil
+}
+
+func (s *serviceImpl) UpdateOverageSettings(
+	ctx context.Context,
+	teamID uint,
+	allowOverage bool,
+	spendCapCents *int,
+) (*OverageSettings, error) {
+	var team entities.Team
+	if err := s.db.WithContext(ctx).First(&team, teamID).Error; err != nil {
+		return nil, err
+	}
+	isPaid := team.PaymentPlan == entities.PaymentPlanTeam || team.PaymentPlan == entities.PaymentPlanEnterprise
+	if allowOverage && !isPaid {
+		return nil, fmt.Errorf("pay-as-you-go overages require a Team or Enterprise plan")
+	}
+	if spendCapCents != nil && *spendCapCents <= 0 {
+		spendCapCents = nil
+	}
+	if err := s.db.WithContext(ctx).Model(&entities.Team{}).Where("id = ?", teamID).Updates(map[string]interface{}{
+		"allow_overage":           allowOverage,
+		"overage_spend_cap_cents": spendCapCents,
+	}).Error; err != nil {
+		return nil, err
+	}
+	return &OverageSettings{
+		AllowOverage:         allowOverage,
+		OverageSpendCapCents: spendCapCents,
+		Eligible:             isPaid,
+	}, nil
 }

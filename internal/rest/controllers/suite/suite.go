@@ -497,3 +497,70 @@ func (h *Handlers) GetTeamUsage(c hs.AuthenticatedContext) error {
 
 	return c.JSON(http.StatusOK, res)
 }
+
+type PutOverageSettingsRequest struct {
+	TeamID               uint `param:"teamId" validate:"required,numeric,gte=0"`
+	AllowOverage         bool `json:"allowOverage"`
+	OverageSpendCapCents *int `json:"overageSpendCapCents"`
+}
+
+func (h *Handlers) PutOverageSettings(c hs.AuthenticatedContext) error {
+	req, err := helpers.Bind[PutOverageSettingsRequest](c)
+	if err != nil {
+		return echo.ErrBadRequest
+	}
+	if h.UsageService == nil {
+		return echo.ErrServiceUnavailable
+	}
+	settings, err := h.UsageService.UpdateOverageSettings(c.Request().Context(), req.TeamID, req.AllowOverage, req.OverageSpendCapCents)
+	if err != nil {
+		if strings.Contains(err.Error(), "require a Team or Enterprise plan") {
+			return c.JSON(http.StatusPaymentRequired, map[string]interface{}{
+				"code":       "UPGRADE_REQUIRED",
+				"message":    err.Error(),
+				"upgradeUrl": "/settings/billing",
+			})
+		}
+		c.Log.WithError(err).Error("failed to update overage settings")
+		return echo.ErrInternalServerError
+	}
+	if h.UsageGuard != nil {
+		go h.UsageGuard.EvaluateTeam(c.Request().Context(), req.TeamID)
+	}
+	return c.JSON(http.StatusOK, settings)
+}
+
+func (h *Handlers) GetInternalQuotaState(c echo.Context) error {
+	authHeader := c.Request().Header.Get("Authorization")
+	expected := "Bearer " + h.InternalAgentKey
+	if h.InternalAgentKey != "" && authHeader != expected {
+		return echo.ErrUnauthorized
+	}
+
+	tenant := strings.TrimSpace(c.QueryParam("tenant"))
+	product := entities.ProductSlug(strings.TrimSpace(c.QueryParam("product")))
+	if product == "" {
+		product = entities.ProductLogSearch
+	}
+
+	teamID := uint(1)
+	if strings.HasPrefix(tenant, "team_") {
+		if parsed, err := strconv.ParseUint(strings.TrimPrefix(tenant, "team_"), 10, 64); err == nil && parsed > 0 {
+			teamID = uint(parsed)
+		}
+	} else if parsed, err := strconv.ParseUint(tenant, 10, 64); err == nil && parsed > 0 {
+		teamID = uint(parsed)
+	}
+
+	state := entities.QuotaStateNormal
+	if h.UsageGuard != nil {
+		state = h.UsageGuard.GetProductEnforcementState(c.Request().Context(), teamID, product)
+	}
+
+	return c.JSON(http.StatusOK, map[string]interface{}{
+		"teamId":  teamID,
+		"tenant":  tenant,
+		"product": product,
+		"state":   state,
+	})
+}
