@@ -81,10 +81,11 @@ func TestRunRemediationAction_ExecutesSignedWebhook(t *testing.T) {
 
 	secret := "top-secret-hmac"
 	svc := &serviceImpl{httpClient: webhookSrv.Client()}
+	incID := uint(99)
 	inv := &entities.IncidentInvestigation{
 		UUID:        "inv_test123",
 		TeamID:      7,
-		IncidentID:  99,
+		IncidentID:  &incID,
 		ServiceName: "auth-service",
 	}
 	cfg := &entities.AgentConfig{

@@ -68,14 +68,20 @@ type Service interface {
 	UpsertServiceCatalogItem(ctx context.Context, item *entities.ServiceCatalogItem) (*entities.ServiceCatalogItem, error)
 	DeleteServiceCatalogItem(ctx context.Context, teamID uint, itemID uint) error
 
-	// Agent Configuration
+	// Agent Configuration & Trigger Rules
 	GetAgentConfig(ctx context.Context, teamID uint) (*entities.AgentConfig, error)
 	UpdateAgentConfig(ctx context.Context, teamID uint, cfg *entities.AgentConfig) (*entities.AgentConfig, error)
+	ListTriggerRules(ctx context.Context, teamID uint) ([]entities.AgentTriggerRule, error)
+	ListActiveTriggerRulesByProduct(ctx context.Context, product entities.ProductSlug) ([]entities.AgentTriggerRule, error)
+	CreateTriggerRule(ctx context.Context, rule *entities.AgentTriggerRule) (*entities.AgentTriggerRule, error)
+	UpdateTriggerRule(ctx context.Context, teamID uint, ruleID uint, incoming *entities.AgentTriggerRule) (*entities.AgentTriggerRule, error)
+	DeleteTriggerRule(ctx context.Context, teamID uint, ruleID uint) error
 
 	// Investigations & Remediation
 	ListInvestigationsByTeam(ctx context.Context, teamID uint, limit int) ([]entities.IncidentInvestigation, error)
 	GetInvestigationsByIncident(ctx context.Context, teamID uint, incidentID uint) ([]entities.IncidentInvestigation, error)
 	TriggerInvestigation(ctx context.Context, req TriggerRequest) (*entities.IncidentInvestigation, error)
+	TriggerFromEvent(ctx context.Context, req AgentEventRequest) (*entities.IncidentInvestigation, error)
 	HandleByoaCallback(ctx context.Context, teamID uint, incidentID uint, invUUID string, payload ByoaCallbackPayload) (*entities.IncidentInvestigation, error)
 	ApproveRemediationAction(ctx context.Context, teamID uint, investigationID uint, actionID uint, userID *uint) (*entities.IncidentInvestigation, error)
 	RejectRemediationAction(ctx context.Context, teamID uint, investigationID uint, actionID uint) (*entities.IncidentInvestigation, error)
@@ -441,11 +447,24 @@ func (s *serviceImpl) TriggerInvestigation(ctx context.Context, req TriggerReque
 		initialStatus = entities.InvestigationStatusRunning
 	}
 
+	incIDCopy := req.IncidentID
+	triggerType := "monitoring.assertion_failed"
+	lowerIncTitle := strings.ToLower(inc.Title)
+	if strings.Contains(lowerIncTitle, "anomaly") {
+		triggerType = "monitoring.latency_anomaly"
+	} else if strings.Contains(lowerIncTitle, "target down") {
+		triggerType = "monitoring.target_down"
+	} else if strings.Contains(lowerIncTitle, "heartbeat") {
+		triggerType = "monitoring.heartbeat_missed"
+	}
+
 	inv := &entities.IncidentInvestigation{
 		UUID:          "inv_" + strings.ReplaceAll(uuid.New().String(), "-", "")[:16],
 		TeamID:        req.TeamID,
-		IncidentID:    req.IncidentID,
+		IncidentID:    &incIDCopy,
 		MonitorID:     inc.MonitorID,
+		SourceProduct: string(entities.ProductMonitoring),
+		TriggerType:   triggerType,
 		ServiceName:   serviceName,
 		TriggerSource: req.TriggerSource,
 		ExecutionMode: agentCfg.ExecutionMode,
@@ -498,25 +517,33 @@ func (s *serviceImpl) executeByoaWebhookFlow(
 	_ = s.db.WithContext(ctx).Save(inv).Error
 
 	stepStart := time.Now()
-	webhookPayload := map[string]interface{}{
-		"event":            "incident.investigation.requested",
-		"investigation_id": inv.UUID,
-		"team_id":          inv.TeamID,
-		"tenant_id":        fmt.Sprintf("team_%d", inv.TeamID),
-		"incident": map[string]interface{}{
+	var incIDVal uint
+	var incPayload map[string]interface{}
+	if inc != nil {
+		incIDVal = inc.ID
+		incPayload = map[string]interface{}{
 			"id":          inc.ID,
 			"title":       inc.Title,
 			"description": inc.Description,
 			"occurrences": inc.Occurrences,
 			"created_at":  inc.CreatedAt,
-		},
-		"service_name": inv.ServiceName,
-		"user_prompt":  inv.UserPrompt,
+		}
+	}
+	webhookPayload := map[string]interface{}{
+		"event":            "incident.investigation.requested",
+		"investigation_id": inv.UUID,
+		"team_id":          inv.TeamID,
+		"tenant_id":        fmt.Sprintf("team_%d", inv.TeamID),
+		"source_product":   inv.SourceProduct,
+		"trigger_type":     inv.TriggerType,
+		"incident":         incPayload,
+		"service_name":     inv.ServiceName,
+		"user_prompt":      inv.UserPrompt,
 		"mcp_servers": map[string]interface{}{
 			"opsway_unified_gateway": "https://api.opsway.eu/v1/mcp",
 			"log_search_direct":      fmt.Sprintf("%s/mcp", s.logSearchPublicURL),
 		},
-		"callback_url": fmt.Sprintf("https://api.opsway.eu/v1/teams/%d/incidents/%d/investigations/%s/callback", inv.TeamID, inc.ID, inv.UUID),
+		"callback_url": fmt.Sprintf("https://api.opsway.eu/v1/teams/%d/incidents/%d/investigations/%s/callback", inv.TeamID, incIDVal, inv.UUID),
 	}
 
 	payloadBytes, _ := json.Marshal(webhookPayload)
@@ -844,7 +871,7 @@ func (s *serviceImpl) executeManagedAgentFlow(
 		act := entities.RemediationAction{
 			InvestigationID: inv.ID,
 			TeamID:          inv.TeamID,
-			IncidentID:      inc.ID,
+			IncidentID:      inv.IncidentID,
 			Title:           prop.Title,
 			Description:     prop.Description,
 			ActionType:      actType,
@@ -859,7 +886,10 @@ func (s *serviceImpl) executeManagedAgentFlow(
 	}
 
 	// Match team's configured RemediationPlaybooks against incident title + root cause.
-	matchCorpus := inc.Title + "\n" + synthesis.RootCauseSummary
+	matchCorpus := synthesis.RootCauseSummary
+	if inc != nil {
+		matchCorpus = inc.Title + "\n" + matchCorpus
+	}
 	for _, pb := range cfg.RemediationPlaybooks {
 		if pb.TriggerPattern == "" {
 			continue
@@ -873,12 +903,12 @@ func (s *serviceImpl) executeManagedAgentFlow(
 			"target_url":  pb.TargetURL,
 			"method":      pb.Method,
 			"service":     inv.ServiceName,
-			"incident_id": inc.ID,
+			"incident_id": inv.IncidentID,
 		})
 		act := entities.RemediationAction{
 			InvestigationID: inv.ID,
 			TeamID:          inv.TeamID,
-			IncidentID:      inc.ID,
+			IncidentID:      inv.IncidentID,
 			Title:           pb.Name,
 			Description:     fmt.Sprintf("Matched allowlisted playbook `%s` (pattern `%s`).", pb.ID, pb.TriggerPattern),
 			ActionType:      pb.ActionType,
@@ -911,8 +941,10 @@ func (s *serviceImpl) executeManagedAgentFlow(
 	_ = s.db.WithContext(ctx).Save(inv).Error
 
 	// Sync RootCauseSummary to Incident.RootCauseAnalysis for backward compatibility.
-	inc.RootCauseAnalysis = &synthesis.RootCauseSummary
-	_ = s.incidentService.Update(ctx, inc)
+	if inc != nil && s.incidentService != nil {
+		inc.RootCauseAnalysis = &synthesis.RootCauseSummary
+		_ = s.incidentService.Update(ctx, inc)
+	}
 }
 
 func (s *serviceImpl) markInvestigationFailed(inv *entities.IncidentInvestigation, reason string) {
@@ -953,15 +985,21 @@ Rules:
 
 func (s *serviceImpl) buildIncidentPrompt(inv *entities.IncidentInvestigation, inc *entities.Incident, mon *entities.Monitor) string {
 	var sb strings.Builder
-	sb.WriteString(fmt.Sprintf("Incident ID: %d\n", inc.ID))
-	sb.WriteString(fmt.Sprintf("Title: %s\n", inc.Title))
-	if inc.Description != nil && *inc.Description != "" {
-		sb.WriteString(fmt.Sprintf("Description: %s\n", *inc.Description))
+	sb.WriteString(fmt.Sprintf("Source Product: %s\n", inv.SourceProduct))
+	if inv.TriggerType != "" {
+		sb.WriteString(fmt.Sprintf("Trigger Type: %s\n", inv.TriggerType))
 	}
-	sb.WriteString(fmt.Sprintf("Occurrences: %d\n", inc.Occurrences))
-	sb.WriteString(fmt.Sprintf("Created At: %s\n", inc.CreatedAt.UTC().Format(time.RFC3339)))
-	if inc.MonitorID != nil {
-		sb.WriteString(fmt.Sprintf("Monitor ID: %d\n", *inc.MonitorID))
+	if inc != nil {
+		sb.WriteString(fmt.Sprintf("Incident ID: %d\n", inc.ID))
+		sb.WriteString(fmt.Sprintf("Title: %s\n", inc.Title))
+		if inc.Description != nil && *inc.Description != "" {
+			sb.WriteString(fmt.Sprintf("Description: %s\n", *inc.Description))
+		}
+		sb.WriteString(fmt.Sprintf("Occurrences: %d\n", inc.Occurrences))
+		sb.WriteString(fmt.Sprintf("Created At: %s\n", inc.CreatedAt.UTC().Format(time.RFC3339)))
+		if inc.MonitorID != nil {
+			sb.WriteString(fmt.Sprintf("Monitor ID: %d\n", *inc.MonitorID))
+		}
 	}
 	if mon != nil && mon.Name != "" {
 		sb.WriteString(fmt.Sprintf("Monitor Name: %s\n", mon.Name))
@@ -970,10 +1008,13 @@ func (s *serviceImpl) buildIncidentPrompt(inv *entities.IncidentInvestigation, i
 		sb.WriteString(fmt.Sprintf("Monitor Target URL: %s %s\n", mon.Steps[0].Method, mon.Steps[0].URL))
 	}
 	sb.WriteString(fmt.Sprintf("Service Name: %s\n", inv.ServiceName))
+	if strings.TrimSpace(inv.TriggerContextJSON) != "" {
+		sb.WriteString(fmt.Sprintf("Trigger Event Context: %s\n", truncateText(inv.TriggerContextJSON, 1000)))
+	}
 	if inv.UserPrompt != nil && strings.TrimSpace(*inv.UserPrompt) != "" {
 		sb.WriteString(fmt.Sprintf("Operator Hint: %s\n", strings.TrimSpace(*inv.UserPrompt)))
 	}
-	sb.WriteString("\nInvestigate this incident using the MCP tools and produce the final JSON diagnosis.")
+	sb.WriteString("\nInvestigate this event using the MCP tools and produce the final JSON diagnosis.")
 	return sb.String()
 }
 
@@ -1341,8 +1382,12 @@ func (s *serviceImpl) runRemediationAction(
 		})
 		bodyStr = string(defaultBody)
 	} else {
+		incIDStr := ""
+		if inv.IncidentID != nil {
+			incIDStr = fmt.Sprintf("%d", *inv.IncidentID)
+		}
 		bodyStr = strings.ReplaceAll(bodyStr, "{{service}}", inv.ServiceName)
-		bodyStr = strings.ReplaceAll(bodyStr, "{{incident_id}}", fmt.Sprintf("%d", inv.IncidentID))
+		bodyStr = strings.ReplaceAll(bodyStr, "{{incident_id}}", incIDStr)
 		bodyStr = strings.ReplaceAll(bodyStr, "{{investigation_id}}", inv.UUID)
 	}
 
@@ -1413,11 +1458,12 @@ func (s *serviceImpl) HandleByoaCallback(
 		_ = s.db.WithContext(ctx).Create(&step).Error
 	}
 
+	incIDCopy := incidentID
 	for _, action := range payload.RemediationActions {
 		action.ID = 0
 		action.InvestigationID = inv.ID
 		action.TeamID = teamID
-		action.IncidentID = incidentID
+		action.IncidentID = &incIDCopy
 		_ = s.db.WithContext(ctx).Create(&action).Error
 	}
 

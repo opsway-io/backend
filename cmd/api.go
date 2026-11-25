@@ -106,10 +106,15 @@ func runAPI(cmd *cobra.Command, args []string) {
 		entities.TeamEntitlement{},
 		entities.ServiceCatalogItem{},
 		entities.AgentConfig{},
+		entities.AgentTriggerRule{},
 		entities.IncidentInvestigation{},
 		entities.InvestigationStep{},
 		entities.RemediationAction{},
 	)
+
+	// Allow standalone (non-monitoring) agent investigations (e.g. Log-Search spikes, Pantomath deploys, Webhooks)
+	db.Exec(`ALTER TABLE incident_investigations ALTER COLUMN incident_id DROP NOT NULL`)
+	db.Exec(`ALTER TABLE remediation_actions ALTER COLUMN incident_id DROP NOT NULL`)
 
 	// --- DATA MIGRATION ---
 	// Migrate existing single-step config into monitor_steps

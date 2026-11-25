@@ -194,5 +194,6 @@ func Register(
 		investigationService,
 		mcpGateway,
 		apiKeyService,
+		mcpGatewayCfg.LogSearchAgentKey,
 	)
 }

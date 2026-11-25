@@ -46,7 +46,7 @@ type RemediationAction struct {
 	ID                  uint       `gorm:"primaryKey" json:"id"`
 	InvestigationID     uint       `gorm:"index;not null" json:"investigationId"`
 	TeamID              uint       `gorm:"index;not null" json:"teamId"`
-	IncidentID          uint       `gorm:"index;not null" json:"incidentId"`
+	IncidentID          *uint      `gorm:"index" json:"incidentId,omitempty"`
 	Title               string     `gorm:"not null" json:"title"`
 	Description         string     `gorm:"type:text" json:"description"`
 	ActionType          string     `gorm:"not null" json:"actionType"` // "GITHUB_PR", "WEBHOOK_CALL", "K8S_ROLLOUT_RESTART", "CLI_COMMAND"
@@ -69,10 +69,14 @@ type IncidentInvestigation struct {
 	ID                 uint                 `gorm:"primaryKey" json:"id"`
 	UUID               string               `gorm:"uniqueIndex;not null" json:"uuid"`
 	TeamID             uint                 `gorm:"index;not null" json:"teamId"`
-	IncidentID         uint                 `gorm:"index;not null" json:"incidentId"`
+	IncidentID         *uint                `gorm:"index" json:"incidentId,omitempty"`
 	MonitorID          *uint                `gorm:"index" json:"monitorId,omitempty"`
+	SourceProduct      string               `gorm:"index;not null;default:'monitoring'" json:"sourceProduct"` // "monitoring", "log_search", "pantomath", "webhook"
+	TriggerType        string               `gorm:"index" json:"triggerType,omitempty"`                       // e.g. "monitoring.target_down", "logs.error_count_threshold"
+	TriggerRuleID      *uint                `gorm:"index" json:"triggerRuleId,omitempty"`
+	TriggerContextJSON string               `gorm:"type:text" json:"triggerContextJson,omitempty"`
 	ServiceName        string               `json:"serviceName,omitempty"`
-	TriggerSource      string               `gorm:"not null;default:'AUTOMATIC'" json:"triggerSource"` // "AUTOMATIC", "MANUAL_UI", "MANUAL_SLACK", "LOG_SPIKE", "API"
+	TriggerSource      string               `gorm:"not null;default:'AUTOMATIC'" json:"triggerSource"` // "AUTOMATIC", "MANUAL_UI", "MANUAL_SLACK", "LOG_SPIKE", "PANTOMATH_DEPLOY", "WEBHOOK", "API"
 	ExecutionMode      AgentExecutionMode   `gorm:"not null;default:'MANAGED'" json:"executionMode"`
 	Status             InvestigationStatus  `gorm:"index;not null;default:'RUNNING'" json:"status"`
 	UserPrompt         *string              `gorm:"type:text" json:"userPrompt,omitempty"`

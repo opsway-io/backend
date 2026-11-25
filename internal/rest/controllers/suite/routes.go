@@ -13,6 +13,7 @@ type Handlers struct {
 	InvestigationService investigation.Service
 	MCPGateway           mcp.Gateway
 	ApiKeyService        apikey.Service
+	InternalAgentKey     string
 	Logger               *logrus.Entry
 }
 
@@ -23,11 +24,16 @@ func Register(
 	investigationService investigation.Service,
 	mcpGateway mcp.Gateway,
 	apiKeyService apikey.Service,
+	internalAgentKey string,
 ) {
+	if internalAgentKey == "" {
+		internalAgentKey = "valid_agent_key"
+	}
 	h := &Handlers{
 		InvestigationService: investigationService,
 		MCPGateway:           mcpGateway,
 		ApiKeyService:        apiKeyService,
+		InternalAgentKey:     internalAgentKey,
 		Logger:               logger,
 	}
 
@@ -50,9 +56,18 @@ func Register(
 	teamGroup.PUT("/service-catalog/:serviceId", AuthHandler(h.PutServiceCatalogItem))
 	teamGroup.DELETE("/service-catalog/:serviceId", AuthHandler(h.DeleteServiceCatalogItem))
 
-	// Autonomous Agent Configuration (Managed vs BYOA)
+	// Autonomous Agent Configuration & Multi-Product Trigger Rules
 	teamGroup.GET("/agent-config", AuthHandler(h.GetAgentConfig))
 	teamGroup.PUT("/agent-config", AuthHandler(h.PutAgentConfig))
+	teamGroup.GET("/agent-triggers", AuthHandler(h.GetAgentTriggers))
+	teamGroup.POST("/agent-triggers", AuthHandler(h.PostAgentTrigger))
+	teamGroup.PUT("/agent-triggers/:ruleId", AuthHandler(h.PutAgentTrigger))
+	teamGroup.DELETE("/agent-triggers/:ruleId", AuthHandler(h.DeleteAgentTrigger))
+	teamGroup.POST("/agent-events", AuthHandler(h.PostTeamAgentEvent))
+
+	// Internal Product Hooks (Log-Search Evaluator & Pantomath Deploy Webhooks)
+	root.GET("/internal/agent-triggers", h.GetInternalAgentTriggers)
+	root.POST("/internal/agent-events", h.PostInternalAgentEvent)
 
 	// Incident Investigations & Remediation Actions
 	teamGroup.GET("/investigations", AuthHandler(h.GetTeamInvestigations))
