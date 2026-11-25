@@ -192,6 +192,8 @@ func Register(
 		db,
 		ch,
 		investigationService,
+		mcpGatewayCfg.LogSearchURL,
+		mcpGatewayCfg.LogSearchAgentKey,
 		logger.WithField("module", "usage"),
 	)
 	suite.Register(

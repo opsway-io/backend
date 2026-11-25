@@ -2,8 +2,12 @@ package usage
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
 	"math"
+	"net/http"
 	"sort"
+	"strings"
 	"time"
 
 	"github.com/opsway-io/backend/internal/entities"
@@ -47,6 +51,8 @@ type LogSearchUsage struct {
 	Tier                       entities.EntitlementTier `json:"tier"`
 	Enabled                    bool                     `json:"enabled"`
 	Quotas                     []QuotaItem              `json:"quotas"`
+	EventsIngested             int64                    `json:"eventsIngested"`
+	BytesIngested              int64                    `json:"bytesIngested"`
 	ActiveServices             int64                    `json:"activeServices"`
 	TriggerRules               int64                    `json:"triggerRules"`
 	LogTriggeredInvestigations int64                    `json:"logTriggeredInvestigations"`
@@ -94,11 +100,20 @@ type PlatformUsage struct {
 type DailyUsagePoint struct {
 	Date          string `json:"date"` // YYYY-MM-DD
 	Probes        int64  `json:"probes"`
+	LogBytes      int64  `json:"logBytes"`
+	LogEvents     int64  `json:"logEvents"`
 	AgentRuns     int64  `json:"agentRuns"`
 	AgentTokens   int64  `json:"agentTokens"`
 	MCPCalls      int64  `json:"mcpCalls"`
 	Notifications int64  `json:"notifications"`
 	Incidents     int64  `json:"incidents"`
+}
+
+type TopLogServiceConsumer struct {
+	ServiceName string  `json:"serviceName"`
+	Events      int64   `json:"events"`
+	Bytes       int64   `json:"bytes"`
+	SharePct    float64 `json:"sharePct"`
 }
 
 type TopMonitorConsumer struct {
@@ -122,9 +137,10 @@ type TopServiceConsumer struct {
 }
 
 type TopConsumers struct {
-	Monitors      []TopMonitorConsumer `json:"monitors"`
-	AgentTriggers []TopTriggerConsumer `json:"agentTriggers"`
-	Services      []TopServiceConsumer `json:"services"`
+	Monitors      []TopMonitorConsumer    `json:"monitors"`
+	LogServices   []TopLogServiceConsumer `json:"logServices"`
+	AgentTriggers []TopTriggerConsumer    `json:"agentTriggers"`
+	Services      []TopServiceConsumer    `json:"services"`
 }
 
 type TeamUsageResponse struct {
@@ -148,6 +164,9 @@ type serviceImpl struct {
 	db                   *gorm.DB
 	ch                   *gorm.DB
 	investigationService investigation.Service
+	logSearchURL         string
+	logSearchAgentKey    string
+	httpClient           *http.Client
 	logger               *logrus.Entry
 }
 
@@ -155,14 +174,95 @@ func NewService(
 	db *gorm.DB,
 	ch *gorm.DB,
 	investigationService investigation.Service,
+	logSearchURL string,
+	logSearchAgentKey string,
 	logger *logrus.Entry,
 ) Service {
 	return &serviceImpl{
 		db:                   db,
 		ch:                   ch,
 		investigationService: investigationService,
+		logSearchURL:         strings.TrimRight(logSearchURL, "/"),
+		logSearchAgentKey:    logSearchAgentKey,
+		httpClient:           &http.Client{Timeout: 5 * time.Second},
 		logger:               logger,
 	}
+}
+
+type logSearchUsageAPIResp struct {
+	TenantID       string  `json:"tenant_id"`
+	EventsIngested int64   `json:"events_ingested"`
+	BytesIngested  int64   `json:"bytes_ingested"`
+	IngestionGB    float64 `json:"ingestion_gb"`
+	ActiveServices int64   `json:"active_services"`
+	TopServices    []struct {
+		ServiceName string  `json:"service_name"`
+		Events      int64   `json:"events"`
+		Bytes       int64   `json:"bytes"`
+		SharePct    float64 `json:"share_pct"`
+	} `json:"top_services"`
+	Daily []struct {
+		Date   string `json:"date"`
+		Events int64  `json:"events"`
+		Bytes  int64  `json:"bytes"`
+	} `json:"daily"`
+}
+
+func (s *serviceImpl) fetchLogSearchUsageForTenant(
+	ctx context.Context,
+	tenantHeader string,
+	from, to time.Time,
+) (*logSearchUsageAPIResp, error) {
+	if s.logSearchURL == "" {
+		return nil, nil
+	}
+	u := fmt.Sprintf("%s/v1/usage?start_ts=%d&end_ts=%d", s.logSearchURL, from.UnixMilli(), to.UnixMilli())
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u, nil)
+	if err != nil {
+		return nil, err
+	}
+	apiKey := s.logSearchAgentKey
+	if apiKey == "" {
+		apiKey = "valid_agent_key"
+	}
+	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", apiKey))
+	if tenantHeader != "" {
+		req.Header.Set("X-Opsway-Tenant-ID", tenantHeader)
+	}
+	resp, err := s.httpClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("log-search /v1/usage returned status %d", resp.StatusCode)
+	}
+	var parsed logSearchUsageAPIResp
+	if err := json.NewDecoder(resp.Body).Decode(&parsed); err != nil {
+		return nil, err
+	}
+	return &parsed, nil
+}
+
+func (s *serviceImpl) fetchLogSearchUsage(ctx context.Context, teamID uint, from, to time.Time) *logSearchUsageAPIResp {
+	if s.logSearchURL == "" {
+		return nil
+	}
+	teamTenant := fmt.Sprintf("team_%d", teamID)
+	res, err := s.fetchLogSearchUsageForTenant(ctx, teamTenant, from, to)
+	if err != nil {
+		if s.logger != nil {
+			s.logger.WithError(err).Warn("failed to fetch log-search usage")
+		}
+		return nil
+	}
+	// If no team-scoped logs were found, also check the default cluster tenant (e.g. Vector default tenant_123).
+	if res != nil && res.EventsIngested == 0 {
+		if fallback, err := s.fetchLogSearchUsageForTenant(ctx, "", from, to); err == nil && fallback != nil && fallback.EventsIngested > 0 {
+			return fallback
+		}
+	}
+	return res
 }
 
 func (s *serviceImpl) IncrementCounter(
@@ -198,10 +298,14 @@ func (s *serviceImpl) IncrementCounter(
 }
 
 func buildQuotaItem(key, label string, used, limit float64, unit string, projected *float64) QuotaItem {
+	roundedUsed := math.Round(used*100) / 100
+	if used > 0 && used < 1 {
+		roundedUsed = math.Round(used*10000) / 10000
+	}
 	item := QuotaItem{
 		Key:       key,
 		Label:     label,
-		Used:      math.Round(used*100) / 100,
+		Used:      roundedUsed,
 		Limit:     limit,
 		Unit:      unit,
 		Projected: projected,
@@ -603,6 +707,32 @@ func (s *serviceImpl) GetTeamUsage(ctx context.Context, teamID uint, from, to ti
 		}
 	}
 
+	// 7e. Live Log-Search usage (events, bytes, top services, daily series)
+	var logEventsIngested, logBytesIngested int64
+	var liveLogIngestionGB float64
+	var liveLogActiveServices int64
+	topLogServices := make([]TopLogServiceConsumer, 0)
+	if lsUsage := s.fetchLogSearchUsage(ctx, teamID, from, to); lsUsage != nil {
+		logEventsIngested = lsUsage.EventsIngested
+		logBytesIngested = lsUsage.BytesIngested
+		liveLogIngestionGB = lsUsage.IngestionGB
+		liveLogActiveServices = lsUsage.ActiveServices
+		for _, svc := range lsUsage.TopServices {
+			topLogServices = append(topLogServices, TopLogServiceConsumer{
+				ServiceName: svc.ServiceName,
+				Events:      svc.Events,
+				Bytes:       svc.Bytes,
+				SharePct:    svc.SharePct,
+			})
+		}
+		for _, d := range lsUsage.Daily {
+			if pt, ok := byDate[d.Date]; ok {
+				pt.LogBytes = d.Bytes
+				pt.LogEvents = d.Events
+			}
+		}
+	}
+
 	timeseries := make([]DailyUsagePoint, 0, len(dates))
 	for _, d := range dates {
 		timeseries = append(timeseries, *byDate[d])
@@ -678,7 +808,14 @@ func (s *serviceImpl) GetTeamUsage(ctx context.Context, teamID uint, from, to ti
 	}
 
 	logUsedGB := float64(logEnt.CurrentUsage)
+	if liveLogIngestionGB > logUsedGB {
+		logUsedGB = liveLogIngestionGB
+	}
 	logLimitGB := float64(logEnt.MonthlyQuota)
+	activeLogServices := int64(len(logServiceSet))
+	if liveLogActiveServices > activeLogServices {
+		activeLogServices = liveLogActiveServices
+	}
 
 	pantoUsed := float64(len(pantoProductSet))
 	if float64(pantoEnt.CurrentUsage) > pantoUsed {
@@ -713,7 +850,9 @@ func (s *serviceImpl) GetTeamUsage(ctx context.Context, teamID uint, from, to ti
 				Quotas: []QuotaItem{
 					buildQuotaItem("ingestion_gb", "Log Ingestion", logUsedGB, logLimitGB, "GB", projectMonthlyUsage(logUsedGB, cycle)),
 				},
-				ActiveServices:             int64(len(logServiceSet)),
+				EventsIngested:             logEventsIngested,
+				BytesIngested:              logBytesIngested,
+				ActiveServices:             activeLogServices,
 				TriggerRules:               logTriggerRules,
 				LogTriggeredInvestigations: logTriggeredInv,
 			},
@@ -754,6 +893,7 @@ func (s *serviceImpl) GetTeamUsage(ctx context.Context, teamID uint, from, to ti
 		Timeseries: timeseries,
 		TopConsumers: TopConsumers{
 			Monitors:      topMonitors,
+			LogServices:   topLogServices,
 			AgentTriggers: topTriggers,
 			Services:      topServices,
 		},
