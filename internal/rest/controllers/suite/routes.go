@@ -18,6 +18,7 @@ type Handlers struct {
 	UsageService         usage.Service
 	UsageGuard           *usage.Guard
 	InternalAgentKey     string
+	PantomathURL         string
 	Logger               *logrus.Entry
 }
 
@@ -31,10 +32,14 @@ func Register(
 	usageService usage.Service,
 	usageGuard *usage.Guard,
 	internalAgentKey string,
+	pantomathURL string,
 	productGuard func(entities.ProductSlug) func(echo.HandlerFunc) echo.HandlerFunc,
 ) {
 	if internalAgentKey == "" {
 		internalAgentKey = "valid_agent_key"
+	}
+	if pantomathURL == "" {
+		pantomathURL = "http://pantomath.pantomath.svc.cluster.local:8000"
 	}
 	h := &Handlers{
 		InvestigationService: investigationService,
@@ -43,6 +48,7 @@ func Register(
 		UsageService:         usageService,
 		UsageGuard:           usageGuard,
 		InternalAgentKey:     internalAgentKey,
+		PantomathURL:         pantomathURL,
 		Logger:               logger,
 	}
 
@@ -75,6 +81,8 @@ func Register(
 	teamGroup.PUT("/overage-settings", AuthHandler(h.PutOverageSettings))
 	teamGroup.PUT("/pantomath/active-product", AuthHandler(h.PutActivePantomathProduct), pantomathMW...)
 	teamGroup.POST("/pantomath/query", AuthHandler(h.PostPantomathQuery), pantomathMW...)
+	teamGroup.POST("/pantomath/products", AuthHandler(h.PostCreatePantomathProduct), pantomathMW...)
+	teamGroup.POST("/pantomath/products/:product/repos", AuthHandler(h.PostAddPantomathProductRepos), pantomathMW...)
 	teamGroup.GET("/pantomath/products/:product/repos", AuthHandler(h.GetPantomathProductRepos), pantomathMW...)
 
 	// Cross-Product Service Catalog

@@ -1,9 +1,13 @@
 package suite
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
+	"fmt"
+	"io"
 	"net/http"
+	"regexp"
 	"strconv"
 	"strings"
 	"sync"
@@ -806,4 +810,116 @@ func (h *Handlers) GetPantomathProductRepos(c hs.AuthenticatedContext) error {
 		parsed.Repos = []string{}
 	}
 	return c.JSON(http.StatusOK, parsed)
+}
+
+var pantomathSlugSanitizer = regexp.MustCompile(`[^a-z0-9_]+`)
+
+func normalizePantomathProductSlug(raw string) string {
+	s := strings.ToLower(strings.TrimSpace(raw))
+	s = pantomathSlugSanitizer.ReplaceAllString(s, "_")
+	s = strings.Trim(s, "_")
+	if len(s) > 64 {
+		s = s[:64]
+	}
+	return s
+}
+
+type CreatePantomathProductRequest struct {
+	TeamID  uint     `param:"teamId" validate:"required,numeric,gte=0"`
+	Product string   `json:"product" validate:"required"`
+	Repos   []string `json:"repos"`
+}
+
+func (h *Handlers) createOrIndexPantomathProduct(c hs.AuthenticatedContext, teamID uint, rawProduct string, repos []string) error {
+	product := normalizePantomathProductSlug(rawProduct)
+	if product == "" {
+		return c.JSON(http.StatusBadRequest, map[string]interface{}{
+			"error": "Product name must contain alphanumeric characters.",
+		})
+	}
+
+	if h.UsageGuard != nil {
+		allowed, currentCount, maxProducts := h.UsageGuard.CanAddPantomathProduct(c.Request().Context(), teamID, product)
+		if !allowed {
+			return c.JSON(http.StatusPaymentRequired, map[string]interface{}{
+				"code":       "UPGRADE_REQUIRED",
+				"error":      fmt.Sprintf("Your plan allows up to %d Agent Context product(s) (%d currently active). Upgrade in Settings -> Billing to add more.", maxProducts, currentCount),
+				"upgradeUrl": "/settings/billing",
+			})
+		}
+	}
+
+	pantoURL := strings.TrimRight(h.PantomathURL, "/")
+	if pantoURL == "" {
+		pantoURL = "http://pantomath.pantomath.svc.cluster.local:8000"
+	}
+
+	tenant := fmt.Sprintf("team_%d", teamID)
+	payloadBytes, _ := json.Marshal(map[string]interface{}{
+		"product": product,
+		"repos":   repos,
+		"tenant":  tenant,
+	})
+
+	req, err := http.NewRequestWithContext(
+		c.Request().Context(),
+		http.MethodPost,
+		fmt.Sprintf("%s/v1/products?tenant=%s", pantoURL, tenant),
+		bytes.NewReader(payloadBytes),
+	)
+	if err != nil {
+		return echo.ErrInternalServerError
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("X-Opsway-Tenant-ID", tenant)
+
+	client := &http.Client{Timeout: 30 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		c.Log.WithError(err).WithField("product", product).Error("failed to call pantomath create product")
+		return c.JSON(http.StatusBadGateway, map[string]interface{}{
+			"error": "Agent Context service is currently unreachable.",
+		})
+	}
+	defer resp.Body.Close()
+
+	respBytes, _ := io.ReadAll(resp.Body)
+	var parsed map[string]interface{}
+	if err := json.Unmarshal(respBytes, &parsed); err != nil {
+		parsed = map[string]interface{}{"raw": string(respBytes)}
+	}
+
+	if resp.StatusCode >= 400 {
+		return c.JSON(resp.StatusCode, parsed)
+	}
+
+	if h.UsageGuard != nil {
+		if err := h.UsageGuard.RegisterPantomathProduct(c.Request().Context(), teamID, product); err != nil {
+			c.Log.WithError(err).WithField("product", product).Warn("failed to register pantomath product lifecycle")
+		}
+	}
+
+	return c.JSON(http.StatusAccepted, parsed)
+}
+
+func (h *Handlers) PostCreatePantomathProduct(c hs.AuthenticatedContext) error {
+	req, err := helpers.Bind[CreatePantomathProductRequest](c)
+	if err != nil {
+		return echo.ErrBadRequest
+	}
+	return h.createOrIndexPantomathProduct(c, req.TeamID, req.Product, req.Repos)
+}
+
+type AddPantomathProductReposRequest struct {
+	TeamID  uint     `param:"teamId" validate:"required,numeric,gte=0"`
+	Product string   `param:"product" validate:"required"`
+	Repos   []string `json:"repos" validate:"required"`
+}
+
+func (h *Handlers) PostAddPantomathProductRepos(c hs.AuthenticatedContext) error {
+	req, err := helpers.Bind[AddPantomathProductReposRequest](c)
+	if err != nil {
+		return echo.ErrBadRequest
+	}
+	return h.createOrIndexPantomathProduct(c, req.TeamID, req.Product, req.Repos)
 }

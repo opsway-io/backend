@@ -144,6 +144,7 @@ type TopPantomathProductConsumer struct {
 	RepoCount    int64      `json:"repoCount"`
 	VectorChunks int64      `json:"vectorChunks"`
 	Source       string     `json:"source"`
+	Indexing     bool       `json:"indexing,omitempty"`
 	Status       string     `json:"status"` // "active" | "scheduled_delete" | "deleted"
 	DeleteAt     *time.Time `json:"deleteAt,omitempty"`
 }
@@ -220,6 +221,7 @@ type pantomathUsageAPIResp struct {
 		RepoCount    int64  `json:"repo_count"`
 		VectorChunks int64  `json:"vector_chunks"`
 		Source       string `json:"source"`
+		Indexing     bool   `json:"indexing"`
 	} `json:"products"`
 }
 
@@ -848,6 +850,7 @@ func (s *serviceImpl) GetTeamUsage(ctx context.Context, teamID uint, from, to ti
 				RepoCount:    p.RepoCount,
 				VectorChunks: p.VectorChunks,
 				Source:       p.Source,
+				Indexing:     p.Indexing,
 				Status:       "active",
 			})
 		}

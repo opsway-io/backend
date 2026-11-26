@@ -26,7 +26,7 @@ func TestTeamsAndSuiteRouteRegistration(t *testing.T) {
 		return func(next echo.HandlerFunc) echo.HandlerFunc { return next }
 	}
 	teamsGroup := teams.Register(authRoot, logger, teamSvc, userSvc, nil, nil)
-	suite.Register(authRoot, teamsGroup, logger, nil, nil, nil, nil, nil, "", noopProductGuard)
+	suite.Register(authRoot, teamsGroup, logger, nil, nil, nil, nil, nil, "", "", noopProductGuard)
 
 	routes := e.Routes()
 

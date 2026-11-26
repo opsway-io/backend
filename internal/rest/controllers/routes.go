@@ -230,6 +230,7 @@ func Register(
 		usageService,
 		usageGuard,
 		mcpGatewayCfg.LogSearchAgentKey,
+		mcpGatewayCfg.PantomathURL,
 		ProductGuard,
 	)
 }

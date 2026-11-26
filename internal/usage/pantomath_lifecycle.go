@@ -249,6 +249,54 @@ func (g *Guard) ReconcilePantomathLifecycle(
 	return allowedProducts, lifecycleByProduct
 }
 
+// CanAddPantomathProduct checks whether a team can create (or add repos to) a Pantomath product
+// under its active plan limits. Existing non-deleted products are always allowed.
+func (g *Guard) CanAddPantomathProduct(ctx context.Context, teamID uint, product string) (allowed bool, currentCount int, maxProducts int) {
+	if g == nil || g.db == nil {
+		return true, 0, -1
+	}
+	product = strings.TrimSpace(product)
+	var team entities.Team
+	if err := g.db.WithContext(ctx).Select("id, payment_plan, allow_overage").First(&team, teamID).Error; err != nil {
+		return true, 0, -1
+	}
+	maxProducts = entities.DefaultMonthlyQuota(entities.ProductPantomath, team.MaxEntitlementTier())
+	isPaidOverage := team.AllowOverage && (team.PaymentPlan == entities.PaymentPlanTeam || team.PaymentPlan == entities.PaymentPlanEnterprise)
+
+	var rows []entities.PantomathProductLifecycle
+	g.db.WithContext(ctx).Where("team_id = ? AND status != ?", teamID, entities.PantomathStatusDeleted).Find(&rows)
+	for _, r := range rows {
+		if r.Product == product {
+			return true, len(rows), maxProducts
+		}
+	}
+	currentCount = len(rows)
+	if maxProducts < 0 || isPaidOverage || currentCount < maxProducts {
+		return true, currentCount, maxProducts
+	}
+	return false, currentCount, maxProducts
+}
+
+// RegisterPantomathProduct ensures a newly created product is immediately recorded as ACTIVE
+// in pantomath_product_lifecycles so quota-state allows querying it right away.
+func (g *Guard) RegisterPantomathProduct(ctx context.Context, teamID uint, product string) error {
+	if g == nil || g.db == nil {
+		return nil
+	}
+	product = strings.TrimSpace(product)
+	if product == "" {
+		return fmt.Errorf("product is required")
+	}
+	row := entities.PantomathProductLifecycle{
+		TeamID:   teamID,
+		Product:  product,
+		Status:   entities.PantomathStatusActive,
+		DeleteAt: nil,
+	}
+	g.upsertLifecycle(ctx, &row)
+	return nil
+}
+
 // SetActivePantomathProduct lets a team choose which product(s) stay ACTIVE when downgraded.
 func (g *Guard) SetActivePantomathProduct(ctx context.Context, teamID uint, product string) error {
 	product = strings.TrimSpace(product)
