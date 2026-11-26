@@ -687,3 +687,123 @@ func (h *Handlers) PutActivePantomathProduct(c hs.AuthenticatedContext) error {
 		"status":  "ACTIVE",
 	})
 }
+
+type PostPantomathQueryRequest struct {
+	TeamID      uint   `param:"teamId" validate:"required,numeric,gte=0"`
+	Query       string `json:"query" validate:"required"`
+	Product     string `json:"product"`
+	Synthesize  *bool  `json:"synthesize"`
+	AgenticLoop *bool  `json:"agenticLoop"`
+	TopK        int    `json:"topK"`
+	MaxHops     int    `json:"maxHops"`
+}
+
+func (h *Handlers) PostPantomathQuery(c hs.AuthenticatedContext) error {
+	req, err := helpers.Bind[PostPantomathQueryRequest](c)
+	if err != nil {
+		return echo.ErrBadRequest
+	}
+	if h.MCPGateway == nil {
+		return echo.ErrServiceUnavailable
+	}
+
+	args := map[string]interface{}{
+		"query": req.Query,
+	}
+	if strings.TrimSpace(req.Product) != "" {
+		args["product"] = strings.TrimSpace(req.Product)
+	}
+	if req.Synthesize != nil {
+		args["synthesize"] = *req.Synthesize
+	}
+	if req.AgenticLoop != nil {
+		args["agentic_loop"] = *req.AgenticLoop
+	}
+	if req.TopK > 0 {
+		args["top_k"] = req.TopK
+	}
+	if req.MaxHops >= 0 {
+		args["max_hops"] = req.MaxHops
+	}
+
+	start := time.Now()
+	result, err := h.MCPGateway.CallTool(c.Request().Context(), req.TeamID, "pantomath.ask_codebase", args)
+	durationMs := time.Since(start).Milliseconds()
+	if err != nil {
+		c.Log.WithError(err).Error("pantomath query failed")
+		return c.JSON(http.StatusBadGateway, map[string]interface{}{
+			"error": err.Error(),
+		})
+	}
+	if h.UsageService != nil {
+		_ = h.UsageService.IncrementCounter(c.Request().Context(), req.TeamID, entities.ProductPantomath, "mcp_calls", 1)
+	}
+
+	var markdown string
+	if result != nil && len(result.Content) > 0 {
+		parts := make([]string, 0, len(result.Content))
+		for _, item := range result.Content {
+			if item.Text != "" {
+				parts = append(parts, item.Text)
+			}
+		}
+		markdown = strings.Join(parts, "\n\n")
+	}
+
+	return c.JSON(http.StatusOK, map[string]interface{}{
+		"markdown":   markdown,
+		"product":    req.Product,
+		"durationMs": durationMs,
+		"isError":    result != nil && result.IsError,
+	})
+}
+
+type GetPantomathProductReposRequest struct {
+	TeamID  uint   `param:"teamId" validate:"required,numeric,gte=0"`
+	Product string `param:"product" validate:"required"`
+}
+
+func (h *Handlers) GetPantomathProductRepos(c hs.AuthenticatedContext) error {
+	req, err := helpers.Bind[GetPantomathProductReposRequest](c)
+	if err != nil {
+		return echo.ErrBadRequest
+	}
+	if h.MCPGateway == nil {
+		return echo.ErrServiceUnavailable
+	}
+
+	result, err := h.MCPGateway.CallTool(c.Request().Context(), req.TeamID, "pantomath.list_repos", map[string]interface{}{
+		"product": req.Product,
+	})
+	if err != nil {
+		c.Log.WithError(err).WithField("product", req.Product).Error("pantomath list_repos failed")
+		return c.JSON(http.StatusBadGateway, map[string]interface{}{
+			"error": err.Error(),
+		})
+	}
+
+	var rawText string
+	if result != nil && len(result.Content) > 0 {
+		rawText = result.Content[0].Text
+	}
+
+	var parsed struct {
+		Product string   `json:"product"`
+		Repos   []string `json:"repos"`
+		Count   int      `json:"count"`
+		Source  string   `json:"source"`
+	}
+	if err := json.Unmarshal([]byte(rawText), &parsed); err != nil {
+		return c.JSON(http.StatusOK, map[string]interface{}{
+			"product": req.Product,
+			"repos":   []string{},
+			"count":   0,
+			"source":  "unknown",
+			"raw":     rawText,
+		})
+	}
+	if parsed.Repos == nil {
+		parsed.Repos = []string{}
+	}
+	return c.JSON(http.StatusOK, parsed)
+}
