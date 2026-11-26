@@ -55,21 +55,25 @@ func Register(
 	// BYOA External Agent Callback (authenticated via investigation UUID & team/incident)
 	root.POST("/teams/:teamId/incidents/:incidentId/investigations/:uuid/callback", h.PostByoaCallback)
 
-	pantomathGroup := teamGroup
-	agentGroup := teamGroup
-	logSearchGroup := teamGroup
-	if productGuard != nil {
-		pantomathGroup = teamGroup.Group("", productGuard(entities.ProductPantomath))
-		agentGroup = teamGroup.Group("", productGuard(entities.ProductManagedAgent))
-		logSearchGroup = teamGroup.Group("", productGuard(entities.ProductLogSearch))
+	// Attach productGuard as route-level middleware instead of teamGroup.Group("", ...)
+	// because Echo's empty-prefix Group registers NotFoundHandler on /v1/teams/:teamId,
+	// overwriting GET/PUT/DELETE /v1/teams/:teamId.
+	withProduct := func(p entities.ProductSlug) []echo.MiddlewareFunc {
+		if productGuard == nil {
+			return nil
+		}
+		return []echo.MiddlewareFunc{productGuard(p)}
 	}
+	pantomathMW := withProduct(entities.ProductPantomath)
+	agentMW := withProduct(entities.ProductManagedAgent)
+	logSearchMW := withProduct(entities.ProductLogSearch)
 
 	// Modular Product Entitlements & Usage Monitoring
 	teamGroup.GET("/entitlements", AuthHandler(h.GetEntitlements))
 	teamGroup.PUT("/entitlements", AuthHandler(h.PutEntitlement))
 	teamGroup.GET("/usage", AuthHandler(h.GetTeamUsage))
 	teamGroup.PUT("/overage-settings", AuthHandler(h.PutOverageSettings))
-	pantomathGroup.PUT("/pantomath/active-product", AuthHandler(h.PutActivePantomathProduct))
+	teamGroup.PUT("/pantomath/active-product", AuthHandler(h.PutActivePantomathProduct), pantomathMW...)
 
 	// Cross-Product Service Catalog
 	teamGroup.GET("/service-catalog", AuthHandler(h.GetServiceCatalog))
@@ -78,13 +82,13 @@ func Register(
 	teamGroup.DELETE("/service-catalog/:serviceId", AuthHandler(h.DeleteServiceCatalogItem))
 
 	// Autonomous Agent Configuration & Multi-Product Trigger Rules
-	agentGroup.GET("/agent-config", AuthHandler(h.GetAgentConfig))
-	agentGroup.PUT("/agent-config", AuthHandler(h.PutAgentConfig))
-	agentGroup.GET("/agent-triggers", AuthHandler(h.GetAgentTriggers))
-	agentGroup.POST("/agent-triggers", AuthHandler(h.PostAgentTrigger))
-	agentGroup.PUT("/agent-triggers/:ruleId", AuthHandler(h.PutAgentTrigger))
-	agentGroup.DELETE("/agent-triggers/:ruleId", AuthHandler(h.DeleteAgentTrigger))
-	agentGroup.POST("/agent-events", AuthHandler(h.PostTeamAgentEvent))
+	teamGroup.GET("/agent-config", AuthHandler(h.GetAgentConfig), agentMW...)
+	teamGroup.PUT("/agent-config", AuthHandler(h.PutAgentConfig), agentMW...)
+	teamGroup.GET("/agent-triggers", AuthHandler(h.GetAgentTriggers), agentMW...)
+	teamGroup.POST("/agent-triggers", AuthHandler(h.PostAgentTrigger), agentMW...)
+	teamGroup.PUT("/agent-triggers/:ruleId", AuthHandler(h.PutAgentTrigger), agentMW...)
+	teamGroup.DELETE("/agent-triggers/:ruleId", AuthHandler(h.DeleteAgentTrigger), agentMW...)
+	teamGroup.POST("/agent-events", AuthHandler(h.PostTeamAgentEvent), agentMW...)
 
 	// Internal Product Hooks (Log-Search Evaluator, Pantomath Deploy Webhooks & Quota Enforcement)
 	root.GET("/internal/agent-triggers", h.GetInternalAgentTriggers)
@@ -92,12 +96,12 @@ func Register(
 	root.GET("/internal/quota-state", h.GetInternalQuotaState)
 
 	// Incident Investigations & Remediation Actions
-	agentGroup.GET("/investigations", AuthHandler(h.GetTeamInvestigations))
-	agentGroup.GET("/incidents/:incidentId/investigations", AuthHandler(h.GetIncidentInvestigations))
-	agentGroup.POST("/incidents/:incidentId/investigations", AuthHandler(h.PostTriggerInvestigation))
-	agentGroup.POST("/investigations/:investigationId/remediations/:actionId/approve", AuthHandler(h.PostApproveRemediation))
-	agentGroup.POST("/investigations/:investigationId/remediations/:actionId/reject", AuthHandler(h.PostRejectRemediation))
+	teamGroup.GET("/investigations", AuthHandler(h.GetTeamInvestigations), agentMW...)
+	teamGroup.GET("/incidents/:incidentId/investigations", AuthHandler(h.GetIncidentInvestigations), agentMW...)
+	teamGroup.POST("/incidents/:incidentId/investigations", AuthHandler(h.PostTriggerInvestigation), agentMW...)
+	teamGroup.POST("/investigations/:investigationId/remediations/:actionId/approve", AuthHandler(h.PostApproveRemediation), agentMW...)
+	teamGroup.POST("/investigations/:investigationId/remediations/:actionId/reject", AuthHandler(h.PostRejectRemediation), agentMW...)
 
 	// Log-Search Federation Proxy for Dashboard / Service Auto-Discovery
-	logSearchGroup.GET("/logs/services", AuthHandler(h.GetLogSearchServices))
+	teamGroup.GET("/logs/services", AuthHandler(h.GetLogSearchServices), logSearchMW...)
 }

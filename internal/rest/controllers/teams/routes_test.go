@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/labstack/echo/v4"
+	"github.com/opsway-io/backend/internal/entities"
 	"github.com/opsway-io/backend/internal/rest/controllers/suite"
 	"github.com/opsway-io/backend/internal/rest/controllers/teams"
 	teamMocks "github.com/opsway-io/backend/internal/team/mocks"
@@ -21,8 +22,11 @@ func TestTeamsAndSuiteRouteRegistration(t *testing.T) {
 	teamSvc := new(teamMocks.Service)
 	userSvc := &mockUserService{Service: new(userMocks.Service)}
 
+	noopProductGuard := func(entities.ProductSlug) func(echo.HandlerFunc) echo.HandlerFunc {
+		return func(next echo.HandlerFunc) echo.HandlerFunc { return next }
+	}
 	teamsGroup := teams.Register(authRoot, logger, teamSvc, userSvc, nil, nil)
-	suite.Register(authRoot, teamsGroup, logger, nil, nil, nil, nil, nil, "")
+	suite.Register(authRoot, teamsGroup, logger, nil, nil, nil, nil, nil, "", noopProductGuard)
 
 	routes := e.Routes()
 
