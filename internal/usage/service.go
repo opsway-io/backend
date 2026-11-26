@@ -509,6 +509,11 @@ func (s *serviceImpl) GetTeamUsage(ctx context.Context, teamID uint, from, to ti
 		return nil, err
 	}
 
+	isAdminTeam := isPlatformAdminTeam(ctx, s.db, teamID)
+	if isAdminTeam {
+		team.PaymentPlan = entities.PaymentPlanEnterprise
+	}
+
 	entMap := make(map[entities.ProductSlug]entities.TeamEntitlement)
 	if s.investigationService != nil {
 		if ents, err := s.investigationService.GetEntitlements(ctx, teamID); err == nil {
@@ -519,6 +524,15 @@ func (s *serviceImpl) GetTeamUsage(ctx context.Context, teamID uint, from, to ti
 	}
 
 	getEnt := func(p entities.ProductSlug) entities.TeamEntitlement {
+		if isAdminTeam {
+			return entities.TeamEntitlement{
+				TeamID:       teamID,
+				Product:      p,
+				Tier:         entities.EntitlementTierEnterprise,
+				Enabled:      true,
+				MonthlyQuota: entities.DefaultMonthlyQuota(p, entities.EntitlementTierEnterprise),
+			}
+		}
 		if e, ok := entMap[p]; ok {
 			return e
 		}

@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/opsway-io/backend/internal/entities"
+	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 )
 
@@ -59,10 +60,39 @@ func (g *Guard) SyncPlanEntitlements(ctx context.Context, team *entities.Team) e
 	return nil
 }
 
+// isPlatformAdminTeam reports whether any member of teamID is a platform owner.
+func isPlatformAdminTeam(ctx context.Context, db *gorm.DB, teamID uint) bool {
+	if db == nil || teamID == 0 {
+		return false
+	}
+	var count int64
+	err := db.WithContext(ctx).
+		Table("team_users").
+		Joins("JOIN users ON users.id = team_users.user_id").
+		Where("team_users.team_id = ? AND users.is_platform_owner = ?", teamID, true).
+		Limit(1).
+		Count(&count).Error
+	return err == nil && count > 0
+}
+
 // ReconcileTeamStripePlan verifies a team's active Stripe subscription and ensures
 // team.PaymentPlan and all product entitlements match paid Stripe state.
+// Platform-admin teams are always granted Enterprise across all products.
 func (g *Guard) ReconcileTeamStripePlan(ctx context.Context, team *entities.Team) {
-	if g == nil || g.db == nil || g.billingSvc == nil || !g.billingSvc.IsConfigured() || team == nil {
+	if g == nil || g.db == nil || team == nil {
+		return
+	}
+
+	if isPlatformAdminTeam(ctx, g.db, team.ID) {
+		if team.PaymentPlan != entities.PaymentPlanEnterprise {
+			team.PaymentPlan = entities.PaymentPlanEnterprise
+			_ = g.db.WithContext(ctx).Model(&entities.Team{}).Where("id = ?", team.ID).Update("payment_plan", entities.PaymentPlanEnterprise).Error
+			_ = g.SyncPlanEntitlements(ctx, team)
+		}
+		return
+	}
+
+	if g.billingSvc == nil || !g.billingSvc.IsConfigured() {
 		return
 	}
 
