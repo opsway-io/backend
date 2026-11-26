@@ -107,7 +107,7 @@ func ComputeEnforcementTransition(
 	overUnits := math.Max(0, used-limit)
 	overageCents = estimateOverageCents(quotaKey, overUnits)
 
-	isPaid := plan == entities.PaymentPlanTeam || plan == entities.PaymentPlanEnterprise
+	isPaid := plan == entities.PaymentPlanPro || plan == entities.PaymentPlanTeam || plan == entities.PaymentPlanEnterprise
 
 	// Paid plan with Pay-As-You-Go overages enabled stays unthrottled unless spend cap is hit.
 	if isPaid && allowOverage {

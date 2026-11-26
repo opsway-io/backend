@@ -94,6 +94,8 @@ func NewServer(
 				"https://my.opsway.eu",
 				"https://monitoring.opsway.eu",
 				"https://logs.opsway.eu",
+				"https://agent-context.opsway.eu",
+				"https://pantomath.opsway.eu",
 			},
 			AllowCredentials: true,
 		}),

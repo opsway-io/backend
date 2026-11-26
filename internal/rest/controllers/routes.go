@@ -157,6 +157,11 @@ func Register(
 		usageGuard,
 	)
 
+	// Public Billing Catalog (shared by Dashboard & Marketing Website)
+	root.GET("/billing/catalog", func(c echo.Context) error {
+		return c.JSON(200, billingService.GetCatalog())
+	})
+
 	// Healthz
 
 	healthz.Register(root, logger)

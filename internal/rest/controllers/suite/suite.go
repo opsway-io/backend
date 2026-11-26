@@ -176,7 +176,7 @@ func (h *Handlers) GetEntitlements(c hs.AuthenticatedContext) error {
 type PutEntitlementRequest struct {
 	TeamID  uint                     `param:"teamId" validate:"required,numeric,gte=0"`
 	Product entities.ProductSlug     `json:"product" validate:"required"`
-	Tier    entities.EntitlementTier `json:"tier" validate:"required"`
+	Tier    entities.EntitlementTier `json:"tier"`
 	Enabled bool                     `json:"enabled"`
 }
 
@@ -185,8 +185,29 @@ func (h *Handlers) PutEntitlement(c hs.AuthenticatedContext) error {
 	if err != nil {
 		return echo.ErrBadRequest
 	}
-	// Prevent self-upgrade bypass: never allow setting an entitlement tier above the team's paid plan.
-	if h.UsageGuard != nil {
+	if !entities.IsValidProduct(req.Product) {
+		return echo.NewHTTPError(http.StatusBadRequest, "invalid product")
+	}
+
+	// Prevent self-upgrade bypass: PUT /entitlements can only toggle enabled state,
+	// never escalate tier above the team's active Stripe-verified entitlement.
+	currentTier := entities.EntitlementTierFree
+	if existing, err := h.InvestigationService.GetEntitlements(c.Request().Context(), req.TeamID); err == nil {
+		for _, item := range existing {
+			if item.Product == req.Product {
+				currentTier = entities.NormalizeTier(string(item.Tier))
+				break
+			}
+		}
+	}
+	if req.Tier != "" && entities.TierRank(req.Tier) > entities.TierRank(currentTier) {
+		return c.JSON(http.StatusPaymentRequired, map[string]interface{}{
+			"code":       "UPGRADE_REQUIRED",
+			"message":    "Cannot enable a higher entitlement tier than your active subscription plan.",
+			"upgradeUrl": "/settings/billing",
+		})
+	}
+	if h.UsageGuard != nil && req.Tier != "" {
 		limits := h.UsageGuard.GetTeamPlanLimits(c.Request().Context(), req.TeamID)
 		if maxTier, ok := limits["maxEntitlementTier"].(entities.EntitlementTier); ok {
 			if entities.EntitlementTierRank(req.Tier) > entities.EntitlementTierRank(maxTier) {
@@ -198,7 +219,8 @@ func (h *Handlers) PutEntitlement(c hs.AuthenticatedContext) error {
 			}
 		}
 	}
-	ent, err := h.InvestigationService.UpdateEntitlement(c.Request().Context(), req.TeamID, req.Product, req.Tier, req.Enabled)
+
+	ent, err := h.InvestigationService.UpdateEntitlement(c.Request().Context(), req.TeamID, req.Product, currentTier, req.Enabled)
 	if err != nil {
 		c.Log.WithError(err).Error("failed to update entitlement")
 		return echo.ErrInternalServerError
@@ -444,7 +466,7 @@ func (h *Handlers) PostTriggerInvestigation(c hs.AuthenticatedContext) error {
 		IncidentID:    req.IncidentID,
 		TriggerSource: source,
 		UserPrompt:    req.UserPrompt,
-		Force:         true,
+		Force:         false,
 	})
 	if err != nil {
 		if errors.Is(err, investigation.ErrQuotaExceeded) {

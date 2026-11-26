@@ -462,7 +462,7 @@ func escalationPolicyLimit(plan entities.PaymentPlan) int {
 	switch plan {
 	case entities.PaymentPlanEnterprise:
 		return -1
-	case entities.PaymentPlanTeam:
+	case entities.PaymentPlanPro, entities.PaymentPlanTeam:
 		return 5
 	default:
 		return 1
@@ -540,7 +540,7 @@ func (s *serviceImpl) GetTeamUsage(ctx context.Context, teamID uint, from, to ti
 		}
 		tier := entities.EntitlementTierFree
 		switch team.PaymentPlan {
-		case entities.PaymentPlanTeam:
+		case entities.PaymentPlanPro, entities.PaymentPlanTeam:
 			tier = entities.EntitlementTierPro
 		case entities.PaymentPlanEnterprise:
 			tier = entities.EntitlementTierEnterprise
@@ -967,7 +967,7 @@ func (s *serviceImpl) GetTeamUsage(ctx context.Context, teamID uint, from, to ti
 		pantoTotalQueries = pantoQueries
 	}
 
-	isPaid := team.PaymentPlan == entities.PaymentPlanTeam || team.PaymentPlan == entities.PaymentPlanEnterprise
+	isPaid := team.PaymentPlan == entities.PaymentPlanPro || team.PaymentPlan == entities.PaymentPlanTeam || team.PaymentPlan == entities.PaymentPlanEnterprise
 	cycleStart := cycle.Start.Format("2006-01-02")
 	var storedStates []entities.QuotaNotificationState
 	s.db.WithContext(ctx).
@@ -1139,7 +1139,7 @@ func (s *serviceImpl) UpdateOverageSettings(
 	if err := s.db.WithContext(ctx).First(&team, teamID).Error; err != nil {
 		return nil, err
 	}
-	isPaid := team.PaymentPlan == entities.PaymentPlanTeam || team.PaymentPlan == entities.PaymentPlanEnterprise
+	isPaid := team.PaymentPlan == entities.PaymentPlanPro || team.PaymentPlan == entities.PaymentPlanTeam || team.PaymentPlan == entities.PaymentPlanEnterprise
 	if allowOverage && !isPaid {
 		return nil, fmt.Errorf("pay-as-you-go overages require a Team or Enterprise plan")
 	}

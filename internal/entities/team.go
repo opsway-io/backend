@@ -32,9 +32,22 @@ type PaymentPlan string
 
 const (
 	PaymentPlanFree       PaymentPlan = "FREE"
-	PaymentPlanTeam       PaymentPlan = "TEAM"
+	PaymentPlanPro        PaymentPlan = "PRO"
+	PaymentPlanTeam       PaymentPlan = "TEAM" // Legacy alias for PRO
 	PaymentPlanEnterprise PaymentPlan = "ENTERPRISE"
 )
+
+// NormalizePaymentPlan converts legacy "TEAM" to canonical "PRO".
+func NormalizePaymentPlan(p PaymentPlan) PaymentPlan {
+	switch NormalizeTier(string(p)) {
+	case EntitlementTierEnterprise:
+		return PaymentPlanEnterprise
+	case EntitlementTierPro:
+		return PaymentPlanPro
+	default:
+		return PaymentPlanFree
+	}
+}
 
 type Team struct {
 	ID                       uint
@@ -69,62 +82,26 @@ func (Team) TableName() string {
 }
 
 func (t *Team) GetMonitorLimit() int {
-	switch t.PaymentPlan {
-	case PaymentPlanFree:
-		return 5
-	case PaymentPlanTeam:
-		return 50
-	case PaymentPlanEnterprise:
-		return -1
-	default:
-		return 5
-	}
+	return DefaultMonthlyQuota(ProductMonitoring, NormalizeTier(string(t.PaymentPlan)))
 }
 
 func (t *Team) GetTeamMemberLimit() int {
-	switch t.PaymentPlan {
-	case PaymentPlanFree:
-		return 3
-	case PaymentPlanTeam:
-		return 5
-	case PaymentPlanEnterprise:
-		return -1
-	default:
-		return 1
-	}
+	return DefaultTeamMemberLimit(NormalizeTier(string(t.PaymentPlan)))
 }
 
 func (t *Team) GetStatusPageLimit() int {
-	switch t.PaymentPlan {
-	case PaymentPlanFree:
-		return 1
-	case PaymentPlanTeam:
-		return 5
-	case PaymentPlanEnterprise:
-		return -1
-	default:
-		return 1
-	}
+	return DefaultStatusPageLimit(NormalizeTier(string(t.PaymentPlan)))
 }
 
 func (t *Team) GetManagedInvestigationLimit() int {
-	switch t.PaymentPlan {
-	case PaymentPlanFree:
-		return 3
-	case PaymentPlanTeam:
-		return 30
-	case PaymentPlanEnterprise:
-		return 500
-	default:
-		return 3
-	}
+	return DefaultMonthlyQuota(ProductManagedAgent, NormalizeTier(string(t.PaymentPlan)))
 }
 
 func (t *Team) GetAgentTokenLimitPerRun() int {
 	switch t.PaymentPlan {
 	case PaymentPlanFree:
 		return 32000
-	case PaymentPlanTeam:
+	case PaymentPlanPro, PaymentPlanTeam:
 		return 100000
 	case PaymentPlanEnterprise:
 		return 250000
@@ -137,7 +114,7 @@ func (t *Team) GetAgentMonthlyTokenLimit() int {
 	switch t.PaymentPlan {
 	case PaymentPlanFree:
 		return 100000
-	case PaymentPlanTeam:
+	case PaymentPlanPro, PaymentPlanTeam:
 		return 2000000
 	case PaymentPlanEnterprise:
 		return -1
@@ -150,7 +127,7 @@ func (t *Team) GetAgentTriggerRuleLimit() int {
 	switch t.PaymentPlan {
 	case PaymentPlanFree:
 		return 3
-	case PaymentPlanTeam:
+	case PaymentPlanPro, PaymentPlanTeam:
 		return 25
 	case PaymentPlanEnterprise:
 		return -1
@@ -163,7 +140,7 @@ func (t *Team) GetMCPGatewayRateLimitPerMin() int {
 	switch t.PaymentPlan {
 	case PaymentPlanFree:
 		return 60
-	case PaymentPlanTeam:
+	case PaymentPlanPro, PaymentPlanTeam:
 		return 300
 	case PaymentPlanEnterprise:
 		return 1000
@@ -176,7 +153,7 @@ func (t *Team) GetPantomathRepoLimit() int {
 	switch t.PaymentPlan {
 	case PaymentPlanFree:
 		return 3
-	case PaymentPlanTeam:
+	case PaymentPlanPro, PaymentPlanTeam:
 		return 25
 	case PaymentPlanEnterprise:
 		return -1
@@ -189,7 +166,7 @@ func (t *Team) GetPantomathVectorChunkLimit() int {
 	switch t.PaymentPlan {
 	case PaymentPlanFree:
 		return 25000
-	case PaymentPlanTeam:
+	case PaymentPlanPro, PaymentPlanTeam:
 		return 250000
 	case PaymentPlanEnterprise:
 		return -1
@@ -202,7 +179,7 @@ func (t *Team) GetMinMonitorFrequencySeconds() uint64 {
 	switch t.PaymentPlan {
 	case PaymentPlanFree:
 		return 60
-	case PaymentPlanTeam:
+	case PaymentPlanPro, PaymentPlanTeam:
 		return 30
 	case PaymentPlanEnterprise:
 		return 10
@@ -215,7 +192,7 @@ func (t *Team) GetMaxMonitorSteps() int {
 	switch t.PaymentPlan {
 	case PaymentPlanFree:
 		return 3
-	case PaymentPlanTeam:
+	case PaymentPlanPro, PaymentPlanTeam:
 		return 10
 	case PaymentPlanEnterprise:
 		return 25
@@ -228,7 +205,7 @@ func (t *Team) GetMaxConcurrentInvestigations() int {
 	switch t.PaymentPlan {
 	case PaymentPlanFree:
 		return 1
-	case PaymentPlanTeam:
+	case PaymentPlanPro, PaymentPlanTeam:
 		return 3
 	case PaymentPlanEnterprise:
 		return 10
@@ -241,7 +218,7 @@ func (t *Team) MaxEntitlementTier() EntitlementTier {
 	switch t.PaymentPlan {
 	case PaymentPlanEnterprise:
 		return EntitlementTierEnterprise
-	case PaymentPlanTeam:
+	case PaymentPlanPro, PaymentPlanTeam:
 		return EntitlementTierPro
 	default:
 		return EntitlementTierFree

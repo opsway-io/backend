@@ -3,6 +3,7 @@ package cmd
 import (
 	"context"
 	"strings"
+	"time"
 
 	"github.com/opsway-io/backend/internal/alerting"
 	"github.com/opsway-io/backend/internal/apikey"
@@ -105,6 +106,8 @@ func runAPI(cmd *cobra.Command, args []string) {
 		entities.EscalationJob{},
 		entities.NotificationJob{},
 		entities.TeamEntitlement{},
+		entities.TeamSubscription{},
+		entities.StripeWebhookEvent{},
 		entities.ServiceCatalogItem{},
 		entities.AgentConfig{},
 		entities.AgentTriggerRule{},
@@ -251,7 +254,19 @@ func runAPI(cmd *cobra.Command, args []string) {
 	statuspageRepository := statuspage.NewRepository(db)
 	statuspageService := statuspage.NewService(statuspageRepository, k8sService)
 
-	billingService := billing.NewService(conf.Stripe)
+	billingService := billing.NewService(conf.Stripe, db)
+
+	// Normalize legacy "TEAM" payment plan rows to canonical "PRO"
+	_ = db.Model(&entities.Team{}).Where("payment_plan = ?", entities.PaymentPlanTeam).Update("payment_plan", entities.PaymentPlanPro).Error
+
+	// Periodically reset expired free-tier monthly usage counters
+	go func() {
+		ticker := time.NewTicker(time.Hour)
+		defer ticker.Stop()
+		for range ticker.C {
+			_ = billingService.ResetExpiredFreeUsage(context.Background())
+		}
+	}()
 
 	changelogService := changelog.NewService(db)
 

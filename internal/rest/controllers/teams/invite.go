@@ -39,7 +39,11 @@ func (h *Handlers) PostTeamUsersInvites(c hs.AuthenticatedContext) error {
 			c.Log.WithError(err).Debug("failed to get team user count")
 			return echo.ErrInternalServerError
 		}
-		if count >= int64(limit) {
+		var pendingCount int64
+		if invites, invErr := h.TeamService.GetTeamInvitations(ctx, req.TeamID); invErr == nil && invites != nil {
+			pendingCount = int64(len(*invites))
+		}
+		if count+pendingCount >= int64(limit) {
 			return echo.NewHTTPError(http.StatusPaymentRequired, "Payment Required")
 		}
 	}

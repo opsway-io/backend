@@ -179,7 +179,7 @@ func (g *Guard) ReconcilePantomathLifecycle(
 
 	team := entities.Team{PaymentPlan: plan}
 	maxProducts := entities.DefaultMonthlyQuota(entities.ProductPantomath, team.MaxEntitlementTier())
-	isPaidOverage := allowOverage && (plan == entities.PaymentPlanTeam || plan == entities.PaymentPlanEnterprise)
+	isPaidOverage := allowOverage && (plan == entities.PaymentPlanPro || plan == entities.PaymentPlanTeam || plan == entities.PaymentPlanEnterprise)
 
 	// Within limit (or Enterprise / paid overage): restore any SCHEDULED_DELETE products back to ACTIVE.
 	if maxProducts < 0 || isPaidOverage || len(allProducts) <= maxProducts {
@@ -261,7 +261,7 @@ func (g *Guard) CanAddPantomathProduct(ctx context.Context, teamID uint, product
 		return true, 0, -1
 	}
 	maxProducts = entities.DefaultMonthlyQuota(entities.ProductPantomath, team.MaxEntitlementTier())
-	isPaidOverage := team.AllowOverage && (team.PaymentPlan == entities.PaymentPlanTeam || team.PaymentPlan == entities.PaymentPlanEnterprise)
+	isPaidOverage := team.AllowOverage && (team.PaymentPlan == entities.PaymentPlanPro || team.PaymentPlan == entities.PaymentPlanTeam || team.PaymentPlan == entities.PaymentPlanEnterprise)
 
 	var rows []entities.PantomathProductLifecycle
 	g.db.WithContext(ctx).Where("team_id = ? AND status != ?", teamID, entities.PantomathStatusDeleted).Find(&rows)

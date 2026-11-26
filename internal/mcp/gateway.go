@@ -291,7 +291,26 @@ func (g *gatewayImpl) ListTools(ctx context.Context, teamID uint) []Tool {
 	return tools
 }
 
+func productForTool(toolName string) (entities.ProductSlug, bool) {
+	switch {
+	case strings.HasPrefix(toolName, "monitoring."):
+		return entities.ProductMonitoring, true
+	case strings.HasPrefix(toolName, "logs."):
+		return entities.ProductLogSearch, true
+	case strings.HasPrefix(toolName, "pantomath."):
+		return entities.ProductPantomath, true
+	default:
+		return "", false
+	}
+}
+
 func (g *gatewayImpl) CallTool(ctx context.Context, teamID uint, toolName string, args map[string]interface{}) (*ToolCallResult, error) {
+	if prod, ok := productForTool(toolName); ok && !g.isProductEnabled(ctx, teamID, prod) {
+		return textResult(map[string]interface{}{
+			"error": fmt.Sprintf("product %s is disabled for this team", prod),
+		}, true), nil
+	}
+
 	switch toolName {
 	case "monitoring.get_incident_details", "monitoring.get_incident":
 		incID := uint(getIntArg(args, "incident_id", 0))

@@ -64,11 +64,14 @@ func Register(
 	teamsGroup.DELETE("/avatar", AuthHandler(h.DeleteTeamAvatar), AllowedRoles(mw.UserRoleOwner, mw.UserRoleAdmin))
 
 	teamsGroup.GET("/config", AuthHandler(h.PostConfig), AllowedRoles(mw.UserRoleOwner, mw.UserRoleAdmin))
-	teamsGroup.POST("/create-checkout-session", AuthHandler(h.PostCreateCheckoutSession), AllowedRoles(mw.UserRoleOwner, mw.UserRoleAdmin))
+	teamsGroup.POST("/create-checkout-session", AuthHandler(h.PostCreateCheckoutSession), AllowedRoles(mw.UserRoleOwner))
 	teamsGroup.GET("/checkout-session", AuthHandler(h.GetCheckoutSession), AllowedRoles(mw.UserRoleOwner, mw.UserRoleAdmin))
-	teamsGroup.POST("/customer-portal", AuthHandler(h.PostCustomerPortal), AllowedRoles(mw.UserRoleOwner, mw.UserRoleAdmin))
+	teamsGroup.POST("/customer-portal", AuthHandler(h.PostCustomerPortal), AllowedRoles(mw.UserRoleOwner))
 	teamsGroup.GET("/customer-session", AuthHandler(h.GetCustomerSession), AllowedRoles(mw.UserRoleOwner, mw.UserRoleAdmin))
 	teamsGroup.GET("/products", AuthHandler(h.GetProducts), AllowedRoles(mw.UserRoleOwner, mw.UserRoleAdmin))
+	teamsGroup.GET("/billing/summary", AuthHandler(h.GetBillingSummary))
+	teamsGroup.POST("/billing/addons", AuthHandler(h.PostProductAddon), AllowedRoles(mw.UserRoleOwner))
+	teamsGroup.POST("/billing/resume", AuthHandler(h.PostResumeSubscription), AllowedRoles(mw.UserRoleOwner))
 
 	teamsGroup.GET("/escalation", AuthHandler(h.GetEscalationPolicy), AllowedRoles(mw.UserRoleOwner, mw.UserRoleAdmin))
 	teamsGroup.PUT("/escalation", AuthHandler(h.PutEscalationPolicy), AllowedRoles(mw.UserRoleOwner, mw.UserRoleAdmin))
